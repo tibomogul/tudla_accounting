@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html data-theme="light">
+<head>
+  <title>TudlaAccounting</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <%= csrf_meta_tags %>
+  <%= csp_meta_tag %>
+
+  <%= yield :head %>
+
+  <%#
+    The engine's Tailwind CSS is compiled into the host application's tailwind.css
+    via the @import stub in app/assets/builds/tailwind/tudla_accounting.css.
+    Referencing "tailwind" here picks up that compiled output which includes all
+    engine styles. The host app must run tailwindcss:build to generate this file.
+  %>
+  <%= stylesheet_link_tag "tailwind", media: "all" %>
+  <script>
+    (function() {
+      var t = localStorage.getItem('theme');
+      if (t) document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+</head>
+<body>
+
+<%= yield %>
+
+</body>
+</html>

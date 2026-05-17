@@ -1,0 +1,45 @@
+# spec/dummy/config/database.yml
+
+default: &default
+    adapter: postgresql
+    encoding: unicode
+    host: db
+    username: postgres
+    password: postgres
+    # For details on connection pooling, see Rails configuration guide
+    # https://guides.rubyonrails.org/configuring.html#database-pooling
+    pool: 5
+
+development:
+    primary:
+        <<: *default
+        database: development
+    cache:
+        <<: *default
+        database: development_cache
+        migrations_paths: db/cache_migrate
+    queue:
+        <<: *default
+        database: development_queue
+        migrations_paths: db/queue_migrate
+    cable:
+        <<: *default
+        database: development_cable
+        migrations_paths: db/cable_migrate
+
+test:
+    primary:
+        <<: *default
+        database: test
+    cache:
+        <<: *default
+        database: test_cache
+        migrations_paths: db/cache_migrate
+    queue:
+        <<: *default
+        database: test_queue
+        migrations_paths: db/queue_migrate
+    cable:
+        <<: *default
+        database: test_cable
+        migrations_paths: db/cable_migrate

@@ -1,0 +1,62 @@
+/* Engine CSS — pure Tailwind v4, no DaisyUI dependency */
+@import "tailwindcss";
+
+/*
+   @source Directive:
+   Explicitly tells the CLI where to look for class usage within the engine.
+   Relative path resolution:
+   app/assets/tailwind/tudla_accounting/engine.css
+   ../../../views -> app/views
+*/
+@source "../../../views";
+
+/*
+  Engine design tokens (--tc-* prefix avoids collision with DaisyUI variables).
+
+  Theme priority:
+  1. [data-theme="dark"]  — explicit DaisyUI dark theme on <html>
+  2. [data-theme="light"] — explicit DaisyUI light theme (redundant but safe)
+  3. prefers-color-scheme — OS dark mode fallback when no data-theme is set
+  4. :root defaults       — light
+*/
+
+:root {
+  --tc-bg:         oklch(0.99 0 0);
+  --tc-bg-subtle:  oklch(0.96 0 0);
+  --tc-surface:    oklch(1.00 0 0);
+  --tc-border:     oklch(0.88 0 0);
+  --tc-text:       oklch(0.15 0 0);
+  --tc-text-muted: oklch(0.48 0 0);
+  --tc-primary:    oklch(0.55 0.20 264);
+  --tc-primary-fg: oklch(0.99 0 0);
+  --tc-accent:     oklch(0.62 0.18 160);
+  --tc-code-bg:    oklch(0.94 0 0);
+}
+
+[data-theme="dark"] {
+  --tc-bg:         oklch(0.18 0.01 264);
+  --tc-bg-subtle:  oklch(0.22 0.01 264);
+  --tc-surface:    oklch(0.25 0.01 264);
+  --tc-border:     oklch(0.32 0.01 264);
+  --tc-text:       oklch(0.93 0 0);
+  --tc-text-muted: oklch(0.62 0 0);
+  --tc-primary:    oklch(0.68 0.18 264);
+  --tc-primary-fg: oklch(0.99 0 0);
+  --tc-accent:     oklch(0.72 0.16 160);
+  --tc-code-bg:    oklch(0.15 0.01 264);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --tc-bg:         oklch(0.18 0.01 264);
+    --tc-bg-subtle:  oklch(0.22 0.01 264);
+    --tc-surface:    oklch(0.25 0.01 264);
+    --tc-border:     oklch(0.32 0.01 264);
+    --tc-text:       oklch(0.93 0 0);
+    --tc-text-muted: oklch(0.62 0 0);
+    --tc-primary:    oklch(0.68 0.18 264);
+    --tc-primary-fg: oklch(0.99 0 0);
+    --tc-accent:     oklch(0.72 0.16 160);
+    --tc-code-bg:    oklch(0.15 0.01 264);
+  }
+}

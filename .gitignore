@@ -1,0 +1,10 @@
+/.bundle/
+/doc/
+/log/*.log
+/pkg/
+/tmp/
+/spec/dummy/log/*.log
+/spec/dummy/tmp/
+/spec/dummy/app/assets/builds/*
+!/spec/dummy/app/assets/builds/.keep
+coverage/

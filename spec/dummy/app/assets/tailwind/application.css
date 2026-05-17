@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+/*
+    DAISYUI
+*/
+@source not "./daisyui{,*}.mjs";
+
+@plugin "./daisyui.mjs";
+
+/* Optional for custom themes – Docs: https://daisyui.com/docs/themes/#how-to-add-a-new-custom-theme */
+@plugin "./daisyui-theme.mjs" {
+    /* custom theme here */
+}
+
+/*
+   IMPORT THE ENGINE CSS ARTIFACT
+
+   Crucial: You are importing the *built* file from the builds directory,
+   NOT the source file from the engine.
+
+   Relative Path Logic:
+   Current Dir: app/assets/tailwind/
+   Target Dir:  app/assets/builds/tailwind/
+
+   Path:../builds/tailwind/<engine_name>
+*/
+@import "../builds/tailwind/tudla_accounting";
