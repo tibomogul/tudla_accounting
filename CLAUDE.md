@@ -36,6 +36,24 @@ The dummy app uses four separate SQLite databases: `primary`, `queue`, `cache`, 
 
 **Critical:** Do NOT use both `database:` keys in `database.yml` AND `connects_to` in environment config — they conflict.
 
+### Migrations
+
+Engine migrations live at `db/migrate/` in the **engine root** (they ship with the gem). The dummy app has its own `spec/dummy/db/migrate/` for dummy-only models (e.g., `Organization`).
+
+**Always generate and run migrations from the engine root**, not from `spec/dummy/`:
+
+```bash
+docker compose exec rails bash -lc 'bin/rails generate migration AddFooToBar'   # lands in db/migrate/
+docker compose exec rails bash -lc 'bin/rails db:migrate'                       # migrates dummy app, sees both paths
+docker compose exec rails bash -lc 'RAILS_ENV=test bin/rails db:migrate'        # test DB
+```
+
+Why: Rails 8.1 does **not** auto-append engine migration paths to the host app's paths. The engine root's `bin/rails` (with `ENGINE_PATH` set) is the only context where both `db/migrate/` and `spec/dummy/db/migrate/` are visible together. Running `bin/rails db:migrate` from `spec/dummy/` will silently skip the engine migrations.
+
+### Ancestry
+
+`has_ancestry` must specify `ancestry_format: :materialized_path2` whenever the migration declares `null: false, default: "/"` on the ancestry column. The ancestry 5.x default format is `:materialized_path`, which uses `nil` for the root and crashes against a NOT NULL column.
+
 ## Testing Gotchas
 
 - Use `stub_const` for inline job classes in specs (Solid Queue requires named classes)
