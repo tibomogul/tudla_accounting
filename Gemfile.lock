@@ -2,7 +2,9 @@ PATH
   remote: .
   specs:
     tudla_accounting (0.1.0)
+      ancestry
       importmap-rails
+      money-rails
       rails (>= 8.1.1)
       solid_cable
       solid_cache
@@ -88,6 +90,9 @@ GEM
       uri (>= 0.13.1)
     addressable (2.8.9)
       public_suffix (>= 2.0.2, < 8.0)
+    ancestry (5.1.0)
+      activerecord (>= 5.2.6)
+      logger
     ast (2.4.3)
     base64 (0.3.0)
     bigdecimal (4.1.0)
@@ -156,6 +161,16 @@ GEM
     minitest (6.0.3)
       drb (~> 2.0)
       prism (~> 1.5)
+    monetize (2.0.0)
+      money (~> 7.0)
+    money (7.0.2)
+      bigdecimal
+      i18n (~> 1.9)
+    money-rails (3.0.0)
+      activesupport (>= 7.0)
+      monetize (~> 2.0)
+      money (~> 7.0)
+      railties (>= 7.0)
     net-imap (0.6.3)
       date
       net-protocol
