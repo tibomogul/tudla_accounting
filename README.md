@@ -21,7 +21,7 @@ An entry can point at a `source` record in the host app, such as the invoice it 
 `Entry.create_from_ruby_hash` builds an entry from plain data. You give account codes and **signed** amounts, and it works out whether each line is a debit or credit from the account's normal side. Positive increases the account; negative decreases it.
 
 ### Posting and balances
-`entry.post(posted_at)` posts every line to the period that contains `posted_at`, then stamps the entry. The whole post is one transaction: if any line fails, nothing is posted. Each account has one `TudlaAccounting::Balance` per period, holding starting, current and ending amounts. Posting:
+`entry.post(posted_at)` posts every line to the period that contains `posted_at`, then stamps the entry. The whole post is one transaction: if any line fails, nothing is posted. Posting an entry twice raises `ArgumentError`. Posts lock the organization's row while they run, so concurrent posts for the same organization take turns instead of overwriting each other's balance updates; other organizations aren't blocked. Each account has one `TudlaAccounting::Balance` per period, holding starting, current and ending amounts. Posting:
 - adds the amount to the balance of the deepest period containing `posted_at`, e.g. the month
 - rolls it up into every parent period (quarter, year) and every parent account
 - carries it forward into the starting amount of every later period, so back-dated entries keep later balances correct
@@ -30,6 +30,31 @@ An entry can point at a `source` record in the host app, such as the invoice it 
 After posting, `CarryingAmountProcessor` keeps track of what's still owed. Posting an entry whose source is an invoice or bill opens a `CarryingAmount` on its receivable or payable line, with a due date and any foreign-currency amount. Posting a payment or disbursement that names that entry as `related` reduces it. If money moves through a bank account held in another currency (`BankAccountBalance`), that balance is updated in its own currency.
 
 This is **off until configured**. The host app chooses which of its models count as invoices, bills, payments and disbursements, and which accounts are receivables and payables. See [Configuration](#configuration).
+
+### Entries from host-app records
+Register how each host model turns into an entry, then create entries from records:
+
+```ruby
+# config/initializers/tudla_accounting.rb
+Rails.application.config.to_prepare do
+  TudlaAccounting.register_entry_source("Invoice", ->(invoice) {
+    {
+      organization_type: "Organization", organization_id: invoice.organization_id,
+      particulars: "Invoice ##{invoice.number}",
+      transacted_at: invoice.issued_at.iso8601,
+      details: [
+        { account_code: "1100", amount: "USD #{invoice.total}" },
+        { account_code: "4000", amount: "USD #{invoice.total}" }
+      ]
+    } # return nil to skip
+  })
+end
+
+entry = TudlaAccounting.create_entry_from_source!(invoice) # linked back via source_type/source_id
+TudlaAccounting::EntryPostingJob.perform_later(entry.id)
+```
+
+`EntryPostingJob` posts the entry into the period of its `transacted_at`, on the `entry_posting` queue. With Solid Queue, only one posting job per organization runs at a time. A failed job is logged and discarded, not retried, and the entry stays unposted.
 
 ### Multi-tenancy
 Accounts, periods, entries, lines and balances all belong to a polymorphic `organization`, provided by the host app. The organization must respond to `currency`, which is the currency its books are kept in.

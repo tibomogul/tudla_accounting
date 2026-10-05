@@ -32,7 +32,7 @@ This is a **Rails engine gem** (not a standalone app). All application code live
 
 ### Multi-Database (Solid Trifecta)
 
-The dummy app uses four separate SQLite databases: `primary`, `queue`, `cache`, `cable`. Each Solid gem requires `connects_to` configuration in environment files (e.g., `config.solid_queue.connects_to = { database: { writing: :queue } }`).
+The dummy app uses four separate PostgreSQL databases (the `db` service in `docker-compose.yml`): `primary`, `queue`, `cache`, `cable`. Each Solid gem requires `connects_to` configuration in environment files (e.g., `config.solid_queue.connects_to = { database: { writing: :queue } }`).
 
 **Critical:** Do NOT use both `database:` keys in `database.yml` AND `connects_to` in environment config — they conflict.
 
@@ -61,6 +61,7 @@ Why: Rails 8.1 does **not** auto-append engine migration paths to the host app's
 - Use `TudlaAccounting::Engine.routes.url_helpers` for engine route helpers in specs
 - Use `main_app.` prefix for host app routes within engine context
 - FactoryBot factories go in `spec/factories/`, auto-loaded via engine initializer
+- `spec/integration/posting_concurrency_spec.rb` turns off transactional tests and uses real threads and PostgreSQL row locks; it deletes its own data afterwards. Any spec that holds a lock in a thread must release it in an `ensure`, or the cleanup blocks forever
 
 ## UI Development
 

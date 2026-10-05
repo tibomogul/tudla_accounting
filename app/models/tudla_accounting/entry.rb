@@ -23,6 +23,9 @@ module TudlaAccounting
       raise ArgumentError, "entry must be valid" unless valid?
 
       transaction do
+        lock_organization!
+        raise ArgumentError, "entry is already posted" if self.class.where(id: id).where.not(posted_at: nil).exists?
+
         details.each do |detail|
           detail.post(posted_at)
         end

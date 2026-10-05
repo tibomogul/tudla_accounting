@@ -19,4 +19,15 @@ RSpec.describe TudlaAccounting::Configuration do
         .to raise_error(ArgumentError, /unknown carrying amount role :recievable for Invoice/)
     end
   end
+
+  describe "#dup" do
+    it "copies the entry source registry, so the copy can change without affecting the original" do
+      config.entry_sources["Invoice"] = ->(_record) { {} }
+      copy = config.dup
+      copy.entry_sources["Bill"] = ->(_record) { {} }
+
+      expect(config.entry_sources.keys).to eq([ "Invoice" ])
+      expect(copy.entry_sources.keys).to eq([ "Invoice", "Bill" ])
+    end
+  end
 end
