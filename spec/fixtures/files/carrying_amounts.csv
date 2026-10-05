@@ -1,0 +1,4 @@
+particulars,amount,type,due_date,other_currency,other_currency_amount,transaction_rate,conversion_date
+Invoice 1001,"1,000.00",receivable,2026-01-15,,,,
+Bill 2001,500,payable,2026-01-20,,,,
+Invoice 1002 (EUR),154.00,receivable,2026-01-25,EUR,100.00,1.54,2025-12-20

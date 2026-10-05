@@ -222,6 +222,25 @@ RSpec.describe TudlaAccounting::Entry, type: :model do
       expect(TudlaAccounting::Balance.count).to eq(0)
     end
 
+    it "reads every currency code, including ones Monetize only knows by a shared symbol" do
+      %w[AUD NZD].each do |code|
+        org = create(:organization, currency: code)
+        create(:tudla_accounting_account, code: "1000", category: :asset, currency: code, organization: org)
+        create(:tudla_accounting_account, code: "4000", category: :income, currency: code, organization: org)
+
+        entry = described_class.create_from_ruby_hash(invoice_hash.merge(organization_id: org.id, details: [
+          { account_code: "1000", amount: "#{code} 1,100.00" }, { account_code: "4000", amount: "#{code} 1100" }
+        ]))
+
+        expect(entry.details.map(&:amount)).to all(eq(Money.new(1100_00, code)))
+      end
+    end
+
+    it "rejects an unknown currency code" do
+      expect { described_class.create_from_ruby_hash(with_first_detail(amount: "XYZ 10.00")) }
+        .to raise_error(ArgumentError, 'unknown currency XYZ in amount "XYZ 10.00"')
+    end
+
     it "records foreign exchange details" do
       entry = described_class.create_from_ruby_hash(invoice_hash.merge(details: [
         { account_code: "1100-EUR", amount: "USD 15400.00", fx: { other_currency_amount: "EUR 10000.00", fx_rate: "1.54" } },

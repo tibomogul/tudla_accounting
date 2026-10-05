@@ -66,7 +66,7 @@ module TudlaAccounting
         account = Account.find_by(code: detail[:account_code], organization_type: hash[:organization_type], organization_id: hash[:organization_id])
         raise ArgumentError, "invalid account_code: #{detail[:account_code]}" unless account
 
-        money = Monetize.parse(detail[:amount])
+        money = parse_money(detail[:amount])
 
         amount_positive = money.positive?
         amount_cents = money.cents.abs
@@ -91,7 +91,7 @@ module TudlaAccounting
           raise ArgumentError, "fx node must have an other_currency_amount" unless fx_hash[:other_currency_amount].present?
           raise ArgumentError, "fx node must have an fx_rate" unless fx_hash[:fx_rate].present?
 
-          other_currency_money = Monetize.parse(fx_hash[:other_currency_amount])
+          other_currency_money = parse_money(fx_hash[:other_currency_amount])
           raise ArgumentError, "fx currency does not match the account currency" unless other_currency_money.currency.iso_code == account.currency
 
           rate = BigDecimal(fx_hash[:fx_rate])
@@ -120,6 +120,20 @@ module TudlaAccounting
         create!(attributes)
       end
     end
+
+    # Parses "AUD 1,100.00" (or "1100.00" in the default currency). Monetize 2 only
+    # recognizes a currency code that is also in its symbol table, so codes such as AUD
+    # and NZD would silently fall back to the default currency; read the code here.
+    def self.parse_money(text)
+      code, number = text.to_s.strip.match(/\A([A-Za-z]{3})\s+(.+)\z/)&.captures
+      return Monetize.parse(text) unless code
+
+      currency = Money::Currency.find(code)
+      raise ArgumentError, "unknown currency #{code} in amount #{text.inspect}" unless currency
+
+      Monetize.parse(number, currency)
+    end
+    private_class_method :parse_money
 
     private
 
