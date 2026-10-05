@@ -76,63 +76,77 @@ module TudlaAccounting
     end
 
     def update_receivable_carrying_amount
-      invoice_entry = @entry.related
-      return unless invoice_entry
+      settle(IsAccountReceivableChecker, bank_sign: 1)
+    end
 
-      receivable_detail = invoice_entry.details.find { |d| IsAccountReceivableChecker.call(detail: d) }
-      return unless receivable_detail
+    def update_payable_carrying_amount
+      settle(IsAccountPayableChecker, bank_sign: -1)
+    end
 
-      carrying_amount = TudlaAccounting::CarryingAmount.find_by(detail_id: receivable_detail.id)
+    # Reduces the carrying amount of the related invoice or bill by this payment or
+    # disbursement. When it settles foreign currency, the carrying amount goes down by
+    # the book value of the foreign amount owed that it settles (at the booked rate), and
+    # the difference from the value paid for it is posted as a realized exchange gain or
+    # loss; see CarryingAmount.settlement. An overpayment is left as a credit.
+    def settle(checker, bank_sign:)
+      original_entry = @entry.related
+      return unless original_entry
+
+      original_detail = original_entry.details.find { |d| checker.call(detail: d) }
+      return unless original_detail
+
+      carrying_amount = TudlaAccounting::CarryingAmount.find_by(detail_id: original_detail.id)
       return unless carrying_amount
 
-      payment_detail = @entry.details.find { |d| IsAccountReceivableChecker.call(detail: d) }
-      return unless payment_detail
+      settlement_detail = @entry.details.find { |d| checker.call(detail: d) }
+      return unless settlement_detail
 
-      carrying_amount.amount_cents -= payment_detail.amount_cents
-
-      if carrying_amount.forex
-        payment_fx_detail = @entry.details.find(&:foreign_exchange)
-        if payment_fx_detail
-          foreign_cents = payment_fx_detail.foreign_exchange.other_currency_cents
-          carrying_amount.forex.other_currency_amount_cents -= foreign_cents
-          carrying_amount.forex.save!
-
-          adjust_foreign_bank_account_balance(foreign_cents)
-        end
+      fx_detail = carrying_amount.forex && (settlement_detail.foreign_exchange ? settlement_detail : @entry.details.find(&:foreign_exchange))
+      if fx_detail
+        forex = carrying_amount.forex
+        foreign_cents = fx_detail.foreign_exchange.other_currency_cents
+        settlement = TudlaAccounting::CarryingAmount.settlement(
+          remaining_cents: carrying_amount.amount_cents, remaining_foreign_cents: forex.other_currency_amount_cents,
+          transaction_rate: forex.transaction_rate, foreign_currency: forex.other_currency, currency: settlement_detail.currency,
+          cash_cents: settlement_detail.amount_cents, paid_foreign_cents: foreign_cents
+        )
+        carrying_amount.amount_cents -= settlement[:reduction_cents]
+        forex.update!(other_currency_amount_cents: forex.other_currency_amount_cents - foreign_cents)
+        post_realized_gain_or_loss(carrying_amount, original_entry, settlement_detail, settlement[:realized_cents])
+        adjust_foreign_bank_account_balance(bank_sign * foreign_cents)
+      else
+        carrying_amount.amount_cents -= settlement_detail.amount_cents
       end
 
       carrying_amount.save!
       carrying_amount.reload
     end
 
-    def update_payable_carrying_amount
-      bill_entry = @entry.related
-      return unless bill_entry
+    # The payment's line moved the receivable/payable by the value paid; move it by the
+    # difference so it reflects the book value settled, and recognize the difference.
+    # Without a realized_fx_gain_account_code nothing is posted (and the difference stays
+    # on the receivable/payable account).
+    def post_realized_gain_or_loss(carrying_amount, original_entry, settlement_detail, difference_cents)
+      return if difference_cents.zero?
 
-      payable_detail = bill_entry.details.find { |d| IsAccountPayableChecker.call(detail: d) }
-      return unless payable_detail
-
-      carrying_amount = TudlaAccounting::CarryingAmount.find_by(detail_id: payable_detail.id)
-      return unless carrying_amount
-
-      disbursement_detail = @entry.details.find { |d| IsAccountPayableChecker.call(detail: d) }
-      return unless disbursement_detail
-
-      carrying_amount.amount_cents -= disbursement_detail.amount_cents
-
-      if carrying_amount.forex
-        disbursement_fx_detail = @entry.details.find(&:foreign_exchange)
-        if disbursement_fx_detail
-          foreign_cents = disbursement_fx_detail.foreign_exchange.other_currency_cents
-          carrying_amount.forex.other_currency_amount_cents -= foreign_cents
-          carrying_amount.forex.save!
-
-          adjust_foreign_bank_account_balance(-foreign_cents)
-        end
+      gain_account_code = TudlaAccounting.configuration.realized_fx_gain_account_code
+      if gain_account_code.blank?
+        Rails.logger.warn("TudlaAccounting: realized_fx_gain_account_code is not set; exchange difference on #{original_entry.particulars} not posted")
+        return
       end
 
-      carrying_amount.save!
-      carrying_amount.reload
+      currency = settlement_detail.currency
+      difference = Money.new(difference_cents, currency)
+      gain = carrying_amount.payable? ? -difference : difference # paying more for a liability is a loss
+      entry = TudlaAccounting::Entry.create_from_ruby_hash(
+        organization_type: @entry.organization_type, organization_id: @entry.organization_id,
+        particulars: "Realized exchange #{gain.positive? ? 'gain' : 'loss'} on #{original_entry.particulars}",
+        transacted_at: (@entry.posted_at || @entry.transacted_at).iso8601,
+        details: [ { account_code: settlement_detail.account.code, amount: "#{currency} #{difference}" },
+                   { account_code: gain_account_code, amount: "#{currency} #{gain}" } ]
+      )
+      entry.update!(related: @entry) # no source, so posting it opens or settles nothing
+      entry.post(entry.transacted_at)
     end
 
     # Money received into / paid out of a non-base-currency bank account also

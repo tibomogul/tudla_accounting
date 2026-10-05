@@ -252,7 +252,7 @@ RSpec.describe TudlaAccounting::CarryingAmountProcessor, type: :service do
 
       carrying_amount = described_class.call(entry: disbursement_entry)
 
-      expect(carrying_amount.amount_cents).to eq(7_300_00)
+      expect(carrying_amount.amount_cents).to eq(7_500_00) # the 5,000 EUR left, at the booked 1.5
       expect(carrying_amount.forex.other_currency_amount_cents).to eq(5_000_00)
     end
 

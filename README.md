@@ -79,6 +79,7 @@ TudlaAccounting::EntryPostingJob.perform_later(entry.id)
 - **`ForexRateRetriever.call(from:, to:, date:)`** returns how many `to` one `from` was worth on a date. Rates are cached in `ForexRate`, and missing ones come from `forex_rate_provider`.
 - **`RbaForexRateProvider`** reads the Reserve Bank of Australia's published rates. It needs the `spreadsheet` gem in the host app and network access. A weekend or holiday uses the latest earlier business day.
 - **`ForexGainOrLossCalculator`** gives the gain or loss on a foreign amount of a receivable or payable between its booked rate and a date's rate.
+- **Settlement at a different rate.** When a payment or disbursement settles a foreign-currency invoice or bill, its carrying amount goes down by the book value of the foreign amount, at the rate it was booked at. The difference from the value actually paid is posted as a realized exchange gain or loss against `realized_fx_gain_account_code`, dated with the payment. Each part payment books its own share, and the final payment books what remains, so the receivable or payable ends at zero. An overpayment books a gain or loss only on what was owed, and leaves the extra as a credit. Without that setting, the carrying amount is still correct, but the difference stays on the receivable or payable account and a warning is logged.
 - **`RevaluationEntryGenerator.call(organization, period_end, next_period_start)`** revalues open foreign-currency receivables and payables at the period-end rate. It posts the unrealized gain or loss against `unrealized_fx_gain_account_code`, then posts a reversal on the next period's start, so the later settlement isn't double-counted. Running it twice for the same date does nothing more.
 
 ### Multi-tenancy
@@ -220,6 +221,7 @@ TudlaAccounting.configure do |config|
   # Foreign exchange: where missing rates come from, and where revaluation gains/losses go
   config.forex_rate_provider = TudlaAccounting::RbaForexRateProvider.new # or any ->(from:, to:, date:) { rate }
   config.unrealized_fx_gain_account_code = "4900"
+  config.realized_fx_gain_account_code = "4950"   # gains/losses when foreign invoices and bills are settled
 end
 ```
 

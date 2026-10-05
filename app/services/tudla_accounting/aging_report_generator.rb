@@ -11,8 +11,9 @@ module TudlaAccounting
   # details are keyed by related party ("ClassName_id", see the related_party_method
   # setting); totals has each bucket and :total, in the organization's currency.
   #
-  # Only invoices or bills transacted by the end of as_of_date are included, and payments
-  # posted after it are added back, so a past date shows what was owed on that day.
+  # Only invoices or bills transacted by the end of as_of_date are included, and only
+  # payments posted against them by then count, so a past date shows what was owed on
+  # that day (including foreign-currency settlements, at their booked value).
   class AgingReportGenerator
     BUCKETS = %i[current days_1_30 days_31_60 days_61_90 days_over_90].freeze
 
@@ -44,7 +45,7 @@ module TudlaAccounting
 
     def open_lines
       carrying_amounts.filter_map do |carrying_amount|
-        outstanding = Money.new(carrying_amount.amount_cents + paid_after_cents(carrying_amount), @organization.currency)
+        outstanding = Money.new(outstanding_cents(carrying_amount), @organization.currency)
         next unless outstanding.positive?
 
         days = days_outstanding(carrying_amount)
@@ -63,14 +64,42 @@ module TudlaAccounting
         .order("tudla_accounting_entries.transacted_at")
     end
 
-    # Payments (or disbursements) against this amount posted after the as-of date had
-    # already reduced it; add them back.
-    def paid_after_cents(carrying_amount)
+    # What was owed at the end of the as-of date: the amount as booked, less each payment
+    # (or disbursement) posted against it by then, settled the way the processor settles it.
+    def outstanding_cents(carrying_amount)
+      original = carrying_amount.detail
+      remaining = original.amount_cents
+      remaining_foreign = original.foreign_exchange&.other_currency_cents.to_i
+      forex = carrying_amount.forex
+
+      settlements_by_as_of(original.entry).each do |line, fx|
+        if forex && fx
+          remaining -= TudlaAccounting::CarryingAmount.settlement(
+            remaining_cents: remaining, remaining_foreign_cents: remaining_foreign, transaction_rate: forex.transaction_rate,
+            foreign_currency: forex.other_currency, currency: line.currency, cash_cents: line.amount_cents, paid_foreign_cents: fx.other_currency_cents
+          )[:reduction_cents]
+          remaining_foreign -= fx.other_currency_cents
+        else
+          remaining -= line.amount_cents
+        end
+      end
+      remaining
+    end
+
+    # [settlement line, its foreign exchange] for each receipt (or disbursement) posted
+    # against the entry by the as-of date, in order. Revaluations, which are also related
+    # to the entry, are not settlements.
+    def settlements_by_as_of(entry)
       checker = @report_type == :receivable ? IsAccountReceivableChecker : IsAccountPayableChecker
+      role = @report_type == :receivable ? :receipt : :disbursement
       TudlaAccounting::Entry
-        .where(related: carrying_amount.detail.entry).where.not(posted_at: nil).where(transacted_at: (as_of_end + 1.second)..)
-        .includes(details: :account)
-        .sum { |payment| payment.details.find { |detail| checker.call(detail: detail) }&.amount_cents.to_i }
+        .where(related: entry).where.not(posted_at: nil).where(transacted_at: ..as_of_end)
+        .includes(details: [ :account, :foreign_exchange ]).order(:transacted_at, :id)
+        .select { |payment| CarryingAmountRole.call(entry: payment) == role }
+        .filter_map do |payment|
+          line = payment.details.find { |detail| checker.call(detail: detail) }
+          [ line, line.foreign_exchange || payment.details.filter_map(&:foreign_exchange).first ] if line
+        end
     end
 
     def as_of_end
