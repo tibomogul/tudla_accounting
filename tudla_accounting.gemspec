@@ -30,6 +30,8 @@ Gem::Specification.new do |spec|
   spec.add_dependency "importmap-rails"
   spec.add_dependency "money-rails"
   spec.add_dependency "ancestry"
+  spec.add_dependency "csv"  # no longer a default gem from Ruby 3.4
+  spec.add_dependency "roo"  # XLSX chart of accounts import
 
   # Development Dependencies
   # These are used only for running the engine's test suite.

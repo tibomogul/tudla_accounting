@@ -31,6 +31,13 @@ After posting, `CarryingAmountProcessor` keeps track of what's still owed. Posti
 
 This is **off until configured**. The host app chooses which of its models count as invoices, bills, payments and disbursements, and which accounts are receivables and payables. See [Configuration](#configuration).
 
+### Setting up the books
+- **`AccountsCreator.call(nested_accounts, organization)`** creates a chart of accounts from nested hashes (`code`, `name`, `category`, optional `currency` and `contra_account`, `children`), all or nothing.
+- **`StartingBalanceCreator.call(organization, date, nodes, currency)`** sets opening balances in the first period at every level, e.g. the first month of the first year. Each parent's amount must equal the sum of its children's.
+- **`CsvLoader` / `XlsxLoader.call(organization, file, date)`** do both from a spreadsheet with the columns `Account Code`, `Account Name`, `Account Type`, `Contra Code`, `Starting Balance`, `Parent Account Code`. See `spec/fixtures/files/coa_saas_services.csv` for an example.
+
+Opening balances are signed the natural way for each category, so a contra account such as accumulated depreciation is entered as a negative amount. The engine stores it on the contra account's own side, so later posting adds to it. Reloading over existing accounts or balances needs `overwrite_mode` (the last argument); any later balances that already exist move by the same amount.
+
 ### Entries from host-app records
 Register how each host model turns into an entry, then create entries from records:
 

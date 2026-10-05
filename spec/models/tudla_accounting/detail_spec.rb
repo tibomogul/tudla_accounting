@@ -197,4 +197,24 @@ RSpec.describe TudlaAccounting::Detail, type: :model do
       end
     end
   end
+
+  describe "#post after a month with no activity" do
+    let(:organization) { create(:organization) }
+    let(:account) { create(:tudla_accounting_account, category: :asset, organization: organization) }
+    let(:entry) { create(:tudla_accounting_entry, organization: organization) }
+    let!(:year) { TudlaAccounting::PeriodCreator.call(organization, 2026) }
+
+    it "carries the earlier month's balance into the next month that has activity" do
+      [ [ 100_00, Time.zone.local(2026, 1, 15) ], [ 50_00, Time.zone.local(2026, 3, 15) ] ].each do |cents, at|
+        create(:tudla_accounting_detail, entry: entry, organization: organization, account: account, amount_cents: cents, tally: :debit).post(at)
+      end
+
+      jan, feb, mar = year.children.order(:from_date).first(3)
+      balance = ->(period) { TudlaAccounting::Balance.find_by(account: account, period: period) }
+
+      expect(balance.call(feb)).to be_nil
+      expect(balance.call(mar)).to have_attributes(starting_amount: Money.new(100_00, "USD"), ending_amount: Money.new(150_00, "USD"))
+      expect(balance.call(jan).ending_amount).to eq(Money.new(100_00, "USD"))
+    end
+  end
 end

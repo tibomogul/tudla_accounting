@@ -88,19 +88,19 @@ module TudlaAccounting
         return balance if balance
 
         org = period.organization
-        same_level_periods = period.root.subtree.at_depth(period.depth)
-        closest_left_period = same_level_periods.where("from_date < ?", period.from_date).order(:from_date).last
+        # The account's most recent balance in an earlier period at the same level.
+        # Periods without activity have no balance, so this may be several periods
+        # back (e.g. January when nothing was posted in February).
+        earlier_periods = period.root.subtree.at_depth(period.depth).where("from_date < ?", period.from_date)
+        latest_earlier_balance = where(account: account, period: earlier_periods)
+          .joins(:period).order(TudlaAccounting::Period.arel_table[:from_date].desc).first
 
-        starting_amount = if closest_left_period
-          sibling_balance = find_by(account: account, period: closest_left_period)
-          sibling_balance&.ending_amount || Money.new(0, org.currency)
+        starting_amount = if latest_earlier_balance
+          latest_earlier_balance.ending_amount
+        elsif period.has_parent?
+          get(account, period.parent).starting_amount
         else
-          if period.has_parent?
-            parent_balance = get(account, period.parent)
-            parent_balance.starting_amount
-          else
-            Money.new(0, org.currency)
-          end
+          Money.new(0, org.currency)
         end
 
         create!(

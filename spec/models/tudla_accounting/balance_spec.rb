@@ -149,6 +149,24 @@ RSpec.describe TudlaAccounting::Balance, type: :model do
 
         expect(described_class.get(asset, apr).starting_amount).to eq(usd(300_00))
       end
+
+      it "skips earlier periods that have no balance and starts from the latest one that does" do
+        jan = create(:tudla_accounting_period, organization: organization, parent: q1, from_date: Date.new(2026, 1, 1), thru_date: Date.new(2026, 1, 31).end_of_day)
+        create(:tudla_accounting_period, organization: organization, parent: q1, from_date: Date.new(2026, 2, 1), thru_date: Date.new(2026, 2, 28).end_of_day)
+        mar = create(:tudla_accounting_period, organization: organization, parent: q1, from_date: Date.new(2026, 3, 1), thru_date: Date.new(2026, 3, 31).end_of_day)
+        create(:tudla_accounting_balance, account: asset, period: jan, organization: organization,
+                                          starting_amount_cents: 0, current_amount_cents: 100_00, ending_amount_cents: 100_00)
+
+        expect(described_class.get(asset, mar)).to have_attributes(starting_amount: usd(100_00), ending_amount: usd(100_00))
+      end
+
+      it "ignores the account's balances in other period trees" do
+        other_year = create(:tudla_accounting_period, organization: organization, from_date: Date.new(2025, 1, 1), thru_date: Date.new(2025, 12, 31).end_of_day)
+        create(:tudla_accounting_balance, account: asset, period: other_year, organization: organization,
+                                          starting_amount_cents: 0, current_amount_cents: 500_00, ending_amount_cents: 500_00)
+
+        expect(described_class.get(asset, year).starting_amount).to eq(usd(0))
+      end
     end
   end
 end
