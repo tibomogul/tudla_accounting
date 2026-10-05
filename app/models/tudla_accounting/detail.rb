@@ -23,6 +23,8 @@ module TudlaAccounting
 
     monetize :amount_cents, with_model_currency: :currency
 
+    validates :amount_cents, numericality: { greater_than: 0, message: "must be more than zero" }
+
     scope :debits, -> { where(tally: TALLY_DEBIT) }
     scope :credits, -> { where(tally: TALLY_CREDIT) }
 

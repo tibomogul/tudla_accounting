@@ -8,15 +8,69 @@ module TudlaAccounting
 
     has_many :details, dependent: :destroy, class_name: "TudlaAccounting::Detail"
 
-    accepts_nested_attributes_for :details
+    REVERSAL_PREFIX = "Reversal of: ".freeze
+
+    accepts_nested_attributes_for :details, allow_destroy: true
 
     validates :particulars, presence: true
     validate :has_one_currency?
     validate :has_credit_amounts?
     validate :has_debit_amounts?
     validate :amounts_cancel?
+    validate :unchanged_once_posted, on: :update
 
-    before_validation :set_detail_organizations, on: :create
+    before_validation :set_detail_organizations
+    before_destroy :ensure_draft, prepend: true
+
+    def posted?
+      posted_at.present?
+    end
+
+    def draft?
+      !posted?
+    end
+
+    # The posted entry that reverses this one, if any.
+    def reversal
+      self.class.where(related: self).where("particulars LIKE ?", "#{REVERSAL_PREFIX}%").first
+    end
+
+    # Opened a receivable or payable, or settled one. Reversing those needs the
+    # receivable or payable reopened or closed too, so they can't simply be reversed.
+    def linked_to_carrying_amounts?
+      details.any? { |detail| detail.carrying_amount.present? } ||
+        %i[receipt disbursement].include?(CarryingAmountRole.call(entry: self))
+    end
+
+    # Why reverse! would be refused, or nil if it can be reversed.
+    def reversal_blocker
+      if draft? then "Only a posted entry can be reversed"
+      elsif reversal then "This entry has already been reversed"
+      elsif linked_to_carrying_amounts? then "Entries that open or settle receivables or payables can't be reversed here"
+      end
+    end
+
+    # Posts an entry on `on` (a date) with every line on the other side, linked back to
+    # this one, and returns it.
+    def reverse!(on:)
+      blocker = reversal_blocker
+      raise ArgumentError, blocker if blocker
+
+      at = ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].local(on.year, on.month, on.day)
+      transaction do
+        reversing = self.class.new(organization: organization, related: self, transacted_at: at,
+                                   particulars: "#{REVERSAL_PREFIX}#{particulars}")
+        details.each do |detail|
+          line = reversing.details.build(account: detail.account, amount_cents: detail.amount_cents, currency: detail.currency,
+                                         tally: detail.debit? ? Detail::TALLY_CREDIT : Detail::TALLY_DEBIT)
+          fx = detail.foreign_exchange
+          line.build_foreign_exchange(other_currency: fx.other_currency, other_currency_cents: fx.other_currency_cents, rate: fx.rate) if fx
+        end
+        reversing.save!
+        reversing.post(at)
+        reversing
+      end
+    end
 
     def post(posted_at)
       raise ArgumentError, "posted_at must be a datetime" unless posted_at.is_a?(Time) || posted_at.is_a?(ActiveSupport::TimeWithZone)
@@ -137,16 +191,37 @@ module TudlaAccounting
 
     private
 
+    # Lines that will remain once saved (not those being removed while editing).
+    def live_details
+      details.reject(&:marked_for_destruction?)
+    end
+
     def debit_amounts
-      details.inject([]) { |arr, x| x.debit? ? arr << x : arr }
+      live_details.select(&:debit?)
     end
 
     def credit_amounts
-      details.inject([]) { |arr, x| x.credit? ? arr << x : arr }
+      live_details.select(&:credit?)
     end
 
     def has_one_currency?
-      details.map(&:currency).uniq.count == 1
+      errors.add(:base, "All lines must be in the same currency") if live_details.map(&:currency).uniq.count > 1
+    end
+
+    # Posted entries are part of the books: correct them by reversing, not editing.
+    def unchanged_once_posted
+      return unless posted_at_was.present?
+
+      edited = (changed - %w[posted_at related_id related_type updated_at]).any? ||
+               details.any? { |detail| detail.new_record? || detail.marked_for_destruction? || detail.changed? }
+      errors.add(:base, "A posted entry can't be changed; reverse it instead") if edited
+    end
+
+    def ensure_draft
+      return if draft?
+
+      errors.add(:base, "A posted entry can't be deleted; reverse it instead")
+      throw :abort
     end
 
     def has_credit_amounts?
@@ -158,6 +233,8 @@ module TudlaAccounting
     end
 
     def amounts_cancel?
+      return if live_details.map(&:currency).uniq.count > 1 # can't add up; has_one_currency? reports it
+
       errors.add(:base, "The credit and debit amounts are not equal") if difference_of_amounts != 0
     end
 

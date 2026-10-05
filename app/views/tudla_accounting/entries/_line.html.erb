@@ -1,0 +1,17 @@
+<%# locals: (detail:, index:, account_options:) %>
+<% name = ->(field) { "entry[lines][#{index}][#{field}]" } %>
+<tr data-entry-lines-target="line" <%= "hidden" if detail.marked_for_destruction? %>>
+  <td class="min-w-64">
+    <% if detail.persisted? %><input type="hidden" name="<%= name.call(:id) %>" value="<%= detail.id %>"><% end %>
+    <input type="hidden" name="<%= name.call(:_destroy) %>" value="<%= detail.marked_for_destruction? ? 1 : 0 %>" data-entry-lines-target="destroy">
+    <%= select_tag name.call(:account_id), options_for_select(account_options, detail.account_id), include_blank: "Choose an account",
+                   class: "tc-input", aria: { label: "Account" } %>
+  </td>
+  <td><%= text_field_tag name.call(:debit), entry_line_amount(detail, "debit"), inputmode: "decimal", class: "tc-input tc-num",
+                         aria: { label: "Debit" }, data: { entry_lines_target: "debit", action: "input->entry-lines#recalculate" } %></td>
+  <td><%= text_field_tag name.call(:credit), entry_line_amount(detail, "credit"), inputmode: "decimal", class: "tc-input tc-num",
+                         aria: { label: "Credit" }, data: { entry_lines_target: "credit", action: "input->entry-lines#recalculate" } %></td>
+  <td class="text-right">
+    <button type="button" class="tc-btn tc-btn-ghost tc-btn-sm" data-action="entry-lines#remove" aria-label="Remove line">✕</button>
+  </td>
+</tr>

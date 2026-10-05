@@ -8,9 +8,11 @@
    app/assets/tailwind/tudla_accounting/engine.css
    ../../../views   -> app/views
    ../../../helpers -> app/helpers (helpers that build markup)
+   ../../../javascript -> app/javascript (Stimulus controllers that set classes)
 */
 @source "../../../views";
 @source "../../../helpers";
+@source "../../../javascript";
 
 /*
   Engine design tokens (--tc-* prefix avoids collision with DaisyUI variables).
@@ -139,9 +141,11 @@
 
   .tc-label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem; }
   .tc-input {
-    display: block; width: 100%; padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 0.875rem;
+    display: block; width: 100%; padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 0.875rem; line-height: 1.25rem;
     background: var(--tc-surface); color: var(--tc-text); border: 1px solid var(--tc-border);
   }
+  /* Text inputs and selects render at different natural heights; give single-line fields one height. */
+  input.tc-input, select.tc-input { height: 2.375rem; padding-top: 0; padding-bottom: 0; }
   .tc-input:focus { outline: 2px solid var(--tc-primary); outline-offset: 0; border-color: transparent; }
   .tc-input-error { border-color: var(--tc-danger); }
   .tc-hint { font-size: 0.75rem; color: var(--tc-text-muted); margin-top: 0.25rem; }

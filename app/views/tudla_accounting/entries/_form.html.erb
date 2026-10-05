@@ -1,0 +1,52 @@
+<%# locals: (entry:) %>
+<% currency = Money::Currency.new(accounting_organization.currency) %>
+<% account_options = organization_accounts.map { |account| [ account.code_with_name, account.id ] } %>
+<%= form_with model: entry, scope: :entry, url: (entry.persisted? ? entry_path(entry) : entries_path),
+              class: "space-y-4", data: { controller: "entry-lines", entry_lines_exponent_value: currency.exponent } do |form| %>
+  <% if entry.errors.any? %>
+    <div class="tc-alert tc-alert-danger" role="alert">
+      <ul class="list-disc pl-4"><% entry.errors.full_messages.uniq.each do |message| %><li><%= message %></li><% end %></ul>
+    </div>
+  <% end %>
+
+  <div class="tc-card tc-card-body grid gap-4 sm:grid-cols-4">
+    <div class="sm:col-span-3"><%= tc_field form, :particulars, required: true, placeholder: "What the entry records" %></div>
+    <div class="space-y-1">
+      <%= form.label :transacted_at, "Date", class: "tc-label" %>
+      <%= form.date_field :transacted_at, value: entry.transacted_at&.to_date, class: "tc-input", required: true %>
+    </div>
+  </div>
+
+  <div class="tc-card overflow-x-auto">
+    <table class="tc-table">
+      <thead>
+        <tr><th>Account</th><th class="tc-num">Debit (<%= currency.iso_code %>)</th><th class="tc-num">Credit (<%= currency.iso_code %>)</th><th><span class="sr-only">Remove</span></th></tr>
+      </thead>
+      <tbody data-entry-lines-target="lines">
+        <% entry.details.each_with_index do |detail, index| %>
+          <%= render "line", detail: detail, index: index, account_options: account_options %>
+        <% end %>
+      </tbody>
+      <tfoot>
+        <tr class="font-semibold">
+          <td>
+            <button type="button" class="tc-btn tc-btn-secondary tc-btn-sm" data-action="entry-lines#add">Add line</button>
+          </td>
+          <td class="tc-num" data-entry-lines-target="debitTotal"></td>
+          <td class="tc-num" data-entry-lines-target="creditTotal"></td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  <p data-entry-lines-target="status" aria-live="polite" class="text-sm"></p>
+
+  <template data-entry-lines-target="template">
+    <%= render "line", detail: TudlaAccounting::Detail.new, index: "NEW_LINE", account_options: account_options %>
+  </template>
+
+  <div class="flex gap-2">
+    <%= form.submit "Save draft", class: "tc-btn" %>
+    <%= link_to "Cancel", (entry.persisted? ? entry_path(entry) : entries_path), class: "tc-btn tc-btn-secondary" %>
+  </div>
+<% end %>

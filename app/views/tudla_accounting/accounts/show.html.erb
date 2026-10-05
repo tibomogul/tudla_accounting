@@ -81,7 +81,7 @@
         <% @ledger[:page].records.each do |row| %>
           <tr>
             <td class="whitespace-nowrap"><%= tc_date(row[:line].entry.posted_at) %></td>
-            <td><%= row[:line].entry.particulars %></td>
+            <td><%= link_to row[:line].entry.particulars, entry_path(row[:line].entry) %></td>
             <% if @account.children.any? %><td class="font-mono"><%= link_to row[:line].account.code, account_path(row[:line].account) %></td><% end %>
             <td class="tc-num"><%= tc_money(row[:debit]) %></td>
             <td class="tc-num"><%= tc_money(row[:credit]) %></td>

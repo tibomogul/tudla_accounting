@@ -297,4 +297,98 @@ RSpec.describe TudlaAccounting::Entry, type: :model do
       end
     end
   end
+
+  describe "drafts, posting and reversal" do
+    let(:organization) { create(:organization, currency: "USD") }
+    let!(:year) { TudlaAccounting::PeriodCreator.call(organization, 2026) }
+    let(:cash) { create(:tudla_accounting_account, code: "1000", category: :asset, organization: organization) }
+    let(:capital) { create(:tudla_accounting_account, code: "3000", category: :equity, organization: organization) }
+
+    def draft(cents = 100_00)
+      entry = build(:tudla_accounting_entry, organization: organization, particulars: "Capital", transacted_at: Time.zone.local(2026, 2, 1))
+      entry.details.build(account: cash, tally: :debit, amount_cents: cents, currency: "USD")
+      entry.details.build(account: capital, tally: :credit, amount_cents: cents, currency: "USD")
+      entry.tap(&:save!)
+    end
+
+    def cash_balance = TudlaAccounting::Balance.peek(cash, year).ending_amount_cents
+
+    it "is a draft until posted" do
+      entry = draft
+      expect([ entry.draft?, entry.posted? ]).to eq([ true, false ])
+      entry.post(entry.transacted_at)
+      expect([ entry.draft?, entry.posted? ]).to eq([ false, true ])
+    end
+
+    it "needs every line above zero and in one currency" do
+      expect(build(:tudla_accounting_detail, amount_cents: 0).tap(&:validate).errors[:amount_cents]).to eq([ "must be more than zero" ])
+
+      entry = draft
+      entry.details.first.currency = "EUR"
+      expect(entry).not_to be_valid
+      expect(entry.errors[:base]).to include("All lines must be in the same currency")
+    end
+
+    it "leaves lines being removed out of the balance check" do
+      entry = draft
+      entry.details.build(account: cash, tally: :debit, amount_cents: 50_00, currency: "USD")
+      expect(entry).not_to be_valid
+      entry.details.last.mark_for_destruction
+      expect(entry).to be_valid
+    end
+
+    it "can't be changed or deleted once posted" do
+      entry = draft
+      entry.post(entry.transacted_at)
+
+      expect(entry.update(particulars: "Changed")).to be(false)
+      expect(entry.errors[:base]).to eq([ "A posted entry can't be changed; reverse it instead" ])
+      entry.reload.details.to_a.first.amount_cents = 1
+      expect(entry).not_to be_valid
+      expect(entry.reload.destroy).to be(false)
+      expect(entry.errors[:base]).to include("A posted entry can't be deleted; reverse it instead")
+    end
+
+    it "is reversed by a posted mirror entry on the given date" do
+      entry = draft
+      entry.post(entry.transacted_at)
+
+      reversal = entry.reverse!(on: Date.new(2026, 3, 1))
+
+      expect(reversal).to have_attributes(particulars: "Reversal of: Capital", related: entry, posted_at: Time.zone.local(2026, 3, 1))
+      expect(reversal.details.map { |line| [ line.account.code, line.tally, line.amount_cents ] }).to contain_exactly([ "1000", "credit", 100_00 ], [ "3000", "debit", 100_00 ])
+      expect(entry.reversal).to eq(reversal)
+      expect(cash_balance).to eq(0)
+    end
+
+    it "mirrors foreign exchange on reversed lines" do
+      entry = draft
+      entry.details.first.build_foreign_exchange(other_currency: "EUR", other_currency_cents: 60_00, rate: BigDecimal("1.6667"))
+      entry.save!
+      entry.post(entry.transacted_at)
+
+      fx = entry.reverse!(on: Date.new(2026, 3, 1)).details.find(&:credit?).foreign_exchange
+      expect(fx).to have_attributes(other_currency: "EUR", other_currency_cents: 60_00, rate: BigDecimal("1.6667"))
+    end
+
+    it "says why it can't be reversed" do
+      entry = draft
+      expect(entry.reversal_blocker).to eq("Only a posted entry can be reversed")
+      expect { entry.reverse!(on: Date.new(2026, 3, 1)) }.to raise_error(ArgumentError, "Only a posted entry can be reversed")
+
+      entry.post(entry.transacted_at)
+      expect(entry.reversal_blocker).to be_nil
+      entry.reverse!(on: Date.new(2026, 3, 1))
+      expect(entry.reversal_blocker).to eq("This entry has already been reversed")
+    end
+
+    it "won't reverse an entry linked to a receivable or payable" do
+      entry = draft
+      entry.post(entry.transacted_at)
+      create(:tudla_accounting_carrying_amount, detail: entry.details.first, related_party: organization)
+
+      expect(entry.reload.linked_to_carrying_amounts?).to be(true)
+      expect(entry.reversal_blocker).to eq("Entries that open or settle receivables or payables can't be reversed here")
+    end
+  end
 end

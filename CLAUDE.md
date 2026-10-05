@@ -91,6 +91,8 @@ docker compose exec rails bash -lc 'cd spec/dummy && bundle exec rails tailwindc
 
 Always rebuild after adding new Tailwind classes to engine views — Tailwind v4 scans source files at build time.
 
+`bin/dev`'s watcher rebuilds automatically for changes to engine views, helpers and JavaScript, but **not** for edits to `engine.css` itself (it is imported by absolute path from outside the dummy app, so the watcher doesn't track it), and it only picks up new `@source` directories when it starts. After editing `engine.css`, run the build command above (or restart `bin/dev`).
+
 ### Engine layout CSS reference
 
 The engine layout (`app/views/layouts/tudla_accounting/application.html.erb`) uses:

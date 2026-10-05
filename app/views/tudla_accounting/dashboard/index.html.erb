@@ -11,7 +11,7 @@
   </div>
   <div class="tc-card tc-card-body">
     <p class="tc-stat-label">Draft entries</p>
-    <p class="tc-stat-value"><%= @draft_count %></p>
+    <p class="tc-stat-value"><%= link_to @draft_count, entries_path(status: "draft") %></p>
   </div>
   <div class="tc-card tc-card-body">
     <p class="tc-stat-label">Current period</p>

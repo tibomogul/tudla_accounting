@@ -11,7 +11,9 @@ export default class extends Controller {
     event.preventDefault()
     this.element.dataset.confirmed = "true"
     const button = this.element.querySelector("[type=submit]")
-    button.textContent = `${this.messageValue} Click again to confirm`
+    const label = `${this.messageValue} Click again to confirm`
+    if (button.tagName === "INPUT") button.value = label // <input type=submit>: its label is its value
+    else button.textContent = label
     button.setAttribute("aria-live", "polite")
   }
 }

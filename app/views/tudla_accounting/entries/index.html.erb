@@ -1,0 +1,35 @@
+<%= tc_page_header "Entries", subtitle: "Journal entries, newest first" do %>
+  <%= link_to "New entry", new_entry_path, class: "tc-btn" %>
+<% end %>
+
+<%= form_with url: entries_path, method: :get, class: "tc-card tc-card-body mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-6 items-end" do |form| %>
+  <div class="lg:col-span-2"><%= form.label :q, "Particulars", class: "tc-label" %><%= form.search_field :q, value: params[:q], class: "tc-input", placeholder: "Search…" %></div>
+  <div><%= form.label :status, "Status", class: "tc-label" %><%= form.select :status, [ [ "All", "" ], [ "Drafts", "draft" ], [ "Posted", "posted" ] ], { selected: params[:status] }, class: "tc-input" %></div>
+  <div><%= form.label :from, "From", class: "tc-label" %><%= form.date_field :from, value: params[:from], class: "tc-input" %></div>
+  <div><%= form.label :thru, "To", class: "tc-label" %><%= form.date_field :thru, value: params[:thru], class: "tc-input" %></div>
+  <div><%= form.label :account_id, "Account", class: "tc-label" %><%= form.select :account_id, [ [ "Any", "" ] ] + organization_accounts.map { |account| [ account.code_with_name, account.id ] }, { selected: params[:account_id] }, class: "tc-input" %></div>
+  <div class="flex gap-2 lg:col-span-6">
+    <%= form.submit "Filter", class: "tc-btn tc-btn-secondary", name: nil %>
+    <%= link_to "Clear", entries_path, class: "tc-btn tc-btn-ghost" %>
+  </div>
+<% end %>
+
+<div class="tc-card overflow-x-auto">
+  <table class="tc-table">
+    <thead><tr><th>Date</th><th>Particulars</th><th>Status</th><th class="tc-num">Amount</th></tr></thead>
+    <tbody>
+      <% if @page.records.empty? %>
+        <tr><td colspan="4" class="tc-muted text-center">No entries<%= " match" if params.values_at(:q, :status, :from, :thru, :account_id).any?(&:present?) %>.</td></tr>
+      <% end %>
+      <% @page.records.each do |entry| %>
+        <tr>
+          <td class="whitespace-nowrap"><%= tc_date(entry.transacted_at) %></td>
+          <td><%= link_to entry.particulars, entry_path(entry) %></td>
+          <td><%= entry_status_badge(entry) %></td>
+          <td class="tc-num"><%= tc_money(entry_total(entry)) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+<%= render "tudla_accounting/shared/pagination", paginator: @page %>
