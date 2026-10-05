@@ -1,4 +1,4 @@
 # Procfile.dev
 web: cd spec/dummy && bin/rails server -p 3000 -b 0.0.0.0
-css: cd spec/dummy && bin/rails tailwindcss:watch
+css: cd spec/dummy && bin/rails tailwindcss:watch[always]
 worker: cd spec/dummy && bin/jobs start
