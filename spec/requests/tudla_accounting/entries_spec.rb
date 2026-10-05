@@ -240,16 +240,35 @@ RSpec.describe "Entries", type: :request do
   context "with receivables" do
     include_context "with entry source models"
 
-    it "explains that an invoice can't be reversed here" do
+    let(:invoice) do
       TudlaAccounting.configuration.receivable_account_code = "1010"
-      invoice = build(:tudla_accounting_entry, organization: organization, particulars: "Invoice", transacted_at: on(3), source: Invoice.create!)
-      invoice.details.build(account: account("1010"), tally: :debit, amount_cents: 100, currency: "AUD", organization: organization)
-      invoice.details.build(account: account("4000"), tally: :credit, amount_cents: 100, currency: "AUD", organization: organization)
-      invoice.save!
-      invoice.post(invoice.transacted_at)
+      record = build(:tudla_accounting_entry, organization: organization, particulars: "Invoice", transacted_at: on(3), source: Invoice.create!)
+      record.details.build(account: account("1010"), tally: :debit, amount_cents: 100, currency: "AUD", organization: organization)
+      record.details.build(account: account("4000"), tally: :credit, amount_cents: 100, currency: "AUD", organization: organization)
+      record.save!
+      record.post(record.transacted_at)
+      record
+    end
+
+    it "reverses an unpaid invoice, closing its receivable" do
+      get routes.entry_path(invoice)
+      expect(response.body).to include("From Invoice", "Reverse on")
+
+      post routes.reverse_entry_path(invoice), params: { on: on(4).to_date.iso8601 }
+      expect(flash[:notice]).to start_with("Entry reversed on")
+      expect(invoice.details.filter_map(&:carrying_amount).first.reload.amount_cents).to eq(0)
+    end
+
+    it "asks for the payments to be reversed first" do
+      payment = build(:tudla_accounting_entry, organization: organization, particulars: "Payment", transacted_at: on(3, 20),
+                                               source: Payment.create!, related: invoice)
+      payment.details.build(account: account("1010"), tally: :credit, amount_cents: 40, currency: "AUD", organization: organization)
+      payment.details.build(account: account("3000"), tally: :debit, amount_cents: 40, currency: "AUD", organization: organization)
+      payment.save!
+      payment.post(payment.transacted_at)
 
       get routes.entry_path(invoice)
-      expect(response.body).to include("From Invoice", "Entries that open or settle receivables or payables can&#39;t be reversed here.")
+      expect(response.body).to include("Reverse the payments against it first.")
       expect(response.body).not_to include("Reverse on")
     end
   end

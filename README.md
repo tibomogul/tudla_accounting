@@ -91,7 +91,7 @@ Mounted at `/tudla_accounting` (see [Integration](#integration-into-a-host-appli
 
 - **Dashboard:** profit this year, what is owed each way, draft entries, recent entries, and a getting-started checklist.
 - **Accounts:** the chart of accounts as a tree with closing balances. Each account page shows monthly balances and a ledger with running balances. You can create, edit and delete unused accounts.
-- **Entries:** search and filter entries, write drafts with a line editor that keeps live debit/credit totals, post them, and reverse posted entries.
+- **Entries:** search and filter entries, write drafts with a line editor that keeps live debit/credit totals, post them, and reverse posted entries. Reversing a payment restores the receivable or payable it settled and reverses its realized exchange difference. An invoice or bill can be reversed once its payments are, which closes its receivable or payable.
 - **Reports:** balance sheet, profit and loss, trial balance, and receivables and payables aging.
 - **Periods:** create calendar or fiscal years, and see each year's months.
 - **Setup:** upload a chart of accounts with opening balances (CSV or Excel), import the receivables and payables open at the cut-over, and run the foreign exchange revaluation.

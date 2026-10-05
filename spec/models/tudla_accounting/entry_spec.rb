@@ -382,13 +382,15 @@ RSpec.describe TudlaAccounting::Entry, type: :model do
       expect(entry.reversal_blocker).to eq("This entry has already been reversed")
     end
 
-    it "won't reverse an entry linked to a receivable or payable" do
+    it "closes a receivable it opened when reversed" do
       entry = draft
       entry.post(entry.transacted_at)
-      create(:tudla_accounting_carrying_amount, detail: entry.details.first, related_party: organization)
+      carrying = create(:tudla_accounting_carrying_amount, detail: entry.details.first, related_party: organization, amount_cents: 100_00)
 
-      expect(entry.reload.linked_to_carrying_amounts?).to be(true)
-      expect(entry.reversal_blocker).to eq("Entries that open or settle receivables or payables can't be reversed here")
+      expect(entry.reload.opens_carrying_amount?).to be(true)
+      expect(entry.reversal_blocker).to be_nil
+      entry.reverse!(on: Date.new(2026, 3, 1))
+      expect(carrying.reload.amount_cents).to eq(0)
     end
   end
 end

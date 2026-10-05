@@ -64,42 +64,9 @@ module TudlaAccounting
         .order("tudla_accounting_entries.transacted_at")
     end
 
-    # What was owed at the end of the as-of date: the amount as booked, less each payment
-    # (or disbursement) posted against it by then, settled the way the processor settles it.
+    # What was owed at the end of the as-of date; see CarryingAmount#outstanding.
     def outstanding_cents(carrying_amount)
-      original = carrying_amount.detail
-      remaining = original.amount_cents
-      remaining_foreign = original.foreign_exchange&.other_currency_cents.to_i
-      forex = carrying_amount.forex
-
-      settlements_by_as_of(original.entry).each do |line, fx|
-        if forex && fx
-          remaining -= TudlaAccounting::CarryingAmount.settlement(
-            remaining_cents: remaining, remaining_foreign_cents: remaining_foreign, transaction_rate: forex.transaction_rate,
-            foreign_currency: forex.other_currency, currency: line.currency, cash_cents: line.amount_cents, paid_foreign_cents: fx.other_currency_cents
-          )[:reduction_cents]
-          remaining_foreign -= fx.other_currency_cents
-        else
-          remaining -= line.amount_cents
-        end
-      end
-      remaining
-    end
-
-    # [settlement line, its foreign exchange] for each receipt (or disbursement) posted
-    # against the entry by the as-of date, in order. Revaluations, which are also related
-    # to the entry, are not settlements.
-    def settlements_by_as_of(entry)
-      checker = @report_type == :receivable ? IsAccountReceivableChecker : IsAccountPayableChecker
-      role = @report_type == :receivable ? :receipt : :disbursement
-      TudlaAccounting::Entry
-        .where(related: entry).where.not(posted_at: nil).where(transacted_at: ..as_of_end)
-        .includes(details: [ :account, :foreign_exchange ]).order(:transacted_at, :id)
-        .select { |payment| CarryingAmountRole.call(entry: payment) == role }
-        .filter_map do |payment|
-          line = payment.details.find { |detail| checker.call(detail: detail) }
-          [ line, line.foreign_exchange || payment.details.filter_map(&:foreign_exchange).first ] if line
-        end
+      carrying_amount.outstanding(as_of: as_of_end)[:cents]
     end
 
     def as_of_end
