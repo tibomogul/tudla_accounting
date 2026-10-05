@@ -1,0 +1,16 @@
+<%= tc_page_header "Profit and loss", subtitle: (@period ? "#{tc_date(@period.from_date)} to #{tc_date(@period.thru_date)}" : nil) do %>
+  <% if @period %><%= render "period_picker", url: reports_profit_and_loss_path, period: @period %><% end %>
+<% end %>
+
+<% if @report.nil? %>
+  <%= render "no_periods" %>
+<% else %>
+  <div class="space-y-6">
+    <%= render "section", report: @report, category: "income" %>
+    <%= render "section", report: @report, category: "expense" %>
+    <div class="tc-card tc-card-body flex items-center justify-between font-semibold text-lg">
+      <span><%= @report.net_profit.negative? ? "Net loss" : "Net profit" %></span>
+      <span class="tc-num" data-total="net_profit"><%= tc_money(@report.net_profit) %></span>
+    </div>
+  </div>
+<% end %>

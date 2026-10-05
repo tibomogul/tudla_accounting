@@ -1,0 +1,29 @@
+<%= tc_page_header "Balance sheet", subtitle: (@period ? "As at #{tc_date(@period.thru_date)}" : nil) do %>
+  <% if @period %><%= render "period_picker", url: reports_balance_sheet_path, period: @period, label: "As at the end of" %><% end %>
+<% end %>
+
+<% if @report.nil? %>
+  <%= render "no_periods" %>
+<% else %>
+  <div class="mb-4">
+    <% if @report.balanced? %>
+      <%= tc_badge "Balanced: assets equal liabilities plus equity", tone: :success %>
+    <% else %>
+      <%= tc_badge "Out of balance by #{@report.difference.abs.format(symbol: false)}", tone: :danger %>
+    <% end %>
+  </div>
+  <div class="space-y-6">
+    <%= render "section", report: @report, category: "asset" %>
+    <%= render "section", report: @report, category: "liability" %>
+    <%= render "section", report: @report, category: "equity", total_label: "Total equity before current-year earnings" %>
+    <div class="tc-card overflow-x-auto">
+      <table class="tc-table">
+        <tbody>
+          <tr><td>Current-year earnings <span class="tc-muted text-sm">(income less expenses so far this year)</span></td><td class="tc-num" data-total="current_year_earnings"><%= tc_money(@report.current_year_earnings) %></td></tr>
+          <tr class="font-semibold"><td>Total equity</td><td class="tc-num" data-total="equity_with_earnings"><%= tc_money(@report.total_equity) %></td></tr>
+          <tr class="font-semibold"><td>Total liabilities and equity</td><td class="tc-num" data-total="liabilities_and_equity"><%= tc_money(@report.liabilities_and_equity) %></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>

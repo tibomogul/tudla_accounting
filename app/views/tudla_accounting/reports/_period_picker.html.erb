@@ -1,0 +1,9 @@
+<%# locals: (url:, period:, label: "Period") %>
+<%= form_with url: url, method: :get, class: "flex flex-wrap items-end gap-2" do |form| %>
+  <div>
+    <%= form.label :period_id, label, class: "tc-label" %>
+    <%= form.select :period_id, @choices.map { |choice| [ (choice.root? ? "Year #{tc_period_label(choice)}" : "#{tc_period_label(choice)} (to #{tc_date(choice.thru_date)})"), choice.id ] },
+                    { selected: period.id }, class: "tc-input" %>
+  </div>
+  <%= form.submit "Show", class: "tc-btn tc-btn-secondary", name: nil %>
+<% end %>

@@ -1,0 +1,13 @@
+<%= tc_page_header "Reports" %>
+<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+  <% [ [ "Balance sheet", reports_balance_sheet_path, "Assets, liabilities and equity at the end of a month." ],
+       [ "Profit and loss", reports_profit_and_loss_path, "Income and expenses for a year or a month." ],
+       [ "Trial balance", reports_trial_balance_path, "Every account's balance in debit and credit columns, to check the books balance." ],
+       [ "Receivables aging", reports_receivables_path, "What customers owe, by how overdue it is." ],
+       [ "Payables aging", reports_payables_path, "What is owed to suppliers, by how overdue it is." ] ].each do |title, path, description| %>
+    <%= link_to path, class: "tc-card tc-card-body block hover:border-[var(--tc-primary)]" do %>
+      <p class="font-semibold"><%= title %></p>
+      <p class="tc-muted text-sm mt-1"><%= description %></p>
+    <% end %>
+  <% end %>
+</div>

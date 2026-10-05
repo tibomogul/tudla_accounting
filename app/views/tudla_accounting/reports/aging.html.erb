@@ -1,0 +1,52 @@
+<% title = @type == :receivable ? "Receivables aging" : "Payables aging" %>
+<%= tc_page_header title, subtitle: "#{@type == :receivable ? 'Owed to' : 'Owed by'} #{accounting_organization.name} as at #{tc_date(@as_of)}, in #{accounting_organization.currency}" do %>
+  <%= form_with url: (@type == :receivable ? reports_receivables_path : reports_payables_path), method: :get, class: "flex items-end gap-2" do |form| %>
+    <div><%= form.label :as_of, "As at", class: "tc-label" %><%= form.date_field :as_of, value: @as_of, class: "tc-input" %></div>
+    <%= form.submit "Show", class: "tc-btn tc-btn-secondary", name: nil %>
+  <% end %>
+<% end %>
+
+<% buckets = TudlaAccounting::ReportsHelper::AGING_BUCKETS %>
+<div class="tc-card overflow-x-auto mb-6">
+  <table class="tc-table">
+    <thead>
+      <tr><th><%= @type == :receivable ? "Customer" : "Supplier" %></th><% buckets.each_value do |label| %><th class="tc-num"><%= label %></th><% end %><th class="tc-num">Total</th></tr>
+    </thead>
+    <tbody>
+      <% if @report[:summary].empty? %>
+        <tr><td colspan="<%= buckets.size + 2 %>" class="tc-muted text-center">Nothing outstanding.</td></tr>
+      <% end %>
+      <% @report[:summary].each do |key, party| %>
+        <tr>
+          <td><a href="#<%= key %>"><%= related_party_name(party[:related_party]) %></a></td>
+          <% buckets.each_key do |bucket| %><td class="tc-num"><%= tc_money(party[:aging_buckets][bucket]) unless party[:aging_buckets][bucket].zero? %></td><% end %>
+          <td class="tc-num font-semibold"><%= tc_money(party[:total]) %></td>
+        </tr>
+      <% end %>
+      <tr class="font-semibold">
+        <td>Total</td>
+        <% buckets.each_key do |bucket| %><td class="tc-num" data-total="<%= bucket %>"><%= tc_money(@report[:totals][bucket]) %></td><% end %>
+        <td class="tc-num" data-total="total"><%= tc_money(@report[:totals][:total]) %></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<% @report[:details].each do |key, lines| %>
+  <details id="<%= key %>" class="tc-card mb-3">
+    <summary class="tc-card-body cursor-pointer font-semibold"><%= related_party_name(@report[:summary][key][:related_party]) %> · <%= tc_money(@report[:summary][key][:total]) %></summary>
+    <table class="tc-table">
+      <thead><tr><th>Entry</th><th>Due</th><th class="tc-num">Days overdue</th><th class="tc-num">Outstanding</th></tr></thead>
+      <tbody>
+        <% lines.each do |line| %>
+          <tr>
+            <td><%= link_to line[:entry].particulars, entry_path(line[:entry]) %></td>
+            <td><%= tc_date(line[:carrying_amount].due_date) || "—" %></td>
+            <td class="tc-num"><%= line[:days_outstanding].positive? ? line[:days_outstanding] : "—" %></td>
+            <td class="tc-num"><%= tc_money(line[:outstanding]) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </details>
+<% end %>

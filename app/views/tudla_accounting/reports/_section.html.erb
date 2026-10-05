@@ -1,0 +1,24 @@
+<%# locals: (report:, category:, total_label: nil) %>
+<% rows = report.rows(category) %>
+<section class="tc-card overflow-x-auto" aria-labelledby="section-<%= category %>">
+  <table class="tc-table">
+    <thead><tr><th id="section-<%= category %>"><%= TudlaAccounting::ReportsHelper::SECTION_TITLES.fetch(category) %></th><th class="tc-num"><%= accounting_organization.currency %></th></tr></thead>
+    <tbody>
+      <% if rows.empty? %>
+        <tr><td colspan="2" class="tc-muted">Nothing to report.</td></tr>
+      <% end %>
+      <% rows.each do |row| %>
+        <tr>
+          <td><div style="padding-left: <%= row.depth * 1.25 %>rem" class="<%= "font-semibold" if row.depth.zero? %>">
+            <span class="font-mono tc-muted mr-2"><%= row.account.code %></span><%= report_account_link(row.account, report.period) %>
+          </div></td>
+          <td class="tc-num"><%= tc_money(row.amount) %></td>
+        </tr>
+      <% end %>
+      <tr class="font-semibold">
+        <td><%= total_label || "Total #{TudlaAccounting::ReportsHelper::SECTION_TITLES.fetch(category).downcase}" %></td>
+        <td class="tc-num" data-total="<%= category %>"><%= tc_money(report.total(category)) %></td>
+      </tr>
+    </tbody>
+  </table>
+</section>

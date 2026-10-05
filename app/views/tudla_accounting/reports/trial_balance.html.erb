@@ -1,0 +1,38 @@
+<%= tc_page_header "Trial balance", subtitle: (@period ? "As at #{tc_date(@period.thru_date)}" : nil) do %>
+  <% if @period %><%= render "period_picker", url: reports_trial_balance_path, period: @period, label: "As at the end of" %><% end %>
+<% end %>
+
+<% if @report.nil? %>
+  <%= render "no_periods" %>
+<% else %>
+  <div class="mb-4">
+    <% if @report.balanced? %>
+      <%= tc_badge "Debits equal credits", tone: :success %>
+    <% else %>
+      <%= tc_badge "Debits and credits differ by #{(@report.total_debits - @report.total_credits).abs.format(symbol: false)}", tone: :danger %>
+    <% end %>
+  </div>
+  <div class="tc-card overflow-x-auto">
+    <table class="tc-table">
+      <thead><tr><th>Code</th><th>Account</th><th class="tc-num">Debit</th><th class="tc-num">Credit</th></tr></thead>
+      <tbody>
+        <% if @report.rows.empty? %>
+          <tr><td colspan="4" class="tc-muted text-center">Nothing to report.</td></tr>
+        <% end %>
+        <% @report.rows.each do |row| %>
+          <tr>
+            <td class="font-mono"><%= row.account.code %></td>
+            <td><%= report_account_link(row.account, @report.period) %></td>
+            <td class="tc-num"><%= tc_money(row.debit) %></td>
+            <td class="tc-num"><%= tc_money(row.credit) %></td>
+          </tr>
+        <% end %>
+        <tr class="font-semibold">
+          <td colspan="2">Total</td>
+          <td class="tc-num" data-total="debits"><%= tc_money(@report.total_debits) %></td>
+          <td class="tc-num" data-total="credits"><%= tc_money(@report.total_credits) %></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+<% end %>
