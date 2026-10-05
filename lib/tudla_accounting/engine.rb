@@ -2,6 +2,12 @@ module TudlaAccounting
   class Engine < ::Rails::Engine
     isolate_namespace TudlaAccounting
 
+    # After the host app's initializers, so TudlaAccounting.configure calls made
+    # there are reflected in money-rails' defaults.
+    config.after_initialize do
+      TudlaAccounting.apply_money_settings!
+    end
+
     config.generators do |g|
       g.test_framework :rspec
       g.fixture_replacement :factory_bot

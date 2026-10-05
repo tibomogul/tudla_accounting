@@ -56,6 +56,19 @@ module TudlaAccounting
   def self.configure
     init_config
     yield(configuration)
+    apply_money_settings!
+  end
+
+  # Pushes base_currency and rounding into money-rails (Money's global defaults).
+  # Runs after every configure and again once the host app has booted, because
+  # engine initializers load before the host's: settings made in a host
+  # initializer would otherwise never reach money-rails.
+  def self.apply_money_settings!
+    MoneyRails.configure do |money|
+      money.default_currency = Money::Currency.new(configuration.base_currency)
+      money.rounding_mode = configuration.rounding
+      money.locale_backend = :currency
+    end
   end
 end
 

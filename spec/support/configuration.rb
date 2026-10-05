@@ -6,5 +6,6 @@ RSpec.shared_context "with isolated TudlaAccounting configuration" do
     example.run
   ensure
     TudlaAccounting.configuration = original
+    TudlaAccounting.apply_money_settings!
   end
 end
