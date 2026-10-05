@@ -44,7 +44,7 @@ module TudlaAccounting
         amount_cents: detail.amount_cents,
         carrying_amount_type: carrying_amount_type,
         due_date: due_date,
-        related_party: @entry.organization
+        related_party: related_party
       )
 
       fx = detail.foreign_exchange
@@ -61,7 +61,16 @@ module TudlaAccounting
     end
 
     def due_date
-      method = TudlaAccounting.configuration.due_date_method
+      read_source(TudlaAccounting.configuration.due_date_method)
+    end
+
+    # The customer or supplier the amount is owed by or to, read from the source
+    # (e.g. invoice.customer); the organization when not configured or not set.
+    def related_party
+      read_source(TudlaAccounting.configuration.related_party_method) || @entry.organization
+    end
+
+    def read_source(method)
       source = @entry.source
       source.public_send(method) if method && source.respond_to?(method)
     end

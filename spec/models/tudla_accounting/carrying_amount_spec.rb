@@ -18,11 +18,11 @@ RSpec.describe TudlaAccounting::CarryingAmount, type: :model do
   end
 
   describe "#amount" do
-    it "returns a Money object backed by the configured base currency" do
-      carrying = create(:tudla_accounting_carrying_amount, amount_cents: 50_000)
+    it "returns a Money object in the currency of the line it was opened on" do
+      carrying = create(:tudla_accounting_carrying_amount, amount_cents: 50_000, detail: create(:tudla_accounting_detail, currency: "AUD"))
       expect(carrying.amount).to be_a(Money)
       expect(carrying.amount.cents).to eq(50_000)
-      expect(carrying.amount.currency.iso_code).to eq(TudlaAccounting.configuration.base_currency)
+      expect(carrying.amount.currency.iso_code).to eq("AUD")
     end
   end
 end

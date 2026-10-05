@@ -11,8 +11,9 @@ module TudlaAccounting
       payable: 1
     }
 
+    # In the currency of the line it was opened on (the organization's currency).
     def amount
-      Money.new(amount_cents, TudlaAccounting.configuration.base_currency)
+      Money.new(amount_cents, detail.currency)
     end
   end
 end

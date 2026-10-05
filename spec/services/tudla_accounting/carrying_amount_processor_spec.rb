@@ -133,6 +133,25 @@ RSpec.describe TudlaAccounting::CarryingAmountProcessor, type: :service do
     end
   end
 
+  context "with a related party method configured" do
+    let(:customer) { create(:organization, name: "Customer") }
+    let(:entry) do
+      create_entry("Invoice", [ detail(receivable_account, 10_000, "debit"), detail(income_account, 10_000, "credit") ],
+                   source: Invoice.create!(due_date: 30.days.from_now, customer: customer))
+    end
+
+    it "records the party read from the source" do
+      TudlaAccounting.configuration.related_party_method = :customer
+      expect(described_class.call(entry: entry).related_party).to eq(customer)
+    end
+
+    it "falls back to the organization when the source has no party" do
+      TudlaAccounting.configuration.related_party_method = :customer
+      entry.source.update!(customer: nil)
+      expect(described_class.call(entry: entry).related_party).to eq(organization)
+    end
+  end
+
   context "when a receivable entry has a source_type but no source record" do
     let(:entry) do
       create_entry("Invoice", [ detail(receivable_account, 10_000, "debit"), detail(income_account, 10_000, "credit") ],

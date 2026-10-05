@@ -21,11 +21,13 @@ RSpec.shared_context "with entry source models" do
     ActiveRecord::Schema.define do
       create_table :invoices, force: true do |t|
         t.datetime :due_date
+        t.bigint :customer_id # an Organization standing in for the customer
         t.timestamps
       end
 
       create_table :bills, force: true do |t|
         t.datetime :due_date
+        t.bigint :customer_id # an Organization standing in for the supplier
         t.timestamps
       end
 
@@ -35,6 +37,9 @@ RSpec.shared_context "with entry source models" do
 
     %w[Invoice Bill Payment Disbursement].each do |name|
       Object.const_set(name, Class.new(ApplicationRecord) { self.table_name = name.tableize })
+    end
+    [ Invoice, Bill ].each do |model|
+      model.belongs_to :customer, class_name: "Organization", optional: true
     end
   end
 

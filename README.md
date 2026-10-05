@@ -70,6 +70,9 @@ TudlaAccounting::EntryPostingJob.perform_later(entry.id)
 
 `EntryPostingJob` posts the entry into the period of its `transacted_at`, on the `entry_posting` queue. With Solid Queue, only one posting job per organization runs at a time. A failed job is logged and discarded, not retried, and the entry stays unposted.
 
+### Aging report
+`AgingReportGenerator.call(organization:, report_type: :receivable, as_of_date:)` (or `:payable`) groups open amounts by related party and buckets them by days past due: current, 1–30, 31–60, 61–90 and over 90. It returns `summary` and `details` per party, plus `totals`, in the organization's currency. A past `as_of_date` shows what was owed on that day: later invoices are left out and later payments are added back.
+
 ### Multi-tenancy
 Accounts, periods, entries, lines and balances all belong to a polymorphic `organization`, provided by the host app. The organization must respond to `currency`, which is the currency its books are kept in.
 
@@ -204,6 +207,7 @@ TudlaAccounting.configure do |config|
     "Disbursement" => :disbursement       # reduces the payable of entry.related
   }
   config.due_date_method = :due_date      # read from the source; blank if it doesn't respond
+  config.related_party_method = :customer # who owes or is owed, read from the source; the organization if unset
 end
 ```
 
