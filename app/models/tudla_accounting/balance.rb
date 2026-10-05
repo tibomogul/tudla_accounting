@@ -48,18 +48,16 @@ module TudlaAccounting
 
       transaction do
         update_current_amount(amount, tally)
-
-        period_siblings = period.siblings.where("from_date > ?", period.from_date).order(:from_date)
-        period_siblings.each do |period_sibling|
-          period_sibling.subtree.each do |period|
-            period_balance = TudlaAccounting::Balance.find_by(account: account, period: period)
-            period_balance&.update_starting_amount(amount, tally)
-          end
-        end
+        delta_cents = signed_cents(amount, tally)
 
         if period.has_parent?
-          parent_balance = Balance.get(account, period.parent)
-          parent_balance.post_to_self_and_associated_period(amount, tally)
+          # Later periods in the same year opened from this one.
+          later_periods = period.siblings.where("from_date > ?", period.from_date)
+          self.class.shift_balances(account, later_periods, delta_cents)
+
+          Balance.get(account, period.parent).post_to_self_and_associated_period(amount, tally)
+        else
+          self.class.carry_into_later_years(account, period, delta_cents)
         end
 
         true
@@ -100,7 +98,7 @@ module TudlaAccounting
         elsif period.has_parent?
           get(account, period.parent).starting_amount
         else
-          Money.new(0, org.currency)
+          opening_for_year(account, period)
         end
 
         create!(
@@ -113,6 +111,87 @@ module TudlaAccounting
           organization: org
         )
       end
+
+      # Moves the account's existing balances in the given periods, and in the periods
+      # inside them, by delta_cents (on the account's own side).
+      def shift_balances(account, periods, delta_cents)
+        return if delta_cents.zero?
+
+        period_ids = periods.flat_map(&:subtree_ids)
+        where(account: account, period_id: period_ids).update_all(
+          [ "starting_amount_cents = starting_amount_cents + :delta, ending_amount_cents = ending_amount_cents + :delta", { delta: delta_cents } ]
+        )
+      end
+
+      # Carries a change in a year's balance into later years that already have
+      # balances, following the year-end rules in opening_for_year: asset, liability
+      # and equity accounts carry their own balance; income and expense accounts
+      # start each year at zero, and their effect on profit moves retained earnings
+      # instead (once, at the top of the account tree).
+      def carry_into_later_years(account, year, delta_cents)
+        later_years = later_roots(year)
+
+        if account.balance_sheet_account?
+          shift_balances(account, later_years, delta_cents)
+        elsif account.root? && (retained_earnings = retained_earnings_account(year.organization))
+          profit_delta = account.debit_balance? ? -delta_cents : delta_cents
+          [ retained_earnings, *retained_earnings.ancestors ].each do |equity_account|
+            shift_balances(equity_account, later_years, profit_delta)
+          end
+        end
+      end
+
+      # The configured retained earnings account for an organization, if any.
+      def retained_earnings_account(organization)
+        code = TudlaAccounting.configuration.retained_earnings_account_code
+        TudlaAccounting::Account.find_by(organization: organization, code: code) if code.present?
+      end
+
+      # Net profit for a year (income less expenses), from the top-level income and
+      # expense accounts' balances.
+      def net_profit(organization, year)
+        accounts = TudlaAccounting::Account.roots.where(organization: organization,
+                                                        category: [ Account::CATEGORY_INCOME, Account::CATEGORY_EXPENSE ])
+        cents = where(period: year, account: accounts).includes(:account).sum do |balance|
+          balance.account.debit_balance? ? -balance.ending_amount_cents : balance.ending_amount_cents
+        end
+        Money.new(cents, organization.currency)
+      end
+
+      private
+
+      # Each root period is a financial year. Asset, liability and equity accounts open
+      # with their closing balance from the previous year; income and expense accounts
+      # open at zero; retained earnings (and the accounts above it) also take in the
+      # previous year's net profit.
+      def opening_for_year(account, year)
+        org = year.organization
+        previous_year = earlier_roots(year).order(:from_date).last
+        return Money.new(0, org.currency) unless previous_year && account.balance_sheet_account?
+
+        opening = get(account, previous_year).ending_amount
+        retained_earnings = retained_earnings_account(org)
+        if retained_earnings && (retained_earnings == account || retained_earnings.ancestor_ids.include?(account.id))
+          opening += net_profit(org, previous_year)
+        end
+        opening
+      end
+
+      def earlier_roots(year)
+        TudlaAccounting::Period.roots.where(organization: year.organization).where("from_date < ?", year.from_date)
+      end
+
+      def later_roots(year)
+        TudlaAccounting::Period.roots.where(organization: year.organization).where("from_date > ?", year.from_date)
+      end
+    end
+
+    private
+
+    def signed_cents(amount, tally)
+      should_add = (account.debit_balance? && tally == TudlaAccounting::Detail::TALLY_DEBIT) ||
+                   (!account.debit_balance? && tally == TudlaAccounting::Detail::TALLY_CREDIT)
+      should_add ? amount.cents : -amount.cents
     end
   end
 end

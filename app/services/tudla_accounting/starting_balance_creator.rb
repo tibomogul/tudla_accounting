@@ -93,15 +93,14 @@ module TudlaAccounting
       node[:children].each { |child| set_amounts(child, period) }
     end
 
-    # Balances in periods after this one (and inside them) took their opening
-    # balance from it, so they move by the same amount.
+    # Balances in periods after this one (and inside them) took their opening balance
+    # from it, so they move by the same amount; later years follow the year-end rules.
     def shift_later_balances(account, period, delta)
-      return if delta.zero?
-
-      later = organization_periods(period.siblings).where("from_date > ?", period.from_date)
-      later_period_ids = later.flat_map(&:subtree_ids)
-      TudlaAccounting::Balance.where(account: account, period_id: later_period_ids)
-        .update_all([ "starting_amount_cents = starting_amount_cents + :delta, ending_amount_cents = ending_amount_cents + :delta", { delta: delta } ])
+      if period.has_parent?
+        TudlaAccounting::Balance.shift_balances(account, period.siblings.where("from_date > ?", period.from_date), delta)
+      else
+        TudlaAccounting::Balance.carry_into_later_years(account, period, delta)
+      end
     end
   end
 end

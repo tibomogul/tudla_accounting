@@ -23,7 +23,8 @@ module TudlaAccounting
     CARRYING_AMOUNT_ROLES = %i[receivable payable receipt disbursement].freeze
 
     attr_accessor :base_currency, :rounding, :time_zone, :organization_class,
-                  :receivable_account_code, :payable_account_code, :due_date_method
+                  :receivable_account_code, :payable_account_code, :due_date_method,
+                  :retained_earnings_account_code
     attr_reader :carrying_amount_sources, :entry_sources
 
     def initialize
@@ -35,6 +36,7 @@ module TudlaAccounting
       @payable_account_code = nil
       @carrying_amount_sources = {}
       @due_date_method = :due_date
+      @retained_earnings_account_code = nil
       @entry_sources = {}
     end
 

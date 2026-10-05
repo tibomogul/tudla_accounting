@@ -160,12 +160,16 @@ RSpec.describe TudlaAccounting::Balance, type: :model do
         expect(described_class.get(asset, mar)).to have_attributes(starting_amount: usd(100_00), ending_amount: usd(100_00))
       end
 
-      it "ignores the account's balances in other period trees" do
-        other_year = create(:tudla_accounting_period, organization: organization, from_date: Date.new(2025, 1, 1), thru_date: Date.new(2025, 12, 31).end_of_day)
-        create(:tudla_accounting_balance, account: asset, period: other_year, organization: organization,
-                                          starting_amount_cents: 0, current_amount_cents: 500_00, ending_amount_cents: 500_00)
+      it "opens a year with the previous year's closing balance, but only for balance-sheet accounts" do
+        previous_year = create(:tudla_accounting_period, organization: organization, from_date: Date.new(2025, 1, 1), thru_date: Date.new(2025, 12, 31).end_of_day)
+        income = create(:tudla_accounting_account, category: :income, organization: organization)
+        [ asset, income ].each do |account|
+          create(:tudla_accounting_balance, account: account, period: previous_year, organization: organization,
+                                            starting_amount_cents: 0, current_amount_cents: 500_00, ending_amount_cents: 500_00)
+        end
 
-        expect(described_class.get(asset, year).starting_amount).to eq(usd(0))
+        expect(described_class.get(asset, year).starting_amount).to eq(usd(500_00))
+        expect(described_class.get(income, year).starting_amount).to eq(usd(0))
       end
     end
   end

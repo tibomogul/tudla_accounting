@@ -26,6 +26,13 @@ An entry can point at a `source` record in the host app, such as the invoice it 
 - rolls it up into every parent period (quarter, year) and every parent account
 - carries it forward into the starting amount of every later period, so back-dated entries keep later balances correct
 
+**Year end.** Each top-level period is a financial year, and balances carry across years automatically, with no closing step:
+- asset, liability and equity accounts open each year with their closing balance from the year before;
+- income and expense accounts start each year at zero;
+- the previous year's net profit (income less expenses) is added to the retained earnings account set in `retained_earnings_account_code`, and to the accounts above it.
+
+Back-dated entries into an earlier year follow the same rules, so later years stay correct whatever order entries are posted in. `Balance.net_profit(organization, year)` returns a year's profit. Without `retained_earnings_account_code`, income and expenses still restart each year, but the profit isn't carried, so later years' balance sheets won't balance.
+
 ### Receivables and payables (carrying amounts)
 After posting, `CarryingAmountProcessor` keeps track of what's still owed. Posting an entry whose source is an invoice or bill opens a `CarryingAmount` on its receivable or payable line, with a due date and any foreign-currency amount. Posting a payment or disbursement that names that entry as `related` reduces it. If money moves through a bank account held in another currency (`BankAccountBalance`), that balance is updated in its own currency.
 
@@ -33,7 +40,7 @@ This is **off until configured**. The host app chooses which of its models count
 
 ### Setting up the books
 - **`AccountsCreator.call(nested_accounts, organization)`** creates a chart of accounts from nested hashes (`code`, `name`, `category`, optional `currency` and `contra_account`, `children`), all or nothing.
-- **`StartingBalanceCreator.call(organization, date, nodes, currency)`** sets opening balances in the first period at every level, e.g. the first month of the first year. Each parent's amount must equal the sum of its children's.
+- **`StartingBalanceCreator.call(organization, date, nodes, currency)`** sets opening balances in the first period at every level, i.e. the first month of the first year; later years carry forward automatically. Each parent's amount must equal the sum of its children's.
 - **`CsvLoader` / `XlsxLoader.call(organization, file, date)`** do both from a spreadsheet with the columns `Account Code`, `Account Name`, `Account Type`, `Contra Code`, `Starting Balance`, `Parent Account Code`. See `spec/fixtures/files/coa_saas_services.csv` for an example.
 
 Opening balances are signed the natural way for each category, so a contra account such as accumulated depreciation is entered as a negative amount. The engine stores it on the contra account's own side, so later posting adds to it. Reloading over existing accounts or balances needs `overwrite_mode` (the last argument); any later balances that already exist move by the same amount.
@@ -184,6 +191,7 @@ Configure the engine in an initializer, e.g. `config/initializers/tudla_accounti
 TudlaAccounting.configure do |config|
   config.base_currency = "USD"
   config.time_zone = "UTC"                # zone PeriodCreator builds periods in; plain Dates are read in it
+  config.retained_earnings_account_code = "3900" # takes in each year's net profit at year end
 
   # Receivables and payables (carrying amounts). Off until configured: entries
   # still post normally, but no carrying amounts are tracked.
