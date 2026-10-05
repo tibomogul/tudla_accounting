@@ -85,6 +85,19 @@ TudlaAccounting::EntryPostingJob.perform_later(entry.id)
 ### Multi-tenancy
 Accounts, periods, entries, lines and balances all belong to a polymorphic `organization`, provided by the host app. The organization must respond to `currency`, which is the currency its books are kept in.
 
+## Web pages
+
+Mounted at `/tudla_accounting` (see [Integration](#integration-into-a-host-application)), the engine has pages for the organization returned by `current_organization`:
+
+- **Dashboard:** profit this year, what is owed each way, draft entries, recent entries, and a getting-started checklist.
+- **Accounts:** the chart of accounts as a tree with closing balances. Each account page shows monthly balances and a ledger with running balances. You can create, edit and delete unused accounts.
+- **Entries:** search and filter entries, write drafts with a line editor that keeps live debit/credit totals, post them, and reverse posted entries.
+- **Reports:** balance sheet, profit and loss, trial balance, and receivables and payables aging.
+- **Periods:** create calendar or fiscal years, and see each year's months.
+- **Setup:** upload a chart of accounts with opening balances (CSV or Excel), import the receivables and payables open at the cut-over, and run the foreign exchange revaluation.
+
+The pages use Tailwind CSS with the engine's own `tc-` component classes (no DaisyUI needed) and follow the host's light/dark theme. Their Stimulus controllers load through the engine's import map.
+
 ## Usage
 
 ```ruby

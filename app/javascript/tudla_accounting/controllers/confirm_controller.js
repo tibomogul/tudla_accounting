@@ -5,6 +5,10 @@ import { Controller } from "@hotwired/stimulus"
 export default class extends Controller {
   static values = { message: String }
 
+  connect() {
+    this.element.dataset.confirmReady = "true" // lets browser tests wait until confirming works
+  }
+
   ask(event) {
     if (this.element.dataset.confirmed === "true") return
 

@@ -1,24 +1,59 @@
 <%= tc_page_header "Dashboard", subtitle: "#{accounting_organization.name}'s books, kept in #{accounting_organization.currency}" %>
 
-<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+<% if @year_count.zero? || @account_count.zero? %>
+  <div class="tc-card tc-card-body mb-6">
+    <p class="font-semibold mb-2">Getting started</p>
+    <ol class="list-decimal pl-5 space-y-1 text-sm">
+      <li class="<%= "line-through tc-muted" if @year_count.positive? %>"><%= link_to "Create a financial year", new_period_path, class: "underline" %> so entries have a period to post to.</li>
+      <li class="<%= "line-through tc-muted" if @account_count.positive? %>"><%= link_to "Load a chart of accounts", setup_path, class: "underline" %> with opening balances, or <%= link_to "add accounts one by one", new_account_path, class: "underline" %>.</li>
+      <li>Then <%= link_to "record entries", new_entry_path, class: "underline" %>.</li>
+    </ol>
+  </div>
+<% end %>
+
+<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
   <div class="tc-card tc-card-body">
-    <p class="tc-stat-label">Accounts</p>
-    <p class="tc-stat-value"><%= @account_count %></p>
+    <p class="tc-stat-label">Profit this year</p>
+    <p class="tc-stat-value" data-stat="profit"><%= @profit_this_year ? link_to(tc_money(@profit_this_year), reports_profit_and_loss_path) : "—" %></p>
+    <p class="tc-hint"><%= @current_period ? "To #{tc_date(@current_period.thru_date)}" : "No period covers today" %></p>
   </div>
   <div class="tc-card tc-card-body">
-    <p class="tc-stat-label">Financial years</p>
-    <p class="tc-stat-value"><%= @year_count %></p>
+    <p class="tc-stat-label">Owed to you</p>
+    <p class="tc-stat-value" data-stat="receivables"><%= link_to tc_money(@receivables[:total]), reports_receivables_path %></p>
+    <p class="tc-hint"><%= tc_money(@receivables[:total] - @receivables[:current]) %> overdue</p>
+  </div>
+  <div class="tc-card tc-card-body">
+    <p class="tc-stat-label">You owe</p>
+    <p class="tc-stat-value" data-stat="payables"><%= link_to tc_money(@payables[:total]), reports_payables_path %></p>
+    <p class="tc-hint"><%= tc_money(@payables[:total] - @payables[:current]) %> overdue</p>
   </div>
   <div class="tc-card tc-card-body">
     <p class="tc-stat-label">Draft entries</p>
-    <p class="tc-stat-value"><%= link_to @draft_count, entries_path(status: "draft") %></p>
-  </div>
-  <div class="tc-card tc-card-body">
-    <p class="tc-stat-label">Current period</p>
-    <% if @current_period %>
-      <p class="tc-stat-value text-lg"><%= tc_date(@current_period.from_date) %> – <%= tc_date(@current_period.thru_date) %></p>
-    <% else %>
-      <p class="mt-1"><%= tc_badge "None open today", tone: :warning %></p>
-    <% end %>
+    <p class="tc-stat-value" data-stat="drafts"><%= link_to @draft_count, entries_path(status: "draft") %></p>
+    <p class="tc-hint">Not yet in the balances</p>
   </div>
 </div>
+
+<div class="tc-card overflow-x-auto">
+  <div class="tc-card-body flex items-center justify-between pb-0">
+    <p class="tc-card-title mb-0">Recent entries</p>
+    <%= link_to "All entries →", entries_path, class: "text-sm tc-muted" %>
+  </div>
+  <table class="tc-table mt-3">
+    <tbody>
+      <% if @recent_entries.empty? %>
+        <tr><td class="tc-muted text-center">No entries yet.</td></tr>
+      <% end %>
+      <% @recent_entries.each do |entry| %>
+        <tr>
+          <td class="whitespace-nowrap w-32"><%= tc_date(entry.transacted_at) %></td>
+          <td><%= link_to entry.particulars, entry_path(entry) %></td>
+          <td><%= entry_status_badge(entry) %></td>
+          <td class="tc-num"><%= tc_money(entry_total(entry)) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+
+<p class="tc-muted text-sm mt-4"><%= pluralize(@account_count, "account") %> · <%= pluralize(@year_count, "financial year") %><% if @current_period %> · current period <%= tc_period_label(@current_period) %><% end %></p>

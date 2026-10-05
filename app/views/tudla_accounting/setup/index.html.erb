@@ -1,0 +1,59 @@
+<%= tc_page_header "Setup", subtitle: "Load the books, import what was open at the cut-over, and revalue foreign currency" %>
+
+<% setting = ->(name) { value = @config.public_send(name); value.present? ? tag.code(value.is_a?(String) ? value : value.class.name, class: "text-xs") : tc_badge("not set", tone: :warning) } %>
+
+<div class="space-y-6">
+  <section class="tc-card tc-card-body space-y-4" aria-labelledby="chart-heading">
+    <div>
+      <h2 id="chart-heading" class="tc-card-title mb-1">Chart of accounts and opening balances</h2>
+      <p class="tc-muted text-sm">A CSV or Excel file with the columns <code class="text-xs">Account Code, Account Name, Account Type, Contra Code, Starting Balance, Parent Account Code</code>.
+        Opening balances go into the first month of the first year; enter contra accounts as negative amounts.</p>
+    </div>
+    <% if @first_year.nil? %>
+      <div class="tc-alert tc-alert-warning"><span><%= link_to "Create a financial year", new_period_path, class: "underline" %> first: opening balances need a period.</span></div>
+    <% else %>
+      <%= form_with url: setup_chart_of_accounts_path, multipart: true, class: "grid gap-4 sm:grid-cols-3 items-end" do |form| %>
+        <div class="sm:col-span-2"><%= form.label :file, "File", class: "tc-label" %><%= form.file_field :file, accept: ".csv,.xlsx", class: "tc-input", required: true %></div>
+        <div><%= form.label :opening_date, "Opening balances at", class: "tc-label" %><%= form.date_field :opening_date, value: @first_year.from_date.to_date, class: "tc-input", required: true %></div>
+        <label class="flex items-center gap-2 text-sm sm:col-span-2"><%= form.check_box :overwrite, {}, "1", "0" %> Replace accounts and opening balances that already exist</label>
+        <div><%= form.submit "Load chart of accounts", class: "tc-btn" %></div>
+      <% end %>
+    <% end %>
+  </section>
+
+  <section class="tc-card tc-card-body space-y-4" aria-labelledby="open-items-heading">
+    <div>
+      <h2 id="open-items-heading" class="tc-card-title mb-1">Open receivables and payables</h2>
+      <p class="tc-muted text-sm">Invoices and bills still open at the cut-over, as a CSV with <code class="text-xs">particulars, amount, type, due_date</code>
+        and, for foreign currency, <code class="text-xs">other_currency, other_currency_amount, transaction_rate, conversion_date</code>.
+        They are recorded without changing balances, which the opening balances already include.</p>
+      <p class="text-sm mt-2">Receivables account: <%= setting.call(:receivable_account_code) %> · Payables account: <%= setting.call(:payable_account_code) %></p>
+    </div>
+    <%= form_with url: setup_open_items_path, multipart: true, class: "grid gap-4 sm:grid-cols-4 items-end" do |form| %>
+      <div class="sm:col-span-2"><%= form.label :file, "CSV file", class: "tc-label", for: "open_items_file" %><%= form.file_field :file, id: "open_items_file", accept: ".csv", class: "tc-input", required: true %></div>
+      <div class="sm:col-span-2"><%= form.label :date_prior, "Day before the cut-over", class: "tc-label" %><%= form.date_field :date_prior, value: @first_year && (@first_year.from_date.to_date - 1), class: "tc-input", required: true %></div>
+      <div class="sm:col-span-2"><%= form.label :sales_account_code, "Offset receivables against", class: "tc-label" %>
+        <%= form.select :sales_account_code, @accounts.select { |account| account.category == "income" }.map { |account| [ account.code_with_name, account.code ] }, { include_blank: "Choose an income account" }, class: "tc-input" %></div>
+      <div class="sm:col-span-2"><%= form.label :purchase_account_code, "Offset payables against", class: "tc-label" %>
+        <%= form.select :purchase_account_code, @accounts.select { |account| account.category == "expense" }.map { |account| [ account.code_with_name, account.code ] }, { include_blank: "Choose an expense account" }, class: "tc-input" %></div>
+      <div><%= form.submit "Import open items", class: "tc-btn" %></div>
+    <% end %>
+  </section>
+
+  <section class="tc-card tc-card-body space-y-4" aria-labelledby="revaluation-heading">
+    <div>
+      <h2 id="revaluation-heading" class="tc-card-title mb-1">Foreign exchange revaluation</h2>
+      <p class="tc-muted text-sm">Revalues open foreign-currency receivables and payables at a month end's rate, and reverses it the next day.</p>
+      <p class="text-sm mt-2">Gains and losses account: <%= setting.call(:unrealized_fx_gain_account_code) %> · Exchange rates from: <%= setting.call(:forex_rate_provider) %></p>
+    </div>
+    <% if @months.none? %>
+      <p class="tc-muted text-sm">No month has ended yet.</p>
+    <% else %>
+      <%= form_with url: setup_revaluation_path, class: "flex flex-wrap items-end gap-3",
+                    data: { controller: "confirm", confirm_message_value: "Post revaluation entries?", action: "submit->confirm#ask" } do |form| %>
+        <div><%= form.label :period_id, "At the end of", class: "tc-label" %><%= form.select :period_id, @months.map { |month| [ "#{tc_period_label(month)} (#{tc_date(month.thru_date)})", month.id ] }, {}, class: "tc-input" %></div>
+        <%= form.submit "Run revaluation", class: "tc-btn" %>
+      <% end %>
+    <% end %>
+  </section>
+</div>

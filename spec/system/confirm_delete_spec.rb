@@ -7,8 +7,12 @@ RSpec.describe "Confirming a delete", type: :system do
 
   before { sign_in_as(organization) }
 
+  # Stimulus connects after the page loads; a click before then would submit unconfirmed.
+  def wait_for_confirm = expect(page).to have_css("form[data-confirm-ready]")
+
   it "asks for a second click before deleting" do
     visit "/tudla_accounting/accounts/#{account.id}"
+    wait_for_confirm
 
     click_button "Delete"
     expect(page).to have_button("Delete 1013 - Petty Cash? Click again to confirm")
@@ -21,6 +25,7 @@ RSpec.describe "Confirming a delete", type: :system do
 
   it "dismisses flash messages" do
     visit "/tudla_accounting/accounts/#{account.id}"
+    wait_for_confirm
     click_button "Delete"
     click_button "Delete 1013 - Petty Cash? Click again to confirm"
 
@@ -38,6 +43,7 @@ RSpec.describe "Confirming a delete", type: :system do
     entry.post(entry.transacted_at)
 
     visit "/tudla_accounting/entries/#{entry.id}"
+    wait_for_confirm
     click_button "Reverse"
     expect(page).to have_button("Reverse this entry? Click again to confirm")
     expect(entry.reload.reversal).to be_nil
