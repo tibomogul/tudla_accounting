@@ -100,6 +100,65 @@ RSpec.describe TudlaAccounting::CarryingAmountProcessor, type: :service do
     end
   end
 
+  context "when carrying amounts are not configured" do
+    before { TudlaAccounting.configuration = TudlaAccounting::Configuration.new }
+
+    it "does nothing, even for an invoice posted to accounts receivable" do
+      entry = create_entry("Invoice", [ detail(receivable_account, 10_000, "debit"), detail(income_account, 10_000, "credit") ],
+                           source: Invoice.create!(due_date: 30.days.from_now))
+
+      expect { expect(described_class.call(entry: entry)).to be_nil }.not_to change(TudlaAccounting::CarryingAmount, :count)
+    end
+  end
+
+  context "with a custom source mapping and due date method" do
+    let(:payment) { Payment.create! }
+    let(:entry) do
+      create_entry("Sale", [ detail(receivable_account, 10_000, "debit"), detail(income_account, 10_000, "credit") ], source: payment)
+    end
+
+    before { TudlaAccounting.configuration.carrying_amount_sources = { "Payment" => :receivable } }
+
+    it "uses the configured role and reads the due date through the configured method" do
+      TudlaAccounting.configuration.due_date_method = :created_at
+
+      carrying_amount = described_class.call(entry: entry)
+
+      expect(carrying_amount.carrying_amount_type).to eq("receivable")
+      expect(carrying_amount.due_date).to be_within(1.second).of(payment.created_at)
+    end
+
+    it "leaves the due date blank when the source does not respond to the due date method" do
+      expect(described_class.call(entry: entry).due_date).to be_nil
+    end
+  end
+
+  context "when a receivable entry has a source_type but no source record" do
+    let(:entry) do
+      create_entry("Invoice", [ detail(receivable_account, 10_000, "debit"), detail(income_account, 10_000, "credit") ],
+                   source_type: "Invoice")
+    end
+
+    it "creates the carrying amount without a due date" do
+      carrying_amount = described_class.call(entry: entry)
+      expect(carrying_amount.amount_cents).to eq(10_000)
+      expect(carrying_amount.due_date).to be_nil
+    end
+  end
+
+  context "when AR is a parent account with sub-accounts" do
+    let(:eur_receivable) { create(:tudla_accounting_account, code: "1105", category: :asset, organization: organization, parent: receivable_account) }
+    let(:entry) do
+      create_entry("Invoice", [ detail(eur_receivable, 10_000, "debit"), detail(income_account, 10_000, "credit") ],
+                   source: Invoice.create!(due_date: 30.days.from_now))
+    end
+
+    it "opens the carrying amount on the sub-account's detail" do
+      carrying_amount = described_class.call(entry: entry)
+      expect(carrying_amount.detail.account).to eq(eur_receivable)
+    end
+  end
+
   context "when the entry has a foreign exchange detail" do
     let(:entry) do
       create_entry("Invoice in EUR", [

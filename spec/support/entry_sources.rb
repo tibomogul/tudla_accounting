@@ -1,6 +1,21 @@
+require_relative "configuration"
+
 # Temporary host-app models (Invoice, Bill, Payment, Disbursement) that act as
-# polymorphic entry sources, as CarryingAmountProcessor expects them to exist.
+# polymorphic entry sources, configured as the four carrying amount roles with
+# accounts receivable at code 1100 and accounts payable at 2100.
 RSpec.shared_context "with entry source models" do
+  include_context "with isolated TudlaAccounting configuration"
+
+  before do
+    TudlaAccounting.configure do |config|
+      config.receivable_account_code = "1100"
+      config.payable_account_code = "2100"
+      config.carrying_amount_sources = {
+        "Invoice" => :receivable, "Bill" => :payable, "Payment" => :receipt, "Disbursement" => :disbursement
+      }
+    end
+  end
+
   before(:all) do
     ActiveRecord::Schema.verbose = false
     ActiveRecord::Schema.define do

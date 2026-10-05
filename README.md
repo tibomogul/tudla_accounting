@@ -83,6 +83,29 @@ Rails.application.routes.draw do
 end
 ```
 
+### Configuration
+
+Configure the engine in an initializer, e.g. `config/initializers/tudla_accounting.rb`:
+
+```ruby
+TudlaAccounting.configure do |config|
+  config.base_currency = "USD"
+  config.organization_class = "Organization"
+
+  # Receivables and payables (carrying amounts). Off until configured: entries
+  # still post normally, but no carrying amounts are tracked.
+  config.receivable_account_code = "1100" # this account and every account beneath it
+  config.payable_account_code = "2100"
+  config.carrying_amount_sources = {      # entry source class => role
+    "Invoice" => :receivable,             # opens a receivable
+    "Bill" => :payable,                   # opens a payable
+    "Payment" => :receipt,                # reduces the receivable of entry.related
+    "Disbursement" => :disbursement       # reduces the payable of entry.related
+  }
+  config.due_date_method = :due_date      # read from the source; blank if it doesn't respond
+end
+```
+
 ## UI Development
 
 ### Dummy App

@@ -18,13 +18,32 @@ module TudlaAccounting
   end
 
   class Configuration
-    attr_accessor :base_currency, :rounding, :time_zone, :organization_class
+    CARRYING_AMOUNT_ROLES = %i[receivable payable receipt disbursement].freeze
+
+    attr_accessor :base_currency, :rounding, :time_zone, :organization_class,
+                  :receivable_account_code, :payable_account_code, :due_date_method
+    attr_reader :carrying_amount_sources
 
     def initialize
       @base_currency = "USD"
       @rounding = BigDecimal::ROUND_HALF_UP
       @time_zone = "UTC"
       @organization_class = "Organization"
+      @receivable_account_code = nil
+      @payable_account_code = nil
+      @carrying_amount_sources = {}
+      @due_date_method = :due_date
+    end
+
+    # Maps entry source class names to the carrying amount role they play, e.g.
+    # { "Invoice" => :receivable, "Bill" => :payable, "Payment" => :receipt, "Disbursement" => :disbursement }
+    def carrying_amount_sources=(sources)
+      @carrying_amount_sources = sources.to_h.to_h do |source_type, role|
+        role = role.to_sym
+        raise ArgumentError, "unknown carrying amount role #{role.inspect} for #{source_type}; expected one of #{CARRYING_AMOUNT_ROLES.join(', ')}" unless CARRYING_AMOUNT_ROLES.include?(role)
+
+        [ source_type.to_s, role ]
+      end.freeze
     end
   end
 

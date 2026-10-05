@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 module TudlaAccounting
-  # Checks whether a Detail posts to an accounts receivable account, i.e. one whose code starts with "11".
+  # Checks whether a Detail posts to the configured accounts receivable account
+  # (TudlaAccounting.configuration.receivable_account_code) or any account beneath it.
   class IsAccountReceivableChecker
     def self.call(detail:)
       new(detail: detail).call
@@ -12,9 +13,11 @@ module TudlaAccounting
     end
 
     def call
-      return false unless @detail&.account&.code
+      code = TudlaAccounting.configuration.receivable_account_code
+      account = @detail&.account
+      return false if code.blank? || account.nil?
 
-      @detail.account.code.start_with?("11")
+      account.code == code || account.ancestors.exists?(code: code)
     end
   end
 end

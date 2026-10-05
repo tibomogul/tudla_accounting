@@ -1,8 +1,9 @@
 # frozen_string_literal: true
 
 module TudlaAccounting
-  # Creates or updates CarryingAmount records based on the type of an Entry:
-  # invoices/bills open a receivable/payable, payments/disbursements reduce it.
+  # Creates or updates CarryingAmount records based on the role of an Entry's source
+  # (see TudlaAccounting.configuration.carrying_amount_sources): receivables/payables
+  # open a carrying amount, receipts/disbursements reduce it. Unmapped sources are ignored.
   class CarryingAmountProcessor
     def self.call(entry:)
       new(entry: entry).call
@@ -13,14 +14,11 @@ module TudlaAccounting
     end
 
     def call
-      if IsEntryReceivableChecker.call(entry: @entry)
-        create_receivable_carrying_amount
-      elsif IsEntryPayableChecker.call(entry: @entry)
-        create_payable_carrying_amount
-      elsif IsEntryReceiptChecker.call(entry: @entry)
-        update_receivable_carrying_amount
-      elsif IsEntryDisbursementChecker.call(entry: @entry)
-        update_payable_carrying_amount
+      case CarryingAmountRole.call(entry: @entry)
+      when :receivable then create_receivable_carrying_amount
+      when :payable then create_payable_carrying_amount
+      when :receipt then update_receivable_carrying_amount
+      when :disbursement then update_payable_carrying_amount
       end
     end
 
@@ -45,7 +43,7 @@ module TudlaAccounting
         detail: detail,
         amount_cents: detail.amount_cents,
         carrying_amount_type: carrying_amount_type,
-        due_date: @entry.source.due_date,
+        due_date: due_date,
         related_party: @entry.organization
       )
 
@@ -60,6 +58,12 @@ module TudlaAccounting
       end
 
       carrying_amount
+    end
+
+    def due_date
+      method = TudlaAccounting.configuration.due_date_method
+      source = @entry.source
+      source.public_send(method) if method && source.respond_to?(method)
     end
 
     def update_receivable_carrying_amount
