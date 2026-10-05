@@ -1,30 +1,91 @@
 # TudlaAccounting
 
-A **Rails 8.1 mountable engine** pre-configured with RSpec, SimpleCov, and the Solid trifecta (Solid Queue, Solid Cache, Solid Cable).
+A double-entry general ledger for Rails apps, packaged as a mountable **Rails 8.1 engine**. Add it to a host app to get a chart of accounts, balanced journal entries, and account balances that roll up through account and period hierarchies. It can also track receivables and payables, including in foreign currencies, and supports multiple organizations.
 
-## Features
+## What it does
 
-### Core Stack
-- **Rails 8.1+** - Mountable engine architecture with `isolate_namespace`
-- **Solid Queue** - SQL-backed background job processing
-- **Solid Cache** - Database-backed caching layer
-- **Solid Cable** - Database-backed Action Cable adapter
-- **Tailwind CSS v4** - Utility-first styling via `tailwindcss-rails`
-- **DaisyUI** - Component library for the dummy app (engine styles are DaisyUI-free)
-- **Importmap Rails** - JavaScript module management without bundling
+### Chart of accounts
+`TudlaAccounting::Account` belongs to an organization and has a `code`, a `name`, and a category: `asset`, `liability`, `equity`, `income` or `expense`. Accounts form a tree, e.g. *1100 Accounts Receivable > 1105 AR – EUR customers*. A child must share its parent's category. An account can name a **contra account**, which flips its normal side, e.g. accumulated depreciation against an asset.
 
-### Testing & Quality
-- **RSpec** - Comprehensive test framework with Rails integration
-- **SimpleCov** - Code coverage reporting with custom groups
-- **FactoryBot** - Test fixture replacement for clean test data
-- **Capybara** - Integration testing for web interfaces
-- **Selenium WebDriver** - Browser automation for feature specs
+### Accounting periods
+`TudlaAccounting::Period` is a date range, and periods also form a tree: a year, then quarters, then months. `TudlaAccounting::PeriodCreator.call(organization, 2026)` builds a financial year and its twelve months in the configured time zone. Each period runs from the start of its first day to the end of its last. Pass a start month and day for a fiscal year, e.g. `PeriodCreator.call(org, 2026, 7, 1)`. `Period.ancestry_check(root)` checks that every period's children exactly cover it, with no gaps or overlaps.
 
-### Architecture Highlights
-- Isolated namespace pattern (`TudlaAccounting::`) for clean integration
-- Multi-database configuration for Solid gems (queue, cache, cable)
-- Full dummy Rails app in `spec/dummy/` for testing the engine
-- RuboCop with `rubocop-rails-omakase` for code style
+### Journal entries
+A `TudlaAccounting::Entry` is made up of `Detail` lines. Each line is a debit or credit of an amount to one account. An entry is only valid if:
+- debits equal credits
+- it has at least one debit and one credit
+- all lines are in one currency
+
+An entry can point at a `source` record in the host app, such as the invoice it came from, and a `related` entry, such as the invoice a payment settles. A line can carry a `ForeignExchange` record holding the foreign-currency amount and rate.
+
+`Entry.create_from_ruby_hash` builds an entry from plain data. You give account codes and **signed** amounts, and it works out whether each line is a debit or credit from the account's normal side. Positive increases the account; negative decreases it.
+
+### Posting and balances
+`entry.post(posted_at)` posts every line to the period that contains `posted_at`, then stamps the entry. The whole post is one transaction: if any line fails, nothing is posted. Each account has one `TudlaAccounting::Balance` per period, holding starting, current and ending amounts. Posting:
+- adds the amount to the balance of the deepest period containing `posted_at`, e.g. the month
+- rolls it up into every parent period (quarter, year) and every parent account
+- carries it forward into the starting amount of every later period, so back-dated entries keep later balances correct
+
+### Receivables and payables (carrying amounts)
+After posting, `CarryingAmountProcessor` keeps track of what's still owed. Posting an entry whose source is an invoice or bill opens a `CarryingAmount` on its receivable or payable line, with a due date and any foreign-currency amount. Posting a payment or disbursement that names that entry as `related` reduces it. If money moves through a bank account held in another currency (`BankAccountBalance`), that balance is updated in its own currency.
+
+This is **off until configured**. The host app chooses which of its models count as invoices, bills, payments and disbursements, and which accounts are receivables and payables. See [Configuration](#configuration).
+
+### Multi-tenancy
+Accounts, periods, entries, lines and balances all belong to a polymorphic `organization`, provided by the host app. The organization must respond to `currency`, which is the currency its books are kept in.
+
+## Usage
+
+```ruby
+org = Organization.find(1) # your host model; must respond to #currency
+
+# A calendar year of periods, and a few accounts
+year = TudlaAccounting::PeriodCreator.call(org, 2026)
+cash  = TudlaAccounting::Account.create!(organization: org, code: "1000", name: "Cash", category: :asset, currency: "USD")
+ar    = TudlaAccounting::Account.create!(organization: org, code: "1100", name: "Accounts Receivable", category: :asset, currency: "USD")
+sales = TudlaAccounting::Account.create!(organization: org, code: "4000", name: "Sales", category: :income, currency: "USD")
+
+# Invoice: amounts are signed, positive increases the account
+invoice = TudlaAccounting::Entry.create_from_ruby_hash(
+  organization_type: "Organization", organization_id: org.id,
+  particulars: "Invoice #42",
+  transacted_at: "2026-03-10T09:00:00Z",
+  details: [
+    { account_code: "1100", amount: "USD 1100.00" }, # debit AR
+    { account_code: "4000", amount: "USD 1100.00" }  # credit Sales
+  ]
+)
+invoice.post(Time.zone.parse("2026-03-10 09:00"))
+
+# Payment in April: AR goes down, cash goes up
+payment = TudlaAccounting::Entry.create_from_ruby_hash(
+  organization_type: "Organization", organization_id: org.id,
+  particulars: "Payment for invoice #42",
+  transacted_at: "2026-04-02T10:00:00Z",
+  details: [
+    { account_code: "1100", amount: "USD -1100.00" }, # credit AR
+    { account_code: "1000", amount: "USD 1100.00" }   # debit Cash
+  ]
+)
+payment.post(Time.zone.parse("2026-04-02 10:00"))
+
+march, april = year.children.order(:from_date).to_a.values_at(2, 3)
+TudlaAccounting::Balance.find_by(account: ar, period: march).ending_amount    # => 1100.00 USD
+TudlaAccounting::Balance.find_by(account: ar, period: april).starting_amount  # => 1100.00 USD (carried forward)
+TudlaAccounting::Balance.find_by(account: ar, period: april).ending_amount    # => 0.00 USD
+TudlaAccounting::Balance.find_by(account: sales, period: year).current_amount # => 1100.00 USD (year to date)
+TudlaAccounting::Balance.find_by(account: cash, period: year).ending_amount   # => 1100.00 USD
+```
+
+## Stack
+
+- **Rails 8.1+** mountable engine with `isolate_namespace TudlaAccounting`
+- **money-rails** for amounts and currencies, **ancestry** for the account and period trees
+- **Solid Queue / Solid Cache / Solid Cable** for SQL-backed jobs, caching and Action Cable
+- **Tailwind CSS v4** for engine views (no DaisyUI dependency) and **Importmap Rails**
+- **RSpec**, **FactoryBot**, **SimpleCov** (100% line coverage), **Capybara**
+- **RuboCop** with `rubocop-rails-omakase`
+- A full dummy Rails app in `spec/dummy/` for running the engine
 
 ## Getting Started
 
@@ -90,7 +151,7 @@ Configure the engine in an initializer, e.g. `config/initializers/tudla_accounti
 ```ruby
 TudlaAccounting.configure do |config|
   config.base_currency = "USD"
-  config.organization_class = "Organization"
+  config.time_zone = "UTC"                # zone PeriodCreator builds periods in; plain Dates are read in it
 
   # Receivables and payables (carrying amounts). Off until configured: entries
   # still post normally, but no carrying amounts are tracked.
