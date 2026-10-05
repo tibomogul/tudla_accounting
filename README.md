@@ -75,6 +75,12 @@ TudlaAccounting::EntryPostingJob.perform_later(entry.id)
 ### Aging report
 `AgingReportGenerator.call(organization:, report_type: :receivable, as_of_date:)` (or `:payable`) groups open amounts by related party and buckets them by days past due: current, 1–30, 31–60, 61–90 and over 90. It returns `summary` and `details` per party, plus `totals`, in the organization's currency. A past `as_of_date` shows what was owed on that day: later invoices are left out and later payments are added back.
 
+### Foreign exchange
+- **`ForexRateRetriever.call(from:, to:, date:)`** returns how many `to` one `from` was worth on a date. Rates are cached in `ForexRate`, and missing ones come from `forex_rate_provider`.
+- **`RbaForexRateProvider`** reads the Reserve Bank of Australia's published rates. It needs the `spreadsheet` gem in the host app and network access. A weekend or holiday uses the latest earlier business day.
+- **`ForexGainOrLossCalculator`** gives the gain or loss on a foreign amount of a receivable or payable between its booked rate and a date's rate.
+- **`RevaluationEntryGenerator.call(organization, period_end, next_period_start)`** revalues open foreign-currency receivables and payables at the period-end rate. It posts the unrealized gain or loss against `unrealized_fx_gain_account_code`, then posts a reversal on the next period's start, so the later settlement isn't double-counted. Running it twice for the same date does nothing more.
+
 ### Multi-tenancy
 Accounts, periods, entries, lines and balances all belong to a polymorphic `organization`, provided by the host app. The organization must respond to `currency`, which is the currency its books are kept in.
 
@@ -210,6 +216,10 @@ TudlaAccounting.configure do |config|
   }
   config.due_date_method = :due_date      # read from the source; blank if it doesn't respond
   config.related_party_method = :customer # who owes or is owed, read from the source; the organization if unset
+
+  # Foreign exchange: where missing rates come from, and where revaluation gains/losses go
+  config.forex_rate_provider = TudlaAccounting::RbaForexRateProvider.new # or any ->(from:, to:, date:) { rate }
+  config.unrealized_fx_gain_account_code = "4900"
 end
 ```
 

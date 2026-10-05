@@ -24,7 +24,8 @@ module TudlaAccounting
 
     attr_accessor :base_currency, :rounding, :time_zone, :organization_class,
                   :receivable_account_code, :payable_account_code, :due_date_method,
-                  :retained_earnings_account_code, :related_party_method
+                  :retained_earnings_account_code, :related_party_method,
+                  :forex_rate_provider, :unrealized_fx_gain_account_code
     attr_reader :carrying_amount_sources, :entry_sources
 
     def initialize
@@ -38,6 +39,8 @@ module TudlaAccounting
       @due_date_method = :due_date
       @retained_earnings_account_code = nil
       @related_party_method = nil
+      @forex_rate_provider = nil
+      @unrealized_fx_gain_account_code = nil
       @entry_sources = {}
     end
 
