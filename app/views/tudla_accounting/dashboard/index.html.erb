@@ -5,7 +5,7 @@
     <p class="font-semibold mb-2">Getting started</p>
     <ol class="list-decimal pl-5 space-y-1 text-sm">
       <li class="<%= "line-through tc-muted" if @year_count.positive? %>"><%= link_to "Create a financial year", new_period_path, class: "underline" %> so entries have a period to post to.</li>
-      <li class="<%= "line-through tc-muted" if @account_count.positive? %>"><%= link_to "Load a chart of accounts", setup_path, class: "underline" %> with opening balances, or <%= link_to "add accounts one by one", new_account_path, class: "underline" %>.</li>
+      <li class="<%= "line-through tc-muted" if @account_count.positive? %>"><%= link_to "Load a chart of accounts", setup_path, class: "underline" %> with opening balances, or <%= link_to "add accounts one by one", new_account_path, class: "underline" %> and <%= link_to "enter their opening balances", setup_opening_balances_path, class: "underline" %>.</li>
       <li>Then <%= link_to "record entries", new_entry_path, class: "underline" %>.</li>
     </ol>
   </div>

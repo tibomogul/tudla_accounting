@@ -16,6 +16,22 @@ module TudlaAccounting
       @config = TudlaAccounting.configuration
     end
 
+    def opening_balances
+      @form = OpeningBalancesForm.new(accounting_organization)
+    end
+
+    def save_opening_balances
+      @form = OpeningBalancesForm.new(accounting_organization)
+      if @form.save(params.fetch(:amounts, {}).permit!.to_h)
+        redirect_to reports_balance_sheet_path(period_id: @form.year.children.order(:from_date).first.id),
+                    notice: "Opening balances saved at #{helpers.tc_date(@form.year.from_date)}."
+      else
+        render :opening_balances, status: :unprocessable_entity
+      end
+    rescue ArgumentError => e
+      redirect_to setup_path, alert: "The opening balances were not saved: #{e.message}"
+    end
+
     def chart_of_accounts
       file = params.require(:file)
       loader = LOADERS[File.extname(file.original_filename).downcase]

@@ -94,7 +94,7 @@ Mounted at `/tudla_accounting` (see [Integration](#integration-into-a-host-appli
 - **Entries:** search and filter entries, write drafts with a line editor that keeps live debit/credit totals, post them, and reverse posted entries. Reversing a payment restores the receivable or payable it settled and reverses its realized exchange difference. An invoice or bill can be reversed once its payments are, which closes its receivable or payable.
 - **Reports:** balance sheet, profit and loss, trial balance, and receivables and payables aging.
 - **Periods:** create calendar or fiscal years, and see each year's months.
-- **Setup:** upload a chart of accounts with opening balances (CSV or Excel), import the receivables and payables open at the cut-over, and run the foreign exchange revaluation.
+- **Setup:** upload a chart of accounts with opening balances (CSV or Excel), or enter or correct opening balances account by account, with live totals checking that they balance. Also import the receivables and payables open at the cut-over, and run the foreign exchange revaluation.
 
 The pages use Tailwind CSS with the engine's own `tc-` component classes (no DaisyUI needed) and follow the host's light/dark theme. Their Stimulus controllers load through the engine's import map.
 

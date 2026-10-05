@@ -1,0 +1,58 @@
+<%= tc_page_header "Opening balances", subtitle: (@form.year ? "At the start of #{tc_period_label(@form.year)} (#{tc_date(@form.year.from_date)}), in #{accounting_organization.currency}" : nil) %>
+
+<% if @form.year.nil? %>
+  <div class="tc-alert tc-alert-warning"><span><%= link_to "Create a financial year", new_period_path, class: "underline" %> first: opening balances go at the start of the first year.</span></div>
+<% elsif @form.accounts.empty? %>
+  <div class="tc-alert tc-alert-warning"><span><%= link_to "Add accounts", new_account_path, class: "underline" %> first, or load a chart of accounts with its opening balances on the <%= link_to "setup page", setup_path, class: "underline" %>.</span></div>
+<% else %>
+  <%= form_with url: setup_opening_balances_path, method: :patch, class: "space-y-4",
+                data: { controller: "opening-balances", opening_balances_exponent_value: Money::Currency.new(accounting_organization.currency).exponent } do |form| %>
+    <% if @form.errors.any? %>
+      <div class="tc-alert tc-alert-danger" role="alert"><ul class="list-disc pl-4"><% @form.errors.each do |message| %><li><%= message %></li><% end %></ul></div>
+    <% end %>
+    <p class="tc-muted text-sm">Enter each account's balance; parent accounts add up their sub-accounts. Enter contra accounts (accumulated depreciation, allowances) as positive amounts: they are deducted.
+      Saving replaces any opening balances already there, and later balances move with them.</p>
+
+    <% account_tree_rows(@form.accounts).each do |label, category, rows| %>
+      <section class="tc-card overflow-x-auto" aria-labelledby="opening-<%= category %>">
+        <table class="tc-table">
+          <thead><tr><th id="opening-<%= category %>"><%= label %></th><th class="tc-num w-48"><%= accounting_organization.currency %></th></tr></thead>
+          <tbody>
+            <% rows.each do |account, depth| %>
+              <tr>
+                <td>
+                  <div style="padding-left: <%= depth * 1.25 %>rem" class="flex flex-wrap items-center gap-2">
+                    <span class="font-mono tc-muted"><%= account.code %></span>
+                    <%= label_tag "amounts_#{account.id}", account.name, class: (@form.leaf?(account) ? nil : "font-semibold") %>
+                    <% if account.contra? %><%= tc_badge "deducted", tone: :warning %><% end %>
+                  </div>
+                </td>
+                <td class="tc-num">
+                  <% if @form.leaf?(account) %>
+                    <%= text_field_tag "amounts[#{account.id}]", @form.amount(account).format(symbol: false, thousands_separator: ""), id: "amounts_#{account.id}",
+                                       inputmode: "decimal", class: "tc-input tc-num",
+                                       data: { opening_balances_target: "amount", side: (@form.debit_side?(account) ? "debit" : "credit"), action: "input->opening-balances#recalculate" } %>
+                  <% else %>
+                    <span class="tc-muted" title="The total of its sub-accounts when the page was loaded"><%= tc_money(@form.parent_total(account)) %></span>
+                  <% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </section>
+    <% end %>
+
+    <div class="tc-card tc-card-body flex flex-wrap items-center justify-between gap-4">
+      <div class="text-sm">
+        Debits <span class="font-semibold tc-num" data-opening-balances-target="debitTotal"></span> ·
+        Credits <span class="font-semibold tc-num" data-opening-balances-target="creditTotal"></span>
+        <p data-opening-balances-target="status" aria-live="polite"></p>
+      </div>
+      <div class="flex gap-2">
+        <%= form.submit "Save opening balances", class: "tc-btn" %>
+        <%= link_to "Cancel", setup_path, class: "tc-btn tc-btn-secondary" %>
+      </div>
+    </div>
+  <% end %>
+<% end %>

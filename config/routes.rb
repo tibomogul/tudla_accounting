@@ -5,6 +5,8 @@ TudlaAccounting::Engine.routes.draw do
   resources :periods, only: %i[index show new create destroy]
   get "setup", to: "setup#index", as: :setup
   scope "setup", controller: :setup, as: :setup do
+    get :opening_balances
+    patch :opening_balances, action: :save_opening_balances
     post :chart_of_accounts
     post :open_items
     post :revaluation
