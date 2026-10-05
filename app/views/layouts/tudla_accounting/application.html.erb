@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<html data-theme="light">
+<html>
 <head>
-  <title>TudlaAccounting</title>
+  <title><%= [ content_for(:title), "Accounting" ].compact.join(" · ") %></title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <%= csrf_meta_tags %>
   <%= csp_meta_tag %>
@@ -15,6 +15,7 @@
     engine styles. The host app must run tailwindcss:build to generate this file.
   %>
   <%= stylesheet_link_tag "tailwind", media: "all" %>
+  <%= javascript_importmap_tags "tudla_accounting/application" %>
   <script>
     (function() {
       var t = localStorage.getItem('theme');
@@ -22,9 +23,28 @@
     })();
   </script>
 </head>
-<body>
+<body class="tc-app">
+  <header class="border-b border-[var(--tc-border)] bg-[var(--tc-surface)]">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-3">
+      <div class="flex items-center gap-3">
+        <%= link_to "Accounting", root_path, class: "text-lg font-bold tracking-tight" %>
+        <% if accounting_organization %>
+          <span class="tc-muted text-sm"><%= accounting_organization.name %></span>
+          <%= tc_badge accounting_organization.currency %>
+        <% end %>
+      </div>
+      <nav class="flex flex-wrap items-center gap-1" aria-label="Accounting">
+        <% if accounting_organization %>
+          <%= tc_nav_link "Dashboard", root_path %>
+        <% end %>
+        <%= link_to "Back to app ↗", main_app.root_path, class: "tc-nav-link" %>
+      </nav>
+    </div>
+  </header>
 
-<%= yield %>
-
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <%= render "tudla_accounting/shared/flash" %>
+    <%= yield %>
+  </main>
 </body>
 </html>

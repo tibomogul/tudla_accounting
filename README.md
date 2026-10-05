@@ -201,6 +201,11 @@ Configure the engine in an initializer, e.g. `config/initializers/tudla_accounti
 
 ```ruby
 TudlaAccounting.configure do |config|
+  # Web pages: engine controllers inherit from this host controller (its login and
+  # helpers apply), and show the books of the organization this returns (403 if nil).
+  config.parent_controller = "::ApplicationController"
+  config.current_organization = ->(controller) { controller.current_organization }
+
   config.base_currency = "USD"
   config.time_zone = "UTC"                # zone PeriodCreator builds periods in; plain Dates are read in it
   config.retained_earnings_account_code = "3900" # takes in each year's net profit at year end

@@ -1,0 +1,24 @@
+<%= tc_page_header "Dashboard", subtitle: "#{accounting_organization.name}'s books, kept in #{accounting_organization.currency}" %>
+
+<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  <div class="tc-card tc-card-body">
+    <p class="tc-stat-label">Accounts</p>
+    <p class="tc-stat-value"><%= @account_count %></p>
+  </div>
+  <div class="tc-card tc-card-body">
+    <p class="tc-stat-label">Financial years</p>
+    <p class="tc-stat-value"><%= @year_count %></p>
+  </div>
+  <div class="tc-card tc-card-body">
+    <p class="tc-stat-label">Draft entries</p>
+    <p class="tc-stat-value"><%= @draft_count %></p>
+  </div>
+  <div class="tc-card tc-card-body">
+    <p class="tc-stat-label">Current period</p>
+    <% if @current_period %>
+      <p class="tc-stat-value text-lg"><%= tc_date(@current_period.from_date) %> – <%= tc_date(@current_period.thru_date) %></p>
+    <% else %>
+      <p class="mt-1"><%= tc_badge "None open today", tone: :warning %></p>
+    <% end %>
+  </div>
+</div>

@@ -5,6 +5,7 @@ require "solid_cache"
 require "solid_cable"
 require "tailwindcss-rails"
 require "importmap-rails"
+require "stimulus-rails"
 require "money-rails"
 require "monetize"
 require "ancestry"
@@ -14,6 +15,7 @@ require "tudla_accounting/engine"
 
 module TudlaAccounting
   class PeriodInvalid < StandardError; end
+  class ConfigurationError < StandardError; end
 
   class << self
     attr_accessor :configuration
@@ -26,7 +28,7 @@ module TudlaAccounting
                   :receivable_account_code, :payable_account_code, :due_date_method,
                   :retained_earnings_account_code, :related_party_method,
                   :forex_rate_provider, :unrealized_fx_gain_account_code,
-                  :realized_fx_gain_account_code
+                  :realized_fx_gain_account_code, :parent_controller, :current_organization
     attr_reader :carrying_amount_sources, :entry_sources
 
     def initialize
@@ -43,6 +45,11 @@ module TudlaAccounting
       @forex_rate_provider = nil
       @unrealized_fx_gain_account_code = nil
       @realized_fx_gain_account_code = nil
+      # UI: engine controllers inherit from this host controller (so its authentication and
+      # helpers apply), and current_organization is called with the controller to find the
+      # organization whose books are shown, e.g. ->(controller) { controller.current_organization }
+      @parent_controller = "::ApplicationController"
+      @current_organization = nil
       @entry_sources = {}
     end
 

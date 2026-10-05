@@ -1,0 +1,12 @@
+<div class="max-w-xl mx-auto p-8">
+  <h1 class="text-2xl font-bold mb-2">Open an organization's books</h1>
+  <p class="text-base-content/70 mb-6">A stand-in for a real login: the engine shows the books of the organization picked here.</p>
+  <ul class="menu bg-base-200 rounded-box">
+    <% @organizations.each do |organization| %>
+      <li><%= button_to "#{organization.name} (#{organization.currency})", session_path(organization_id: organization.id) %></li>
+    <% end %>
+  </ul>
+  <% if @organizations.empty? %>
+    <p class="mt-4">No organizations yet. Create one in the console: <code>Organization.create!(name: "Acme", currency: "AUD")</code></p>
+  <% end %>
+</div>

@@ -6,9 +6,11 @@
    Explicitly tells the CLI where to look for class usage within the engine.
    Relative path resolution:
    app/assets/tailwind/tudla_accounting/engine.css
-   ../../../views -> app/views
+   ../../../views   -> app/views
+   ../../../helpers -> app/helpers (helpers that build markup)
 */
 @source "../../../views";
+@source "../../../helpers";
 
 /*
   Engine design tokens (--tc-* prefix avoids collision with DaisyUI variables).
@@ -31,6 +33,12 @@
   --tc-primary-fg: oklch(0.99 0 0);
   --tc-accent:     oklch(0.62 0.18 160);
   --tc-code-bg:    oklch(0.94 0 0);
+  --tc-success:    oklch(0.52 0.14 155);
+  --tc-success-bg: oklch(0.95 0.04 155);
+  --tc-danger:     oklch(0.55 0.20 25);
+  --tc-danger-bg:  oklch(0.95 0.03 25);
+  --tc-warning:    oklch(0.55 0.13 75);
+  --tc-warning-bg: oklch(0.96 0.05 85);
 }
 
 [data-theme="dark"] {
@@ -44,6 +52,12 @@
   --tc-primary-fg: oklch(0.99 0 0);
   --tc-accent:     oklch(0.72 0.16 160);
   --tc-code-bg:    oklch(0.15 0.01 264);
+  --tc-success:    oklch(0.75 0.14 155);
+  --tc-success-bg: oklch(0.30 0.05 155);
+  --tc-danger:     oklch(0.72 0.16 25);
+  --tc-danger-bg:  oklch(0.30 0.06 25);
+  --tc-warning:    oklch(0.80 0.13 85);
+  --tc-warning-bg: oklch(0.32 0.05 85);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -58,5 +72,100 @@
     --tc-primary-fg: oklch(0.99 0 0);
     --tc-accent:     oklch(0.72 0.16 160);
     --tc-code-bg:    oklch(0.15 0.01 264);
+    --tc-success:    oklch(0.75 0.14 155);
+    --tc-success-bg: oklch(0.30 0.05 155);
+    --tc-danger:     oklch(0.72 0.16 25);
+    --tc-danger-bg:  oklch(0.30 0.06 25);
+    --tc-warning:    oklch(0.80 0.13 85);
+    --tc-warning-bg: oklch(0.32 0.05 85);
   }
+}
+
+/*
+  Engine components. Prefixed tc- so they never collide with DaisyUI's
+  .btn / .card / .table / .badge / .alert when the host app also loads DaisyUI.
+*/
+@layer components {
+  .tc-app { background: var(--tc-bg); color: var(--tc-text); min-height: 100vh; }
+
+  .tc-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem;
+    padding: 0.5rem 1rem; border-radius: 0.5rem; border: 1px solid transparent;
+    font-size: 0.875rem; font-weight: 600; line-height: 1.25rem; cursor: pointer;
+    background: var(--tc-primary); color: var(--tc-primary-fg);
+    transition: opacity 150ms, background-color 150ms;
+  }
+  .tc-btn:hover { opacity: 0.9; }
+  .tc-btn:focus-visible { outline: 2px solid var(--tc-primary); outline-offset: 2px; }
+  .tc-btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+  .tc-btn-secondary { background: var(--tc-surface); color: var(--tc-text); border-color: var(--tc-border); }
+  .tc-btn-secondary:hover { background: var(--tc-bg-subtle); opacity: 1; }
+  .tc-btn-danger { background: var(--tc-danger); color: var(--tc-primary-fg); }
+  .tc-btn-ghost { background: transparent; color: var(--tc-text-muted); }
+  .tc-btn-ghost:hover { background: var(--tc-bg-subtle); color: var(--tc-text); opacity: 1; }
+  .tc-btn-sm { padding: 0.25rem 0.625rem; font-size: 0.8125rem; }
+
+  .tc-card { background: var(--tc-surface); border: 1px solid var(--tc-border); border-radius: 0.75rem; }
+  .tc-card-body { padding: 1.25rem; }
+  .tc-card-title { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; }
+
+  .tc-table { width: 100%; font-size: 0.875rem; border-collapse: collapse; }
+  .tc-table th {
+    text-align: left; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--tc-text-muted); padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--tc-border);
+  }
+  .tc-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--tc-border); }
+  .tc-table tbody tr:hover { background: var(--tc-bg-subtle); }
+  .tc-table .tc-num, .tc-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .tc-badge {
+    display: inline-flex; align-items: center; padding: 0.125rem 0.5rem; border-radius: 9999px;
+    font-size: 0.75rem; font-weight: 600; background: var(--tc-bg-subtle); color: var(--tc-text-muted);
+    border: 1px solid var(--tc-border);
+  }
+  .tc-badge-primary { background: var(--tc-primary); color: var(--tc-primary-fg); border-color: transparent; }
+  .tc-badge-success { background: var(--tc-success-bg); color: var(--tc-success); border-color: transparent; }
+  .tc-badge-danger { background: var(--tc-danger-bg); color: var(--tc-danger); border-color: transparent; }
+  .tc-badge-warning { background: var(--tc-warning-bg); color: var(--tc-warning); border-color: transparent; }
+
+  .tc-alert {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
+    padding: 0.75rem 1rem; border-radius: 0.5rem; font-size: 0.875rem;
+    background: var(--tc-bg-subtle); color: var(--tc-text); border: 1px solid var(--tc-border);
+  }
+  .tc-alert-success { background: var(--tc-success-bg); color: var(--tc-success); border-color: transparent; }
+  .tc-alert-danger { background: var(--tc-danger-bg); color: var(--tc-danger); border-color: transparent; }
+  .tc-alert-warning { background: var(--tc-warning-bg); color: var(--tc-warning); border-color: transparent; }
+
+  .tc-label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem; }
+  .tc-input {
+    display: block; width: 100%; padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 0.875rem;
+    background: var(--tc-surface); color: var(--tc-text); border: 1px solid var(--tc-border);
+  }
+  .tc-input:focus { outline: 2px solid var(--tc-primary); outline-offset: 0; border-color: transparent; }
+  .tc-input-error { border-color: var(--tc-danger); }
+  .tc-hint { font-size: 0.75rem; color: var(--tc-text-muted); margin-top: 0.25rem; }
+  .tc-error-text { font-size: 0.75rem; color: var(--tc-danger); margin-top: 0.25rem; }
+
+  .tc-stat-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--tc-text-muted); }
+  .tc-stat-value { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  .tc-nav-link {
+    padding: 0.375rem 0.75rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500;
+    color: var(--tc-text-muted);
+  }
+  .tc-nav-link:hover { color: var(--tc-text); background: var(--tc-bg-subtle); }
+  .tc-nav-link[aria-current="page"] { color: var(--tc-text); background: var(--tc-bg-subtle); }
+
+  .tc-pagination { display: flex; align-items: center; gap: 0.25rem; font-size: 0.875rem; }
+  .tc-page {
+    min-width: 2rem; padding: 0.25rem 0.5rem; border-radius: 0.375rem; text-align: center;
+    color: var(--tc-text-muted); border: 1px solid transparent;
+  }
+  .tc-page:hover { background: var(--tc-bg-subtle); color: var(--tc-text); }
+  .tc-page[aria-current="page"] { border-color: var(--tc-border); color: var(--tc-text); font-weight: 600; }
+  .tc-page[aria-disabled="true"] { opacity: 0.4; pointer-events: none; }
+
+  .tc-muted { color: var(--tc-text-muted); }
+  .tc-negative { color: var(--tc-danger); }
 }

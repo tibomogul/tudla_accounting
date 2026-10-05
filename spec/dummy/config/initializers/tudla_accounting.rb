@@ -7,3 +7,8 @@ if ENV["TUDLA_SPEC_BASE_CURRENCY"]
     config.rounding = BigDecimal::ROUND_HALF_EVEN
   end
 end
+
+# The engine shows the books of the organization the dummy app's stand-in login picked.
+TudlaAccounting.configure do |config|
+  config.current_organization = ->(controller) { controller.send(:current_organization) }
+end

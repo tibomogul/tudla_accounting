@@ -28,6 +28,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency "solid_cable"
   spec.add_dependency "tailwindcss-rails"
   spec.add_dependency "importmap-rails"
+  spec.add_dependency "stimulus-rails"
   spec.add_dependency "money-rails"
   spec.add_dependency "ancestry"
   spec.add_dependency "csv"  # no longer a default gem from Ruby 3.4
@@ -42,7 +43,6 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "simplecov"
   spec.add_development_dependency "capybara"
   spec.add_development_dependency "selenium-webdriver"
-  spec.add_development_dependency "stimulus-rails"
   spec.add_development_dependency "debug"
   spec.add_development_dependency "spreadsheet" # for the optional RbaForexRateProvider (host apps add it to use it)
 end

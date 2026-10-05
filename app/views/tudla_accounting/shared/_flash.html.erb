@@ -1,0 +1,7 @@
+<% tones = { "notice" => "success", "alert" => "danger" } %>
+<% flash.each do |type, message| %>
+  <div class="tc-alert tc-alert-<%= tones.fetch(type.to_s, "warning") %> mb-4" role="status" data-controller="dismiss">
+    <span><%= message %></span>
+    <button type="button" class="tc-btn tc-btn-ghost tc-btn-sm" data-action="dismiss#close" aria-label="Dismiss">✕</button>
+  </div>
+<% end %>

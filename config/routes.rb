@@ -1,3 +1,3 @@
 TudlaAccounting::Engine.routes.draw do
-  root to: "pages#index"
+  root to: "dashboard#index"
 end
