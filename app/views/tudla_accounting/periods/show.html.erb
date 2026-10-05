@@ -1,0 +1,32 @@
+<%= tc_page_header "Financial year #{tc_period_label(@year)}", subtitle: "#{tc_date(@year.from_date)} to #{tc_date(@year.thru_date)}" do %>
+  <% if @year.deletable? %>
+    <%= button_to "Delete year", period_path(@year), method: :delete, class: "tc-btn tc-btn-danger",
+                  form: { data: { controller: "confirm", confirm_message_value: "Delete #{tc_period_label(@year)} and its months?", action: "submit->confirm#ask" } } %>
+  <% end %>
+<% end %>
+
+<p class="mb-4">
+  <% if TudlaAccounting::Period.ancestry_check(@year) %>
+    <%= tc_badge "Months cover the whole year", tone: :success %>
+  <% else %>
+    <%= tc_badge "Months leave gaps or overlap", tone: :danger %>
+  <% end %>
+</p>
+
+<div class="tc-card overflow-x-auto">
+  <table class="tc-table">
+    <thead><tr><th>Month</th><th>From</th><th>To</th><th class="tc-num">Lines posted</th></tr></thead>
+    <tbody>
+      <% @months.each do |month| %>
+        <tr>
+          <td class="font-medium"><%= tc_period_label(month) %></td>
+          <td><%= tc_date(month.from_date) %></td>
+          <td><%= tc_date(month.thru_date) %></td>
+          <td class="tc-num"><%= @line_counts.fetch(month.id, 0) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+
+<p class="mt-6"><%= link_to "← All years", periods_path, class: "tc-btn tc-btn-ghost" %></p>

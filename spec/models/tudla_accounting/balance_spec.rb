@@ -150,6 +150,24 @@ RSpec.describe TudlaAccounting::Balance, type: :model do
         expect(described_class.get(asset, apr).starting_amount).to eq(usd(300_00))
       end
 
+      describe ".peek" do
+        it "returns the stored balance" do
+          stored = described_class.get(asset, year)
+          expect(described_class.peek(asset, year)).to eq(stored)
+        end
+
+        it "works out a missing balance without storing anything, at what .get would store" do
+          create(:tudla_accounting_balance, account: asset, period: q2, organization: organization,
+                                            starting_amount_cents: 300_00, current_amount_cents: 0, ending_amount_cents: 300_00)
+
+          peeked = nil
+          expect { peeked = described_class.peek(asset, apr) }.not_to change(described_class, :count)
+          expect(peeked).to be_new_record
+          expect(peeked).to have_attributes(starting_amount: usd(300_00), ending_amount: usd(300_00), current_amount: usd(0))
+          expect(described_class.get(asset, apr)).to have_attributes(starting_amount: peeked.starting_amount, persisted?: true)
+        end
+      end
+
       it "skips earlier periods that have no balance and starts from the latest one that does" do
         jan = create(:tudla_accounting_period, organization: organization, parent: q1, from_date: Date.new(2026, 1, 1), thru_date: Date.new(2026, 1, 31).end_of_day)
         create(:tudla_accounting_period, organization: organization, parent: q1, from_date: Date.new(2026, 2, 1), thru_date: Date.new(2026, 2, 28).end_of_day)

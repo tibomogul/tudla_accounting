@@ -19,9 +19,16 @@ module TudlaAccounting
       CATEGORY_EXPENSE.to_sym => 4
     }
 
+    normalizes :currency, with: ->(currency) { currency.strip.upcase.presence }
+
     validates :name, :code, :category, presence: true
+    validates :code, uniqueness: { scope: [ :organization_type, :organization_id ] }
 
     validate :validate_parent
+    validate :validate_known_currency
+    validate :validate_structure_unchanged_once_used, on: :update
+
+    before_destroy :ensure_deletable, prepend: true
 
     has_many :balances, dependent: :destroy, class_name: "TudlaAccounting::Balance"
     has_many :details, dependent: :destroy, class_name: "TudlaAccounting::Detail"
@@ -46,7 +53,36 @@ module TudlaAccounting
       contra_account_id.present?
     end
 
+    # Category, parent and contra account decide how balances add up, so they are fixed
+    # once anything has been posted to the account.
+    def structure_editable?
+      details.none? && balances.none?
+    end
+
+    # Only an account with no history, no sub-accounts and nothing offsetting it.
+    def deletable?
+      structure_editable? && children.none? && contra_for.nil?
+    end
+
     private
+
+    def validate_known_currency
+      errors.add(:currency, "is not a known currency code") if currency.present? && Money::Currency.find(currency).nil?
+    end
+
+    def validate_structure_unchanged_once_used
+      changed_structure = %w[category ancestry contra_account_id] & changed
+      return if changed_structure.empty? || structure_editable?
+
+      errors.add(:base, "Category, parent and contra account can't change once the account has postings")
+    end
+
+    def ensure_deletable
+      return if deletable?
+
+      errors.add(:base, "Only an account with no postings, sub-accounts or contra accounts can be deleted")
+      throw :abort
+    end
 
     def validate_parent
       return if parent_id.nil?

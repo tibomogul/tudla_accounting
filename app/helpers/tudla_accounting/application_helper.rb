@@ -35,6 +35,19 @@ module TudlaAccounting
       link_to text, path, class: "tc-nav-link", aria: { current: ("page" if current) }
     end
 
+    # "2026" for a calendar year, otherwise its date range; "Mar 2026" for a month.
+    def tc_period_label(period)
+      from = period.from_date.to_date
+      thru = period.thru_date.to_date
+      if from == from.beginning_of_year && thru == from.end_of_year
+        from.year.to_s
+      elsif from == from.beginning_of_month && thru == from.end_of_month
+        from.strftime("%b %Y")
+      else
+        "#{tc_date(from)} – #{tc_date(thru)}"
+      end
+    end
+
     # A labelled form field with its hint and errors, e.g.
     #   tc_field(form, :name) / tc_field(form, :category, as: :select, choices: [...])
     def tc_field(form, attribute, as: :text_field, label: nil, hint: nil, choices: nil, **options)

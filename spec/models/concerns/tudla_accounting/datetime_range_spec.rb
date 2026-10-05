@@ -18,6 +18,22 @@ RSpec.describe TudlaAccounting::DatetimeRange do
     it "orders by from_date, then thru_date" do
       expect([ mar, q1, feb, jan ].sort).to eq([ jan, q1, feb, mar ])
     end
+
+    it "is not comparable with something that isn't a range" do
+      expect(jan <=> nil).to be_nil
+      expect(jan <=> "January").to be_nil
+    end
+
+    it "leaves equality to the records: same dates are not the same period" do
+      organization = create(:organization)
+      saved = create(:tudla_accounting_period, organization: organization, from_date: jan.from_date, thru_date: jan.thru_date)
+      twin = create(:tudla_accounting_period, organization: create(:organization), from_date: jan.from_date, thru_date: jan.thru_date)
+
+      expect(saved).not_to eq(twin)
+      expect(saved).to eq(klass.find(saved.id))
+      expect(saved.equals?(twin)).to be(true)
+      expect(saved == nil).to be(false) # rubocop:disable Style/NilComparison
+    end
   end
 
   describe "#includes_date?" do

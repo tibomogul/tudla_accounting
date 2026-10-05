@@ -11,6 +11,14 @@ module TudlaAccounting
 
     has_many :balances, dependent: :destroy, class_name: "TudlaAccounting::Balance"
 
+    # Records are equal by identity, as ActiveRecord defines it, not by their dates as
+    # DatetimeRange's Comparable would make them (two organizations' 2026 are different
+    # periods). Use equals? to compare dates.
+    def ==(other)
+      ActiveRecord::Core.instance_method(:==).bind_call(self, other)
+    end
+    alias eql? ==
+
     def self.ancestry_check(period)
       return false if period.parent
 
@@ -29,6 +37,18 @@ module TudlaAccounting
     # Periods containing a moment in time. A plain Date means that day in the
     # configured time zone (the zone PeriodCreator builds periods in), not Rails'
     # Time.zone, which may differ.
+    # A year (or any period) can be removed while nothing has been posted in it.
+    def deletable?
+      TudlaAccounting::Balance.where(period_id: subtree_ids).none?
+    end
+
+    # Removes the period and everything inside it, deepest first.
+    def destroy_with_subtree!
+      raise ActiveRecord::RecordNotDestroyed.new("Only a period with no balances can be deleted", self) unless deletable?
+
+      transaction { subtree.sort_by(&:depth).reverse_each(&:destroy!) }
+    end
+
     def self.periods_for_date(org, date_or_time)
       moment = date_or_time.instance_of?(Date) ? date_or_time.in_time_zone(TudlaAccounting.configuration.time_zone) : date_or_time
       where(organization: org).includes_date?(moment)

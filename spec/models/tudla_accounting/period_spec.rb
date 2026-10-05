@@ -157,4 +157,20 @@ RSpec.describe TudlaAccounting::Period, type: :model do
       expect(described_class.periods_for_date(organization, Date.new(2026, 1, 31))).to contain_exactly(year, jan)
     end
   end
+
+  describe "#deletable? and #destroy_with_subtree!" do
+    let(:organization) { create(:organization) }
+    let!(:year) { TudlaAccounting::PeriodCreator.call(organization, 2026) }
+
+    it "removes the year and its months while nothing is posted" do
+      expect(year.deletable?).to be(true)
+      expect { year.destroy_with_subtree! }.to change(described_class, :count).by(-13)
+    end
+
+    it "refuses once a balance exists anywhere in it" do
+      TudlaAccounting::Balance.get(create(:tudla_accounting_account, organization: organization), year.children.last)
+      expect(year.deletable?).to be(false)
+      expect { year.destroy_with_subtree! }.to raise_error(ActiveRecord::RecordNotDestroyed, "Only a period with no balances can be deleted")
+    end
+  end
 end

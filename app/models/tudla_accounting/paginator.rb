@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module TudlaAccounting
-  # Splits a scope into pages for the engine's lists:
+  # Splits a scope (or an array) into pages for the engine's lists:
   #
   #   @page = Paginator.new(organization_scope(Entry).order(:id), page: params[:page])
   #   @page.records # this page's records
@@ -18,7 +18,8 @@ module TudlaAccounting
     end
 
     def records
-      @scope.limit(per_page).offset((page - 1) * per_page)
+      offset = (page - 1) * per_page
+      @scope.is_a?(Array) ? @scope.slice(offset, per_page) || [] : @scope.limit(per_page).offset(offset)
     end
 
     def total_pages

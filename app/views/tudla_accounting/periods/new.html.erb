@@ -1,0 +1,26 @@
+<%= tc_page_header "New financial year", subtitle: "Creates the year and its twelve months, in #{TudlaAccounting.configuration.time_zone} time" %>
+
+<%= form_with scope: :year, url: periods_path, class: "tc-card tc-card-body space-y-4 max-w-xl" do |form| %>
+  <% if @error %><div class="tc-alert tc-alert-danger" role="alert"><%= @error %></div><% end %>
+
+  <div class="grid gap-4 sm:grid-cols-3">
+    <div class="space-y-1">
+      <%= form.label :year, "Year", class: "tc-label" %>
+      <%= form.number_field :year, value: @form.year, min: 1, class: "tc-input", required: true %>
+    </div>
+    <div class="space-y-1">
+      <%= form.label :start_month, "Starts in", class: "tc-label" %>
+      <%= form.select :start_month, Date::MONTHNAMES.compact.each_with_index.map { |name, index| [ name, index + 1 ] }, { selected: @form.start_month }, class: "tc-input" %>
+    </div>
+    <div class="space-y-1">
+      <%= form.label :start_day, "On day", class: "tc-label" %>
+      <%= form.number_field :start_day, value: @form.start_day, min: 1, max: 28, class: "tc-input" %>
+    </div>
+  </div>
+  <p class="tc-hint">A calendar year starts in January on day 1. A July–June financial year starts in July.</p>
+
+  <div class="flex gap-2">
+    <%= form.submit "Create year", class: "tc-btn" %>
+    <%= link_to "Cancel", periods_path, class: "tc-btn tc-btn-secondary" %>
+  </div>
+<% end %>

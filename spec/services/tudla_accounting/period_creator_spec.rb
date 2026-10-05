@@ -68,6 +68,15 @@ RSpec.describe TudlaAccounting::PeriodCreator, type: :service do
       expect(root.thru_date).to eq(zone.local(2026, 12, 31).end_of_day.floor(6))
     end
 
+    it "refuses a year overlapping one of the organization's years, but not another organization's" do
+      described_class.call(organization, 2026)
+
+      expect { described_class.call(organization, 2026, 7) }.to raise_error(TudlaAccounting::PeriodInvalid, "The year overlaps an existing financial year")
+      expect { described_class.call(organization, 2025, 12, 31 - 3) }.to raise_error(TudlaAccounting::PeriodInvalid)
+      expect(described_class.call(organization, 2027)).to be_present
+      expect(described_class.call(create(:organization), 2026)).to be_present
+    end
+
     it "produces a period tree that passes Period.ancestry_check" do
       expect(TudlaAccounting::Period.ancestry_check(described_class.call(organization, 2026))).to be(true)
     end

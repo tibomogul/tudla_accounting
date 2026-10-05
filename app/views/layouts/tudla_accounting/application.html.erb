@@ -36,6 +36,8 @@
       <nav class="flex flex-wrap items-center gap-1" aria-label="Accounting">
         <% if accounting_organization %>
           <%= tc_nav_link "Dashboard", root_path %>
+          <%= tc_nav_link "Accounts", accounts_path %>
+          <%= tc_nav_link "Periods", periods_path %>
         <% end %>
         <%= link_to "Back to app ↗", main_app.root_path, class: "tc-nav-link" %>
       </nav>

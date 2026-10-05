@@ -69,4 +69,14 @@ RSpec.describe TudlaAccounting::ApplicationHelper, type: :helper do
       expect(html).to include("tc-input-error", '<p class="tc-error-text">Code can&#39;t be blank</p>')
     end
   end
+
+  it "#tc_period_label names calendar years and months, and dates other periods" do
+    organization = create(:organization)
+    year = TudlaAccounting::PeriodCreator.call(organization, 2026)
+    fiscal = TudlaAccounting::PeriodCreator.call(organization, 2027, 7)
+
+    expect(helper.tc_period_label(year)).to eq("2026")
+    expect(helper.tc_period_label(year.children.order(:from_date).third)).to eq("Mar 2026")
+    expect(helper.tc_period_label(fiscal)).to eq("1 Jul 2027 – 30 Jun 2028")
+  end
 end

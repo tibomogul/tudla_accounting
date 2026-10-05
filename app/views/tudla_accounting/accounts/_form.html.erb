@@ -1,0 +1,35 @@
+<%# locals: (account:, accounts:) %>
+<%= form_with model: account, url: (account.persisted? ? account_path(account) : accounts_path), class: "tc-card tc-card-body space-y-4 max-w-2xl" do |form| %>
+  <% if account.errors[:base].any? %>
+    <div class="tc-alert tc-alert-danger" role="alert"><%= account.errors[:base].to_sentence %></div>
+  <% end %>
+
+  <div class="grid gap-4 sm:grid-cols-3">
+    <%= tc_field form, :code, required: true %>
+    <div class="sm:col-span-2"><%= tc_field form, :name, required: true %></div>
+  </div>
+
+  <% locked = account.persisted? && !account.structure_editable? %>
+  <% if locked %>
+    <p class="tc-hint">Category, parent and contra account are fixed now that the account has postings.</p>
+  <% end %>
+
+  <div class="grid gap-4 sm:grid-cols-2">
+    <%= tc_field form, :category, as: :select, choices: account_category_options, disabled: locked %>
+    <%= tc_field form, :currency, maxlength: 3, class: "uppercase", hint: "#{accounting_organization.currency} unless the account is held in another currency" %>
+  </div>
+
+  <div class="grid gap-4 sm:grid-cols-2">
+    <%= tc_field form, :parent_id, as: :select, label: "Parent account", disabled: locked,
+                 choices: [ [ "None (top level)", "" ] ] + account_choices(accounts, except: account, exclude_descendants: true),
+                 hint: "Must have the same category" %>
+    <%= tc_field form, :contra_account_id, as: :select, label: "Contra account for", disabled: locked,
+                 choices: [ [ "Not a contra account", "" ] ] + account_choices(accounts, except: account),
+                 hint: "The account this one offsets, e.g. accumulated depreciation offsets equipment" %>
+  </div>
+
+  <div class="flex gap-2">
+    <%= form.submit (account.persisted? ? "Save account" : "Create account"), class: "tc-btn" %>
+    <%= link_to "Cancel", (account.persisted? ? account_path(account) : accounts_path), class: "tc-btn tc-btn-secondary" %>
+  </div>
+<% end %>

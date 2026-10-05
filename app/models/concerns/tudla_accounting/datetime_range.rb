@@ -34,7 +34,9 @@ module TudlaAccounting
       end
     end
 
+    # Orders ranges by start, then end. Not comparable with anything that isn't a range.
     def <=>(other)
+      return nil unless other.respond_to?(:from_date) && other.respond_to?(:thru_date)
       return (from_date <=> other.from_date) unless from_date == other.from_date
 
       (thru_date <=> other.thru_date)

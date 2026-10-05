@@ -1,0 +1,95 @@
+<%= tc_page_header @account.code_with_name, subtitle: "#{@account.category.capitalize} account#{" · held in #{@account.currency}" if @account.currency.present?}" do %>
+  <%= link_to "Edit", edit_account_path(@account), class: "tc-btn tc-btn-secondary" %>
+  <%= link_to "Add sub-account", new_account_path(parent_id: @account.id, category: @account.category), class: "tc-btn tc-btn-secondary" %>
+  <% if @account.deletable? %>
+    <%= button_to "Delete", account_path(@account), method: :delete, class: "tc-btn tc-btn-danger",
+                  form: { data: { controller: "confirm", confirm_message_value: "Delete #{@account.code_with_name}?", action: "submit->confirm#ask" } } %>
+  <% end %>
+<% end %>
+
+<div class="grid gap-4 sm:grid-cols-3 mb-6">
+  <div class="tc-card tc-card-body">
+    <p class="tc-stat-label">Parent</p>
+    <p class="mt-1"><%= @account.parent ? link_to(@account.parent.code_with_name, account_path(@account.parent)) : "Top level" %></p>
+  </div>
+  <div class="tc-card tc-card-body">
+    <p class="tc-stat-label">Contra account for</p>
+    <p class="mt-1"><%= @account.contra_account ? link_to(@account.contra_account.code_with_name, account_path(@account.contra_account)) : "—" %></p>
+  </div>
+  <div class="tc-card tc-card-body">
+    <p class="tc-stat-label">Sub-accounts</p>
+    <p class="mt-1"><%= safe_join(@account.children.order(:code).map { |child| link_to(child.code, account_path(child)) }, ", ").presence || "None" %></p>
+  </div>
+</div>
+
+<% if @year.nil? %>
+  <div class="tc-alert tc-alert-warning">No financial year yet. <%= link_to "Create one", new_period_path, class: "underline" %> to see balances.</div>
+<% else %>
+  <div class="flex flex-wrap items-end justify-between gap-4 mb-3">
+    <h2 class="text-lg font-semibold">Balances for <%= tc_period_label(@year) %></h2>
+    <% if @years.size > 1 %>
+      <%= form_with url: account_path(@account), method: :get, class: "flex items-end gap-2" do |form| %>
+        <%= form.select :year_id, @years.map { |year| [ tc_period_label(year), year.id ] }, { selected: @year.id }, class: "tc-input", aria: { label: "Financial year" } %>
+        <%= form.submit "Show", class: "tc-btn tc-btn-secondary", name: nil %>
+      <% end %>
+    <% end %>
+  </div>
+
+  <div class="tc-card overflow-x-auto mb-8">
+    <table class="tc-table">
+      <thead>
+        <tr><th>Period</th><th class="tc-num">Opening</th><th class="tc-num">Movement</th><th class="tc-num">Closing</th></tr>
+      </thead>
+      <tbody>
+        <% @months.each do |month, balance| %>
+          <tr>
+            <td><%= tc_period_label(month) %></td>
+            <td class="tc-num"><%= tc_money(balance.starting_amount) %></td>
+            <td class="tc-num"><%= balance.current_amount.zero? ? tag.span("—", class: "tc-muted") : tc_money(balance.current_amount) %></td>
+            <td class="tc-num"><%= tc_money(balance.ending_amount) %></td>
+          </tr>
+        <% end %>
+        <tr class="font-semibold">
+          <td>Year</td>
+          <td class="tc-num"><%= tc_money(@year_balance.starting_amount) %></td>
+          <td class="tc-num"><%= tc_money(@year_balance.current_amount) %></td>
+          <td class="tc-num"><%= tc_money(@year_balance.ending_amount) %></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="flex flex-wrap items-end justify-between gap-4 mb-3">
+    <h2 class="text-lg font-semibold" id="ledger">Ledger<% if @account.children.any? %> <span class="tc-muted text-sm font-normal">(including sub-accounts)</span><% end %></h2>
+    <%= form_with url: account_path(@account, anchor: "ledger"), method: :get, class: "flex flex-wrap items-end gap-2" do |form| %>
+      <%= form.hidden_field :year_id, value: @year.id %>
+      <div><%= form.label :from, "From", class: "tc-label" %><%= form.date_field :from, value: @ledger[:from], class: "tc-input" %></div>
+      <div><%= form.label :thru, "To", class: "tc-label" %><%= form.date_field :thru, value: @ledger[:thru], class: "tc-input" %></div>
+      <%= form.submit "Filter", class: "tc-btn tc-btn-secondary", name: nil %>
+    <% end %>
+  </div>
+
+  <div class="tc-card overflow-x-auto">
+    <table class="tc-table">
+      <thead>
+        <tr><th>Date</th><th>Particulars</th><% if @account.children.any? %><th>Account</th><% end %><th class="tc-num">Debit</th><th class="tc-num">Credit</th><th class="tc-num">Balance</th></tr>
+      </thead>
+      <tbody>
+        <% if @ledger[:page].records.empty? %>
+          <tr><td colspan="6" class="tc-muted text-center">Nothing posted<%= " in these dates" if @ledger[:from] || @ledger[:thru] %>.</td></tr>
+        <% end %>
+        <% @ledger[:page].records.each do |row| %>
+          <tr>
+            <td class="whitespace-nowrap"><%= tc_date(row[:line].entry.posted_at) %></td>
+            <td><%= row[:line].entry.particulars %></td>
+            <% if @account.children.any? %><td class="font-mono"><%= link_to row[:line].account.code, account_path(row[:line].account) %></td><% end %>
+            <td class="tc-num"><%= tc_money(row[:debit]) %></td>
+            <td class="tc-num"><%= tc_money(row[:credit]) %></td>
+            <td class="tc-num"><%= tc_money(row[:balance]) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+  <%= render "tudla_accounting/shared/pagination", paginator: @ledger[:page] %>
+<% end %>

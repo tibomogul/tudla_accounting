@@ -1,0 +1,42 @@
+<%= tc_page_header "Chart of accounts", subtitle: (@year ? "Closing balances for #{tc_period_label(@year)}, in #{accounting_organization.currency}" : "No financial year yet") do %>
+  <%= link_to "New account", new_account_path, class: "tc-btn" %>
+<% end %>
+
+<% tree = account_tree_rows(@accounts) %>
+<% if tree.empty? %>
+  <div class="tc-card tc-card-body text-center">
+    <p class="tc-muted">No accounts yet.</p>
+    <p class="mt-4"><%= link_to "Create the first account", new_account_path, class: "tc-btn" %></p>
+  </div>
+<% end %>
+
+<div class="space-y-6">
+  <% tree.each do |label, category, rows| %>
+    <section class="tc-card overflow-x-auto" aria-labelledby="category-<%= category %>">
+      <table class="tc-table">
+        <thead>
+          <tr>
+            <th id="category-<%= category %>" colspan="2"><%= label %></th>
+            <th class="tc-num">Balance</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% rows.each do |account, depth| %>
+            <tr>
+              <td class="w-24 font-mono"><%= link_to account.code, account_path(account) %></td>
+              <td>
+                <div style="padding-left: <%= depth * 1.25 %>rem" class="flex flex-wrap items-center gap-2">
+                  <%= link_to account.name, account_path(account), class: (depth.zero? ? "font-semibold" : nil) %>
+                  <% if account.contra? %><%= tc_badge "contra #{account.contra_account.code}", tone: :warning %><% end %>
+                  <% if account.currency.present? && account.currency != accounting_organization.currency %><%= tc_badge account.currency %><% end %>
+                </div>
+              </td>
+              <%# A contra account reduces its category, so it shows as a deduction here. %>
+              <td class="tc-num"><%= @year ? tc_money(account.contra? ? -@closing[account.id] : @closing[account.id]) : "—" %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </section>
+  <% end %>
+</div>

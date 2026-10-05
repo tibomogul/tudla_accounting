@@ -27,4 +27,10 @@ RSpec.describe TudlaAccounting::Paginator do
     expect(paginator.window).to eq([ 1, nil, 3, 4, 5, nil, 7 ])
     expect(described_class.new(scope, page: 1, per_page: 1).window).to eq([ 1, 2, nil, 7 ])
   end
+
+  it "pages an array" do
+    paginator = described_class.new((1..7).to_a, page: 3, per_page: 3)
+    expect(paginator.records).to eq([ 7 ])
+    expect(described_class.new([], page: 1).records).to eq([])
+  end
 end

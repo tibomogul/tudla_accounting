@@ -81,7 +81,16 @@ module TudlaAccounting
     end
 
     class << self
+      # The account's balance for a period, created (and stored) if it doesn't exist yet.
       def get(account, period)
+        balance = peek(account, period)
+        balance.save! if balance.new_record?
+        balance
+      end
+
+      # The account's balance for a period without storing anything: the stored balance,
+      # or a new unsaved one opening at what the period would open at. Use it to read.
+      def peek(account, period)
         balance = find_by(account: account, period: period)
         return balance if balance
 
@@ -96,12 +105,12 @@ module TudlaAccounting
         starting_amount = if latest_earlier_balance
           latest_earlier_balance.ending_amount
         elsif period.has_parent?
-          get(account, period.parent).starting_amount
+          peek(account, period.parent).starting_amount
         else
           opening_for_year(account, period)
         end
 
-        create!(
+        new(
           account: account,
           period: period,
           starting_amount: starting_amount,
@@ -169,7 +178,7 @@ module TudlaAccounting
         previous_year = earlier_roots(year).order(:from_date).last
         return Money.new(0, org.currency) unless previous_year && account.balance_sheet_account?
 
-        opening = get(account, previous_year).ending_amount
+        opening = peek(account, previous_year).ending_amount
         retained_earnings = retained_earnings_account(org)
         if retained_earnings && (retained_earnings == account || retained_earnings.ancestor_ids.include?(account.id))
           opening += net_profit(org, previous_year)
