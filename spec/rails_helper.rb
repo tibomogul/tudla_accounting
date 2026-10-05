@@ -33,12 +33,23 @@ require 'capybara/rspec'
 # If there are pending migrations it will invoke `db:test:prepare` to
 # recreate the test database by loading the schema.
 # If you are not using ActiveRecord, you can remove these lines.
+# Loading schema.rb into the test database records which migrations it covers from the
+# dummy app's db/migrate only; include the engine's, or after a reload the engine's
+# migrations look pending.
+ActiveRecord::Tasks::DatabaseTasks.migrations_paths |= [ TudlaAccounting::Engine.root.join("db/migrate").to_s ]
+
 begin
   ActiveRecord::Migration.maintain_test_schema!
 rescue ActiveRecord::PendingMigrationError => e
   abort e.to_s.strip
 end
 RSpec.configure do |config|
+  # schema.rb can't hold the triggers protecting posted entries; make sure the test
+  # database has them even when it was built from the schema.
+  config.before(:suite) do
+    TudlaAccounting::DatabaseProtection.install! unless TudlaAccounting::DatabaseProtection.installed?
+  end
+
   # Remove this line if you're not using ActiveRecord or ActiveRecord fixtures
   config.fixture_paths = [
     Rails.root.join('spec/fixtures')

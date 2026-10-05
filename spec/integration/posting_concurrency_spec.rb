@@ -8,6 +8,12 @@ RSpec.describe "Concurrent posting" do
   let(:organizations) { [] }
 
   after do
+    # Posted entries are protected in the database; purging test books is the
+    # legitimate exception.
+    TudlaAccounting::DatabaseProtection.allowing_posted_changes { purge_books }
+  end
+
+  def purge_books
     org_ids = organizations.map(&:id)
     scope = ->(model) { model.where(organization_type: "Organization", organization_id: org_ids) }
     entry_ids = scope.call(TudlaAccounting::Entry).pluck(:id)

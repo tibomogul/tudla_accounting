@@ -33,6 +33,18 @@ An entry can point at a `source` record in the host app, such as the invoice it 
 
 Back-dated entries into an earlier year follow the same rules, so later years stay correct whatever order entries are posted in. `Balance.net_profit(organization, year)` returns a year's profit. Without `retained_earnings_account_code`, income and expenses still restart each year, but the profit isn't carried, so later years' balance sheets won't balance.
 
+**Checking and rebuilding balances.** Balances are a running total kept by posting; the posted entries and the first year's opening balances are the record. `TudlaAccounting::BalanceRebuilder.new(organization).differences` works every balance out again from those, independently of the posting code, and lists any stored figure that differs (or a balance with activity that is missing). `rebuild!` rewrites the stored balances to match, under the same organization lock as posting, and never touches entries. From the command line:
+
+```bash
+bin/rails tudla_accounting:balances:check     # lists differences; exits 1 if there are any
+bin/rails tudla_accounting:balances:rebuild   # ORGANIZATION=Organization:42 limits either task to one organization
+```
+
+### Database integrity
+The engine's migrations add unique keys (one balance per account and period, account codes per organization, one carrying amount per line, one exchange rate per currency pair and day) and checks (positive line amounts, known tallies, categories and carrying-amount types). On PostgreSQL, triggers also refuse any change to a posted entry or its lines, or their deletion, from anywhere (a console, a job, raw SQL): correct posted entries by reversing them. Touching `updated_at` is allowed. Data maintenance that really must change posted rows can run inside `TudlaAccounting::DatabaseProtection.allowing_posted_changes { ... }`, which lifts the protection for that block's transaction only.
+
+Triggers can't be stored in `db/schema.rb`, so the engine reinstalls them after `db:schema:load`; run `bin/rails tudla_accounting:protect_posted_entries` if a database was built some other way.
+
 ### Receivables and payables (carrying amounts)
 After posting, `CarryingAmountProcessor` keeps track of what's still owed. Posting an entry whose source is an invoice or bill opens a `CarryingAmount` on its receivable or payable line, with a due date and any foreign-currency amount. Posting a payment or disbursement that names that entry as `related` reduces it. If money moves through a bank account held in another currency (`BankAccountBalance`), that balance is updated in its own currency.
 
@@ -94,7 +106,7 @@ Mounted at `/tudla_accounting` (see [Integration](#integration-into-a-host-appli
 - **Entries:** search and filter entries, write drafts with a line editor that keeps live debit/credit totals, post them, and reverse posted entries. Reversing a payment restores the receivable or payable it settled and reverses its realized exchange difference. An invoice or bill can be reversed once its payments are, which closes its receivable or payable.
 - **Reports:** balance sheet, profit and loss, trial balance, and receivables and payables aging.
 - **Periods:** create calendar or fiscal years, and see each year's months.
-- **Setup:** upload a chart of accounts with opening balances (CSV or Excel), or enter or correct opening balances account by account, with live totals checking that they balance. Also import the receivables and payables open at the cut-over, and run the foreign exchange revaluation.
+- **Setup:** upload a chart of accounts with opening balances (CSV or Excel), or enter or correct opening balances account by account, with live totals checking that they balance. Also import the receivables and payables open at the cut-over, and run the foreign exchange revaluation. A balance check compares the stored balances with the posted entries and can rebuild them.
 
 The pages use Tailwind CSS with the engine's own `tc-` component classes (no DaisyUI needed) and follow the host's light/dark theme. Their Stimulus controllers load through the engine's import map.
 

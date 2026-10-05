@@ -12,6 +12,7 @@ require "ancestry"
 
 require "tudla_accounting/version"
 require "tudla_accounting/engine"
+require "tudla_accounting/database_protection"
 
 module TudlaAccounting
   class PeriodInvalid < StandardError; end

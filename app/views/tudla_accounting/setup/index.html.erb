@@ -64,4 +64,12 @@
       <% end %>
     <% end %>
   </section>
+
+  <section class="tc-card tc-card-body flex flex-wrap items-center justify-between gap-4" aria-labelledby="balances-heading">
+    <div>
+      <h2 id="balances-heading" class="tc-card-title mb-1">Balance check</h2>
+      <p class="tc-muted text-sm">Works out every balance again from the posted entries and the opening balances, and shows any stored balance that differs.</p>
+    </div>
+    <%= link_to "Check balances", setup_balances_path, class: "tc-btn tc-btn-secondary" %>
+  </section>
 </div>

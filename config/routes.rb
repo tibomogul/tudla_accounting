@@ -10,6 +10,8 @@ TudlaAccounting::Engine.routes.draw do
     post :chart_of_accounts
     post :open_items
     post :revaluation
+    get :balances
+    post :balances, action: :rebuild_balances
   end
 
   get "reports", to: "reports#index", as: :reports

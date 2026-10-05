@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_19_034727) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_05_212011) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -38,7 +38,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_19_034727) do
     t.index ["code"], name: "index_tudla_accounting_accounts_on_code"
     t.index ["contra_account_id"], name: "index_tudla_accounting_accounts_on_contra_account_id"
     t.index ["name"], name: "index_tudla_accounting_accounts_on_name"
+    t.index ["organization_type", "organization_id", "code"], name: "tudla_accounting_accounts_unique_key", unique: true
     t.index ["organization_type", "organization_id"], name: "index_tudla_accounting_accounts_on_organization"
+    t.check_constraint "category = ANY (ARRAY[0, 1, 2, 3, 4])", name: "tudla_accounting_accounts_category_known"
   end
 
   create_table "tudla_accounting_balances", force: :cascade do |t|
@@ -52,6 +54,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_19_034727) do
     t.bigint "period_id"
     t.bigint "starting_amount_cents"
     t.datetime "updated_at", null: false
+    t.index ["account_id", "period_id"], name: "tudla_accounting_balances_unique_key", unique: true
     t.index ["account_id"], name: "index_tudla_accounting_balances_on_account_id"
     t.index ["organization_type", "organization_id"], name: "index_tudla_accounting_balances_on_organization"
     t.index ["period_id"], name: "index_tudla_accounting_balances_on_period_id"
@@ -64,7 +67,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_19_034727) do
     t.string "currency"
     t.string "name"
     t.datetime "updated_at", null: false
-    t.index ["account_id"], name: "index_tudla_accounting_bank_account_balances_on_account_id"
+    t.index ["account_id"], name: "tudla_accounting_bank_account_balances_unique_key", unique: true
   end
 
   create_table "tudla_accounting_carrying_amount_forexes", force: :cascade do |t|
@@ -87,8 +90,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_19_034727) do
     t.bigint "related_party_id", null: false
     t.string "related_party_type", null: false
     t.datetime "updated_at", null: false
-    t.index ["detail_id"], name: "index_tudla_accounting_carrying_amounts_on_detail_id"
+    t.index ["detail_id"], name: "tudla_accounting_carrying_amounts_unique_key", unique: true
     t.index ["related_party_type", "related_party_id"], name: "index_tudla_accounting_carrying_amounts_on_related_party"
+    t.check_constraint "carrying_amount_type = ANY (ARRAY[0, 1])", name: "tudla_accounting_carrying_amounts_type_known"
   end
 
   create_table "tudla_accounting_details", force: :cascade do |t|
@@ -106,6 +110,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_19_034727) do
     t.index ["balance_id"], name: "index_tudla_accounting_details_on_balance_id"
     t.index ["entry_id"], name: "index_tudla_accounting_details_on_entry_id"
     t.index ["organization_type", "organization_id"], name: "index_tudla_accounting_details_on_organization"
+    t.check_constraint "amount_cents > 0", name: "tudla_accounting_details_amount_positive"
+    t.check_constraint "tally = ANY (ARRAY[0, 1])", name: "tudla_accounting_details_tally_known"
   end
 
   create_table "tudla_accounting_entries", force: :cascade do |t|
@@ -134,7 +140,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_19_034727) do
     t.bigint "other_currency_cents"
     t.decimal "rate", precision: 24, scale: 8
     t.datetime "updated_at", null: false
-    t.index ["detail_id"], name: "index_tudla_accounting_foreign_exchanges_on_detail_id"
+    t.index ["detail_id"], name: "tudla_accounting_foreign_exchanges_unique_key", unique: true
   end
 
   create_table "tudla_accounting_forex_rates", force: :cascade do |t|
@@ -146,6 +152,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_19_034727) do
     t.string "to"
     t.datetime "updated_at", null: false
     t.integer "year"
+    t.index ["from", "to", "year", "month", "day"], name: "tudla_accounting_forex_rates_unique_key", unique: true
   end
 
   create_table "tudla_accounting_periods", force: :cascade do |t|

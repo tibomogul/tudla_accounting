@@ -3,7 +3,8 @@ require "csv"
 module TudlaAccounting
   # Getting an organization's books started: loading a chart of accounts with opening
   # balances, importing the receivables and payables open at the cut-over, and running
-  # the period-end foreign exchange revaluation.
+  # the period-end foreign exchange revaluation; and checking the stored balances against
+  # the posted entries.
   class SetupController < ApplicationController
     LOADERS = { ".csv" => CsvLoader, ".xlsx" => XlsxLoader }.freeze
     PROBLEMS = [ ArgumentError, ActiveRecord::RecordInvalid, ActiveRecord::RecordNotFound, CSV::MalformedCSVError,
@@ -62,6 +63,17 @@ module TudlaAccounting
       redirect_to entries_path(q: "Revaluation"), notice: notice
     rescue *PROBLEMS, ActionController::ParameterMissing => e
       redirect_to setup_path, alert: "The revaluation was not run: #{e.message}"
+    end
+
+    def balances
+      @differences = BalanceRebuilder.new(accounting_organization).differences
+        .sort_by { |difference| [ difference.period.from_date, -difference.period.thru_date.to_i, difference.account.code ] }
+    end
+
+    def rebuild_balances
+      corrected = BalanceRebuilder.new(accounting_organization).rebuild!
+      notice = corrected.zero? ? "The balances already agree with the posted entries." : "Corrected #{corrected} #{'balance'.pluralize(corrected)} from the posted entries."
+      redirect_to setup_balances_path, notice: notice
     end
   end
 end
