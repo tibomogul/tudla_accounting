@@ -13,6 +13,8 @@ require "tudla_accounting/version"
 require "tudla_accounting/engine"
 
 module TudlaAccounting
+  class PeriodInvalid < StandardError; end
+
   class << self
     attr_accessor :configuration
   end

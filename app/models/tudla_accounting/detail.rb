@@ -41,7 +41,7 @@ module TudlaAccounting
       raise ArgumentError, "posted_at must be a datetime" unless posted_at.is_a?(Time) || posted_at.is_a?(ActiveSupport::TimeWithZone)
 
       transaction do
-        periods = TudlaAccounting::Period.leaf_periods_for_date(organization, posted_at.to_date)
+        periods = TudlaAccounting::Period.leaf_periods_for_date(organization, posted_at)
 
         raise ArgumentError, "no valid period found for the posted date" if periods.empty?
         raise ArgumentError, "multiple periods found for the posted date" if periods.count > 1

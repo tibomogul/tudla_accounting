@@ -26,11 +26,11 @@ RSpec.describe TudlaAccounting::Balance, type: :model do
     let(:organization) { create(:organization) }
     let(:asset) { create(:tudla_accounting_account, category: :asset, organization: organization) }
     let(:liability) { create(:tudla_accounting_account, category: :liability, organization: organization) }
-    let(:year) { create(:tudla_accounting_period, organization: organization, from_date: Date.new(2026, 1, 1), thru_date: Date.new(2026, 12, 31)) }
-    let(:q1) { create(:tudla_accounting_period, organization: organization, parent: year, from_date: Date.new(2026, 1, 1), thru_date: Date.new(2026, 3, 31)) }
-    let(:q2) { create(:tudla_accounting_period, organization: organization, parent: year, from_date: Date.new(2026, 4, 1), thru_date: Date.new(2026, 6, 30)) }
-    let(:apr) { create(:tudla_accounting_period, organization: organization, parent: q2, from_date: Date.new(2026, 4, 1), thru_date: Date.new(2026, 4, 30)) }
-    let(:may) { create(:tudla_accounting_period, organization: organization, parent: q2, from_date: Date.new(2026, 5, 1), thru_date: Date.new(2026, 5, 31)) }
+    let(:year) { create(:tudla_accounting_period, organization: organization, from_date: Date.new(2026, 1, 1), thru_date: Date.new(2026, 12, 31).end_of_day) }
+    let(:q1) { create(:tudla_accounting_period, organization: organization, parent: year, from_date: Date.new(2026, 1, 1), thru_date: Date.new(2026, 3, 31).end_of_day) }
+    let(:q2) { create(:tudla_accounting_period, organization: organization, parent: year, from_date: Date.new(2026, 4, 1), thru_date: Date.new(2026, 6, 30).end_of_day) }
+    let(:apr) { create(:tudla_accounting_period, organization: organization, parent: q2, from_date: Date.new(2026, 4, 1), thru_date: Date.new(2026, 4, 30).end_of_day) }
+    let(:may) { create(:tudla_accounting_period, organization: organization, parent: q2, from_date: Date.new(2026, 5, 1), thru_date: Date.new(2026, 5, 31).end_of_day) }
 
     def usd(cents) = Money.new(cents, "USD")
     def balance_for(account, period) = described_class.find_by(account: account, period: period)

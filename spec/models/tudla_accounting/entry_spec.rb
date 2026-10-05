@@ -52,7 +52,7 @@ RSpec.describe TudlaAccounting::Entry, type: :model do
     let(:payable) { create(:tudla_accounting_account, code: "2100", category: :liability, organization: organization) }
     let(:capital) { create(:tudla_accounting_account, code: "3000", category: :equity, organization: organization) }
     let(:sales) { create(:tudla_accounting_account, code: "4000", category: :income, organization: organization) }
-    let!(:period) { create(:tudla_accounting_period, organization: organization, from_date: Date.new(2026, 1, 1), thru_date: Date.new(2026, 12, 31)) }
+    let!(:period) { create(:tudla_accounting_period, organization: organization, from_date: Date.new(2026, 1, 1), thru_date: Date.new(2026, 12, 31).end_of_day) }
     let(:posted_at) { Time.zone.local(2026, 3, 10, 9) }
 
     def usd(cents) = Money.new(cents, "USD")
@@ -141,6 +141,124 @@ RSpec.describe TudlaAccounting::Entry, type: :model do
     it "raises when no period covers posted_at" do
       expect { investment.post(Time.zone.local(2028, 1, 1)) }.to raise_error(ArgumentError, "no valid period found for the posted date")
       expect(investment.reload.posted_at).to be_nil
+    end
+  end
+
+  describe ".create_from_ruby_hash" do
+    let(:organization) { create(:organization, currency: "USD") }
+    let!(:cash) { create(:tudla_accounting_account, code: "1000", category: :asset, organization: organization) }
+    let!(:receivable) { create(:tudla_accounting_account, code: "1100", category: :asset, organization: organization) }
+    let!(:receivable_eur) do
+      create(:tudla_accounting_account, code: "1100-EUR", category: :asset, currency: "EUR", organization: organization, parent: receivable)
+    end
+    let!(:tax_payable) { create(:tudla_accounting_account, code: "2100", category: :liability, organization: organization) }
+    let!(:sales) { create(:tudla_accounting_account, code: "4100", category: :income, organization: organization) }
+
+    let(:invoice_hash) do
+      {
+        organization_type: "Organization",
+        organization_id: organization.id,
+        source_type: "Invoice",
+        source_id: 123_456,
+        particulars: "Invoice for landlord",
+        transacted_at: "2026-04-27T09:12:36+10:00",
+        details: [
+          { account_code: "1100", amount: "USD 2750.00" },
+          { account_code: "4100", amount: "USD 2500.00" },
+          { account_code: "2100", amount: "USD 250.00" }
+        ]
+      }
+    end
+
+    def with_first_detail(changes)
+      invoice_hash.merge(details: [ invoice_hash[:details].first.merge(changes).compact, *invoice_hash[:details].drop(1) ])
+    end
+
+    def detail_for(entry, account) = entry.details.find { |d| d.account == account }
+
+    it "creates an entry, turning each signed amount into a debit or credit for its account" do
+      entry = described_class.create_from_ruby_hash(invoice_hash)
+
+      expect(entry).to be_persisted
+      expect(entry).to have_attributes(organization: organization, source_type: "Invoice", source_id: 123_456,
+                                       particulars: "Invoice for landlord", posted_at: nil,
+                                       transacted_at: Time.iso8601("2026-04-27T09:12:36+10:00"))
+      expect(entry.details.size).to eq(3)
+      expect(detail_for(entry, receivable)).to have_attributes(tally: "debit", amount: Money.new(2750_00, "USD"), organization: organization)
+      expect(detail_for(entry, sales)).to have_attributes(tally: "credit", amount: Money.new(2500_00, "USD"))
+      expect(detail_for(entry, tax_payable)).to have_attributes(tally: "credit", amount: Money.new(250_00, "USD"))
+    end
+
+    it "treats a negative amount as a decrease to the account" do
+      entry = described_class.create_from_ruby_hash(invoice_hash.merge(
+        source_type: "Payment", particulars: "Payment from landlord",
+        details: [ { account_code: "1100", amount: "USD -2750.00" }, { account_code: "1000", amount: "USD 2750.00" } ]
+      ))
+
+      expect(detail_for(entry, receivable)).to have_attributes(tally: "credit", amount: Money.new(2750_00, "USD"))
+      expect(detail_for(entry, cash)).to have_attributes(tally: "debit", amount: Money.new(2750_00, "USD"))
+    end
+
+    it "sets posted_at when given (without posting to balances)" do
+      entry = described_class.create_from_ruby_hash(invoice_hash.merge(posted_at: "2026-04-27T11:00:00Z"))
+      expect(entry.posted_at).to eq(Time.iso8601("2026-04-27T11:00:00Z"))
+      expect(TudlaAccounting::Balance.count).to eq(0)
+    end
+
+    it "records foreign exchange details" do
+      entry = described_class.create_from_ruby_hash(invoice_hash.merge(details: [
+        { account_code: "1100-EUR", amount: "USD 15400.00", fx: { other_currency_amount: "EUR 10000.00", fx_rate: "1.54" } },
+        { account_code: "4100", amount: "USD 15400.00" }
+      ]))
+
+      fx = detail_for(entry, receivable_eur).foreign_exchange
+      expect(fx).to have_attributes(rate: BigDecimal("1.54"), foreign_amount: Money.new(10_000_00, "EUR"))
+    end
+
+    it "only looks up account codes within the given organization" do
+      other = create(:organization)
+      create(:tudla_accounting_account, code: "9999", organization: other)
+      expect { described_class.create_from_ruby_hash(with_first_detail(account_code: "9999")) }
+        .to raise_error(ArgumentError, "invalid account_code: 9999")
+    end
+
+    it "raises (and creates nothing) when the amounts do not balance" do
+      expect { described_class.create_from_ruby_hash(with_first_detail(amount: "USD 2000.00")) }
+        .to raise_error(ActiveRecord::RecordInvalid, /credit and debit amounts are not equal/)
+      expect(described_class.count).to eq(0)
+    end
+
+    {
+      "transacted_at that is not ISO 8601" => [ { transacted_at: "2026-04-27" }, "transacted_at must be a valid ISO 8601 datetime string" ],
+      "transacted_at that is not a string" => [ { transacted_at: Time.current }, "transacted_at must be a valid ISO 8601 datetime string" ],
+      "posted_at that is not ISO 8601" => [ { posted_at: "yesterday" }, "posted_at must be a valid ISO 8601 datetime string" ],
+      "posted_at that is not a string" => [ { posted_at: Time.current }, "posted_at must be a valid ISO 8601 datetime string" ],
+      "particulars that is not a string" => [ { particulars: 123 }, "particulars must be a string" ],
+      "details that is not an array" => [ { details: "not an array" }, "details must be an array" ]
+    }.each do |description, (changes, message)|
+      it "rejects #{description}" do
+        expect { described_class.create_from_ruby_hash(invoice_hash.merge(changes)) }.to raise_error(ArgumentError, message)
+      end
+    end
+
+    it "rejects fewer than two details" do
+      expect { described_class.create_from_ruby_hash(invoice_hash.merge(details: invoice_hash[:details].first(1))) }
+        .to raise_error(ArgumentError, "details must have at least 2 elements")
+    end
+
+    {
+      "a missing account_code" => [ { account_code: nil }, "each detail must have an account_code" ],
+      "an unknown account_code" => [ { account_code: "INVALID" }, "invalid account_code: INVALID" ],
+      "a missing amount" => [ { amount: nil }, "each detail must have an amount" ],
+      "an amount that is not a string" => [ { amount: 123 }, "amount must be a string" ],
+      "an fx node without other_currency_amount" => [ { fx: { fx_rate: "1.54" } }, "fx node must have an other_currency_amount" ],
+      "an fx node without fx_rate" => [ { fx: { other_currency_amount: "EUR 10.00" } }, "fx node must have an fx_rate" ],
+      "an fx currency that differs from the account's" => [ { fx: { other_currency_amount: "EUR 10.00", fx_rate: "1.5" } },
+                                                           "fx currency does not match the account currency" ]
+    }.each do |description, (changes, message)|
+      it "rejects a detail with #{description}" do
+        expect { described_class.create_from_ruby_hash(with_first_detail(changes)) }.to raise_error(ArgumentError, message)
+      end
     end
   end
 end

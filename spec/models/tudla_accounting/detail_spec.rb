@@ -1,4 +1,5 @@
 require "rails_helper"
+require_relative "../../support/configuration"
 
 RSpec.describe TudlaAccounting::Detail, type: :model do
   it "builds from the factory" do
@@ -69,10 +70,10 @@ RSpec.describe TudlaAccounting::Detail, type: :model do
     let(:root_account) { create(:tudla_accounting_account, category: :asset, organization: organization) }
     let(:parent_account) { create(:tudla_accounting_account, category: :asset, organization: organization, parent: root_account) }
     let(:child_account) { create(:tudla_accounting_account, category: :asset, organization: organization, parent: parent_account) }
-    let(:year) { create(:tudla_accounting_period, organization: organization, from_date: Date.new(2026, 1, 1), thru_date: Date.new(2026, 12, 31)) }
-    let(:q2) { create(:tudla_accounting_period, organization: organization, parent: year, from_date: Date.new(2026, 4, 1), thru_date: Date.new(2026, 6, 30)) }
-    let!(:apr) { create(:tudla_accounting_period, organization: organization, parent: q2, from_date: Date.new(2026, 4, 1), thru_date: Date.new(2026, 4, 30)) }
-    let!(:may) { create(:tudla_accounting_period, organization: organization, parent: q2, from_date: Date.new(2026, 5, 1), thru_date: Date.new(2026, 5, 31)) }
+    let(:year) { create(:tudla_accounting_period, organization: organization, from_date: Date.new(2026, 1, 1), thru_date: Date.new(2026, 12, 31).end_of_day) }
+    let(:q2) { create(:tudla_accounting_period, organization: organization, parent: year, from_date: Date.new(2026, 4, 1), thru_date: Date.new(2026, 6, 30).end_of_day) }
+    let!(:apr) { create(:tudla_accounting_period, organization: organization, parent: q2, from_date: Date.new(2026, 4, 1), thru_date: Date.new(2026, 4, 30).end_of_day) }
+    let!(:may) { create(:tudla_accounting_period, organization: organization, parent: q2, from_date: Date.new(2026, 5, 1), thru_date: Date.new(2026, 5, 31).end_of_day) }
 
     def usd(cents) = Money.new(cents, "USD")
     def balance_for(account, period) = TudlaAccounting::Balance.find_by(account: account, period: period)
@@ -92,6 +93,11 @@ RSpec.describe TudlaAccounting::Detail, type: :model do
     it "posts on the last day of a period" do
       detail = post_detail(child_account, 100_00, :debit, Time.zone.local(2026, 4, 30, 18))
       expect(detail.reload.balance.period).to eq(apr)
+    end
+
+    it "posts on the first day of a period" do
+      detail = post_detail(child_account, 100_00, :debit, Time.zone.local(2026, 5, 1))
+      expect(detail.reload.balance.period).to eq(may)
     end
 
     it "reuses an existing balance" do
@@ -129,7 +135,7 @@ RSpec.describe TudlaAccounting::Detail, type: :model do
 
     it "only posts to periods belonging to the detail's organization" do
       other_org = create(:organization)
-      create(:tudla_accounting_period, organization: other_org, from_date: Date.new(2026, 4, 1), thru_date: Date.new(2026, 4, 30))
+      create(:tudla_accounting_period, organization: other_org, from_date: Date.new(2026, 4, 1), thru_date: Date.new(2026, 4, 30).end_of_day)
 
       detail = post_detail(child_account, 100_00, :debit, Time.zone.local(2026, 4, 15))
       expect(detail.reload.balance.period).to eq(apr)
@@ -141,7 +147,7 @@ RSpec.describe TudlaAccounting::Detail, type: :model do
     end
 
     it "raises when more than one leaf period covers the date" do
-      create(:tudla_accounting_period, organization: organization, from_date: Date.new(2026, 4, 10), thru_date: Date.new(2026, 4, 20))
+      create(:tudla_accounting_period, organization: organization, from_date: Date.new(2026, 4, 10), thru_date: Date.new(2026, 4, 20).end_of_day)
       detail = create(:tudla_accounting_detail, entry: entry, organization: organization, account: child_account)
       expect { detail.post(Time.zone.local(2026, 4, 15)) }.to raise_error(ArgumentError, "multiple periods found for the posted date")
     end
@@ -150,6 +156,45 @@ RSpec.describe TudlaAccounting::Detail, type: :model do
       detail = create(:tudla_accounting_detail, entry: entry, organization: organization, account: child_account)
       expect { detail.post("2026-04-15") }.to raise_error(ArgumentError, "posted_at must be a datetime")
       expect { detail.post(Date.new(2026, 4, 15)) }.to raise_error(ArgumentError, "posted_at must be a datetime")
+    end
+  end
+
+  describe "#post across time zones" do
+    include_context "with isolated TudlaAccounting configuration"
+
+    let(:organization) { create(:organization) }
+    let(:account) { create(:tudla_accounting_account, category: :asset, organization: organization) }
+    let(:entry) { create(:tudla_accounting_entry, organization: organization) }
+
+    # Periods are built in the configured zone, which differs from Rails' Time.zone (UTC) here.
+    def posted_month(zone_name, posted_at)
+      TudlaAccounting.configuration.time_zone = zone_name
+      TudlaAccounting::PeriodCreator.call(organization, 2026)
+      detail = create(:tudla_accounting_detail, entry: entry, organization: organization, account: account)
+      detail.post(posted_at)
+      detail.reload.balance.period.from_date.in_time_zone(zone_name).month
+    end
+
+    {
+      "America/New_York" => "behind UTC",
+      "Australia/Brisbane" => "ahead of UTC"
+    }.each do |zone_name, description|
+      context "when the configured zone is #{description} (#{zone_name})" do
+        let(:zone) { ActiveSupport::TimeZone[zone_name] }
+
+        it "posts the start of a month to that month, in whatever zone posted_at is given" do
+          feb_first = zone.local(2026, 2, 1, 0, 30)
+          expect(posted_month(zone_name, feb_first)).to eq(2)
+        end
+
+        it "posts the start of a month given as UTC to that month" do
+          expect(posted_month(zone_name, zone.local(2026, 2, 1, 9).utc)).to eq(2)
+        end
+
+        it "posts the end of a month given as UTC to that month" do
+          expect(posted_month(zone_name, zone.local(2026, 1, 31, 22).in_time_zone("UTC"))).to eq(1)
+        end
+      end
     end
   end
 end

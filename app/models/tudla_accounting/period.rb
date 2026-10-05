@@ -26,8 +26,12 @@ module TudlaAccounting
       partitioned_by?(children)
     end
 
-    def self.periods_for_date(org, date)
-      where(organization: org).includes_date?(date)
+    # Periods containing a moment in time. A plain Date means that day in the
+    # configured time zone (the zone PeriodCreator builds periods in), not Rails'
+    # Time.zone, which may differ.
+    def self.periods_for_date(org, date_or_time)
+      moment = date_or_time.instance_of?(Date) ? date_or_time.in_time_zone(TudlaAccounting.configuration.time_zone) : date_or_time
+      where(organization: org).includes_date?(moment)
     end
 
     def self.leaf_periods_for_date(org, date)
