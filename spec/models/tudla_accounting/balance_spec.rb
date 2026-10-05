@@ -63,6 +63,24 @@ RSpec.describe TudlaAccounting::Balance, type: :model do
         balance.update_starting_amount(usd(50_00), "debit")
         expect(balance.reload).to have_attributes(starting_amount: usd(50_00), current_amount: usd(0), ending_amount: usd(50_00))
       end
+
+      it "follows the account's normal side for credits and credit-balance accounts" do
+        asset_balance = create(:tudla_accounting_balance, account: asset, period: year, organization: organization)
+        liability_balance = create(:tudla_accounting_balance, account: liability, period: year, organization: organization)
+
+        asset_balance.update_starting_amount(usd(30_00), "credit")
+        liability_balance.update_starting_amount(usd(100_00), "credit")
+        liability_balance.update_starting_amount(usd(30_00), "debit")
+
+        expect(asset_balance.reload).to have_attributes(starting_amount: usd(-30_00), ending_amount: usd(-30_00))
+        expect(liability_balance.reload).to have_attributes(starting_amount: usd(70_00), current_amount: usd(0), ending_amount: usd(70_00))
+      end
+
+      it "rejects non-Money amounts and unknown tallies" do
+        balance = create(:tudla_accounting_balance, account: asset, period: year, organization: organization)
+        expect { balance.update_starting_amount(100, "debit") }.to raise_error(ArgumentError, "amount must be a Money object")
+        expect { balance.update_starting_amount(usd(1), "sideways") }.to raise_error(ArgumentError, "tally must be debit or credit")
+      end
     end
 
     describe "#post" do

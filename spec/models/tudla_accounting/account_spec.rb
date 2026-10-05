@@ -56,4 +56,17 @@ RSpec.describe TudlaAccounting::Account, type: :model do
       expect(build(:tudla_accounting_account, category: :income).debit_balance?).to be false
     end
   end
+
+  describe "#balance_sheet_account?" do
+    it "is true for assets, liabilities and equity, and false for income and expenses" do
+      results = TudlaAccounting::Account.categories.keys.to_h { |category| [ category, build(:tudla_accounting_account, category: category).balance_sheet_account? ] }
+      expect(results).to eq("asset" => true, "liability" => true, "equity" => true, "income" => false, "expense" => false)
+    end
+  end
+
+  describe "#code_with_name" do
+    it "joins the code and name" do
+      expect(build(:tudla_accounting_account, code: "1100", name: "Accounts Receivable").code_with_name).to eq("1100 - Accounts Receivable")
+    end
+  end
 end

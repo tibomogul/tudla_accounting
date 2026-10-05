@@ -22,6 +22,7 @@ SimpleCov.start 'rails' do
   add_filter '/spec/'        # Ignore the specs themselves
   add_filter '/config/'      # Ignore configuration files
   add_filter '/app/channels/' # Optional: if not using custom channels
+  add_filter '/lib/tudla_accounting/version.rb' # Loaded by the gemspec before SimpleCov starts
 
   # Create groups to segment the report
   add_group "Controllers", "app/controllers"

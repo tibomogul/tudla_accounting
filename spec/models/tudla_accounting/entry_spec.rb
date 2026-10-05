@@ -36,6 +36,23 @@ RSpec.describe TudlaAccounting::Entry, type: :model do
     end
   end
 
+  describe "creating with details" do
+    it "gives details without an organization the entry's organization" do
+      org = create(:organization)
+      other = create(:organization)
+      asset = create(:tudla_accounting_account, category: :asset, organization: org)
+      liability = create(:tudla_accounting_account, category: :liability, organization: org)
+
+      entry = described_class.create!(organization: org, particulars: "Opening", transacted_at: Time.current, details_attributes: [
+        { account: asset, tally: :debit, amount_cents: 1_000, currency: "USD" },
+        { account: liability, tally: :credit, amount_cents: 1_000, currency: "USD", organization: other }
+      ])
+
+      expect(entry.details.find_by(account: asset).organization).to eq(org)
+      expect(entry.details.find_by(account: liability).organization).to eq(other)
+    end
+  end
+
   describe "associations" do
     it { expect(described_class.reflect_on_association(:organization).macro).to eq(:belongs_to) }
     it { expect(described_class.reflect_on_association(:source).macro).to eq(:belongs_to) }

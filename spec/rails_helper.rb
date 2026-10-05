@@ -1,6 +1,9 @@
 # This file is copied to spec/ when you run 'rails generate rspec:install'
 require 'spec_helper'
 ENV['RAILS_ENV'] ||= 'test'
+# Load factory_bot_rails before the app boots so its railtie and the engine's
+# "tudla_accounting.factories" initializer register the engine's factory path.
+require 'factory_bot_rails'
 require_relative '../spec/dummy/config/environment'
 # Prevent database truncation if the environment is production
 abort("The Rails environment is running in production mode!") if Rails.env.production?
@@ -8,7 +11,6 @@ abort("The Rails environment is running in production mode!") if Rails.env.produ
 # that will avoid rails generators crashing because migrations haven't been run yet
 # return unless Rails.env.test?
 require 'rspec/rails'
-require 'factory_bot_rails'
 require 'capybara/rspec'
 # Add additional requires below this line. Rails is not loaded until this point!
 
