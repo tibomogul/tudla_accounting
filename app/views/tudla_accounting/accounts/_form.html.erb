@@ -28,6 +28,12 @@
                  hint: "The account this one offsets, e.g. accumulated depreciation offsets equipment" %>
   </div>
 
+  <div class="grid gap-4 sm:grid-cols-2">
+    <%= tc_field form, :cash_flow_activity, as: :select, label: "In the cash flow statement",
+                 choices: [ [ "As its parent (or by category)", "" ], [ "Operating", "operating" ], [ "Investing", "investing" ], [ "Financing", "financing" ] ],
+                 hint: "e.g. investing for equipment, financing for loans" %>
+  </div>
+
   <div class="flex gap-2">
     <%= form.submit (account.persisted? ? "Save account" : "Create account"), class: "tc-btn" %>
     <%= link_to "Cancel", (account.persisted? ? account_path(account) : accounts_path), class: "tc-btn tc-btn-secondary" %>

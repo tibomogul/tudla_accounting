@@ -40,6 +40,16 @@ module TudlaAccounting
     has_one :contra_for, class_name: "TudlaAccounting::Account", foreign_key: :contra_account_id
     has_one :bank_account_balance, class_name: "TudlaAccounting::BankAccountBalance", dependent: :destroy
 
+    # Where its cash movements go in the cash flow statement. Blank inherits; see
+    # cash_flow_section.
+    enum :cash_flow_activity, { operating: 0, investing: 1, financing: 2 }, prefix: :cash_flow
+
+    # The cash flow activity in effect: its own, else the nearest parent's, else financing
+    # for equity accounts and operating for the rest.
+    def cash_flow_section
+      [ self, *ancestors.reverse ].find(&:cash_flow_activity)&.cash_flow_activity || (equity? ? "financing" : "operating")
+    end
+
     def debit_balance?
       contra? ? (liability? || equity? || income?) : (asset? || expense?)
     end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_06_210000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_06_220000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -24,6 +24,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_210000) do
   create_table "tudla_accounting_accounts", force: :cascade do |t|
     t.string "ancestry", default: "/", null: false
     t.integer "ancestry_depth", default: 0, null: false
+    t.integer "cash_flow_activity"
     t.integer "category", null: false
     t.string "code", null: false
     t.bigint "contra_account_id"
@@ -40,6 +41,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_210000) do
     t.index ["name"], name: "index_tudla_accounting_accounts_on_name"
     t.index ["organization_type", "organization_id", "code"], name: "tudla_accounting_accounts_unique_key", unique: true
     t.index ["organization_type", "organization_id"], name: "index_tudla_accounting_accounts_on_organization"
+    t.check_constraint "cash_flow_activity IS NULL OR (cash_flow_activity = ANY (ARRAY[0, 1, 2]))", name: "tudla_accounting_accounts_cash_flow_activity_known"
     t.check_constraint "category = ANY (ARRAY[0, 1, 2, 3, 4])", name: "tudla_accounting_accounts_category_known"
   end
 

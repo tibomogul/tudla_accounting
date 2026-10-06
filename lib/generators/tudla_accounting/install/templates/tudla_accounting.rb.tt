@@ -15,6 +15,7 @@ TudlaAccounting.configure do |config|
   config.base_currency = "USD"
   config.time_zone = "UTC" # financial years and months are built in this zone
   # config.retained_earnings_account_code = "3900" # takes in each year's profit at year end
+  # config.cash_account_codes = %w[1010] # cash for the cash flow statement (with sub-accounts)
 
   # --- Receivables and payables (off until configured) ---
   # config.receivable_account_code = "1100" # this account and every account beneath it

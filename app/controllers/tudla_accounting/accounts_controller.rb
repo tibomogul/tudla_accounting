@@ -66,7 +66,7 @@ module TudlaAccounting
 
     # Parent and contra accounts can only be the organization's own.
     def account_params
-      permitted = params.require(:account).permit(:code, :name, :category, :currency, :parent_id, :contra_account_id)
+      permitted = params.require(:account).permit(:code, :name, :category, :currency, :parent_id, :contra_account_id, :cash_flow_activity)
       %i[parent_id contra_account_id].each do |key|
         permitted[key] = organization_scope(Account).find(permitted[key]).id if permitted[key].present?
       end

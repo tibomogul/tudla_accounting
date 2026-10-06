@@ -62,6 +62,11 @@ The entry form has a Tax column once the organization has tax codes: the totals 
 
 `TaxReport.call(organization, from:, thru:)` (Reports → Tax summary) totals, per code, the amounts taxed and the tax for lines posted in that time: sales codes count credits up, purchases codes debits, so credit notes and reversals reduce their own side. `net_tax` is tax on sales less tax on purchases: owed when positive, a refund when negative.
 
+### General ledger and cash flow
+`Reports::GeneralLedger.new(organization, from: month, thru: month, account_ids: nil)` lists, for every account lines are posted to (or the ones chosen), the opening balance, each posted line with a running balance on the account's own side, and the closing balance; `to_csv` writes it out. Reports → General ledger shows it and downloads the CSV.
+
+`Reports::CashFlow.new(organization, from:, thru:, cash_accounts: nil)` is a direct-method cash flow statement: each posted entry that moves cash is attributed to its other lines, grouped by their account's **cash flow activity** — operating, investing or financing, set on the account (inherited from its parent when blank; equity defaults to financing, everything else to operating). Moves between cash accounts cancel out, and `reconciles?` checks that opening cash plus the net change is the closing cash. Cash is the `cash_accounts` given or the `cash_account_codes` setting (each with its sub-accounts); Reports → Cash flow lets you pick them too.
+
 ### Reporting dimensions
 `TudlaAccounting::Dimension`s (department, project, location...) each have `DimensionValue`s, managed under Setup → Dimensions; inactive ones stop being offered but stay on the lines that have them. Entry lines are tagged with at most one value of each dimension (`DetailTag`): in `Entry.create_from_ruby_hash` with `dimensions: { "DEPT" => "SALES", "PROJ" => "APOLLO" }` on a line (codes), or with a column per dimension in the entry form. Reversals keep the tags; tax lines aren't tagged.
 
@@ -147,7 +152,7 @@ Mounted at `/accounting` by the install generator (see [Integration](#integratio
 - **Accounts:** the chart of accounts as a tree with closing balances. Each account page shows monthly balances and a ledger with running balances. You can create, edit and delete unused accounts.
 - **Entries:** search and filter entries, write drafts with a line editor that keeps live debit/credit totals, post them, and reverse posted entries. A posted payment or credit note shows what it was applied to and what is left, with forms to apply it to the party's open invoices or bills (or oldest first) and to take an allocation off; an invoice or bill shows what was applied to it. Reversing a payment takes it off what it settled and reverses its realized exchange difference. An invoice or bill can be reversed once nothing is applied to it, which closes its receivable or payable.
 - **Banking:** import bank statements, see where the books and the bank stand on a date, match statement lines to the books (suggested matches in one click), post entries for bank fees and the like, and see what is in the books but not yet on a statement.
-- **Reports:** balance sheet, profit and loss, trial balance, receivables and payables aging, a tax summary for a run of months, and profit and loss by dimension.
+- **Reports:** balance sheet, profit and loss, trial balance, receivables and payables aging, a tax summary for a run of months, profit and loss by dimension, a cash flow statement, and the general ledger (also as CSV).
 - **Periods:** create calendar or fiscal years, see each year's months, and close or reopen them (reopening asks for a reason).
 - **Setup:** upload a chart of accounts with opening balances (CSV or Excel), or enter or correct opening balances account by account, with live totals checking that they balance. Manage tax codes and reporting dimensions. Also import the receivables and payables open at the cut-over, and run the foreign exchange revaluation. A balance check compares the stored balances with the posted entries and can rebuild them.
 - **Activity:** the audit trail, newest first, filterable by kind, linking to entries, accounts and years that still exist.
@@ -281,6 +286,7 @@ TudlaAccounting.configure do |config|
   config.base_currency = "USD"
   config.time_zone = "UTC"                # zone PeriodCreator builds periods in; plain Dates are read in it
   config.retained_earnings_account_code = "3900" # takes in each year's net profit at year end
+  config.cash_account_codes = %w[1010]    # cash for the cash flow statement, with sub-accounts
 
   # Receivables and payables (carrying amounts). Off until configured: entries
   # still post normally, but no carrying amounts are tracked.

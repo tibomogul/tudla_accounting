@@ -6,7 +6,9 @@
        [ "Receivables aging", reports_receivables_path, "What customers owe, by how overdue it is." ],
        [ "Payables aging", reports_payables_path, "What is owed to suppliers, by how overdue it is." ],
        [ "Tax summary", reports_tax_path, "Tax collected on sales and paid on purchases, by tax code, for a run of months." ],
-       [ "Profit and loss by dimension", reports_by_dimension_path, "Income and expenses split by department, project or another dimension." ] ].each do |title, path, description| %>
+       [ "Profit and loss by dimension", reports_by_dimension_path, "Income and expenses split by department, project or another dimension." ],
+       [ "Cash flow", reports_cash_flow_path, "Cash in and out from operating, investing and financing activities." ],
+       [ "General ledger", reports_general_ledger_path, "Every posted line, account by account, with running balances; downloadable as CSV." ] ].each do |title, path, description| %>
     <%= link_to path, class: "tc-card tc-card-body block hover:border-[var(--tc-primary)]" do %>
       <p class="font-semibold"><%= title %></p>
       <p class="tc-muted text-sm mt-1"><%= description %></p>

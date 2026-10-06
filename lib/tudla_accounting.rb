@@ -62,7 +62,7 @@ module TudlaAccounting
                   :retained_earnings_account_code, :related_party_method,
                   :forex_rate_provider, :unrealized_fx_gain_account_code,
                   :realized_fx_gain_account_code, :parent_controller, :current_organization,
-                  :current_actor, :authorize
+                  :current_actor, :authorize, :cash_account_codes
     attr_reader :carrying_amount_sources, :entry_sources
 
     def initialize
@@ -92,6 +92,9 @@ module TudlaAccounting
       # payments, :administer for periods and setup); a falsy result refuses it (403).
       # Everything is allowed when nil. e.g. ->(controller, permission) { controller.current_user.can?(permission) }
       @authorize = nil
+      # The cash flow statement's cash: these accounts and every account beneath them
+      # (e.g. %w[1010] for a "Cash and bank" parent). The report can choose others.
+      @cash_account_codes = []
       @entry_sources = {}
     end
 

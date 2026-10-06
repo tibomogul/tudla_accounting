@@ -29,6 +29,8 @@ TudlaAccounting::Engine.routes.draw do
     get :payables
     get :tax
     get :by_dimension
+    get :general_ledger
+    get :cash_flow
   end
 
   resources :tax_codes, except: :show
