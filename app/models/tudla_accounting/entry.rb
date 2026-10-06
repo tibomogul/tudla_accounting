@@ -227,16 +227,29 @@ module TudlaAccounting
     # A line with a tax_code becomes the base the tax is on, plus a line for the tax on the
     # code's account, on the same side. Its amount excludes the tax (the tax is added), or
     # with tax_inclusive (on the line, or for the whole hash) includes it (it is split).
+    #
+    # Tax is worked out and posted in the organization's currency: on a line with a foreign
+    # amount (fx), it is on the line's converted amount, and the tax line has no foreign
+    # amount. Split out of an inclusive line, the line's foreign amount is split the same
+    # way, so it too excludes the tax.
     def self.add_tax(details_attributes, detail, hash)
       base = details_attributes.last
       code = TaxCode.find_by(organization_type: hash[:organization_type], organization_id: hash[:organization_id], code: detail[:tax_code])
       raise ArgumentError, "invalid tax_code: #{detail[:tax_code]}" unless code
-      raise ArgumentError, "a foreign-currency line can't be taxed" if base[:foreign_exchange_attributes]
+
+      tax_account_currency = code.account&.currency.presence
+      if tax_account_currency && tax_account_currency != base[:currency]
+        raise ArgumentError, "the #{code.code} tax account is held in #{tax_account_currency}; tax is posted in #{base[:currency]}"
+      end
 
       inclusive = detail.fetch(:tax_inclusive, hash[:tax_inclusive]) ? true : false
       tax_cents = code.tax_cents(base[:amount_cents], inclusive: inclusive)
       base.merge!(tax_code: code, tax_role: :base)
-      base[:amount_cents] -= tax_cents if inclusive
+      if inclusive
+        base[:amount_cents] -= tax_cents
+        fx = base[:foreign_exchange_attributes]
+        fx[:other_currency_cents] -= code.tax_cents(fx[:other_currency_cents], inclusive: true) if fx
+      end
       return unless tax_cents.positive?
 
       details_attributes << base.slice(:tally, :currency, :organization_type, :organization_id)

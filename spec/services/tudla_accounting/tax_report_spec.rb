@@ -78,14 +78,40 @@ RSpec.describe "Tax", type: :service do
       expect(lines(reversal)).to contain_exactly([ "1100", "credit", 300_00, nil, nil ], [ "4100", "debit", 300_00, "FRE", "base" ])
     end
 
-    it "refuses an unknown code, a foreign-currency line, and a tax line on another account" do
+    describe "on a line with a foreign amount" do
+      before { TudlaAccounting::AccountsCreator.call([ { code: "4200", name: "Sales EUR", category: "income", currency: "EUR" } ], organization) }
+
+      def foreign(entry) = entry.details.filter_map { |d| d.foreign_exchange && [ d.account.code, d.foreign_exchange.other_currency_cents ] }
+
+      it "taxes the converted amount, in the organization's currency" do
+        sale = book("Export", Time.zone.local(2026, 2, 3), [
+          { account_code: "1100", amount: "AUD 176.00" },
+          { account_code: "4200", amount: "AUD 160.00", tax_code: "GST", fx: { other_currency_amount: "EUR 100.00", fx_rate: "1.6" } }
+        ])
+        expect(lines(sale)).to contain_exactly([ "1100", "debit", 176_00, nil, nil ], [ "4200", "credit", 160_00, "GST", "base" ], [ "2200", "credit", 16_00, "GST", "tax" ])
+        expect(foreign(sale)).to eq([ [ "4200", 100_00 ] ]) # the tax line has no foreign amount
+      end
+
+      it "splits the foreign amount too when the amounts include the tax" do
+        sale = book("Export", Time.zone.local(2026, 2, 3), [
+          { account_code: "1100", amount: "AUD 176.00" },
+          { account_code: "4200", amount: "AUD 176.00", tax_code: "GST", fx: { other_currency_amount: "EUR 110.00", fx_rate: "1.6" } }
+        ], tax_inclusive: true)
+        expect(lines(sale)).to contain_exactly([ "1100", "debit", 176_00, nil, nil ], [ "4200", "credit", 160_00, "GST", "base" ], [ "2200", "credit", 16_00, "GST", "tax" ])
+        expect(foreign(sale)).to eq([ [ "4200", 100_00 ] ])
+        expect(TudlaAccounting::TaxReport.call(organization, from: Time.zone.local(2026, 2, 1), thru: Time.zone.local(2026, 2, 28).end_of_day)[:sales])
+          .to eq(base: aud(160), tax: aud(16))
+      end
+    end
+
+    it "refuses an unknown code, a tax account in another currency, and a tax line on another account" do
       details = [ { account_code: "1100", amount: "AUD 110.00" }, { account_code: "4000", amount: "AUD 100.00", tax_code: "NOPE" } ]
       expect { book("Bad", Time.zone.local(2026, 2, 3), details) }.to raise_error(ArgumentError, "invalid tax_code: NOPE")
 
-      TudlaAccounting::AccountsCreator.call([ { code: "4200", name: "Sales EUR", category: "income", currency: "EUR" } ], organization)
-      details = [ { account_code: "1100", amount: "AUD 110.00" },
-                  { account_code: "4200", amount: "AUD 100.00", tax_code: "GST", fx: { other_currency_amount: "EUR 60.00", fx_rate: "1.6666" } } ]
-      expect { book("Bad", Time.zone.local(2026, 2, 3), details) }.to raise_error(ArgumentError, "a foreign-currency line can't be taxed")
+      TudlaAccounting::AccountsCreator.call([ { code: "2210", name: "VAT EUR", category: "liability", currency: "EUR" } ], organization)
+      TudlaAccounting::TaxCode.create!(organization: organization, code: "VAT", name: "VAT", rate: "0.2", kind: :sales, account: account("2210"))
+      details = [ { account_code: "1100", amount: "AUD 120.00" }, { account_code: "4000", amount: "AUD 100.00", tax_code: "VAT" } ]
+      expect { book("Bad", Time.zone.local(2026, 2, 3), details) }.to raise_error(ArgumentError, "the VAT tax account is held in EUR; tax is posted in AUD")
 
       line = TudlaAccounting::Detail.new(organization: organization, account: account("4000"), tax_code: gst_sales, tax_role: :tax, amount_cents: 1, tally: :credit)
       expect(line.errors.tap { line.valid? }[:account]).to include("must be the tax code's account for a tax line")

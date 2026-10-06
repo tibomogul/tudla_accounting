@@ -6,6 +6,9 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Lines with a foreign amount can be taxed: the tax is worked out on the converted amount and posted in the organization's currency (an inclusive line's foreign amount is split too). A tax account held in another currency is refused.
+
 ## [0.1.0] - 2026-10-06
 
 First release.
