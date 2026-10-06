@@ -5,9 +5,11 @@ module TudlaAccounting
   class ApplicationController < TudlaAccounting.configuration.parent_controller.constantize
     layout "tudla_accounting/application"
     # Every engine helper in every engine view (the host's helpers come from parent_controller).
-    helper TudlaAccounting::ApplicationHelper, TudlaAccounting::AccountsHelper, TudlaAccounting::EntriesHelper, TudlaAccounting::ReportsHelper
+    helper TudlaAccounting::ApplicationHelper, TudlaAccounting::AccountsHelper, TudlaAccounting::EntriesHelper, TudlaAccounting::ReportsHelper,
+           TudlaAccounting::ActivityHelper
 
     before_action :require_organization
+    before_action :set_actor
 
     rescue_from ActiveRecord::RecordNotFound do
       render "tudla_accounting/shared/not_found", status: :not_found
@@ -30,6 +32,11 @@ module TudlaAccounting
 
     def require_organization
       render "tudla_accounting/shared/no_organization", status: :forbidden unless accounting_organization
+    end
+
+    # Whoever the current_actor setting returns is recorded on audit events.
+    def set_actor
+      Current.actor = TudlaAccounting.configuration.current_actor&.call(self)
     end
 
     # model scoped to the current organization, e.g. organization_scope(Account).find(id)

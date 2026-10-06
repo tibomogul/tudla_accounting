@@ -1,14 +1,21 @@
 # frozen_string_literal: true
 
 module TudlaAccounting
-  # PostgreSQL triggers that refuse to change or delete a posted entry or its lines, even
-  # through raw SQL: posted entries are corrected by reversing them. Does nothing on other
-  # databases.
+  # PostgreSQL triggers that keep the books' history fixed, even against raw SQL: a posted
+  # entry or its lines can't be changed or deleted (they are corrected by reversing them),
+  # nothing can be posted into a closed period, and audit events can't be changed or
+  # deleted. Does nothing on other databases.
   #
   # schema.rb can't hold triggers, so they are installed by the engine's migration and
   # again after db:schema:load (see lib/tasks); hosts can also call install! themselves.
   module DatabaseProtection
     SETTING = "tudla_accounting.allow_posted_changes"
+    TRIGGERS = {
+      "tudla_accounting_protect_posted_entries" => "tudla_accounting_entries",
+      "tudla_accounting_protect_posted_details" => "tudla_accounting_details",
+      "tudla_accounting_protect_closed_periods" => "tudla_accounting_entries",
+      "tudla_accounting_protect_audit_events" => "tudla_accounting_audit_events"
+    }.freeze
 
     module_function
 
@@ -20,29 +27,27 @@ module TudlaAccounting
         #{function_sql("tudla_accounting_protect_posted_details",
                        "EXISTS (SELECT 1 FROM tudla_accounting_entries WHERE id = OLD.entry_id AND posted_at IS NOT NULL)",
                        "A line of a posted entry")}
-        DROP TRIGGER IF EXISTS tudla_accounting_protect_posted_entries ON tudla_accounting_entries;
-        CREATE TRIGGER tudla_accounting_protect_posted_entries BEFORE UPDATE OR DELETE ON tudla_accounting_entries
-          FOR EACH ROW EXECUTE FUNCTION tudla_accounting_protect_posted_entries();
-        DROP TRIGGER IF EXISTS tudla_accounting_protect_posted_details ON tudla_accounting_details;
-        CREATE TRIGGER tudla_accounting_protect_posted_details BEFORE UPDATE OR DELETE ON tudla_accounting_details
-          FOR EACH ROW EXECUTE FUNCTION tudla_accounting_protect_posted_details();
+        #{closed_period_function_sql}
+        #{audit_function_sql}
+        #{trigger_sql(connection, "tudla_accounting_protect_posted_entries", "BEFORE UPDATE OR DELETE")}
+        #{trigger_sql(connection, "tudla_accounting_protect_posted_details", "BEFORE UPDATE OR DELETE")}
+        #{trigger_sql(connection, "tudla_accounting_protect_closed_periods", "BEFORE INSERT OR UPDATE OF posted_at")}
+        #{trigger_sql(connection, "tudla_accounting_protect_audit_events", "BEFORE UPDATE OR DELETE")}
       SQL
     end
 
     def uninstall!(connection = ActiveRecord::Base.connection)
       return unless supported?(connection)
 
-      connection.execute(<<~SQL)
-        DROP TRIGGER IF EXISTS tudla_accounting_protect_posted_details ON tudla_accounting_details;
-        DROP TRIGGER IF EXISTS tudla_accounting_protect_posted_entries ON tudla_accounting_entries;
-        DROP FUNCTION IF EXISTS tudla_accounting_protect_posted_details();
-        DROP FUNCTION IF EXISTS tudla_accounting_protect_posted_entries();
+      connection.execute(TRIGGERS.map { |name, table| <<~SQL }.join)
+        #{"DROP TRIGGER IF EXISTS #{name} ON #{table};" if connection.table_exists?(table)}
+        DROP FUNCTION IF EXISTS #{name}();
       SQL
     end
 
     def installed?(connection = ActiveRecord::Base.connection)
       supported?(connection) &&
-        connection.select_value("SELECT COUNT(*) FROM pg_trigger WHERE tgname LIKE 'tudla_accounting_protect_posted_%'").to_i == 2
+        connection.select_value("SELECT COUNT(*) FROM pg_trigger WHERE tgname LIKE 'tudla_accounting_protect_%'").to_i == TRIGGERS.size
     end
 
     def supported?(connection)
@@ -61,6 +66,53 @@ module TudlaAccounting
         connection.execute("SET LOCAL #{SETTING} = 'off'")
         result
       end
+    end
+
+    # Each trigger is created once its table exists (the audit table comes in a later
+    # migration than the entries).
+    def trigger_sql(connection, name, timing)
+      return "" unless connection.table_exists?(TRIGGERS.fetch(name))
+
+      <<~SQL
+        DROP TRIGGER IF EXISTS #{name} ON #{TRIGGERS.fetch(name)};
+        CREATE TRIGGER #{name} #{timing} ON #{TRIGGERS.fetch(name)} FOR EACH ROW EXECUTE FUNCTION #{name}();
+      SQL
+    end
+
+    # Posting stamps posted_at, so an entry being posted (or inserted already posted) must
+    # not fall in a closed period of its organization.
+    def closed_period_function_sql
+      <<~SQL
+        CREATE OR REPLACE FUNCTION tudla_accounting_protect_closed_periods() RETURNS trigger AS $$
+        BEGIN
+          IF current_setting('#{SETTING}', true) = 'on' OR NEW.posted_at IS NULL THEN
+            RETURN NEW;
+          END IF;
+          IF TG_OP = 'UPDATE' AND OLD.posted_at IS NOT DISTINCT FROM NEW.posted_at THEN
+            RETURN NEW;
+          END IF;
+          IF EXISTS (SELECT 1 FROM tudla_accounting_periods
+                     WHERE organization_type = NEW.organization_type AND organization_id = NEW.organization_id
+                       AND closed_at IS NOT NULL AND from_date <= NEW.posted_at AND thru_date >= NEW.posted_at) THEN
+            RAISE EXCEPTION 'Entry % falls in a closed period and cannot be posted', NEW.id;
+          END IF;
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+      SQL
+    end
+
+    def audit_function_sql
+      <<~SQL
+        CREATE OR REPLACE FUNCTION tudla_accounting_protect_audit_events() RETURNS trigger AS $$
+        BEGIN
+          IF current_setting('#{SETTING}', true) = 'on' THEN
+            RETURN COALESCE(NEW, OLD);
+          END IF;
+          RAISE EXCEPTION 'Audit events (id %) cannot be changed or deleted', OLD.id;
+        END;
+        $$ LANGUAGE plpgsql;
+      SQL
     end
 
     def function_sql(name, posted_condition, subject)

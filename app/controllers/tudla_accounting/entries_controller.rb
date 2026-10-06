@@ -132,7 +132,8 @@ module TudlaAccounting
     end
 
     def posting_problem(error)
-      { "no valid period found for the posted date" => "no financial year covers its date" }.fetch(error.message, error.message.downcase_first)
+      { "no valid period found for the posted date" => "no financial year covers its date",
+        "the period for the posted date is closed" => "its month is closed" }.fetch(error.message, error.message.downcase_first)
     end
   end
 end

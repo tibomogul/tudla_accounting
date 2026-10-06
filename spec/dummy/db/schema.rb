@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_05_212011) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_06_090100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -41,6 +41,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_05_212011) do
     t.index ["organization_type", "organization_id", "code"], name: "tudla_accounting_accounts_unique_key", unique: true
     t.index ["organization_type", "organization_id"], name: "index_tudla_accounting_accounts_on_organization"
     t.check_constraint "category = ANY (ARRAY[0, 1, 2, 3, 4])", name: "tudla_accounting_accounts_category_known"
+  end
+
+  create_table "tudla_accounting_audit_events", force: :cascade do |t|
+    t.string "action", null: false
+    t.bigint "actor_id"
+    t.string "actor_label"
+    t.string "actor_type"
+    t.datetime "created_at", null: false
+    t.jsonb "details", default: {}, null: false
+    t.bigint "organization_id", null: false
+    t.string "organization_type", null: false
+    t.bigint "subject_id"
+    t.string "subject_label"
+    t.string "subject_type"
+    t.index ["organization_type", "organization_id", "created_at"], name: "index_tudla_accounting_audit_events_on_organization"
+    t.index ["subject_type", "subject_id"], name: "index_tudla_accounting_audit_events_on_subject"
   end
 
   create_table "tudla_accounting_balances", force: :cascade do |t|
@@ -159,6 +175,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_05_212011) do
     t.string "ancestry", default: "/", null: false
     t.integer "ancestry_depth", default: 0, null: false
     t.integer "children_count", default: 0, null: false
+    t.datetime "closed_at"
     t.datetime "created_at", null: false
     t.datetime "from_date", null: false
     t.bigint "organization_id", null: false

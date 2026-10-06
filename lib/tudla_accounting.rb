@@ -29,7 +29,8 @@ module TudlaAccounting
                   :receivable_account_code, :payable_account_code, :due_date_method,
                   :retained_earnings_account_code, :related_party_method,
                   :forex_rate_provider, :unrealized_fx_gain_account_code,
-                  :realized_fx_gain_account_code, :parent_controller, :current_organization
+                  :realized_fx_gain_account_code, :parent_controller, :current_organization,
+                  :current_actor
     attr_reader :carrying_amount_sources, :entry_sources
 
     def initialize
@@ -51,6 +52,9 @@ module TudlaAccounting
       # organization whose books are shown, e.g. ->(controller) { controller.current_organization }
       @parent_controller = "::ApplicationController"
       @current_organization = nil
+      # Called with the controller for whoever is acting, recorded on audit events: a
+      # record (a user) or a plain label, e.g. ->(controller) { controller.current_user }
+      @current_actor = nil
       @entry_sources = {}
     end
 

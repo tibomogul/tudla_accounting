@@ -29,6 +29,9 @@ module TudlaAccounting
     validate :validate_structure_unchanged_once_used, on: :update
 
     before_destroy :ensure_deletable, prepend: true
+    after_create { audit("account.created") }
+    after_update { audit("account.updated", changes: saved_changes.except("created_at", "updated_at")) if saved_changes.except("created_at", "updated_at").any? }
+    after_destroy { audit("account.deleted") }
 
     has_many :balances, dependent: :destroy, class_name: "TudlaAccounting::Balance"
     has_many :details, dependent: :destroy, class_name: "TudlaAccounting::Detail"
@@ -65,6 +68,10 @@ module TudlaAccounting
     end
 
     private
+
+    def audit(action, **details)
+      AuditEvent.record!(action, organization: organization, subject: self, details: details)
+    end
 
     def validate_known_currency
       errors.add(:currency, "is not a known currency code") if currency.present? && Money::Currency.find(currency).nil?

@@ -44,8 +44,12 @@ module TudlaAccounting
           end
         end
 
+        raise ArgumentError, "#{periods.find(&:closed?).label} is closed; reopen it to change the opening balances" if periods.any?(&:closed?)
+
         nodes.each { |node| check_amounts(node) }
         periods.each { |period| nodes.each { |node| set_amounts(node, period) } }
+        TudlaAccounting::AuditEvent.record!("opening_balances.saved", organization: organization,
+                                            details: { date: date.to_date.iso8601, overwrite: overwrite_mode })
       end
     end
 

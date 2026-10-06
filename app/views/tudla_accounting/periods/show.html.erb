@@ -1,11 +1,16 @@
 <%= tc_page_header "Financial year #{tc_period_label(@year)}", subtitle: "#{tc_date(@year.from_date)} to #{tc_date(@year.thru_date)}" do %>
+  <% if @year.close_blocker.nil? %>
+    <%= button_to "Close year", close_period_path(@year), class: "tc-btn tc-btn-secondary",
+                  form: { data: { controller: "confirm", confirm_message_value: "Close #{tc_period_label(@year)} and all its months?", action: "submit->confirm#ask" } } %>
+  <% end %>
   <% if @year.deletable? %>
     <%= button_to "Delete year", period_path(@year), method: :delete, class: "tc-btn tc-btn-danger",
                   form: { data: { controller: "confirm", confirm_message_value: "Delete #{tc_period_label(@year)} and its months?", action: "submit->confirm#ask" } } %>
   <% end %>
 <% end %>
 
-<p class="mb-4">
+<p class="mb-4 flex flex-wrap gap-2">
+  <% if @year.closed? %><%= tc_badge "Closed #{tc_date(@year.closed_at)}", tone: :warning %><% end %>
   <% if TudlaAccounting::Period.ancestry_check(@year) %>
     <%= tc_badge "Months cover the whole year", tone: :success %>
   <% else %>
@@ -15,7 +20,7 @@
 
 <div class="tc-card overflow-x-auto">
   <table class="tc-table">
-    <thead><tr><th>Month</th><th>From</th><th>To</th><th class="tc-num">Lines posted</th></tr></thead>
+    <thead><tr><th>Month</th><th>From</th><th>To</th><th class="tc-num">Lines posted</th><th>Status</th><th></th></tr></thead>
     <tbody>
       <% @months.each do |month| %>
         <tr>
@@ -23,10 +28,24 @@
           <td><%= tc_date(month.from_date) %></td>
           <td><%= tc_date(month.thru_date) %></td>
           <td class="tc-num"><%= @line_counts.fetch(month.id, 0) %></td>
+          <td><%= month.closed? ? tc_badge("Closed", tone: :warning) : tc_badge("Open") %></td>
+          <td class="text-right">
+            <% if month.close_blocker.nil? %>
+              <%= button_to "Close", close_period_path(month), class: "tc-btn tc-btn-secondary tc-btn-sm",
+                            form: { data: { controller: "confirm", confirm_message_value: "Close #{tc_period_label(month)}? Nothing more can be posted to it.", action: "submit->confirm#ask" } } %>
+            <% elsif month.reopen_blocker.nil? %>
+              <%= render "reopen_form", period: month %>
+            <% end %>
+          </td>
         </tr>
       <% end %>
     </tbody>
   </table>
 </div>
+
+<% if @year.reopen_blocker.nil? %>
+  <div class="mt-6 max-w-xl"><%= render "reopen_form", period: @year %></div>
+<% end %>
+<p class="tc-hint mt-4">Periods close in order. A closed month takes no more postings or reversals; reopening needs a reason, which the activity log keeps.</p>
 
 <p class="mt-6"><%= link_to "← All years", periods_path, class: "tc-btn tc-btn-ghost" %></p>

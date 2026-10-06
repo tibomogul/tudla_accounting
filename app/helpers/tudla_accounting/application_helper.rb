@@ -37,15 +37,7 @@ module TudlaAccounting
 
     # "2026" for a calendar year, otherwise its date range; "Mar 2026" for a month.
     def tc_period_label(period)
-      from = period.from_date.to_date
-      thru = period.thru_date.to_date
-      if from == from.beginning_of_year && thru == from.end_of_year
-        from.year.to_s
-      elsif from == from.beginning_of_month && thru == from.end_of_month
-        from.strftime("%b %Y")
-      else
-        "#{tc_date(from)} – #{tc_date(thru)}"
-      end
+      period.label
     end
 
     # A labelled form field with its hint and errors, e.g.

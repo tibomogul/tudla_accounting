@@ -11,4 +11,6 @@ end
 # The engine shows the books of the organization the dummy app's stand-in login picked.
 TudlaAccounting.configure do |config|
   config.current_organization = ->(controller) { controller.send(:current_organization) }
+  # The dummy app has no users; audit events name the stand-in login instead.
+  config.current_actor = ->(_controller) { "Demo user" }
 end

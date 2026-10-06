@@ -1,0 +1,5 @@
+<%= form_with url: reopen_period_path(period), class: "flex flex-wrap items-center justify-end gap-2" do |form| %>
+  <%= form.label :reason, "Reason for reopening #{tc_period_label(period)}", class: "sr-only", for: "reason_#{period.id}" %>
+  <%= form.text_field :reason, id: "reason_#{period.id}", class: "tc-input w-56", required: true, placeholder: "Reason for reopening" %>
+  <%= form.submit "Reopen #{period.root? ? 'year' : ''}".strip, class: "tc-btn tc-btn-secondary tc-btn-sm" %>
+<% end %>

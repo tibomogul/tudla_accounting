@@ -36,6 +36,23 @@ module TudlaAccounting
       end
     end
 
+    # Closes a year or one of its months (both identified by id under the year's page).
+    def close
+      period = organization_scope(Period).find(params[:id])
+      period.close!
+      redirect_to period_path(period.root), notice: "#{year_label(period)} is closed: nothing more can be posted to it."
+    rescue ArgumentError => e
+      redirect_to period_path(period.root), alert: "#{year_label(period)} was not closed: #{e.message.downcase_first}."
+    end
+
+    def reopen
+      period = organization_scope(Period).find(params[:id])
+      period.reopen!(reason: params[:reason])
+      redirect_to period_path(period.root), notice: "#{year_label(period)} is open again."
+    rescue ArgumentError => e
+      redirect_to period_path(period.root), alert: "#{year_label(period)} was not reopened: #{e.message.downcase_first}."
+    end
+
     private
 
     YearForm = Struct.new(:year, :start_month, :start_day, keyword_init: true)

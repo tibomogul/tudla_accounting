@@ -2,7 +2,13 @@ TudlaAccounting::Engine.routes.draw do
   root to: "dashboard#index"
 
   resources :accounts
-  resources :periods, only: %i[index show new create destroy]
+  resources :periods, only: %i[index show new create destroy] do
+    member do
+      post :close
+      post :reopen
+    end
+  end
+  get "activity", to: "activity#index", as: :activity
   get "setup", to: "setup#index", as: :setup
   scope "setup", controller: :setup, as: :setup do
     get :opening_balances

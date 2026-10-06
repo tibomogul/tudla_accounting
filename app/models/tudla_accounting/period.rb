@@ -46,7 +46,67 @@ module TudlaAccounting
     def destroy_with_subtree!
       raise ActiveRecord::RecordNotDestroyed.new("Only a period with no balances can be deleted", self) unless deletable?
 
-      transaction { subtree.sort_by(&:depth).reverse_each(&:destroy!) }
+      transaction do
+        subtree.sort_by(&:depth).reverse_each(&:destroy!)
+        AuditEvent.record!("period.deleted", organization: organization, subject: self)
+      end
+    end
+
+    # "2026" for a calendar year, otherwise its date range; "Mar 2026" for a month.
+    def label
+      from = from_date.to_date
+      thru = thru_date.to_date
+      if from == from.beginning_of_year && thru == from.end_of_year
+        from.year.to_s
+      elsif from == from.beginning_of_month && thru == from.end_of_month
+        from.strftime("%b %Y")
+      else
+        "#{from.strftime('%-d %b %Y')} – #{thru.strftime('%-d %b %Y')}"
+      end
+    end
+
+    # Closed periods take no more postings. Periods close in order (each after the ones
+    # before it at its level) and closing a period closes the periods inside it, so a
+    # closed period's balances can't be moved by later postings.
+    def closed?
+      closed_at.present?
+    end
+
+    # Why close! would be refused, or nil if the period can be closed.
+    def close_blocker
+      if closed? then "#{label} is already closed"
+      elsif same_level.where("from_date < ?", from_date).where(closed_at: nil).exists? then "Close the earlier periods first"
+      end
+    end
+
+    # Why reopen! would be refused (apart from a missing reason), or nil.
+    def reopen_blocker
+      if !closed? then "#{label} is not closed"
+      elsif same_level.where("from_date > ?", from_date).where.not(closed_at: nil).exists? then "Reopen the later periods first"
+      elsif parent&.closed? then "Reopen the year first"
+      end
+    end
+
+    def close!(at: Time.current)
+      blocker = close_blocker
+      raise ArgumentError, blocker if blocker
+
+      transaction do
+        subtree.where(closed_at: nil).update_all(closed_at: at)
+        reload
+        AuditEvent.record!("period.closed", organization: organization, subject: self)
+      end
+    end
+
+    # Reopening needs a reason, kept on the audit event.
+    def reopen!(reason:)
+      blocker = reopen_blocker || ("Give a reason for reopening #{label}" if reason.blank?)
+      raise ArgumentError, blocker if blocker
+
+      transaction do
+        update!(closed_at: nil)
+        AuditEvent.record!("period.reopened", organization: organization, subject: self, details: { reason: reason })
+      end
     end
 
     def self.periods_for_date(org, date_or_time)
@@ -59,6 +119,10 @@ module TudlaAccounting
     end
 
     private
+
+    def same_level
+      self.class.where(organization: organization).at_depth(depth)
+    end
 
     def check_period_length
       errors.add(:thru_date, "should be greater than from date") if from_date && thru_date && (from_date >= thru_date)

@@ -48,6 +48,7 @@ module TudlaAccounting
 
         raise ArgumentError, "no valid period found for the posted date" if periods.empty?
         raise ArgumentError, "multiple periods found for the posted date" if periods.count > 1
+        raise ArgumentError, "the period for the posted date is closed" if periods.first.closed?
 
         balance = TudlaAccounting::Balance.get(account, periods.first)
 

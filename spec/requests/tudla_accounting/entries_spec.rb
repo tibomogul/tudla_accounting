@@ -190,6 +190,12 @@ RSpec.describe "Entries", type: :request do
       expect(flash[:alert]).to eq("The entry could not be posted: no financial year covers its date.")
       expect(outside.reload).to be_draft
     end
+
+    it "explains that its month is closed" do
+      TudlaAccounting::Period.roots.first.children.order(:from_date).first(2).each(&:close!)
+      post routes.post_entry_path(draft)
+      expect(flash[:alert]).to eq("The entry could not be posted: its month is closed.")
+    end
   end
 
   describe "a posted entry" do

@@ -26,6 +26,7 @@ RSpec.describe "Concurrent posting" do
     TudlaAccounting::Entry.where(id: entry_ids).delete_all
     scope.call(TudlaAccounting::Account).delete_all
     scope.call(TudlaAccounting::Period).delete_all
+    scope.call(TudlaAccounting::AuditEvent).delete_all
     Organization.where(id: org_ids).delete_all
   end
 

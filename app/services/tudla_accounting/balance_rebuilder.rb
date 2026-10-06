@@ -52,6 +52,7 @@ module TudlaAccounting
           balance.assign_attributes(values.merge(organization: organization, currency: currency))
           balance.save!
         end
+        TudlaAccounting::AuditEvent.record!("balances.rebuilt", organization: organization, details: { corrected: fixes.size })
         fixes.size
       end
     end

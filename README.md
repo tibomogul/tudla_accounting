@@ -41,9 +41,17 @@ bin/rails tudla_accounting:balances:rebuild   # ORGANIZATION=Organization:42 lim
 ```
 
 ### Database integrity
-The engine's migrations add unique keys (one balance per account and period, account codes per organization, one carrying amount per line, one exchange rate per currency pair and day) and checks (positive line amounts, known tallies, categories and carrying-amount types). On PostgreSQL, triggers also refuse any change to a posted entry or its lines, or their deletion, from anywhere (a console, a job, raw SQL): correct posted entries by reversing them. Touching `updated_at` is allowed. Data maintenance that really must change posted rows can run inside `TudlaAccounting::DatabaseProtection.allowing_posted_changes { ... }`, which lifts the protection for that block's transaction only.
+The engine's migrations add unique keys (one balance per account and period, account codes per organization, one carrying amount per line, one exchange rate per currency pair and day) and checks (positive line amounts, known tallies, categories and carrying-amount types). On PostgreSQL, triggers also refuse any change to a posted entry or its lines, or their deletion, from anywhere (a console, a job, raw SQL): correct posted entries by reversing them. Touching `updated_at` is allowed. Triggers likewise refuse posting into a closed period and any change to audit events. Data maintenance that really must change posted rows can run inside `TudlaAccounting::DatabaseProtection.allowing_posted_changes { ... }`, which lifts the protection for that block's transaction only.
 
 Triggers can't be stored in `db/schema.rb`, so the engine reinstalls them after `db:schema:load`; run `bin/rails tudla_accounting:protect_posted_entries` if a database was built some other way.
+
+### Closing periods
+`period.close!` closes a month, or a year with all its months. Nothing more can be posted into a closed period: posting, reversing into it, revaluation entries and changes to opening balances in it are refused (and on PostgreSQL a trigger refuses it from anywhere). Periods close in order, each after the earlier ones, so later postings can never move a closed period's balances. `period.reopen!(reason: "...")` reopens the most recently closed period (a year before its months); the reason is kept in the audit trail. `close_blocker` and `reopen_blocker` say why either would be refused.
+
+### Audit trail
+Each change to the books records a `TudlaAccounting::AuditEvent`: entries posted, reversed and deleted as drafts; accounts added, changed and deleted; years created and deleted; periods closed and reopened (with the reason); opening balances saved; and balance rebuilds. Each event keeps who acted, the subject, any details, and labels for both, so it still reads after they are gone. Events can't be changed or deleted (a trigger on PostgreSQL).
+
+Who acted comes from `TudlaAccounting::Current.actor`: the engine's pages set it from the `current_actor` setting, and other code can set it around its work with `TudlaAccounting::Current.set(actor: user) { ... }`. The actor can be a record (labelled by its `name` or `email`) or a plain string; events without one show as "System".
 
 ### Receivables and payables (carrying amounts)
 After posting, `CarryingAmountProcessor` keeps track of what's still owed. Posting an entry whose source is an invoice or bill opens a `CarryingAmount` on its receivable or payable line, with a due date and any foreign-currency amount. Posting a payment or disbursement that names that entry as `related` reduces it. If money moves through a bank account held in another currency (`BankAccountBalance`), that balance is updated in its own currency.
@@ -105,8 +113,9 @@ Mounted at `/tudla_accounting` (see [Integration](#integration-into-a-host-appli
 - **Accounts:** the chart of accounts as a tree with closing balances. Each account page shows monthly balances and a ledger with running balances. You can create, edit and delete unused accounts.
 - **Entries:** search and filter entries, write drafts with a line editor that keeps live debit/credit totals, post them, and reverse posted entries. Reversing a payment restores the receivable or payable it settled and reverses its realized exchange difference. An invoice or bill can be reversed once its payments are, which closes its receivable or payable.
 - **Reports:** balance sheet, profit and loss, trial balance, and receivables and payables aging.
-- **Periods:** create calendar or fiscal years, and see each year's months.
+- **Periods:** create calendar or fiscal years, see each year's months, and close or reopen them (reopening asks for a reason).
 - **Setup:** upload a chart of accounts with opening balances (CSV or Excel), or enter or correct opening balances account by account, with live totals checking that they balance. Also import the receivables and payables open at the cut-over, and run the foreign exchange revaluation. A balance check compares the stored balances with the posted entries and can rebuild them.
+- **Activity:** the audit trail, newest first, filterable by kind, linking to entries, accounts and years that still exist.
 
 The pages use Tailwind CSS with the engine's own `tc-` component classes (no DaisyUI needed) and follow the host's light/dark theme. Their Stimulus controllers load through the engine's import map.
 
@@ -230,6 +239,7 @@ TudlaAccounting.configure do |config|
   # helpers apply), and show the books of the organization this returns (403 if nil).
   config.parent_controller = "::ApplicationController"
   config.current_organization = ->(controller) { controller.current_organization }
+  config.current_actor = ->(controller) { controller.current_user } # recorded on audit events (optional)
 
   config.base_currency = "USD"
   config.time_zone = "UTC"                # zone PeriodCreator builds periods in; plain Dates are read in it

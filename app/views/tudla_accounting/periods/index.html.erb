@@ -19,6 +19,7 @@
             <td><%= tc_date(year.thru_date) %></td>
             <td><%= year.children_count %></td>
             <td class="text-right">
+              <% if year.closed? %><%= tc_badge "Closed", tone: :warning %><% end %>
               <% if year.includes_date?(Time.current) %><%= tc_badge "Current", tone: :primary %><% end %>
             </td>
           </tr>

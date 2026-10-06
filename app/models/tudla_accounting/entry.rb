@@ -21,6 +21,7 @@ module TudlaAccounting
 
     before_validation :set_detail_organizations
     before_destroy :ensure_draft, prepend: true
+    after_destroy { AuditEvent.record!("entry.deleted", organization: organization, subject: self) }
 
     def posted?
       posted_at.present?
@@ -79,6 +80,7 @@ module TudlaAccounting
         reversing.save!
         reversing.post(at)
         undo_carrying_amounts(on)
+        AuditEvent.record!("entry.reversed", organization: organization, subject: self, details: { reversal_id: reversing.id, on: on.to_date.iso8601 })
         reversing
       end
     end
@@ -96,6 +98,7 @@ module TudlaAccounting
         end
         update!(posted_at: posted_at)
         CarryingAmountProcessor.call(entry: self)
+        AuditEvent.record!("entry.posted", organization: organization, subject: self, details: { posted_at: posted_at.iso8601 })
         true
       end
     end

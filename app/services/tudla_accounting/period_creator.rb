@@ -45,6 +45,7 @@ module TudlaAccounting
             thru_date: (month_start.next_month - 1.day).end_of_day
           )
         end
+        TudlaAccounting::AuditEvent.record!("period.created", organization: organization, subject: root)
         root
       end
     rescue ActiveRecord::RecordInvalid => e

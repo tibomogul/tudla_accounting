@@ -1,0 +1,27 @@
+<%= tc_page_header "Activity", subtitle: "Who did what to the books, newest first" %>
+
+<%= form_with url: activity_path, method: :get, class: "tc-card tc-card-body mb-6 flex flex-wrap items-end gap-3" do |form| %>
+  <div><%= form.label :kind, "Show", class: "tc-label" %>
+    <%= form.select :kind, activity_kind_options, { selected: @kind }, class: "tc-input" %></div>
+  <%= form.submit "Filter", class: "tc-btn tc-btn-secondary", name: nil %>
+<% end %>
+
+<% if @page.total_count.zero? %>
+  <div class="tc-card tc-card-body text-center"><p class="tc-muted">Nothing recorded yet.</p></div>
+<% else %>
+  <div class="tc-card overflow-x-auto">
+    <table class="tc-table">
+      <thead><tr><th class="w-44">When</th><th class="w-40">Who</th><th>What</th></tr></thead>
+      <tbody>
+        <% @page.records.each do |event| %>
+          <tr data-audit-action="<%= event.action %>">
+            <td class="whitespace-nowrap tc-muted"><%= activity_time(event) %></td>
+            <td><%= event.actor_label.presence || tag.span("System", class: "tc-muted") %></td>
+            <td><%= activity_description(event) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+  <%= render "tudla_accounting/shared/pagination", paginator: @page %>
+<% end %>

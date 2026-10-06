@@ -43,7 +43,8 @@ RSpec.describe "Financial years", type: :request do
 
       rows = css_select("tbody tr").map { |row| row.css("td").map { |cell| cell.text.squish } }
       expect(rows.size).to eq(12)
-      expect(rows[2]).to eq([ "Mar #{this_year}", "1 Mar #{this_year}", "31 Mar #{this_year}", "2" ])
+      expect(rows[2]).to eq([ "Mar #{this_year}", "1 Mar #{this_year}", "31 Mar #{this_year}", "2", "Open", "" ])
+      expect(rows[0].last).to eq("Close") # months close in order, so only the first is offered
       expect(response.body).to include("Months cover the whole year")
       expect(response.body).not_to include("Delete year")
     end
@@ -78,6 +79,55 @@ RSpec.describe "Financial years", type: :request do
       expect { delete routes.period_path(year) }.not_to change(TudlaAccounting::Period, :count)
       expect(response).to redirect_to(routes.period_path(year))
       expect(flash[:alert]).to eq("A year with postings can't be deleted.")
+    end
+  end
+
+  describe "closing and reopening" do
+    let!(:year) { TudlaAccounting::PeriodCreator.call(organization, this_year) }
+
+    def month(number) = year.children.order(:from_date)[number - 1]
+
+    it "closes months in order, then the year" do
+      post routes.close_period_path(month(1))
+      expect(response).to redirect_to(routes.period_path(year))
+      expect(flash[:notice]).to eq("Jan #{this_year} is closed: nothing more can be posted to it.")
+
+      post routes.close_period_path(month(3))
+      expect(flash[:alert]).to eq("Mar #{this_year} was not closed: close the earlier periods first.")
+
+      get routes.period_path(year)
+      rows = css_select("tbody tr").map { |row| row.css("td").map { |cell| cell.text.squish } }
+      expect(rows[0][4]).to eq("Closed")
+      buttons = css_select("tbody tr").map { |row| row.css("button, input[type=submit]").map { |button| button["value"] || button.text } }
+      expect(buttons.first(3)).to eq([ [ "Reopen" ], [ "Close" ], [] ])
+      expect(css_select("input#reason_#{month(1).id}[required]")).to be_present
+
+      post routes.close_period_path(year)
+      get routes.period_path(year)
+      expect(response.body).to include("Closed #{Date.current.strftime('%-d %b %Y')}", "Reopen year")
+      expect(response.body).not_to include("Close year")
+      get routes.periods_path
+      expect(css_select("tbody tr").first.text).to include("Closed")
+    end
+
+    it "reopens with a reason" do
+      year.close!
+
+      post routes.reopen_period_path(month(12)), params: { reason: "Late bill" }
+      expect(flash[:alert]).to eq("Dec #{this_year} was not reopened: reopen the year first.")
+
+      post routes.reopen_period_path(year), params: { reason: "" }
+      expect(flash[:alert]).to eq("#{this_year} was not reopened: give a reason for reopening #{this_year}.")
+
+      post routes.reopen_period_path(year), params: { reason: "Late bill" }
+      expect(flash[:notice]).to eq("#{this_year} is open again.")
+      expect(year.reload).not_to be_closed
+    end
+
+    it "refuses another organization's period" do
+      other = TudlaAccounting::PeriodCreator.call(create(:organization), this_year)
+      post routes.close_period_path(other)
+      expect(response).to have_http_status(:not_found)
     end
   end
 
