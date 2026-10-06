@@ -5,6 +5,9 @@ module TudlaAccounting
     belongs_to :detail, class_name: "TudlaAccounting::Detail"
     belongs_to :related_party, polymorphic: true
     has_one :forex, class_name: "TudlaAccounting::CarryingAmountForex", dependent: :destroy
+    # As a credit: where it has been applied. As a charge: what has been applied to it.
+    has_many :allocations_from, class_name: "TudlaAccounting::Allocation", foreign_key: :from_id, inverse_of: :from
+    has_many :allocations_to, class_name: "TudlaAccounting::Allocation", foreign_key: :to_id, inverse_of: :to
 
     enum :carrying_amount_type, {
       receivable: 0,
@@ -16,48 +19,67 @@ module TudlaAccounting
       Money.new(amount_cents, detail.currency)
     end
 
-    # What is still owed, in the organization's currency and (for a foreign amount) in the
-    # foreign currency: the amount as booked, less each payment (or disbursement) posted
-    # against it by as_of (a time; nil for everything), settled the way the processor
-    # settles them. A reversed payment stops counting from its reversal's date, and the
-    # whole amount stops being owed from the date the invoice or bill itself is reversed.
+    # A credit held by the customer or supplier (a payment, disbursement or credit note,
+    # stored as a negative amount) rather than a charge they owe or are owed (an invoice
+    # or bill): on the other side of the receivable or payable account.
+    def credit?
+      receivable? ? detail.credit? : detail.debit?
+    end
+
+    def charge?
+      !credit?
+    end
+
+    # The allocations made from a credit, or to a charge.
+    def allocations
+      credit? ? allocations_from : allocations_to
+    end
+
+    # What is still owed (positive, on a charge) or still to apply (negative, on a credit),
+    # in the organization's currency and, for a foreign amount, in the foreign currency, as
+    # it stood at as_of (a time; nil for now). A charge starts at its line's amount and is
+    # reduced by each allocation to it in force then, in order, settled at the rate it was
+    # booked at (see settlement); a credit starts at minus its line's amount and goes back
+    # towards zero by the credit each allocation used. Nothing is outstanding from the date
+    # the entry itself is reversed.
     def outstanding(as_of: nil)
-      opening = detail.entry
-      return { cents: 0, foreign_cents: 0 } if reversed?(opening, as_of)
+      return { cents: 0, foreign_cents: 0 } if reversed?(detail.entry, as_of)
+
+      active = allocations.active(as_of).order(:allocated_at, :id)
+      return { cents: -detail.amount_cents + active.sum(:amount_cents), foreign_cents: -opening_foreign_cents + active.sum(:other_currency_cents).to_i } if credit?
 
       remaining = detail.amount_cents
-      remaining_foreign = detail.foreign_exchange&.other_currency_cents.to_i
-      settlements(as_of: as_of).each do |line, fx|
-        if forex && fx
-          remaining -= self.class.settlement(remaining_cents: remaining, remaining_foreign_cents: remaining_foreign,
-                                             transaction_rate: forex.transaction_rate, foreign_currency: forex.other_currency,
-                                             currency: line.currency, cash_cents: line.amount_cents,
-                                             paid_foreign_cents: fx.other_currency_cents)[:reduction_cents]
-          remaining_foreign -= fx.other_currency_cents
+      remaining_foreign = opening_foreign_cents
+      active.each do |allocation|
+        if forex && allocation.other_currency_cents
+          remaining -= settle(remaining, remaining_foreign, allocation.amount_cents, allocation.other_currency_cents)[:reduction_cents]
+          remaining_foreign -= allocation.other_currency_cents
         else
-          remaining -= line.amount_cents
+          remaining -= allocation.amount_cents
         end
       end
       { cents: remaining, foreign_cents: remaining_foreign }
     end
 
-    # [settlement line, its foreign exchange] for each payment (or disbursement) posted
-    # against the invoice or bill by as_of and not reversed by then, in order. Revaluations,
-    # which are also related to it, are not settlements.
-    def settlements(as_of: nil)
-      role = receivable? ? :receipt : :disbursement
-      checker = receivable? ? IsAccountReceivableChecker : IsAccountPayableChecker
-      payments = TudlaAccounting::Entry.where(related: detail.entry).where.not(posted_at: nil)
-      payments = payments.where(transacted_at: ..as_of) if as_of
-      payments.includes(details: %i[account foreign_exchange]).order(:transacted_at, :id)
-        .select { |payment| CarryingAmountRole.call(entry: payment) == role && !reversed?(payment, as_of) }
-        .filter_map do |payment|
-          line = payment.details.find { |candidate| checker.call(detail: candidate) }
-          [ line, line.foreign_exchange || payment.details.filter_map(&:foreign_exchange).first ] if line
-        end
+    # How applying cash_cents of a credit for paid_foreign_cents of this charge's foreign
+    # amount reduces it, given what was still owed; see settlement.
+    def settle(remaining_cents, remaining_foreign_cents, cash_cents, paid_foreign_cents)
+      self.class.settlement(remaining_cents: remaining_cents, remaining_foreign_cents: remaining_foreign_cents,
+                            transaction_rate: forex.transaction_rate, foreign_currency: forex.other_currency,
+                            currency: detail.currency, cash_cents: cash_cents, paid_foreign_cents: paid_foreign_cents)
     end
 
-    # Brings the stored amounts in line with outstanding, e.g. after a reversal.
+    # The foreign amount it opened with: its line's, or for a payment whose foreign amount
+    # is on its bank line, that one.
+    def opening_foreign_cents
+      return 0 unless forex
+
+      fx = detail.foreign_exchange || detail.entry.details.filter_map(&:foreign_exchange).first
+      fx.other_currency_cents
+    end
+
+    # Brings the stored amounts in line with outstanding, e.g. after an allocation or a
+    # reversal.
     def recompute!
       remaining = outstanding
       update!(amount_cents: remaining[:cents])

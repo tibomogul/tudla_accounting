@@ -23,7 +23,9 @@ module TudlaAccounting
   end
 
   class Configuration
-    CARRYING_AMOUNT_ROLES = %i[receivable payable receipt disbursement].freeze
+    # receivable/payable open what is owed; receipt/disbursement (cash) and
+    # credit_note/supplier_credit (no cash) are credits applied against it.
+    CARRYING_AMOUNT_ROLES = %i[receivable payable receipt disbursement credit_note supplier_credit].freeze
 
     attr_accessor :base_currency, :rounding, :time_zone, :organization_class,
                   :receivable_account_code, :payable_account_code, :due_date_method,

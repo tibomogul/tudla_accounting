@@ -46,6 +46,7 @@
 </div>
 
 <% if @entry.posted? %>
+  <%= render "allocations", entry: @entry %>
   <% if (blocker = @entry.reversal_blocker) %>
     <% unless @entry.reversal %><p class="tc-hint"><%= blocker %>.</p><% end %>
   <% else %>

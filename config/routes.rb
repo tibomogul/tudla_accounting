@@ -29,6 +29,11 @@ TudlaAccounting::Engine.routes.draw do
     get :payables
   end
 
+  resources :allocations, only: :create do
+    collection { post :oldest_first }
+    member { post :reverse }
+  end
+
   resources :entries do
     member do
       post :post

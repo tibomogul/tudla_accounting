@@ -215,10 +215,12 @@ RSpec.describe TudlaAccounting::CarryingAmountProcessor, type: :service do
         detail(receivable_account, 7_700, "credit", fx: { other_currency: "EUR", other_currency_cents: 5_000, rate: 1.54 })
       ], source: Payment.create!, related: invoice_entry)
 
-      carrying_amount = described_class.call(entry: payment_entry)
+      credit = described_class.call(entry: payment_entry)
+      carrying_amount = invoice_entry.details.filter_map(&:carrying_amount).first.reload
 
       expect(carrying_amount.amount_cents).to eq(7_700)
       expect(carrying_amount.forex.other_currency_amount_cents).to eq(5_000)
+      expect(credit).to have_attributes(amount_cents: 0, credit?: true) # all of it applied
     end
 
     it "increases the balance of a foreign currency bank account it is deposited into" do
@@ -250,7 +252,8 @@ RSpec.describe TudlaAccounting::CarryingAmountProcessor, type: :service do
         detail(payable_account, 7_700_00, "debit", fx: { other_currency: "EUR", other_currency_cents: 5_000_00, rate: 1.54 })
       ], source: Disbursement.create!, related: bill_entry)
 
-      carrying_amount = described_class.call(entry: disbursement_entry)
+      described_class.call(entry: disbursement_entry)
+      carrying_amount = bill_entry.details.filter_map(&:carrying_amount).first.reload
 
       expect(carrying_amount.amount_cents).to eq(7_500_00) # the 5,000 EUR left, at the booked 1.5
       expect(carrying_amount.forex.other_currency_amount_cents).to eq(5_000_00)
@@ -275,7 +278,8 @@ RSpec.describe TudlaAccounting::CarryingAmountProcessor, type: :service do
         detail(payable_account, 7_700_00, "debit")
       ], source: Disbursement.create!, related: bill_entry)
 
-      carrying_amount = described_class.call(entry: disbursement_entry)
+      described_class.call(entry: disbursement_entry)
+      carrying_amount = bill_entry.details.filter_map(&:carrying_amount).first.reload
 
       expect(carrying_amount.amount_cents).to eq(7_300_00)
       expect(carrying_amount.forex.other_currency_amount_cents).to eq(10_000_00)

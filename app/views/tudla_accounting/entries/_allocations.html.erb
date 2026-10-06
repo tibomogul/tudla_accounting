@@ -1,0 +1,64 @@
+<%# What a posted payment or credit note was applied to (and what is left), or what was applied to an invoice or bill. %>
+<% carrying_amount = entry.details.filter_map(&:carrying_amount).first %>
+<% if carrying_amount %>
+  <% currency = accounting_organization.currency %>
+  <% foreign = ->(cents) { cents && carrying_amount.forex ? Money.new(cents, carrying_amount.forex.other_currency).format : nil } %>
+  <% allocations = carrying_amount.allocations.includes(from: { detail: :entry }, to: { detail: :entry }).order(:allocated_at, :id) %>
+  <section class="tc-card mb-6" aria-labelledby="allocations-heading">
+    <div class="tc-card-body pb-0 flex flex-wrap items-baseline justify-between gap-2">
+      <h2 id="allocations-heading" class="tc-card-title"><%= carrying_amount.credit? ? "Applied to" : "Payments and credits applied" %></h2>
+      <p class="text-sm" data-total="<%= carrying_amount.credit? ? 'left_to_apply' : 'still_owed' %>">
+        <%= carrying_amount.credit? ? "Left to apply" : "Still owed" %>:
+        <span class="font-semibold"><%= tc_money(Money.new(carrying_amount.credit? ? -carrying_amount.amount_cents : carrying_amount.amount_cents, currency)) %></span>
+        <% if carrying_amount.forex %><span class="tc-muted">(<%= foreign.call(carrying_amount.credit? ? -carrying_amount.forex.other_currency_amount_cents : carrying_amount.forex.other_currency_amount_cents) %>)</span><% end %>
+      </p>
+    </div>
+    <% if allocations.none? %>
+      <p class="tc-card-body tc-muted text-sm">Nothing applied yet.</p>
+    <% else %>
+      <div class="overflow-x-auto">
+        <table class="tc-table">
+          <thead><tr><th><%= carrying_amount.credit? ? "Invoice or bill" : "Payment or credit" %></th><th>On</th><th class="tc-num">Amount</th><th></th></tr></thead>
+          <tbody>
+            <% allocations.each do |allocation| %>
+              <% other = carrying_amount.credit? ? allocation.to.detail.entry : allocation.from.detail.entry %>
+              <tr class="<%= 'tc-muted line-through' unless allocation.active? %>">
+                <td><%= link_to other.particulars, entry_path(other), class: "underline" %></td>
+                <td><%= tc_date(allocation.allocated_at) %></td>
+                <td class="tc-num"><%= tc_money(allocation.amount) %><% if allocation.other_currency_cents && carrying_amount.forex %> <span class="tc-muted text-xs">(<%= foreign.call(allocation.other_currency_cents) %>)</span><% end %></td>
+                <td class="text-right">
+                  <% if !allocation.active? %>
+                    <span class="no-underline"><%= tc_badge "Taken off #{tc_date(allocation.reversed_at)}" %></span>
+                  <% elsif carrying_amount.credit? %>
+                    <%= button_to "Take off", reverse_allocation_path(allocation), class: "tc-btn tc-btn-ghost tc-btn-sm",
+                                  form: { data: { controller: "confirm", confirm_message_value: "Take this off #{other.particulars}?", action: "submit->confirm#ask" } } %>
+                  <% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+
+    <% if carrying_amount.credit? && carrying_amount.amount_cents.negative? && entry.reversal.nil? %>
+      <% charges = TudlaAccounting::Allocator.open_charges(carrying_amount) %>
+      <div class="tc-card-body border-t border-[var(--tc-border)]">
+        <% if charges.empty? %>
+          <p class="tc-muted text-sm">Nothing is owed that it could be applied to.</p>
+        <% else %>
+          <%= form_with url: allocations_path, class: "grid gap-3 sm:grid-cols-6 items-end" do |form| %>
+            <%= form.hidden_field :entry_id, value: entry.id %>
+            <div class="sm:col-span-3"><%= form.label :to_id, "Apply to", class: "tc-label" %>
+              <%= form.select :to_id, charges.map { |charge| [ "#{charge.detail.entry.particulars} · owes #{tc_money(charge.amount)}#{" (#{Money.new(charge.forex.other_currency_amount_cents, charge.forex.other_currency).format})" if charge.forex}#{" · due #{tc_date(charge.due_date)}" if charge.due_date}", charge.id ] }, {}, class: "tc-input" %></div>
+            <div><%= form.label :amount, (carrying_amount.forex ? "Amount (#{carrying_amount.forex.other_currency} for #{carrying_amount.forex.other_currency} invoices)" : "Amount"), class: "tc-label" %>
+              <%= form.text_field :amount, class: "tc-input", inputmode: "decimal", placeholder: "All it can" %></div>
+            <div><%= form.label :on, "On", class: "tc-label" %><%= form.date_field :on, value: Date.current, class: "tc-input" %></div>
+            <div><%= form.submit "Apply", class: "tc-btn" %></div>
+          <% end %>
+          <%= button_to "Apply oldest first", oldest_first_allocations_path, params: { entry_id: entry.id }, class: "tc-btn tc-btn-secondary tc-btn-sm mt-3" %>
+        <% end %>
+      </div>
+    <% end %>
+  </section>
+<% end %>

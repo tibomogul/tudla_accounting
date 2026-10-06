@@ -12,6 +12,7 @@ module TudlaAccounting
       account.created account.updated account.deleted
       period.created period.deleted period.closed period.reopened
       opening_balances.saved balances.rebuilt
+      allocation.created allocation.reversed
     ].freeze
 
     belongs_to :organization, polymorphic: true
@@ -34,7 +35,7 @@ module TudlaAccounting
       when nil, String then object
       when Entry then object.particulars
       when Account then object.code_with_name
-      when Period then object.label
+      when Period, Allocation then object.label
       else
         %i[name email].each { |method| return object.public_send(method).to_s if object.respond_to?(method) && object.public_send(method).present? }
         "#{object.class.name} ##{object.id}"

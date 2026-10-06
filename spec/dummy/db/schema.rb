@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_06_090100) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_06_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -41,6 +41,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_090100) do
     t.index ["organization_type", "organization_id", "code"], name: "tudla_accounting_accounts_unique_key", unique: true
     t.index ["organization_type", "organization_id"], name: "index_tudla_accounting_accounts_on_organization"
     t.check_constraint "category = ANY (ARRAY[0, 1, 2, 3, 4])", name: "tudla_accounting_accounts_category_known"
+  end
+
+  create_table "tudla_accounting_allocations", force: :cascade do |t|
+    t.datetime "allocated_at", null: false
+    t.bigint "amount_cents", null: false
+    t.datetime "created_at", null: false
+    t.bigint "from_id", null: false
+    t.bigint "organization_id", null: false
+    t.string "organization_type", null: false
+    t.bigint "other_currency_cents"
+    t.bigint "realized_entry_id"
+    t.datetime "reversed_at"
+    t.bigint "to_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["from_id"], name: "index_tudla_accounting_allocations_on_from_id"
+    t.index ["organization_type", "organization_id"], name: "index_tudla_accounting_allocations_on_organization"
+    t.index ["realized_entry_id"], name: "index_tudla_accounting_allocations_on_realized_entry_id"
+    t.index ["to_id"], name: "index_tudla_accounting_allocations_on_to_id"
+    t.check_constraint "amount_cents > 0", name: "tudla_accounting_allocations_amount_positive"
   end
 
   create_table "tudla_accounting_audit_events", force: :cascade do |t|
@@ -187,6 +206,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_090100) do
   end
 
   add_foreign_key "tudla_accounting_accounts", "tudla_accounting_accounts", column: "contra_account_id"
+  add_foreign_key "tudla_accounting_allocations", "tudla_accounting_carrying_amounts", column: "from_id"
+  add_foreign_key "tudla_accounting_allocations", "tudla_accounting_carrying_amounts", column: "to_id"
+  add_foreign_key "tudla_accounting_allocations", "tudla_accounting_entries", column: "realized_entry_id"
   add_foreign_key "tudla_accounting_balances", "tudla_accounting_accounts", column: "account_id"
   add_foreign_key "tudla_accounting_balances", "tudla_accounting_periods", column: "period_id"
   add_foreign_key "tudla_accounting_bank_account_balances", "tudla_accounting_accounts", column: "account_id"

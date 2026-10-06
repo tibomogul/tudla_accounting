@@ -54,7 +54,15 @@ Each change to the books records a `TudlaAccounting::AuditEvent`: entries posted
 Who acted comes from `TudlaAccounting::Current.actor`: the engine's pages set it from the `current_actor` setting, and other code can set it around its work with `TudlaAccounting::Current.set(actor: user) { ... }`. The actor can be a record (labelled by its `name` or `email`) or a plain string; events without one show as "System".
 
 ### Receivables and payables (carrying amounts)
-After posting, `CarryingAmountProcessor` keeps track of what's still owed. Posting an entry whose source is an invoice or bill opens a `CarryingAmount` on its receivable or payable line, with a due date and any foreign-currency amount. Posting a payment or disbursement that names that entry as `related` reduces it. If money moves through a bank account held in another currency (`BankAccountBalance`), that balance is updated in its own currency.
+After posting, `CarryingAmountProcessor` keeps track of what's still owed. Posting an entry whose source is an invoice or bill opens a `CarryingAmount` on its receivable or payable line, with a due date and any foreign-currency amount. Posting a payment, disbursement or credit note opens a **credit** for the customer or supplier: a carrying amount on its line with a negative amount. If money moves through a bank account held in another currency (`BankAccountBalance`), that balance is updated in its own currency.
+
+Credits are applied to what is owed through **allocations** (`TudlaAccounting::Allocation`):
+- A payment or credit note that names an invoice or bill as `related` is applied to it automatically, up to what is still owed. Anything over stays as the customer's or supplier's credit, so an invoice never goes below zero.
+- `Allocator.allocate!(payment, invoice)` applies a credit to any open invoice or bill of the same party: as much as both allow, or `amount_cents:` (or `other_currency_cents:` for a foreign amount). `Allocator.allocate_oldest_first!(payment)` spreads it over the party's open items, earliest due first, and `Allocator.open_charges(payment)` lists them.
+- `Allocator.unallocate!(allocation, at:)` takes one off again without reversing the payment. Reversing a payment or credit note takes it off everything it was applied to; an invoice or bill can be reversed once nothing is applied to it.
+- Allocations are dated, so `CarryingAmount#outstanding(as_of:)` and the aging report show what was owed on any day. Dates in a closed period are refused, and each allocation is in the audit trail.
+
+The migration that adds allocations converts payments posted before them: each gets its credit, applied to its related invoice or bill as far as that was owed (`AllocationBackfill`, safe to run again).
 
 This is **off until configured**. The host app chooses which of its models count as invoices, bills, payments and disbursements, and which accounts are receivables and payables. See [Configuration](#configuration).
 
@@ -93,13 +101,13 @@ TudlaAccounting::EntryPostingJob.perform_later(entry.id)
 `EntryPostingJob` posts the entry into the period of its `transacted_at`, on the `entry_posting` queue. With Solid Queue, only one posting job per organization runs at a time. A failed job is logged and discarded, not retried, and the entry stays unposted.
 
 ### Aging report
-`AgingReportGenerator.call(organization:, report_type: :receivable, as_of_date:)` (or `:payable`) groups open amounts by related party and buckets them by days past due: current, 1–30, 31–60, 61–90 and over 90. It returns `summary` and `details` per party, plus `totals`, in the organization's currency. A past `as_of_date` shows what was owed on that day: later invoices are left out and later payments are added back.
+`AgingReportGenerator.call(organization:, report_type: :receivable, as_of_date:)` (or `:payable`) groups open amounts by related party and buckets them by days past due: current, 1–30, 31–60, 61–90 and over 90. It returns `summary` and `details` per party, plus `totals`, in the organization's currency. A past `as_of_date` shows what was owed on that day: later invoices are left out and later payments are added back. Credits not yet applied are listed as lines of their own with a negative amount, in the current bucket, so each party's total is what it owes net.
 
 ### Foreign exchange
 - **`ForexRateRetriever.call(from:, to:, date:)`** returns how many `to` one `from` was worth on a date. Rates are cached in `ForexRate`, and missing ones come from `forex_rate_provider`.
 - **`RbaForexRateProvider`** reads the Reserve Bank of Australia's published rates. It needs the `spreadsheet` gem in the host app and network access. A weekend or holiday uses the latest earlier business day.
 - **`ForexGainOrLossCalculator`** gives the gain or loss on a foreign amount of a receivable or payable between its booked rate and a date's rate.
-- **Settlement at a different rate.** When a payment or disbursement settles a foreign-currency invoice or bill, its carrying amount goes down by the book value of the foreign amount, at the rate it was booked at. The difference from the value actually paid is posted as a realized exchange gain or loss against `realized_fx_gain_account_code`, dated with the payment. Each part payment books its own share, and the final payment books what remains, so the receivable or payable ends at zero. An overpayment books a gain or loss only on what was owed, and leaves the extra as a credit. Without that setting, the carrying amount is still correct, but the difference stays on the receivable or payable account and a warning is logged.
+- **Settlement at a different rate.** When a foreign-currency payment or credit is applied to a foreign-currency invoice or bill, its carrying amount goes down by the book value of the foreign amount, at the rate it was booked at. The difference from the credit's own value for that foreign amount is posted as a realized exchange gain or loss against `realized_fx_gain_account_code`, dated with the allocation (and reversed if the allocation is taken off). Each part payment books its own share, and the final one books what remains, so the receivable or payable ends at zero. An overpayment books a gain or loss only on what was owed, and leaves the extra as a credit in the foreign currency. Without that setting, the carrying amount is still correct, but the difference stays on the receivable or payable account and a warning is logged.
 - **`RevaluationEntryGenerator.call(organization, period_end, next_period_start)`** revalues open foreign-currency receivables and payables at the period-end rate. It posts the unrealized gain or loss against `unrealized_fx_gain_account_code`, then posts a reversal on the next period's start, so the later settlement isn't double-counted. Running it twice for the same date does nothing more.
 
 ### Multi-tenancy
@@ -111,7 +119,7 @@ Mounted at `/tudla_accounting` (see [Integration](#integration-into-a-host-appli
 
 - **Dashboard:** profit this year, what is owed each way, draft entries, recent entries, and a getting-started checklist.
 - **Accounts:** the chart of accounts as a tree with closing balances. Each account page shows monthly balances and a ledger with running balances. You can create, edit and delete unused accounts.
-- **Entries:** search and filter entries, write drafts with a line editor that keeps live debit/credit totals, post them, and reverse posted entries. Reversing a payment restores the receivable or payable it settled and reverses its realized exchange difference. An invoice or bill can be reversed once its payments are, which closes its receivable or payable.
+- **Entries:** search and filter entries, write drafts with a line editor that keeps live debit/credit totals, post them, and reverse posted entries. A posted payment or credit note shows what it was applied to and what is left, with forms to apply it to the party's open invoices or bills (or oldest first) and to take an allocation off; an invoice or bill shows what was applied to it. Reversing a payment takes it off what it settled and reverses its realized exchange difference. An invoice or bill can be reversed once nothing is applied to it, which closes its receivable or payable.
 - **Reports:** balance sheet, profit and loss, trial balance, and receivables and payables aging.
 - **Periods:** create calendar or fiscal years, see each year's months, and close or reopen them (reopening asks for a reason).
 - **Setup:** upload a chart of accounts with opening balances (CSV or Excel), or enter or correct opening balances account by account, with live totals checking that they balance. Also import the receivables and payables open at the cut-over, and run the foreign exchange revaluation. A balance check compares the stored balances with the posted entries and can rebuild them.
@@ -252,8 +260,10 @@ TudlaAccounting.configure do |config|
   config.carrying_amount_sources = {      # entry source class => role
     "Invoice" => :receivable,             # opens a receivable
     "Bill" => :payable,                   # opens a payable
-    "Payment" => :receipt,                # reduces the receivable of entry.related
-    "Disbursement" => :disbursement       # reduces the payable of entry.related
+    "Payment" => :receipt,                # a customer's credit, applied to entry.related if set
+    "Disbursement" => :disbursement,      # a credit with a supplier, applied to entry.related if set
+    "CreditNote" => :credit_note,         # like a receipt, without cash
+    "SupplierCredit" => :supplier_credit  # like a disbursement, without cash
   }
   config.due_date_method = :due_date      # read from the source; blank if it doesn't respond
   config.related_party_method = :customer # who owes or is owed, read from the source; the organization if unset

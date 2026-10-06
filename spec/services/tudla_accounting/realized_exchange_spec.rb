@@ -136,8 +136,10 @@ RSpec.describe "Realized exchange gains and losses", type: :service do
     expect(realized_lines(overpayment)).to eq([ "Realized exchange loss on Invoice 1001", [ "1100-EUR", "credit", aud(1.6) ], [ "4950", "debit", aud(1.6) ] ])
     expect(balance("4950")).to eq(aud(-1.6))                       # 40 x (1.50 - 1.54)
     expect(balance("1100-EUR")).to eq(aud(-15))                    # 10 EUR at 1.50 owed back to the customer
-    expect(carrying_amount(inv, "1100-EUR")).to have_attributes(amount_cents: -15_00)
-    expect(carrying_amount(inv, "1100-EUR").forex.other_currency_amount_cents).to eq(-10_00)
+    expect(carrying_amount(inv, "1100-EUR")).to have_attributes(amount_cents: 0)
+    credit = carrying_amount(overpayment, "1100-EUR")               # the customer's credit, to apply later
+    expect(credit).to have_attributes(amount_cents: -15_00, credit?: true)
+    expect(credit.forex.other_currency_amount_cents).to eq(-10_00)
   end
 
   it "treats a payment against an already settled amount as all overpayment" do
@@ -156,7 +158,10 @@ RSpec.describe "Realized exchange gains and losses", type: :service do
 
   it "does not open or settle carrying amounts with the realized entry" do
     inv = invoice(100, "1.54")
-    expect { receive_payment(inv, 100, "1.60") }.not_to change(TudlaAccounting::CarryingAmount, :count)
+    payment = receive_payment(inv, 100, "1.60")
+    realized = TudlaAccounting::Entry.find_by(related: payment)
+    expect(realized.details.filter_map(&:carrying_amount)).to be_empty
+    expect(TudlaAccounting::Allocation.sole.realized_entry).to eq(realized)
   end
 
   describe "the aging report's past view" do

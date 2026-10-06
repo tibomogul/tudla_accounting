@@ -41,7 +41,7 @@
         <% lines.each do |line| %>
           <tr>
             <td><%= link_to line[:entry].particulars, entry_path(line[:entry]) %></td>
-            <td><%= tc_date(line[:carrying_amount].due_date) || "—" %></td>
+            <td><%= line[:credit] ? tc_badge("Credit to apply") : (tc_date(line[:carrying_amount].due_date) || "—") %></td>
             <td class="tc-num"><%= line[:days_outstanding].positive? ? line[:days_outstanding] : "—" %></td>
             <td class="tc-num"><%= tc_money(line[:outstanding]) %></td>
           </tr>

@@ -41,9 +41,9 @@ module TudlaAccounting
       details.any? { |detail| detail.carrying_amount.present? }
     end
 
-    # Settles a receivable or payable (a payment or disbursement).
+    # A credit applied to receivables or payables (a payment, disbursement or credit note).
     def settlement?
-      %i[receipt disbursement].include?(CarryingAmountRole.call(entry: self))
+      %i[receipt disbursement credit_note supplier_credit].include?(CarryingAmountRole.call(entry: self))
     end
 
     # A realized exchange gain or loss posted with a payment.
@@ -55,8 +55,9 @@ module TudlaAccounting
     def reversal_blocker
       if draft? then "Only a posted entry can be reversed"
       elsif reversal then "This entry has already been reversed"
-      elsif realized_exchange? && related.reversal.nil? then "Reverse the payment this exchange difference came from instead"
-      elsif details.any? { |detail| detail.carrying_amount&.settlements&.any? }
+      elsif realized_exchange? && related.reversal.nil? && !Allocation.where(realized_entry: self).where.not(reversed_at: nil).exists?
+        "Reverse the payment this exchange difference came from instead"
+      elsif details.any? { |detail| detail.carrying_amount&.charge? && detail.carrying_amount.allocations_to.active.any? }
         "Reverse the payments against it first"
       end
     end
@@ -79,7 +80,7 @@ module TudlaAccounting
         end
         reversing.save!
         reversing.post(at)
-        undo_carrying_amounts(on)
+        undo_carrying_amounts(at)
         AuditEvent.record!("entry.reversed", organization: organization, subject: self, details: { reversal_id: reversing.id, on: on.to_date.iso8601 })
         reversing
       end
@@ -205,15 +206,11 @@ module TudlaAccounting
 
     private
 
-    # Reversing an invoice or bill closes its receivable or payable; reversing a payment
-    # reverses its realized exchange difference too and restores what it settled.
-    def undo_carrying_amounts(on)
-      if settlement?
-        self.class.where(related: self).where.not(posted_at: nil)
-          .where("particulars LIKE ?", "#{CarryingAmountProcessor::REALIZED_PREFIX}%")
-          .reject(&:reversal).each { |realized| realized.reverse!(on: on) }
-        CarryingAmountProcessor.new(entry: self).undo_settlement
-      end
+    # Reversing an invoice or bill closes its receivable or payable; reversing a payment or
+    # credit note takes it off what it was applied to (reversing any realized exchange
+    # difference) and closes its credit.
+    def undo_carrying_amounts(at)
+      CarryingAmountProcessor.new(entry: self).undo_credit(at) if settlement?
       details.filter_map(&:carrying_amount).each(&:recompute!)
     end
 

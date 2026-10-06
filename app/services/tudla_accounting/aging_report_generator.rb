@@ -12,8 +12,10 @@ module TudlaAccounting
   # setting); totals has each bucket and :total, in the organization's currency.
   #
   # Only invoices or bills transacted by the end of as_of_date are included, and only
-  # payments posted against them by then count, so a past date shows what was owed on
-  # that day (including foreign-currency settlements, at their booked value).
+  # payments applied to them by then count, so a past date shows what was owed on that
+  # day (including foreign-currency settlements, at their booked value). Credits not yet
+  # applied (payments on account, overpayments, credit notes) are lines of their own with
+  # a negative amount, in :current, so each party's total is what they owe net.
   class AgingReportGenerator
     BUCKETS = %i[current days_1_30 days_31_60 days_61_90 days_over_90].freeze
 
@@ -46,11 +48,11 @@ module TudlaAccounting
     def open_lines
       carrying_amounts.filter_map do |carrying_amount|
         outstanding = Money.new(outstanding_cents(carrying_amount), @organization.currency)
-        next unless outstanding.positive?
+        next if outstanding.zero?
 
-        days = days_outstanding(carrying_amount)
+        days = carrying_amount.credit? ? 0 : days_outstanding(carrying_amount)
         { carrying_amount: carrying_amount, entry: carrying_amount.detail.entry, source: carrying_amount.detail.entry.source,
-          outstanding: outstanding, days_outstanding: days, aging_bucket: bucket_for(days) }
+          outstanding: outstanding, days_outstanding: days, aging_bucket: bucket_for(days), credit: carrying_amount.credit? }
       end
     end
 

@@ -1,7 +1,8 @@
 module TudlaAccounting
   module ActivityHelper
     ACTIVITY_KINDS = { "entry" => "Entries", "account" => "Accounts", "period" => "Periods",
-                       "opening_balances" => "Opening balances", "balances" => "Balance rebuilds" }.freeze
+                       "opening_balances" => "Opening balances", "balances" => "Balance rebuilds",
+                       "allocation" => "Payments applied" }.freeze
 
     # What an audit event did, in words, linking to its subject while it still exists.
     def activity_description(event)
@@ -19,6 +20,8 @@ module TudlaAccounting
       when "period.closed" then safe_join([ "Closed ", subject ])
       when "period.reopened" then safe_join([ "Reopened ", subject, ": “#{details['reason']}”" ])
       when "opening_balances.saved" then "Saved the opening balances at #{tc_date(details['date'])}"
+      when "allocation.created" then safe_join([ "Applied ", subject ])
+      when "allocation.reversed" then safe_join([ "Took off ", subject ])
       when "balances.rebuilt" then "Rebuilt the balances: #{pluralize(details['corrected'], 'balance')} corrected"
       end
     end
@@ -38,6 +41,7 @@ module TudlaAccounting
       when Entry.name then (entry_path(event.subject_id) if Entry.exists?(event.subject_id))
       when Account.name then (account_path(event.subject_id) if Account.exists?(event.subject_id))
       when Period.name then (period_path(Period.find(event.subject_id).root) if Period.exists?(event.subject_id))
+      when Allocation.name then entry_path(Allocation.find(event.subject_id).from.detail.entry_id)
       end
       path ? link_to(event.subject_label, path, class: "underline") : event.subject_label.to_s
     end
