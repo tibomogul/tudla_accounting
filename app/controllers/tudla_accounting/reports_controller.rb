@@ -31,7 +31,8 @@ module TudlaAccounting
     def tax
       return unless month_range
 
-      @report = TaxReport.call(accounting_organization, from: @from.from_date, thru: @thru.thru_date)
+      @report = TaxReport.call(accounting_organization, from: @from.from_date, thru: @thru.thru_date,
+                               basis: params[:basis].presence_in(TaxReport::BASES.map(&:to_s)))
     end
 
     # Profit and loss with a column per value of a dimension, over a run of months (the

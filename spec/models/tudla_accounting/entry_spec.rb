@@ -251,6 +251,16 @@ RSpec.describe TudlaAccounting::Entry, type: :model do
       expect(fx).to have_attributes(rate: BigDecimal("1.54"), foreign_amount: Money.new(10_000_00, "EUR"))
     end
 
+    it "keeps the foreign amount of a line written as a decrease as a magnitude, like its amount" do
+      entry = described_class.create_from_ruby_hash(invoice_hash.merge(details: [
+        { account_code: "1100-EUR", amount: "USD -15400.00", fx: { other_currency_amount: "EUR -10000.00", fx_rate: "1.54" } },
+        { account_code: "4100", amount: "USD -15400.00" }
+      ]))
+
+      line = detail_for(entry, receivable_eur)
+      expect([ line.tally, line.amount_cents, line.foreign_exchange.other_currency_cents ]).to eq([ "credit", 15_400_00, 10_000_00 ])
+    end
+
     it "only looks up account codes within the given organization" do
       other = create(:organization)
       create(:tudla_accounting_account, code: "9999", organization: other)

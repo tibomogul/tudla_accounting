@@ -62,6 +62,8 @@ The entry form has a Tax column once the organization has tax codes: the totals 
 
 `TaxReport.call(organization, from:, thru:)` (Reports → Tax summary) totals, per code, the amounts taxed and the tax for lines posted in that time: sales codes count credits up, purchases codes debits, so credit notes and reversals reduce their own side. `net_tax` is tax on sales less tax on purchases: owed when positive, a refund when negative.
 
+By default tax counts when its lines are posted (accrual basis). With `basis: :cash` (or the `tax_basis` setting, or the page's Basis choice) it counts when money changes hands: entries that open no receivable or payable count when posted, while an invoice's, bill's or taxed credit note's tax counts in proportion as payments and credits are applied to it (by its foreign amount when it has one), back out if one is taken off, and the reversal of an invoice or bill isn't counted.
+
 ### General ledger and cash flow
 `Reports::GeneralLedger.new(organization, from: month, thru: month, account_ids: nil)` lists, for every account lines are posted to (or the ones chosen), the opening balance, each posted line with a running balance on the account's own side, and the closing balance; `to_csv` writes it out. Reports → General ledger shows it and downloads the CSV.
 

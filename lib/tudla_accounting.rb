@@ -59,7 +59,7 @@ module TudlaAccounting
                   :retained_earnings_account_code, :related_party_method,
                   :forex_rate_provider, :unrealized_fx_gain_account_code,
                   :realized_fx_gain_account_code, :parent_controller, :current_organization,
-                  :current_actor, :authorize, :cash_account_codes
+                  :current_actor, :authorize, :cash_account_codes, :tax_basis
     attr_reader :carrying_amount_sources, :entry_sources
 
     def initialize
@@ -92,6 +92,9 @@ module TudlaAccounting
       # The cash flow statement's cash: these accounts and every account beneath them
       # (e.g. %w[1010] for a "Cash and bank" parent). The report can choose others.
       @cash_account_codes = []
+      # When the tax summary counts tax: :accrual (as lines are posted) or :cash (as
+      # invoices and bills are paid). The report can choose either.
+      @tax_basis = :accrual
       @entry_sources = {}
     end
 

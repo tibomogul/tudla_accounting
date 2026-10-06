@@ -180,7 +180,7 @@ module TudlaAccounting
           rate = BigDecimal(fx_hash[:fx_rate])
 
           detail_attributes[:foreign_exchange_attributes] = {
-            other_currency_cents: other_currency_money.cents,
+            other_currency_cents: other_currency_money.cents.abs, # a magnitude: the line's tally gives the side
             other_currency: other_currency_money.currency.iso_code,
             rate: rate
           }

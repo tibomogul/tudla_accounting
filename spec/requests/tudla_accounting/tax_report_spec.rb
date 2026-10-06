@@ -51,7 +51,8 @@ RSpec.describe "Tax summary", type: :request do
       it "shows the month containing today by default" do
         travel_to(Time.zone.local(2026, 2, 15)) { get routes.reports_tax_path }
         expect([ total("sales_base"), total("sales_tax"), total("purchases_tax"), total("net_tax") ]).to eq([ "100.00", "10.00", "0.00", "10.00" ])
-        expect(response.body).to include("Owed to the tax authority", "1 Feb 2026 to 28 Feb 2026")
+        expect(response.body).to include("Owed to the tax authority", "1 Feb 2026 to 28 Feb 2026, accrual basis")
+        expect(css_select("#basis option[selected]").text).to eq("Accrual")
       end
 
       it "covers a chosen run of months, either way round, with a refund when more was paid" do
@@ -60,6 +61,13 @@ RSpec.describe "Tax summary", type: :request do
         expect([ total("sales_tax"), total("purchases_base"), total("purchases_tax"), total("net_tax") ]).to eq([ "10.00", "300.00", "30.00", "20.00" ])
         expect(response.body).to include("Refund due")
         expect(css_select("#from_id option[selected]").text).to eq("Feb 2026")
+      end
+
+      it "counts tax as invoices are paid on the cash basis" do
+        travel_to(Time.zone.local(2026, 2, 15)) { get routes.reports_tax_path(basis: "cash") }
+        expect(response.body).to include("cash basis (as invoices and bills are paid)")
+        expect(total("sales_tax")).to eq("10.00") # the sale has no receivable, so it counts when posted
+        expect(css_select("#basis option[selected]").text).to eq("Cash")
       end
 
       it "refuses another organization's month" do

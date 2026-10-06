@@ -6,7 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- `Entry.create_from_ruby_hash` stored a foreign amount given as a decrease (`EUR -55.00`) as a negative number; it is now a magnitude, like the line's amount.
+
 ### Added
+- Cash-basis tax summary: tax on invoices, bills and taxed credit notes counts as they are settled (each allocation's share, reversed if taken off); entries with no receivable or payable count when posted. Choose it on the page, per call (`basis: :cash`) or with the `tax_basis` setting.
 - Lines with a foreign amount can be taxed: the tax is worked out on the converted amount and posted in the organization's currency (an inclusive line's foreign amount is split too). A tax account held in another currency is refused.
 
 ## [0.1.0] - 2026-10-06
