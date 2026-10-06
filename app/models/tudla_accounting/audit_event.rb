@@ -5,15 +5,10 @@ module TudlaAccounting
   # record or a plain label), what (an action such as "entry.posted"), to what (the
   # subject), and when. Labels are kept with the event so it still reads after the actor
   # or subject is gone. Events are never changed or deleted (on PostgreSQL a trigger
-  # enforces it).
+  # enforces it). Once its transaction commits, each is also published as an event; see
+  # TudlaAccounting.subscribe.
   class AuditEvent < ApplicationRecord
-    ACTIONS = %w[
-      entry.posted entry.reversed entry.deleted
-      account.created account.updated account.deleted
-      period.created period.deleted period.closed period.reopened
-      opening_balances.saved balances.rebuilt
-      allocation.created allocation.reversed
-    ].freeze
+    ACTIONS = TudlaAccounting::EVENTS
 
     belongs_to :organization, polymorphic: true
     belongs_to :actor, polymorphic: true, optional: true
@@ -25,9 +20,13 @@ module TudlaAccounting
 
     def self.record!(action, organization:, subject: nil, details: {})
       actor = Current.actor
-      create!(action: action, organization: organization, details: details,
-              actor: (actor unless actor.is_a?(String)), actor_label: label_for(actor),
-              subject: subject, subject_label: label_for(subject))
+      event = create!(action: action, organization: organization, details: details,
+                      actor: (actor unless actor.is_a?(String)), actor_label: label_for(actor),
+                      subject: subject, subject_label: label_for(subject))
+      ActiveRecord.after_all_transactions_commit do
+        ActiveSupport::Notifications.instrument("#{action}.tudla_accounting", event: event)
+      end
+      event
     end
 
     def self.label_for(object)

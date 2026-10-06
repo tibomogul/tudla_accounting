@@ -15,7 +15,8 @@ RSpec.describe "Entering a journal entry", type: :system do
   end
 
   def status = find("[data-entry-lines-target=status]").text
-  def line(index) = all("tbody[data-entry-lines-target=lines] tr:not([hidden])")[index]
+  # Waits for the row to exist: one just added by "Add line" may not be rendered yet.
+  def line(index) = all("tbody[data-entry-lines-target=lines] tr:not([hidden])", minimum: index + 1)[index]
 
   it "totals the lines as they are typed, then saves and posts the entry" do
     visit "/tudla_accounting/entries/new"

@@ -8,14 +8,27 @@ module TudlaAccounting
     helper TudlaAccounting::ApplicationHelper, TudlaAccounting::AccountsHelper, TudlaAccounting::EntriesHelper, TudlaAccounting::ReportsHelper,
            TudlaAccounting::ActivityHelper
 
+    PERMISSIONS = %i[read record post administer].freeze
+
     before_action :require_organization
     before_action :set_actor
+    before_action :authorize_accounting
+
+    # Which permission each action needs, for the authorize setting: :read unless a
+    # controller says otherwise with permits.
+    class_attribute :accounting_permissions, default: {}
+
+    def self.permits(permission, only:)
+      raise ArgumentError, "unknown permission #{permission.inspect}" unless PERMISSIONS.include?(permission)
+
+      self.accounting_permissions = accounting_permissions.merge(Array(only).to_h { |action| [ action.to_s, permission ] })
+    end
 
     rescue_from ActiveRecord::RecordNotFound do
       render "tudla_accounting/shared/not_found", status: :not_found
     end
 
-    helper_method :accounting_organization
+    helper_method :accounting_organization, :tc_can?
 
     private
 
@@ -37,6 +50,20 @@ module TudlaAccounting
     # Whoever the current_actor setting returns is recorded on audit events.
     def set_actor
       Current.actor = TudlaAccounting.configuration.current_actor&.call(self)
+    end
+
+    # Whether the authorize setting lets the current user do what needs permission (one of
+    # PERMISSIONS); everything is allowed when it isn't set. Views use it to hide actions.
+    def tc_can?(permission)
+      hook = TudlaAccounting.configuration.authorize
+      return true unless hook
+
+      (@tc_permissions ||= {}).fetch(permission) { @tc_permissions[permission] = hook.call(self, permission) ? true : false }
+    end
+
+    def authorize_accounting
+      permission = accounting_permissions.fetch(action_name, :read)
+      render "tudla_accounting/shared/not_allowed", status: :forbidden, locals: { permission: permission } unless tc_can?(permission)
     end
 
     # model scoped to the current organization, e.g. organization_scope(Account).find(id)

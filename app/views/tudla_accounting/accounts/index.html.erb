@@ -1,12 +1,12 @@
 <%= tc_page_header "Chart of accounts", subtitle: (@year ? "Closing balances for #{tc_period_label(@year)}, in #{accounting_organization.currency}" : "No financial year yet") do %>
-  <%= link_to "New account", new_account_path, class: "tc-btn" %>
+  <% if tc_can?(:record) %><%= link_to "New account", new_account_path, class: "tc-btn" %><% end %>
 <% end %>
 
 <% tree = account_tree_rows(@accounts) %>
 <% if tree.empty? %>
   <div class="tc-card tc-card-body text-center">
     <p class="tc-muted">No accounts yet.</p>
-    <p class="mt-4"><%= link_to "Create the first account", new_account_path, class: "tc-btn" %></p>
+    <% if tc_can?(:record) %><p class="mt-4"><%= link_to "Create the first account", new_account_path, class: "tc-btn" %></p><% end %>
   </div>
 <% end %>
 

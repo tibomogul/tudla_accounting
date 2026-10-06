@@ -109,7 +109,15 @@ module TudlaAccounting
       end
     end
 
+    # Creates an entry (not posted) from a plain hash, e.g. from another system. With an
+    # idempotency_key, an entry already created with that key for the organization is
+    # returned instead, so a retried job or replayed webhook doesn't book it twice.
     def self.create_from_ruby_hash(hash)
+      key = hash[:idempotency_key].presence
+      scope = { organization_type: hash[:organization_type], organization_id: hash[:organization_id] }
+      existing = key && find_by(**scope, idempotency_key: key)
+      return existing if existing
+
       raise ArgumentError, "transacted_at must be a valid ISO 8601 datetime string" unless hash[:transacted_at].is_a?(String)
       begin
         transacted_at = Time.iso8601(hash[:transacted_at])
@@ -180,19 +188,22 @@ module TudlaAccounting
         details_attributes << detail_attributes
       end
 
-      transaction do
-        attributes = {
-          organization_type: hash[:organization_type],
-          organization_id: hash[:organization_id],
-          source_type: hash[:source_type],
-          source_id: hash[:source_id],
-          particulars: hash[:particulars],
-          transacted_at: transacted_at,
-          details_attributes: details_attributes
-        }
-        attributes[:posted_at] = posted_at if hash[:posted_at].present?
-        create!(attributes)
-      end
+      attributes = {
+        organization_type: hash[:organization_type],
+        organization_id: hash[:organization_id],
+        source_type: hash[:source_type],
+        source_id: hash[:source_id],
+        particulars: hash[:particulars],
+        transacted_at: transacted_at,
+        idempotency_key: key,
+        details_attributes: details_attributes
+      }
+      attributes[:posted_at] = posted_at if hash[:posted_at].present?
+      transaction(requires_new: true) { create!(attributes) }
+    rescue ActiveRecord::RecordNotUnique
+      raise unless key
+
+      find_by!(**scope, idempotency_key: key) # created by someone else at the same time
     end
 
     # Parses "AUD 1,100.00" (or "1100.00" in the default currency). Monetize 2 only

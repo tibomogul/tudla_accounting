@@ -116,7 +116,7 @@ Accounts, periods, entries, lines and balances all belong to a polymorphic `orga
 
 ## Web pages
 
-Mounted at `/tudla_accounting` (see [Integration](#integration-into-a-host-application)), the engine has pages for the organization returned by `current_organization`:
+Mounted at `/accounting` by the install generator (see [Integration](#integration-into-a-host-application)), the engine has pages for the organization returned by `current_organization`:
 
 - **Dashboard:** profit this year, what is owed each way, draft entries, recent entries, and a getting-started checklist.
 - **Accounts:** the chart of accounts as a tree with closing balances. Each account page shows monthly balances and a ledger with running balances. You can create, edit and delete unused accounts.
@@ -227,16 +227,18 @@ gem "tudla_accounting", path: "../path/to/tudla_accounting"
 Then:
 ```bash
 bundle install
-bin/rails tudla_accounting:install:migrations
+bin/rails generate tudla_accounting:install   # --mount-path=/books, --skip-migrations
 bin/rails db:migrate
 ```
 
-Mount the engine in `config/routes.rb`:
-```ruby
-Rails.application.routes.draw do
-  mount TudlaAccounting::Engine => "/tudla_accounting"
-end
-```
+The generator writes `config/initializers/tudla_accounting.rb` with every setting, mounts the engine (at `/accounting` by default), copies the engine's migrations, and imports the engine's styles into `app/assets/tailwind/application.css` (with tailwindcss-rails). To do it by hand: `bin/rails tudla_accounting:install:migrations`, `mount TudlaAccounting::Engine => "/accounting"` in `config/routes.rb`, and `@import "../builds/tailwind/tudla_accounting";` in the Tailwind entry point.
+
+### Hooks for the host app
+
+- **Authorization.** `config.authorize = ->(controller, permission) { ... }` is asked before every page and action, with the permission it needs: `:read`, `:record` (drafts and accounts), `:post` (posting, reversing, applying payments) or `:administer` (periods and setup). A falsy answer gets a 403 page, and the pages hide the buttons for what isn't allowed. Without it, everyone who reaches the pages can do everything.
+- **Who did it.** `config.current_actor` names the user on the audit trail; around background work, use `TudlaAccounting::Current.set(actor: user) { ... }`.
+- **Events.** `TudlaAccounting.subscribe("entry.posted") { |event| ... }` calls the block with the `AuditEvent` after the change commits (never for one rolled back); with no action it receives every one. The actions are `TudlaAccounting::EVENTS`, also published as `ActiveSupport::Notifications` named `"<action>.tudla_accounting"`.
+- **Idempotency.** `Entry.create_from_ruby_hash(..., idempotency_key: "stripe-ch_123")` returns the entry already created with that key for the organization instead of booking it twice, even when two processes race. `TudlaAccounting.create_entry_from_source!(record)` uses `"Type:id"` as the key unless the registered callable returns its own (or `idempotency_key: nil` for none).
 
 ### Configuration
 

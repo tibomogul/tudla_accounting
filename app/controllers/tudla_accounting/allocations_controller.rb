@@ -2,6 +2,8 @@ module TudlaAccounting
   # Applying a payment or credit note (the entry whose page these forms are on) to what is
   # owed on invoices or bills, and taking it off again. See Allocator.
   class AllocationsController < ApplicationController
+    permits :post, only: %i[create oldest_first reverse]
+
     before_action :set_credit_entry, only: %i[create oldest_first]
 
     def create

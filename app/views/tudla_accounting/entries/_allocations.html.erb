@@ -29,7 +29,7 @@
                 <td class="text-right">
                   <% if !allocation.active? %>
                     <span class="no-underline"><%= tc_badge "Taken off #{tc_date(allocation.reversed_at)}" %></span>
-                  <% elsif carrying_amount.credit? %>
+                  <% elsif carrying_amount.credit? && tc_can?(:post) %>
                     <%= button_to "Take off", reverse_allocation_path(allocation), class: "tc-btn tc-btn-ghost tc-btn-sm",
                                   form: { data: { controller: "confirm", confirm_message_value: "Take this off #{other.particulars}?", action: "submit->confirm#ask" } } %>
                   <% end %>
@@ -41,7 +41,7 @@
       </div>
     <% end %>
 
-    <% if carrying_amount.credit? && carrying_amount.amount_cents.negative? && entry.reversal.nil? %>
+    <% if carrying_amount.credit? && carrying_amount.amount_cents.negative? && entry.reversal.nil? && tc_can?(:post) %>
       <% charges = TudlaAccounting::Allocator.open_charges(carrying_amount) %>
       <div class="tc-card-body border-t border-[var(--tc-border)]">
         <% if charges.empty? %>

@@ -1,5 +1,5 @@
 <%= tc_page_header "Entries", subtitle: "Journal entries, newest first" do %>
-  <%= link_to "New entry", new_entry_path, class: "tc-btn" %>
+  <% if tc_can?(:record) %><%= link_to "New entry", new_entry_path, class: "tc-btn" %><% end %>
 <% end %>
 
 <%= form_with url: entries_path, method: :get, class: "tc-card tc-card-body mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-6 items-end" do |form| %>

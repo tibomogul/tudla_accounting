@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_06_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_06_150000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -151,6 +151,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_120000) do
 
   create_table "tudla_accounting_entries", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.string "idempotency_key"
     t.bigint "organization_id", null: false
     t.string "organization_type", null: false
     t.text "particulars"
@@ -161,6 +162,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_120000) do
     t.string "source_type"
     t.datetime "transacted_at"
     t.datetime "updated_at", null: false
+    t.index ["organization_type", "organization_id", "idempotency_key"], name: "tudla_accounting_entries_idempotency_key", unique: true, where: "(idempotency_key IS NOT NULL)"
     t.index ["organization_type", "organization_id"], name: "index_tudla_accounting_entries_on_organization"
     t.index ["posted_at"], name: "index_tudla_accounting_entries_on_posted_at"
     t.index ["related_type", "related_id"], name: "index_tudla_accounting_entries_on_related"

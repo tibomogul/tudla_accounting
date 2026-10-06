@@ -42,7 +42,7 @@
           <%= tc_nav_link "Entries", entries_path %>
           <%= tc_nav_link "Reports", reports_path %>
           <%= tc_nav_link "Periods", periods_path %>
-          <%= tc_nav_link "Setup", setup_path %>
+          <% if tc_can?(:administer) %><%= tc_nav_link "Setup", setup_path %><% end %>
           <%= tc_nav_link "Activity", activity_path %>
         <% end %>
         <%= link_to "Back to app ↗", main_app.root_path, class: "tc-nav-link" %>

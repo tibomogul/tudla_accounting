@@ -1,9 +1,11 @@
 <%= tc_page_header @entry.particulars, subtitle: "Dated #{tc_date(@entry.transacted_at)}" do %>
   <% if @entry.draft? %>
-    <%= button_to "Post", post_entry_path(@entry), class: "tc-btn" %>
-    <%= link_to "Edit", edit_entry_path(@entry), class: "tc-btn tc-btn-secondary" %>
-    <%= button_to "Delete", entry_path(@entry), method: :delete, class: "tc-btn tc-btn-danger",
-                  form: { data: { controller: "confirm", confirm_message_value: "Delete this draft?", action: "submit->confirm#ask" } } %>
+    <% if tc_can?(:post) %><%= button_to "Post", post_entry_path(@entry), class: "tc-btn" %><% end %>
+    <% if tc_can?(:record) %>
+      <%= link_to "Edit", edit_entry_path(@entry), class: "tc-btn tc-btn-secondary" %>
+      <%= button_to "Delete", entry_path(@entry), method: :delete, class: "tc-btn tc-btn-danger",
+                    form: { data: { controller: "confirm", confirm_message_value: "Delete this draft?", action: "submit->confirm#ask" } } %>
+    <% end %>
   <% end %>
 <% end %>
 
@@ -47,7 +49,8 @@
 
 <% if @entry.posted? %>
   <%= render "allocations", entry: @entry %>
-  <% if (blocker = @entry.reversal_blocker) %>
+  <% if !tc_can?(:post) %>
+  <% elsif (blocker = @entry.reversal_blocker) %>
     <% unless @entry.reversal %><p class="tc-hint"><%= blocker %>.</p><% end %>
   <% else %>
     <%= form_with url: reverse_entry_path(@entry), class: "tc-card tc-card-body flex flex-wrap items-end gap-3 max-w-xl",

@@ -1,9 +1,11 @@
 <%= tc_page_header @account.code_with_name, subtitle: "#{@account.category.capitalize} account#{" · held in #{@account.currency}" if @account.currency.present?}" do %>
-  <%= link_to "Edit", edit_account_path(@account), class: "tc-btn tc-btn-secondary" %>
-  <%= link_to "Add sub-account", new_account_path(parent_id: @account.id, category: @account.category), class: "tc-btn tc-btn-secondary" %>
-  <% if @account.deletable? %>
-    <%= button_to "Delete", account_path(@account), method: :delete, class: "tc-btn tc-btn-danger",
-                  form: { data: { controller: "confirm", confirm_message_value: "Delete #{@account.code_with_name}?", action: "submit->confirm#ask" } } %>
+  <% if tc_can?(:record) %>
+    <%= link_to "Edit", edit_account_path(@account), class: "tc-btn tc-btn-secondary" %>
+    <%= link_to "Add sub-account", new_account_path(parent_id: @account.id, category: @account.category), class: "tc-btn tc-btn-secondary" %>
+    <% if @account.deletable? %>
+      <%= button_to "Delete", account_path(@account), method: :delete, class: "tc-btn tc-btn-danger",
+                    form: { data: { controller: "confirm", confirm_message_value: "Delete #{@account.code_with_name}?", action: "submit->confirm#ask" } } %>
+    <% end %>
   <% end %>
 <% end %>
 

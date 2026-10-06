@@ -1,5 +1,8 @@
 module TudlaAccounting
   class EntriesController < ApplicationController
+    permits :record, only: %i[new create edit update destroy]
+    permits :post, only: %i[post reverse]
+
     before_action :set_entry, only: %i[show edit update destroy post reverse]
     before_action :require_draft, only: %i[edit update destroy]
     helper_method :organization_accounts

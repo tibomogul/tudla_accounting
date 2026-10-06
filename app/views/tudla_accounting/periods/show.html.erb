@@ -1,9 +1,9 @@
 <%= tc_page_header "Financial year #{tc_period_label(@year)}", subtitle: "#{tc_date(@year.from_date)} to #{tc_date(@year.thru_date)}" do %>
-  <% if @year.close_blocker.nil? %>
+  <% if tc_can?(:administer) && @year.close_blocker.nil? %>
     <%= button_to "Close year", close_period_path(@year), class: "tc-btn tc-btn-secondary",
                   form: { data: { controller: "confirm", confirm_message_value: "Close #{tc_period_label(@year)} and all its months?", action: "submit->confirm#ask" } } %>
   <% end %>
-  <% if @year.deletable? %>
+  <% if tc_can?(:administer) && @year.deletable? %>
     <%= button_to "Delete year", period_path(@year), method: :delete, class: "tc-btn tc-btn-danger",
                   form: { data: { controller: "confirm", confirm_message_value: "Delete #{tc_period_label(@year)} and its months?", action: "submit->confirm#ask" } } %>
   <% end %>
@@ -30,7 +30,8 @@
           <td class="tc-num"><%= @line_counts.fetch(month.id, 0) %></td>
           <td><%= month.closed? ? tc_badge("Closed", tone: :warning) : tc_badge("Open") %></td>
           <td class="text-right">
-            <% if month.close_blocker.nil? %>
+            <% if !tc_can?(:administer) %>
+            <% elsif month.close_blocker.nil? %>
               <%= button_to "Close", close_period_path(month), class: "tc-btn tc-btn-secondary tc-btn-sm",
                             form: { data: { controller: "confirm", confirm_message_value: "Close #{tc_period_label(month)}? Nothing more can be posted to it.", action: "submit->confirm#ask" } } %>
             <% elsif month.reopen_blocker.nil? %>
@@ -43,7 +44,7 @@
   </table>
 </div>
 
-<% if @year.reopen_blocker.nil? %>
+<% if tc_can?(:administer) && @year.reopen_blocker.nil? %>
   <div class="mt-6 max-w-xl"><%= render "reopen_form", period: @year %></div>
 <% end %>
 <p class="tc-hint mt-4">Periods close in order. A closed month takes no more postings or reversals; reopening needs a reason, which the activity log keeps.</p>

@@ -1,5 +1,7 @@
 module TudlaAccounting
   class AccountsController < ApplicationController
+    permits :record, only: %i[new create edit update destroy]
+
     before_action :set_account, only: %i[show edit update destroy]
     helper_method :organization_accounts
 

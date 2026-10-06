@@ -22,6 +22,32 @@ module TudlaAccounting
     attr_accessor :configuration
   end
 
+  # What can happen to the books, each recorded as an AuditEvent and published once it
+  # commits; see subscribe.
+  EVENTS = %w[
+    entry.posted entry.reversed entry.deleted
+    account.created account.updated account.deleted
+    period.created period.deleted period.closed period.reopened
+    opening_balances.saved balances.rebuilt
+    allocation.created allocation.reversed
+  ].freeze
+
+  # Calls the block with each TudlaAccounting::AuditEvent for an action (or for every
+  # action when none is given) once the change has committed, e.g. to sync another
+  # system or send a notification:
+  #
+  #   TudlaAccounting.subscribe("entry.posted") { |event| LedgerSyncJob.perform_later(event.subject_id) }
+  #
+  # Returns the subscriber, for ActiveSupport::Notifications.unsubscribe. The events
+  # are ActiveSupport::Notifications events named "<action>.tudla_accounting".
+  def self.subscribe(action = nil, &block)
+    raise ArgumentError, "unknown event #{action.inspect}; expected one of #{EVENTS.join(', ')}" if action && !EVENTS.include?(action)
+
+    ActiveSupport::Notifications.subscribe(action ? "#{action}.tudla_accounting" : /\.tudla_accounting\z/) do |*, payload|
+      block.call(payload[:event])
+    end
+  end
+
   class Configuration
     # receivable/payable open what is owed; receipt/disbursement (cash) and
     # credit_note/supplier_credit (no cash) are credits applied against it; refund (paid
@@ -33,7 +59,7 @@ module TudlaAccounting
                   :retained_earnings_account_code, :related_party_method,
                   :forex_rate_provider, :unrealized_fx_gain_account_code,
                   :realized_fx_gain_account_code, :parent_controller, :current_organization,
-                  :current_actor
+                  :current_actor, :authorize
     attr_reader :carrying_amount_sources, :entry_sources
 
     def initialize
@@ -58,6 +84,11 @@ module TudlaAccounting
       # Called with the controller for whoever is acting, recorded on audit events: a
       # record (a user) or a plain label, e.g. ->(controller) { controller.current_user }
       @current_actor = nil
+      # Called with the controller and the permission a page or action needs (:read,
+      # :record for drafts and accounts, :post for posting, reversing and applying
+      # payments, :administer for periods and setup); a falsy result refuses it (403).
+      # Everything is allowed when nil. e.g. ->(controller, permission) { controller.current_user.can?(permission) }
+      @authorize = nil
       @entry_sources = {}
     end
 
@@ -104,6 +135,8 @@ module TudlaAccounting
   # Creates (but does not post) the entry for a host-app record using its
   # registered callable. source_type and source_id default to the record's,
   # so the entry is linked back to it. Returns nil if the callable returns nil.
+  # The idempotency_key defaults to "Type:id", so calling it again for the same record
+  # returns the entry already made; the callable can return its own key, or nil for none.
   def self.create_entry_from_source!(source)
     source_type = source.class.name
     callable = configuration.entry_sources[source_type]
@@ -113,7 +146,10 @@ module TudlaAccounting
     return if entry_hash.nil?
 
     defaults = { source_type: source_type }
-    defaults[:source_id] = source.id if source.respond_to?(:id)
+    if source.respond_to?(:id)
+      defaults[:source_id] = source.id
+      defaults[:idempotency_key] = "#{source_type}:#{source.id}" if source.id
+    end
     TudlaAccounting::Entry.create_from_ruby_hash(defaults.merge(entry_hash))
   end
 

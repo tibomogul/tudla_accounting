@@ -1,11 +1,11 @@
 <%= tc_page_header "Financial years", subtitle: "Each year is split into months; entries post to the month containing their date" do %>
-  <%= link_to "New financial year", new_period_path, class: "tc-btn" %>
+  <% if tc_can?(:administer) %><%= link_to "New financial year", new_period_path, class: "tc-btn" %><% end %>
 <% end %>
 
 <% if @years.empty? %>
   <div class="tc-card tc-card-body text-center">
     <p class="tc-muted">No financial years yet. Entries can only be posted once a year covers their date.</p>
-    <p class="mt-4"><%= link_to "Create the first year", new_period_path, class: "tc-btn" %></p>
+    <% if tc_can?(:administer) %><p class="mt-4"><%= link_to "Create the first year", new_period_path, class: "tc-btn" %></p><% end %>
   </div>
 <% else %>
   <div class="tc-card overflow-x-auto">

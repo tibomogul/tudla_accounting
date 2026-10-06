@@ -1,5 +1,7 @@
 module TudlaAccounting
   class PeriodsController < ApplicationController
+    permits :administer, only: %i[new create destroy close reopen]
+
     def index
       @years = organization_scope(Period).roots.order(from_date: :desc).to_a
     end

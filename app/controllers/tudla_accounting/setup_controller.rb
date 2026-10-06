@@ -6,6 +6,8 @@ module TudlaAccounting
   # the period-end foreign exchange revaluation; and checking the stored balances against
   # the posted entries.
   class SetupController < ApplicationController
+    permits :administer, only: %i[index opening_balances save_opening_balances chart_of_accounts open_items revaluation balances rebuild_balances]
+
     LOADERS = { ".csv" => CsvLoader, ".xlsx" => XlsxLoader }.freeze
     PROBLEMS = [ ArgumentError, ActiveRecord::RecordInvalid, ActiveRecord::RecordNotFound, CSV::MalformedCSVError,
                  ForexRateRetriever::RateNotFound, Zip::Error ].freeze

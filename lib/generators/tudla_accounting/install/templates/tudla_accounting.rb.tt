@@ -1,0 +1,41 @@
+# TudlaAccounting settings. See the engine's README for what each one does.
+TudlaAccounting.configure do |config|
+  # --- Pages (mounted at <%= options[:mount_path] %>) ---
+  # Engine controllers inherit from this controller, so its login and helpers apply.
+  config.parent_controller = "::ApplicationController"
+  # Whose books to show; nil shows a "no organization" page.
+  config.current_organization = ->(controller) { controller.send(:current_organization) }
+  # Who is acting, recorded on the audit trail: a record (labelled by name or email) or a string.
+  # config.current_actor = ->(controller) { controller.send(:current_user) }
+  # What each user may do: permission is :read, :record (drafts and accounts),
+  # :post (posting, reversing, applying payments) or :administer (periods and setup).
+  # config.authorize = ->(controller, permission) { controller.send(:current_user)&.admin? || permission == :read }
+
+  # --- Books ---
+  config.base_currency = "USD"
+  config.time_zone = "UTC" # financial years and months are built in this zone
+  # config.retained_earnings_account_code = "3900" # takes in each year's profit at year end
+
+  # --- Receivables and payables (off until configured) ---
+  # config.receivable_account_code = "1100" # this account and every account beneath it
+  # config.payable_account_code = "2100"
+  # config.carrying_amount_sources = {
+  #   "Invoice" => :receivable, "Bill" => :payable,
+  #   "Payment" => :receipt, "Disbursement" => :disbursement,
+  #   "CreditNote" => :credit_note, "SupplierCredit" => :supplier_credit,
+  #   "Refund" => :refund, "SupplierRefund" => :supplier_refund
+  # }
+  # config.due_date_method = :due_date
+  # config.related_party_method = :customer
+
+  # --- Foreign exchange ---
+  # config.forex_rate_provider = TudlaAccounting::RbaForexRateProvider.new # or ->(from:, to:, date:) { rate }
+  # config.unrealized_fx_gain_account_code = "4900"
+  # config.realized_fx_gain_account_code = "4950"
+end
+
+# Entries from your own records (Entry hashes; one entry per record by default):
+# TudlaAccounting.register_entry_source("Invoice", ->(invoice) { { organization_type: ..., details: [...] } })
+
+# React to changes to the books once they commit:
+# TudlaAccounting.subscribe("entry.posted") { |event| LedgerSyncJob.perform_later(event.subject_id) }
