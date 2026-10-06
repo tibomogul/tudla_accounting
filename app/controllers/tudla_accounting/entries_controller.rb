@@ -81,7 +81,7 @@ module TudlaAccounting
     end
 
     def set_entry
-      @entry = organization_scope(Entry).includes(details: %i[account foreign_exchange carrying_amount tax_code]).find(params[:id])
+      @entry = organization_scope(Entry).includes(details: [ :account, :foreign_exchange, :carrying_amount, :tax_code, { tags: { dimension_value: :dimension } } ]).find(params[:id])
     end
 
     def require_draft
@@ -96,7 +96,7 @@ module TudlaAccounting
     # The form's lines, with separate debit and credit columns, as detail attributes, and
     # anything wrong with them that the model can't tell (e.g. both columns filled in).
     def entry_attributes
-      permitted = params.require(:entry).permit(:particulars, :transacted_at, :tax_inclusive, lines: %i[id account_id debit credit tax_code_id _destroy])
+      permitted = params.require(:entry).permit(:particulars, :transacted_at, :tax_inclusive, lines: [ :id, :account_id, :debit, :credit, :tax_code_id, :_destroy, { dimensions: {} } ])
       currency = accounting_organization.currency
       problems = []
       rows = permitted.fetch(:lines, {}).to_h.values
@@ -112,12 +112,32 @@ module TudlaAccounting
           tally: (credit && !debit ? Detail::TALLY_CREDIT : Detail::TALLY_DEBIT),
           amount_cents: (debit || credit).to_i, currency: currency }.compact
           .merge(tax_code_id: line[:tax_code_id].presence, tax_role: nil) # tagged by tax_lines
+          .merge(dimension_tags(line))
       end
       lines += tax_lines(lines, permitted[:tax_inclusive] == "1", currency)
 
       attributes = { particulars: permitted[:particulars], details_attributes: lines,
                      transacted_at: (day_start(permitted[:transacted_at]) if permitted[:transacted_at].present?) }
       [ attributes, problems ]
+    end
+
+    # tags_attributes setting a line's dimension values as chosen: added, changed, or taken
+    # off when left blank.
+    def dimension_tags(line)
+      existing = @entry&.details&.find { |detail| detail.id.to_s == line[:id].to_s } if line[:id].present?
+      tags = line.fetch(:dimensions, {}).to_h.filter_map do |dimension_id, value_id|
+        dimension = organization_scope(Dimension).find(dimension_id)
+        current = existing&.tags&.find { |tag| tag.dimension_id == dimension.id }
+        if value_id.blank?
+          { id: current.id, _destroy: "1" } if current
+        else
+          value = dimension.dimension_values.find(value_id)
+          next if current&.dimension_value_id == value.id
+
+          current ? { id: current.id, dimension_value_id: value.id } : { dimension_value_id: value.id }
+        end
+      end
+      tags.any? ? { tags_attributes: tags } : {}
     end
 
     # Tags the taxed lines and works out their tax: a line for each tax code and side, on

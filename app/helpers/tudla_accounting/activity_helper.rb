@@ -3,7 +3,8 @@ module TudlaAccounting
     ACTIVITY_KINDS = { "entry" => "Entries", "account" => "Accounts", "period" => "Periods",
                        "opening_balances" => "Opening balances", "balances" => "Balance rebuilds",
                        "allocation" => "Payments applied", "tax_code" => "Tax codes",
-                       "bank_statement" => "Statement imports", "bank_line" => "Bank matches" }.freeze
+                       "bank_statement" => "Statement imports", "bank_line" => "Bank matches",
+                       "dimension" => "Dimensions", "dimension_value" => "Dimension values" }.freeze
 
     # What an audit event did, in words, linking to its subject while it still exists.
     def activity_description(event)
@@ -29,6 +30,10 @@ module TudlaAccounting
       when "bank_statement.imported" then safe_join([ "Imported a statement for ", subject, ": #{pluralize(details['imported'], 'line')} new, #{details['skipped']} already there" ])
       when "bank_line.matched" then safe_join([ "Matched the statement line ", subject ])
       when "bank_line.unmatched" then safe_join([ "Unmatched the statement line ", subject ])
+      when "dimension.created" then safe_join([ "Added the dimension ", subject ])
+      when "dimension_value.created" then safe_join([ "Added ", subject ])
+      when "dimension.updated", "dimension_value.updated"
+        safe_join([ "Changed ", subject, ": #{details.fetch('changes', {}).keys.map(&:humanize).join(', ').downcase}" ])
       when "balances.rebuilt" then "Rebuilt the balances: #{pluralize(details['corrected'], 'balance')} corrected"
       end
     end
@@ -49,6 +54,10 @@ module TudlaAccounting
       when Account.name then (account_path(event.subject_id) if Account.exists?(event.subject_id))
       when Period.name then (period_path(Period.find(event.subject_id).root) if Period.exists?(event.subject_id))
       when BankStatementLine.name then (banking_account_path(BankStatementLine.find(event.subject_id).account_id, show: "all") if BankStatementLine.exists?(event.subject_id))
+      when Dimension.name then (edit_dimension_path(event.subject_id) if Dimension.exists?(event.subject_id))
+      when DimensionValue.name
+        value = DimensionValue.find_by(id: event.subject_id)
+        value && edit_dimension_dimension_value_path(value.dimension_id, value)
       when TaxCode.name then (edit_tax_code_path(event.subject_id) if TaxCode.exists?(event.subject_id))
       when Allocation.name then entry_path(Allocation.find(event.subject_id).from.detail.entry_id)
       end

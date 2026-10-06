@@ -12,6 +12,16 @@ module TudlaAccounting
         .order(:kind, :code).map { |code| [ code.label, code.id, { data: { rate: code.rate.to_s } } ] }
     end
 
+    # [dimension, value choices] for the line editor: the active dimensions and values,
+    # and any already on the entry.
+    def entry_dimensions(entry)
+      used = entry.details.flat_map { |detail| detail.tags.map(&:dimension_value_id) }
+      TudlaAccounting::Dimension.where(organization: accounting_organization).includes(:dimension_values).order(:code).filter_map do |dimension|
+        values = dimension.dimension_values.select { |value| value.active? || used.include?(value.id) }
+        [ dimension, values.map { |value| [ value.name, value.id ] } ] if (dimension.active? && values.any?) || values.any? { |value| used.include?(value.id) }
+      end
+    end
+
     def entry_total(entry)
       entry.details.select(&:debit?).sum(Money.new(0, accounting_organization.currency), &:amount)
     end

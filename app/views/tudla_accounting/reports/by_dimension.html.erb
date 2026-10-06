@@ -1,0 +1,54 @@
+<%= tc_page_header "Profit and loss by #{@dimension ? @dimension.name.downcase : 'dimension'}",
+                   subtitle: (@report ? "#{tc_date(@from.from_date)} to #{tc_date(@thru.thru_date)}" : nil) do %>
+  <% if @report %>
+    <%= form_with url: reports_by_dimension_path, method: :get, class: "flex flex-wrap items-end gap-2" do |form| %>
+      <div><%= form.label :dimension_id, "By", class: "tc-label" %><%= form.select :dimension_id, @dimensions.map { |d| [ d.name, d.id ] }, { selected: @dimension.id }, class: "tc-input" %></div>
+      <div><%= form.label :from_id, "From", class: "tc-label" %><%= form.select :from_id, @months.map { |month| [ tc_period_label(month), month.id ] }, { selected: @from.id }, class: "tc-input" %></div>
+      <div><%= form.label :thru_id, "To", class: "tc-label" %><%= form.select :thru_id, @months.map { |month| [ tc_period_label(month), month.id ] }, { selected: @thru.id }, class: "tc-input" %></div>
+      <%= form.submit "Show", class: "tc-btn tc-btn-secondary", name: nil %>
+    <% end %>
+  <% end %>
+<% end %>
+
+<% if @dimensions.blank? %>
+  <div class="tc-card tc-card-body text-center">
+    <p class="tc-muted">No dimensions yet.<% if tc_can?(:administer) %> <%= link_to "Add one", dimensions_path, class: "underline" %>, such as Department, and tag entry lines with its values.<% end %></p>
+  </div>
+<% elsif @report.nil? %>
+  <%= render "no_periods" %>
+<% else %>
+  <% columns = @report[:columns] %>
+  <% heading = ->(column) { column ? column.name : "Untagged" } %>
+  <div class="tc-card overflow-x-auto">
+    <table class="tc-table">
+      <thead>
+        <tr><th>Account</th><% columns.each do |column| %><th class="tc-num"><%= heading.call(column) %></th><% end %><th class="tc-num">Total</th></tr>
+      </thead>
+      <tbody>
+        <% [ [ "Income", :income ], [ "Expenses", :expense ] ].each do |title, key| %>
+          <tr><th colspan="<%= columns.size + 2 %>" class="text-left" id="section-<%= key %>"><%= title %></th></tr>
+          <% if @report[key].empty? %>
+            <tr><td colspan="<%= columns.size + 2 %>" class="tc-muted">Nothing posted.</td></tr>
+          <% end %>
+          <% @report[key].each do |row| %>
+            <tr>
+              <td><%= report_account_link(row[:account], @thru) %></td>
+              <% columns.each do |column| %><td class="tc-num"><%= tc_money(row[:amounts][column]) %></td><% end %>
+              <td class="tc-num"><%= tc_money(row[:total]) %></td>
+            </tr>
+          <% end %>
+          <tr class="font-semibold">
+            <td>Total <%= title.downcase %></td>
+            <% columns.each do |column| %><td class="tc-num"><%= tc_money(@report[:totals][key][column]) %></td><% end %>
+            <td class="tc-num"><%= tc_money(@report[:totals][key][:total]) %></td>
+          </tr>
+        <% end %>
+        <tr class="font-semibold">
+          <td>Net profit</td>
+          <% columns.each do |column| %><td class="tc-num" data-net="<%= column&.code || 'untagged' %>"><%= tc_money(@report[:totals][:net_profit][column]) %></td><% end %>
+          <td class="tc-num" data-net="total"><%= tc_money(@report[:totals][:net_profit][:total]) %></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+<% end %>

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_06_200000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_06_210000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -159,6 +159,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_200000) do
     t.check_constraint "carrying_amount_type = ANY (ARRAY[0, 1])", name: "tudla_accounting_carrying_amounts_type_known"
   end
 
+  create_table "tudla_accounting_detail_tags", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "detail_id", null: false
+    t.bigint "dimension_id", null: false
+    t.bigint "dimension_value_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["detail_id", "dimension_id"], name: "tudla_accounting_detail_tags_unique_key", unique: true
+    t.index ["dimension_id"], name: "index_tudla_accounting_detail_tags_on_dimension_id"
+    t.index ["dimension_value_id"], name: "index_tudla_accounting_detail_tags_on_dimension_value_id"
+  end
+
   create_table "tudla_accounting_details", force: :cascade do |t|
     t.bigint "account_id"
     t.bigint "amount_cents"
@@ -180,6 +191,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_200000) do
     t.check_constraint "(tax_code_id IS NULL) = (tax_role IS NULL) AND (tax_role IS NULL OR (tax_role = ANY (ARRAY[0, 1])))", name: "tudla_accounting_details_tax_tagged"
     t.check_constraint "amount_cents > 0", name: "tudla_accounting_details_amount_positive"
     t.check_constraint "tally = ANY (ARRAY[0, 1])", name: "tudla_accounting_details_tally_known"
+  end
+
+  create_table "tudla_accounting_dimension_values", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.string "code", null: false
+    t.datetime "created_at", null: false
+    t.bigint "dimension_id", null: false
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["dimension_id", "code"], name: "tudla_accounting_dimension_values_unique_key", unique: true
+  end
+
+  create_table "tudla_accounting_dimensions", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.string "code", null: false
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.bigint "organization_id", null: false
+    t.string "organization_type", null: false
+    t.datetime "updated_at", null: false
+    t.index ["organization_type", "organization_id", "code"], name: "tudla_accounting_dimensions_unique_key", unique: true
   end
 
   create_table "tudla_accounting_entries", force: :cascade do |t|
@@ -269,10 +301,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_200000) do
   add_foreign_key "tudla_accounting_bank_statement_lines", "tudla_accounting_accounts", column: "account_id"
   add_foreign_key "tudla_accounting_carrying_amount_forexes", "tudla_accounting_carrying_amounts", column: "carrying_amount_id"
   add_foreign_key "tudla_accounting_carrying_amounts", "tudla_accounting_details", column: "detail_id"
+  add_foreign_key "tudla_accounting_detail_tags", "tudla_accounting_details", column: "detail_id"
+  add_foreign_key "tudla_accounting_detail_tags", "tudla_accounting_dimension_values", column: "dimension_value_id"
+  add_foreign_key "tudla_accounting_detail_tags", "tudla_accounting_dimensions", column: "dimension_id"
   add_foreign_key "tudla_accounting_details", "tudla_accounting_accounts", column: "account_id"
   add_foreign_key "tudla_accounting_details", "tudla_accounting_balances", column: "balance_id"
   add_foreign_key "tudla_accounting_details", "tudla_accounting_entries", column: "entry_id"
   add_foreign_key "tudla_accounting_details", "tudla_accounting_tax_codes", column: "tax_code_id"
+  add_foreign_key "tudla_accounting_dimension_values", "tudla_accounting_dimensions", column: "dimension_id"
   add_foreign_key "tudla_accounting_foreign_exchanges", "tudla_accounting_details", column: "detail_id"
   add_foreign_key "tudla_accounting_tax_codes", "tudla_accounting_accounts", column: "account_id"
 end

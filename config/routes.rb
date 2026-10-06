@@ -28,9 +28,13 @@ TudlaAccounting::Engine.routes.draw do
     get :receivables
     get :payables
     get :tax
+    get :by_dimension
   end
 
   resources :tax_codes, except: :show
+  resources :dimensions, except: %i[show destroy] do
+    resources :dimension_values, path: "values", only: %i[new create edit update]
+  end
 
   get "banking", to: "banking#index", as: :banking
   scope "banking/:account_id", controller: :banking, as: :banking do

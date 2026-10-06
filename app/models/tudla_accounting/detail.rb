@@ -17,8 +17,11 @@ module TudlaAccounting
     has_one :foreign_exchange, class_name: "TudlaAccounting::ForeignExchange", dependent: :destroy
     has_one :carrying_amount, class_name: "TudlaAccounting::CarryingAmount", dependent: :destroy
     has_one :bank_match, class_name: "TudlaAccounting::BankMatch", dependent: :destroy
+    # Dimension values (department, project...) the line is tagged with, one per dimension.
+    has_many :tags, class_name: "TudlaAccounting::DetailTag", dependent: :destroy, inverse_of: :detail, autosave: true
 
     accepts_nested_attributes_for :foreign_exchange
+    accepts_nested_attributes_for :tags, allow_destroy: true
 
     enum :tally, {
       TALLY_DEBIT.to_sym => 0,
@@ -30,6 +33,7 @@ module TudlaAccounting
     validates :amount_cents, numericality: { greater_than: 0, message: "must be more than zero" }
     validates :tax_role, presence: true, if: :tax_code
     validate :tax_code_fits
+    validate :one_value_per_dimension
 
     scope :debits, -> { where(tally: TALLY_DEBIT) }
     scope :credits, -> { where(tally: TALLY_CREDIT) }
@@ -67,7 +71,17 @@ module TudlaAccounting
       end
     end
 
+    # The tagged value of a dimension, if any.
+    def dimension_value_for(dimension)
+      tags.reject(&:marked_for_destruction?).find { |tag| tag.dimension_value&.dimension_id == dimension.id }&.dimension_value
+    end
+
     private
+
+    def one_value_per_dimension
+      dimensions = tags.reject(&:marked_for_destruction?).map { |tag| tag.dimension_value&.dimension_id }
+      errors.add(:tags, "can only have one value of each dimension") if dimensions.uniq.size < dimensions.size
+    end
 
     def tax_code_fits
       return unless tax_code

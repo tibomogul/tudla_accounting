@@ -1,0 +1,9 @@
+<%# locals: (dimension:) %>
+<%= form_with model: dimension, url: (dimension.persisted? ? dimension_path(dimension) : dimensions_path), class: "tc-card tc-card-body space-y-4 max-w-xl" do |form| %>
+  <div class="grid gap-4 sm:grid-cols-3">
+    <%= tc_field form, :code, required: true, hint: "Short, e.g. DEPT" %>
+    <div class="sm:col-span-2"><%= tc_field form, :name, required: true, hint: "e.g. Department" %></div>
+  </div>
+  <label class="flex items-center gap-2 text-sm"><%= form.check_box :active %> Active (offered on entry lines)</label>
+  <div class="flex gap-2"><%= form.submit "Save dimension", class: "tc-btn" %><%= link_to "Cancel", dimensions_path, class: "tc-btn tc-btn-ghost" %></div>
+<% end %>

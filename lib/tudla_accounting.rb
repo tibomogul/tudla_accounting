@@ -32,6 +32,7 @@ module TudlaAccounting
     allocation.created allocation.reversed
     tax_code.created tax_code.updated tax_code.deleted
     bank_statement.imported bank_line.matched bank_line.unmatched
+    dimension.created dimension.updated dimension_value.created dimension_value.updated
   ].freeze
 
   # Calls the block with each TudlaAccounting::AuditEvent for an action (or for every

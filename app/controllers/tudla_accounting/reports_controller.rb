@@ -37,6 +37,21 @@ module TudlaAccounting
       @report = TaxReport.call(accounting_organization, from: @from.from_date, thru: @thru.thru_date)
     end
 
+    # Profit and loss with a column per value of a dimension, over a run of months (the
+    # current year to date by default).
+    def by_dimension
+      @dimensions = organization_scope(Dimension).order(:code).to_a
+      @months = months.reverse
+      return if @dimensions.empty? || @months.empty?
+
+      @dimension = params[:dimension_id].present? ? (@dimensions.find { |d| d.id == params[:dimension_id].to_i } || raise(ActiveRecord::RecordNotFound)) : @dimensions.first
+      current = @months.find { |month| month.includes_date?(Time.current) }
+      @from = picked_month(:from_id) || (current && @months.find { |month| month.parent_id == current.parent_id }) || @months.first
+      @thru = picked_month(:thru_id) || current || @months.last
+      @from, @thru = @thru, @from if @thru.from_date < @from.from_date
+      @report = DimensionReport.call(accounting_organization, @dimension, from: @from.from_date, thru: @thru.thru_date)
+    end
+
     private
 
     def picked_month(param)

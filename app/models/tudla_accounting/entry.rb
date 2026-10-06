@@ -81,6 +81,7 @@ module TudlaAccounting
           line = reversing.details.build(account: detail.account, amount_cents: detail.amount_cents, currency: detail.currency,
                                          tally: detail.debit? ? Detail::TALLY_CREDIT : Detail::TALLY_DEBIT,
                                          tax_code: detail.tax_code, tax_role: detail.tax_role)
+          detail.tags.each { |tag| line.tags.build(dimension_value: tag.dimension_value) }
           fx = detail.foreign_exchange
           line.build_foreign_exchange(other_currency: fx.other_currency, other_currency_cents: fx.other_currency_cents, rate: fx.rate) if fx
         end
@@ -186,6 +187,7 @@ module TudlaAccounting
           }
         end
 
+        detail_attributes[:tags_attributes] = dimension_tags(detail[:dimensions], hash) if detail[:dimensions].present?
         details_attributes << detail_attributes
         add_tax(details_attributes, detail, hash) if detail[:tax_code].present?
       end
@@ -207,6 +209,21 @@ module TudlaAccounting
 
       find_by!(**scope, idempotency_key: key) # created by someone else at the same time
     end
+
+    # Tags for a line's dimensions, given as dimension code => value code, e.g.
+    # { "DEPT" => "SALES", "PROJECT" => "P1" }.
+    def self.dimension_tags(dimensions, hash)
+      dimensions.map do |dimension_code, value_code|
+        dimension = Dimension.find_by(organization_type: hash[:organization_type], organization_id: hash[:organization_id], code: dimension_code.to_s)
+        raise ArgumentError, "invalid dimension: #{dimension_code}" unless dimension
+
+        value = dimension.dimension_values.find_by(code: value_code.to_s)
+        raise ArgumentError, "invalid #{dimension.name} value: #{value_code}" unless value
+
+        { dimension_value: value }
+      end
+    end
+    private_class_method :dimension_tags
 
     # A line with a tax_code becomes the base the tax is on, plus a line for the tax on the
     # code's account, on the same side. Its amount excludes the tax (the tax is added), or

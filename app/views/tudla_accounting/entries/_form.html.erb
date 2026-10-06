@@ -2,6 +2,8 @@
 <% currency = Money::Currency.new(accounting_organization.currency) %>
 <% account_options = organization_accounts.map { |account| [ account.code_with_name, account.id ] } %>
 <% tax_options = entry_tax_options(entry) %>
+<% dimensions = entry_dimensions(entry) %>
+<% extra_columns = (tax_options.any? ? 1 : 0) + dimensions.size %>
 <% lines = entry.details.reject(&:tax_tax?) # tax lines are worked out from the taxed lines on save %>
 <%= form_with model: entry, scope: :entry, url: (entry.persisted? ? entry_path(entry) : entries_path),
               class: "space-y-4", data: { controller: "entry-lines", entry_lines_exponent_value: currency.exponent } do |form| %>
@@ -22,11 +24,11 @@
   <div class="tc-card overflow-x-auto">
     <table class="tc-table">
       <thead>
-        <tr><th>Account</th><th class="tc-num">Debit (<%= currency.iso_code %>)</th><th class="tc-num">Credit (<%= currency.iso_code %>)</th><% if tax_options.any? %><th>Tax</th><% end %><th><span class="sr-only">Remove</span></th></tr>
+        <tr><th>Account</th><th class="tc-num">Debit (<%= currency.iso_code %>)</th><th class="tc-num">Credit (<%= currency.iso_code %>)</th><% if tax_options.any? %><th>Tax</th><% end %><% dimensions.each do |dimension, _values| %><th><%= dimension.name %></th><% end %><th><span class="sr-only">Remove</span></th></tr>
       </thead>
       <tbody data-entry-lines-target="lines">
         <% lines.each_with_index do |detail, index| %>
-          <%= render "line", detail: detail, index: index, account_options: account_options, tax_options: tax_options %>
+          <%= render "line", detail: detail, index: index, account_options: account_options, tax_options: tax_options, dimensions: dimensions %>
         <% end %>
       </tbody>
       <tfoot>
@@ -35,7 +37,7 @@
             <td>Tax, added on save</td>
             <td class="tc-num" data-entry-lines-target="debitTax"></td>
             <td class="tc-num" data-entry-lines-target="creditTax"></td>
-            <td colspan="2"></td>
+            <td colspan="<%= extra_columns + 1 %>"></td>
           </tr>
         <% end %>
         <tr class="font-semibold">
@@ -44,7 +46,7 @@
           </td>
           <td class="tc-num" data-entry-lines-target="debitTotal"></td>
           <td class="tc-num" data-entry-lines-target="creditTotal"></td>
-          <td <%= %(colspan="2") if tax_options.any? %>></td>
+          <td colspan="<%= extra_columns + 1 %>"></td>
         </tr>
       </tfoot>
     </table>
@@ -58,7 +60,7 @@
   <% end %>
 
   <template data-entry-lines-target="template">
-    <%= render "line", detail: TudlaAccounting::Detail.new, index: "NEW_LINE", account_options: account_options, tax_options: tax_options %>
+    <%= render "line", detail: TudlaAccounting::Detail.new, index: "NEW_LINE", account_options: account_options, tax_options: tax_options, dimensions: dimensions %>
   </template>
 
   <div class="flex gap-2">

@@ -29,6 +29,14 @@
     <%= link_to "Manage tax codes", tax_codes_path, class: "tc-btn tc-btn-secondary" %>
   </section>
 
+  <section class="tc-card tc-card-body flex flex-wrap items-center justify-between gap-4" aria-labelledby="dimensions-heading">
+    <div>
+      <h2 id="dimensions-heading" class="tc-card-title mb-1">Dimensions</h2>
+      <p class="tc-muted text-sm">Departments, projects or locations to tag entry lines with, for profit and loss by each.</p>
+    </div>
+    <%= link_to "Manage dimensions", dimensions_path, class: "tc-btn tc-btn-secondary" %>
+  </section>
+
   <section class="tc-card tc-card-body flex flex-wrap items-center justify-between gap-4" aria-labelledby="opening-heading">
     <div>
       <h2 id="opening-heading" class="tc-card-title mb-1">Opening balances</h2>
