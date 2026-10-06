@@ -79,7 +79,8 @@ module TudlaAccounting
                                    particulars: "#{REVERSAL_PREFIX}#{particulars}")
         details.each do |detail|
           line = reversing.details.build(account: detail.account, amount_cents: detail.amount_cents, currency: detail.currency,
-                                         tally: detail.debit? ? Detail::TALLY_CREDIT : Detail::TALLY_DEBIT)
+                                         tally: detail.debit? ? Detail::TALLY_CREDIT : Detail::TALLY_DEBIT,
+                                         tax_code: detail.tax_code, tax_role: detail.tax_role)
           fx = detail.foreign_exchange
           line.build_foreign_exchange(other_currency: fx.other_currency, other_currency_cents: fx.other_currency_cents, rate: fx.rate) if fx
         end
@@ -186,6 +187,7 @@ module TudlaAccounting
         end
 
         details_attributes << detail_attributes
+        add_tax(details_attributes, detail, hash) if detail[:tax_code].present?
       end
 
       attributes = {
@@ -205,6 +207,26 @@ module TudlaAccounting
 
       find_by!(**scope, idempotency_key: key) # created by someone else at the same time
     end
+
+    # A line with a tax_code becomes the base the tax is on, plus a line for the tax on the
+    # code's account, on the same side. Its amount excludes the tax (the tax is added), or
+    # with tax_inclusive (on the line, or for the whole hash) includes it (it is split).
+    def self.add_tax(details_attributes, detail, hash)
+      base = details_attributes.last
+      code = TaxCode.find_by(organization_type: hash[:organization_type], organization_id: hash[:organization_id], code: detail[:tax_code])
+      raise ArgumentError, "invalid tax_code: #{detail[:tax_code]}" unless code
+      raise ArgumentError, "a foreign-currency line can't be taxed" if base[:foreign_exchange_attributes]
+
+      inclusive = detail.fetch(:tax_inclusive, hash[:tax_inclusive]) ? true : false
+      tax_cents = code.tax_cents(base[:amount_cents], inclusive: inclusive)
+      base.merge!(tax_code: code, tax_role: :base)
+      base[:amount_cents] -= tax_cents if inclusive
+      return unless tax_cents.positive?
+
+      details_attributes << base.slice(:tally, :currency, :organization_type, :organization_id)
+        .merge(account: code.account, amount_cents: tax_cents, tax_code: code, tax_role: :tax)
+    end
+    private_class_method :add_tax
 
     # Parses "AUD 1,100.00" (or "1100.00" in the default currency). Monetize 2 only
     # recognizes a currency code that is also in its symbol table, so codes such as AUD

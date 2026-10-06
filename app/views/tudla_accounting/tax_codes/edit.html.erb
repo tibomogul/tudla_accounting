@@ -1,0 +1,8 @@
+<%= tc_page_header "Tax code #{@tax_code.code}", subtitle: @tax_code.name do %>
+  <% unless @tax_code.used? %>
+    <%= button_to "Delete", tax_code_path(@tax_code), method: :delete, class: "tc-btn tc-btn-danger",
+                  form: { data: { controller: "confirm", confirm_message_value: "Delete #{@tax_code.code}?", action: "submit->confirm#ask" } } %>
+  <% end %>
+<% end %>
+<% if @tax_code.used? %><p class="tc-hint mb-4">Lines are taxed under this code, so it can't be deleted or change what it is for; make it inactive to stop offering it.</p><% end %>
+<%= render "form", tax_code: @tax_code %>

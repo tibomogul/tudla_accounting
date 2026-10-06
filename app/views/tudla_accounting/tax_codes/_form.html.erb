@@ -1,0 +1,24 @@
+<%# locals: (tax_code:) %>
+<%= form_with model: tax_code, url: (tax_code.persisted? ? tax_code_path(tax_code) : tax_codes_path), class: "tc-card tc-card-body space-y-4 max-w-2xl" do |form| %>
+  <% other_errors = tax_code.errors.reject { |error| %i[code name].include?(error.attribute) }.map(&:full_message) %>
+  <% if other_errors.any? %>
+    <div class="tc-alert tc-alert-danger" role="alert"><%= other_errors.to_sentence %></div>
+  <% end %>
+  <div class="grid gap-4 sm:grid-cols-3">
+    <%= tc_field form, :code, required: true, hint: "Short, e.g. GST" %>
+    <div class="sm:col-span-2"><%= tc_field form, :name, required: true %></div>
+  </div>
+  <div class="grid gap-4 sm:grid-cols-3">
+    <%= tc_field form, :kind, as: :select, label: "For", choices: [ [ "Sales (tax collected)", "sales" ], [ "Purchases (tax paid)", "purchases" ] ],
+                 disabled: tax_code.persisted? && tax_code.used? %>
+    <%= tc_field form, :rate_percent, label: "Rate (%)", inputmode: "decimal", required: true, hint: "0 for tax-free" %>
+    <%= tc_field form, :account_id, as: :select, label: "Tax account",
+                 choices: [ [ "None (tax-free)", "" ] ] + tax_accounts.map { |account| [ account.code_with_name, account.id ] },
+                 hint: "Where the tax is posted" %>
+  </div>
+  <label class="flex items-center gap-2 text-sm"><%= form.check_box :active %> Active (offered for new lines)</label>
+  <div class="flex flex-wrap gap-2">
+    <%= form.submit "Save tax code", class: "tc-btn" %>
+    <%= link_to "Cancel", tax_codes_path, class: "tc-btn tc-btn-ghost" %>
+  </div>
+<% end %>

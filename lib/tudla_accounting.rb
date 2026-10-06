@@ -30,6 +30,7 @@ module TudlaAccounting
     period.created period.deleted period.closed period.reopened
     opening_balances.saved balances.rebuilt
     allocation.created allocation.reversed
+    tax_code.created tax_code.updated tax_code.deleted
   ].freeze
 
   # Calls the block with each TudlaAccounting::AuditEvent for an action (or for every

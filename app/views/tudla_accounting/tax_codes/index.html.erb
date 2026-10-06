@@ -1,0 +1,32 @@
+<%= tc_page_header "Tax codes", subtitle: "Taxes lines can be taxed under, and the accounts their tax goes to" do %>
+  <%= link_to "New tax code", new_tax_code_path, class: "tc-btn" %>
+<% end %>
+
+<% if @tax_codes.empty? %>
+  <div class="tc-card tc-card-body text-center">
+    <p class="tc-muted">No tax codes yet. Add one for each tax you charge or pay (e.g. GST on sales and GST on purchases), and for tax-free sales you report.</p>
+  </div>
+<% else %>
+  <div class="tc-card overflow-x-auto">
+    <table class="tc-table">
+      <thead><tr><th>Code</th><th>Name</th><th>For</th><th class="tc-num">Rate</th><th>Tax account</th><th></th></tr></thead>
+      <tbody>
+        <% @tax_codes.each do |tax_code| %>
+          <tr>
+            <td class="font-mono"><%= link_to tax_code.code, edit_tax_code_path(tax_code), class: "underline" %></td>
+            <td><%= tax_code.name %></td>
+            <td><%= tax_code.sales? ? "Sales (collected)" : "Purchases (paid)" %></td>
+            <td class="tc-num"><%= tax_code.rate_percent %>%</td>
+            <td><%= tax_code.account&.code_with_name || tag.span("None", class: "tc-muted") %></td>
+            <td class="text-right space-x-1">
+              <% unless tax_code.active? %><%= tc_badge "Inactive" %><% end %>
+              <% if @used.include?(tax_code.id) %><%= tc_badge "In use" %><% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
+
+<p class="mt-6"><%= link_to "← Back to setup", setup_path, class: "tc-btn tc-btn-ghost" %></p>

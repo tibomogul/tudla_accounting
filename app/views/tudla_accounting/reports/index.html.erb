@@ -4,7 +4,8 @@
        [ "Profit and loss", reports_profit_and_loss_path, "Income and expenses for a year or a month." ],
        [ "Trial balance", reports_trial_balance_path, "Every account's balance in debit and credit columns, to check the books balance." ],
        [ "Receivables aging", reports_receivables_path, "What customers owe, by how overdue it is." ],
-       [ "Payables aging", reports_payables_path, "What is owed to suppliers, by how overdue it is." ] ].each do |title, path, description| %>
+       [ "Payables aging", reports_payables_path, "What is owed to suppliers, by how overdue it is." ],
+       [ "Tax summary", reports_tax_path, "Tax collected on sales and paid on purchases, by tax code, for a run of months." ] ].each do |title, path, description| %>
     <%= link_to path, class: "tc-card tc-card-body block hover:border-[var(--tc-primary)]" do %>
       <p class="font-semibold"><%= title %></p>
       <p class="tc-muted text-sm mt-1"><%= description %></p>

@@ -27,7 +27,10 @@ TudlaAccounting::Engine.routes.draw do
     get :trial_balance
     get :receivables
     get :payables
+    get :tax
   end
+
+  resources :tax_codes, except: :show
 
   resources :allocations, only: :create do
     collection { post :oldest_first }

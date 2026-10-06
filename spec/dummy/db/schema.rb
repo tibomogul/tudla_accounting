@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_06_150000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_06_180000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -140,11 +140,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_150000) do
     t.bigint "organization_id", null: false
     t.string "organization_type", null: false
     t.integer "tally"
+    t.bigint "tax_code_id"
+    t.integer "tax_role"
     t.datetime "updated_at", null: false
     t.index ["account_id"], name: "index_tudla_accounting_details_on_account_id"
     t.index ["balance_id"], name: "index_tudla_accounting_details_on_balance_id"
     t.index ["entry_id"], name: "index_tudla_accounting_details_on_entry_id"
     t.index ["organization_type", "organization_id"], name: "index_tudla_accounting_details_on_organization"
+    t.index ["tax_code_id"], name: "index_tudla_accounting_details_on_tax_code_id"
+    t.check_constraint "(tax_code_id IS NULL) = (tax_role IS NULL) AND (tax_role IS NULL OR (tax_role = ANY (ARRAY[0, 1])))", name: "tudla_accounting_details_tax_tagged"
     t.check_constraint "amount_cents > 0", name: "tudla_accounting_details_amount_positive"
     t.check_constraint "tally = ANY (ARRAY[0, 1])", name: "tudla_accounting_details_tally_known"
   end
@@ -207,6 +211,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_150000) do
     t.index ["organization_type", "organization_id"], name: "index_tudla_accounting_periods_on_organization"
   end
 
+  create_table "tudla_accounting_tax_codes", force: :cascade do |t|
+    t.bigint "account_id"
+    t.boolean "active", default: true, null: false
+    t.string "code", null: false
+    t.datetime "created_at", null: false
+    t.integer "kind", null: false
+    t.string "name", null: false
+    t.bigint "organization_id", null: false
+    t.string "organization_type", null: false
+    t.decimal "rate", precision: 9, scale: 6, default: "0.0", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_tudla_accounting_tax_codes_on_account_id"
+    t.index ["organization_type", "organization_id", "code"], name: "tudla_accounting_tax_codes_unique_key", unique: true
+    t.check_constraint "kind = ANY (ARRAY[0, 1])", name: "tudla_accounting_tax_codes_kind_known"
+    t.check_constraint "rate >= 0::numeric", name: "tudla_accounting_tax_codes_rate_not_negative"
+  end
+
   add_foreign_key "tudla_accounting_accounts", "tudla_accounting_accounts", column: "contra_account_id"
   add_foreign_key "tudla_accounting_allocations", "tudla_accounting_carrying_amounts", column: "from_id"
   add_foreign_key "tudla_accounting_allocations", "tudla_accounting_carrying_amounts", column: "to_id"
@@ -219,5 +240,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_150000) do
   add_foreign_key "tudla_accounting_details", "tudla_accounting_accounts", column: "account_id"
   add_foreign_key "tudla_accounting_details", "tudla_accounting_balances", column: "balance_id"
   add_foreign_key "tudla_accounting_details", "tudla_accounting_entries", column: "entry_id"
+  add_foreign_key "tudla_accounting_details", "tudla_accounting_tax_codes", column: "tax_code_id"
   add_foreign_key "tudla_accounting_foreign_exchanges", "tudla_accounting_details", column: "detail_id"
+  add_foreign_key "tudla_accounting_tax_codes", "tudla_accounting_accounts", column: "account_id"
 end

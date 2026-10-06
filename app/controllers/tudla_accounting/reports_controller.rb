@@ -26,7 +26,24 @@ module TudlaAccounting
       aging(:payable)
     end
 
+    # Tax collected and paid over a run of months (the month containing today by default).
+    def tax
+      @months = months.reverse
+      return if @months.empty?
+
+      @from = picked_month(:from_id) || @months.find { |month| month.includes_date?(Time.current) } || @months.last
+      @thru = picked_month(:thru_id) || @from
+      @from, @thru = @thru, @from if @thru.from_date < @from.from_date
+      @report = TaxReport.call(accounting_organization, from: @from.from_date, thru: @thru.thru_date)
+    end
+
     private
+
+    def picked_month(param)
+      return if params[param].blank?
+
+      @months.find { |month| month.id == params[param].to_i } || raise(ActiveRecord::RecordNotFound)
+    end
 
     def years
       organization_scope(Period).roots.order(from_date: :desc).to_a

@@ -53,6 +53,13 @@ Each change to the books records a `TudlaAccounting::AuditEvent`: entries posted
 
 Who acted comes from `TudlaAccounting::Current.actor`: the engine's pages set it from the `current_actor` setting, and other code can set it around its work with `TudlaAccounting::Current.set(actor: user) { ... }`. The actor can be a record (labelled by its `name` or `email`) or a plain string; events without one show as "System".
 
+### Tax
+`TudlaAccounting::TaxCode` records each tax lines can be taxed under: a code, a rate, whether it is on **sales** (tax collected) or **purchases** (tax paid), and the account the tax is posted to (a zero-rate code, such as GST-free, needs none but is still reported). Codes are managed under Setup → Tax codes; once lines are taxed under a code it can be made inactive but not deleted or switched between sales and purchases.
+
+In `Entry.create_from_ruby_hash`, a line with `tax_code: "GST"` is taxed: its amount excludes the tax, and a line for the tax is added on the code's account, on the same side, so the other lines must include it (e.g. receivable 110, sales 100 with GST). With `tax_inclusive: true` (on the line or the whole hash) the amount includes the tax and is split instead, leaving the totals unchanged. Taxed lines and tax lines are tagged with the code (`tax_role` base or tax), and reversals keep the tags. Foreign-currency lines can't be taxed yet.
+
+`TaxReport.call(organization, from:, thru:)` (Reports → Tax summary) totals, per code, the amounts taxed and the tax for lines posted in that time: sales codes count credits up, purchases codes debits, so credit notes and reversals reduce their own side. `net_tax` is tax on sales less tax on purchases: owed when positive, a refund when negative.
+
 ### Receivables and payables (carrying amounts)
 After posting, `CarryingAmountProcessor` keeps track of what's still owed. Posting an entry whose source is an invoice or bill opens a `CarryingAmount` on its receivable or payable line, with a due date and any foreign-currency amount. Posting a payment, disbursement or credit note opens a **credit** for the customer or supplier: a carrying amount on its line with a negative amount. If money moves through a bank account held in another currency (`BankAccountBalance`), that balance is updated in its own currency.
 
@@ -121,9 +128,9 @@ Mounted at `/accounting` by the install generator (see [Integration](#integratio
 - **Dashboard:** profit this year, what is owed each way, draft entries, recent entries, and a getting-started checklist.
 - **Accounts:** the chart of accounts as a tree with closing balances. Each account page shows monthly balances and a ledger with running balances. You can create, edit and delete unused accounts.
 - **Entries:** search and filter entries, write drafts with a line editor that keeps live debit/credit totals, post them, and reverse posted entries. A posted payment or credit note shows what it was applied to and what is left, with forms to apply it to the party's open invoices or bills (or oldest first) and to take an allocation off; an invoice or bill shows what was applied to it. Reversing a payment takes it off what it settled and reverses its realized exchange difference. An invoice or bill can be reversed once nothing is applied to it, which closes its receivable or payable.
-- **Reports:** balance sheet, profit and loss, trial balance, and receivables and payables aging.
+- **Reports:** balance sheet, profit and loss, trial balance, receivables and payables aging, and a tax summary for a run of months.
 - **Periods:** create calendar or fiscal years, see each year's months, and close or reopen them (reopening asks for a reason).
-- **Setup:** upload a chart of accounts with opening balances (CSV or Excel), or enter or correct opening balances account by account, with live totals checking that they balance. Also import the receivables and payables open at the cut-over, and run the foreign exchange revaluation. A balance check compares the stored balances with the posted entries and can rebuild them.
+- **Setup:** upload a chart of accounts with opening balances (CSV or Excel), or enter or correct opening balances account by account, with live totals checking that they balance. Manage tax codes. Also import the receivables and payables open at the cut-over, and run the foreign exchange revaluation. A balance check compares the stored balances with the posted entries and can rebuild them.
 - **Activity:** the audit trail, newest first, filterable by kind, linking to entries, accounts and years that still exist.
 
 The pages use Tailwind CSS with the engine's own `tc-` component classes (no DaisyUI needed) and follow the host's light/dark theme. Their Stimulus controllers load through the engine's import map.

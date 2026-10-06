@@ -21,6 +21,14 @@
     <% end %>
   </section>
 
+  <section class="tc-card tc-card-body flex flex-wrap items-center justify-between gap-4" aria-labelledby="tax-heading">
+    <div>
+      <h2 id="tax-heading" class="tc-card-title mb-1">Tax codes</h2>
+      <p class="tc-muted text-sm">The taxes lines can be taxed under (GST, VAT, sales tax), their rates and the accounts their tax is posted to.</p>
+    </div>
+    <%= link_to "Manage tax codes", tax_codes_path, class: "tc-btn tc-btn-secondary" %>
+  </section>
+
   <section class="tc-card tc-card-body flex flex-wrap items-center justify-between gap-4" aria-labelledby="opening-heading">
     <div>
       <h2 id="opening-heading" class="tc-card-title mb-1">Opening balances</h2>

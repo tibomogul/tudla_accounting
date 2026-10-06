@@ -1,0 +1,48 @@
+<%= tc_page_header "Tax summary", subtitle: (@report ? "#{tc_date(@from.from_date)} to #{tc_date(@thru.thru_date)}, by posting date" : nil) do %>
+  <% if @report %>
+    <%= form_with url: reports_tax_path, method: :get, class: "flex flex-wrap items-end gap-2" do |form| %>
+      <div><%= form.label :from_id, "From", class: "tc-label" %><%= form.select :from_id, @months.map { |month| [ tc_period_label(month), month.id ] }, { selected: @from.id }, class: "tc-input" %></div>
+      <div><%= form.label :thru_id, "To", class: "tc-label" %><%= form.select :thru_id, @months.map { |month| [ tc_period_label(month), month.id ] }, { selected: @thru.id }, class: "tc-input" %></div>
+      <%= form.submit "Show", class: "tc-btn tc-btn-secondary", name: nil %>
+    <% end %>
+  <% end %>
+<% end %>
+
+<% if @report.nil? %>
+  <%= render "no_periods" %>
+<% elsif @report[:codes].empty? %>
+  <div class="tc-card tc-card-body text-center">
+    <p class="tc-muted">No tax codes yet.<% if tc_can?(:administer) %> <%= link_to "Add them", tax_codes_path, class: "underline" %> to tax lines and report on them.<% end %></p>
+  </div>
+<% else %>
+  <% { "sales" => [ "Sales", "Tax collected" ], "purchases" => [ "Purchases", "Tax paid" ] }.each do |kind, (title, tax_label)| %>
+    <% rows = @report[:codes].select { |row| row[:tax_code].kind == kind } %>
+    <% next if rows.empty? %>
+    <section class="tc-card overflow-x-auto mb-6" aria-labelledby="tax-<%= kind %>">
+      <table class="tc-table">
+        <thead><tr><th id="tax-<%= kind %>"><%= title %></th><th class="tc-num">Rate</th><th class="tc-num">Taxed amount</th><th class="tc-num"><%= tax_label %></th></tr></thead>
+        <tbody>
+          <% rows.each do |row| %>
+            <tr>
+              <td><span class="font-mono"><%= row[:tax_code].code %></span> <%= row[:tax_code].name %></td>
+              <td class="tc-num"><%= row[:tax_code].rate_percent %>%</td>
+              <td class="tc-num"><%= tc_money(row[:base]) %></td>
+              <td class="tc-num"><%= tc_money(row[:tax]) %></td>
+            </tr>
+          <% end %>
+          <tr class="font-semibold">
+            <td colspan="2">Total</td>
+            <td class="tc-num" data-total="<%= kind %>_base"><%= tc_money(@report[kind.to_sym][:base]) %></td>
+            <td class="tc-num" data-total="<%= kind %>_tax"><%= tc_money(@report[kind.to_sym][:tax]) %></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  <% end %>
+
+  <div class="tc-card tc-card-body flex flex-wrap items-center justify-between gap-2">
+    <p class="font-semibold"><%= @report[:net_tax].negative? ? "Refund due" : "Owed to the tax authority" %></p>
+    <p class="text-lg font-semibold" data-total="net_tax"><%= tc_money(@report[:net_tax].abs) %></p>
+  </div>
+  <p class="tc-hint mt-3">Tax on sales less tax on purchases. Credit notes and reversals reduce the side they are on.</p>
+<% end %>

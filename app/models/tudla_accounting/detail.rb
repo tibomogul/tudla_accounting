@@ -10,6 +10,9 @@ module TudlaAccounting
     belongs_to :account, class_name: "TudlaAccounting::Account"
 
     belongs_to :balance, class_name: "TudlaAccounting::Balance", optional: true
+    # Taxed under a code: the line the tax is on (base), or the tax itself (tax).
+    belongs_to :tax_code, class_name: "TudlaAccounting::TaxCode", optional: true
+    enum :tax_role, { base: 0, tax: 1 }, prefix: :tax
 
     has_one :foreign_exchange, class_name: "TudlaAccounting::ForeignExchange", dependent: :destroy
     has_one :carrying_amount, class_name: "TudlaAccounting::CarryingAmount", dependent: :destroy
@@ -24,6 +27,8 @@ module TudlaAccounting
     monetize :amount_cents, with_model_currency: :currency
 
     validates :amount_cents, numericality: { greater_than: 0, message: "must be more than zero" }
+    validates :tax_role, presence: true, if: :tax_code
+    validate :tax_code_fits
 
     scope :debits, -> { where(tally: TALLY_DEBIT) }
     scope :credits, -> { where(tally: TALLY_CREDIT) }
@@ -59,6 +64,15 @@ module TudlaAccounting
         save!
         true
       end
+    end
+
+    private
+
+    def tax_code_fits
+      return unless tax_code
+
+      errors.add(:tax_code, "must belong to the same organization") if tax_code.organization_type != organization_type || tax_code.organization_id != organization_id
+      errors.add(:account, "must be the tax code's account for a tax line") if tax_tax? && account_id != tax_code.account_id
     end
   end
 end
