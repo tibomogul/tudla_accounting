@@ -16,8 +16,8 @@ module TudlaAccounting
       @year = (params[:year_id] && @years.find(params[:year_id])) || year_for(Time.current) || @years.first
       return unless @year
 
-      @months = @year.children.order(:from_date).map { |month| [ month, Balance.peek(@account, month) ] }
       @year_balance = Balance.peek(@account, @year)
+      @months = monthly_balances(@year.children.order(:from_date).to_a)
       @ledger = ledger
     end
 
@@ -77,12 +77,25 @@ module TudlaAccounting
       Period.periods_for_date(accounting_organization, time).roots.first
     end
 
+    # [month, balance] for each month in order, as Balance.peek would give them: a month
+    # with nothing posted opens and closes where the one before it closed (the first at
+    # the year's opening).
+    def monthly_balances(months)
+      stored = Balance.where(account: @account, period: months).index_by(&:period_id)
+      running = @year_balance.starting_amount_cents
+      months.map do |month|
+        balance = stored[month.id] || Balance.new(account: @account, period: month, organization: accounting_organization, currency: accounting_organization.currency,
+                                                  starting_amount_cents: running, current_amount_cents: 0, ending_amount_cents: running)
+        running = balance.ending_amount_cents
+        [ month, balance ]
+      end
+    end
+
     # Closing balance of each account for the year, read without storing anything.
     def closing_balances(accounts, year)
       return {} unless year
 
-      stored = Balance.where(account: accounts, period: year).index_by(&:account_id)
-      accounts.to_h { |account| [ account.id, (stored[account.id] || Balance.peek(account, year)).ending_amount ] }
+      Balance.peek_all(accounts, year).transform_values(&:ending_amount)
     end
 
     # Lines posted to the account and its sub-accounts during the year, signed on the

@@ -18,8 +18,7 @@ module TudlaAccounting
         @period = period
         @amount = amount
         @accounts = TudlaAccounting::Account.where(organization: organization).order(:code).to_a
-        stored = TudlaAccounting::Balance.where(account: @accounts, period: period).index_by(&:account_id)
-        @balances = @accounts.to_h { |account| [ account.id, stored[account.id] || TudlaAccounting::Balance.peek(account, period) ] }
+        @balances = TudlaAccounting::Balance.peek_all(@accounts, period)
       end
 
       # Rows for a category, in tree order.

@@ -141,6 +141,16 @@ RSpec.describe "Bank reconciliation", type: :service do
       expect { reconciler.match!(line("Again"), [ deposit ]) }.to raise_error(ArgumentError, "A ledger line is matched to another statement line already")
     end
 
+    it "offers the closest ledger lines moving money the same way within 60 days to match by hand" do
+      stub_const("TudlaAccounting::BankReconciler::MATCH_CANDIDATE_LIMIT", 1)
+      far = post("6100", "1000", 7_00, on(5, 30), particulars: "Far")
+      expect(reconciler.candidates_for(line("Monthly fee"))).to eq([ fee_in_books ])
+      expect(reconciler.candidates_for(line("Deposit"))).to eq([ deposit ])
+      stub_const("TudlaAccounting::BankReconciler::MATCH_CANDIDATE_LIMIT", 10)
+      expect(reconciler.candidates_for(line("Monthly fee"))).to eq([ fee_in_books, cheque ]) # not the one 88 days away
+      expect(reconciler.candidates_for(line("Monthly fee"))).not_to include(far)
+    end
+
     it "posts an entry for a line the books don't have, and matches it" do
       entry = reconciler.create_entry!(line("Interest"), account: account("3000"), particulars: "Interest March")
       expect(entry).to have_attributes(particulars: "Interest March", transacted_at: on(3, 4), posted_at: on(3, 4))

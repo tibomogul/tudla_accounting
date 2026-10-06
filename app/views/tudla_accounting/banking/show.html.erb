@@ -76,7 +76,7 @@
                   <details>
                     <summary class="cursor-pointer text-sm underline">Match or record it</summary>
                     <div class="mt-2 space-y-3">
-                      <% candidates = @unmatched_ledger.select { |detail| @reconciler.bank_cents(detail) && (@reconciler.bank_cents(detail) <=> 0) == (line.amount_cents <=> 0) } %>
+                      <% candidates = @reconciler.candidates_for(line, @unmatched_ledger) %>
                       <% if candidates.any? %>
                         <%= form_with url: match_bank_statement_line_path(line, show: params[:show]), class: "flex flex-wrap items-end gap-2" do |form| %>
                           <div><%= form.label "detail_ids_#{line.id}", "Ledger lines that add up to it", class: "tc-label" %>
@@ -118,7 +118,7 @@
       <table class="tc-table">
         <thead><tr><th>Posted</th><th>Entry</th><th class="tc-num">Amount</th></tr></thead>
         <tbody>
-          <% @unmatched_ledger.each do |detail| %>
+          <% @ledger_page.records.each do |detail| %>
             <tr>
               <td class="whitespace-nowrap"><%= tc_date(detail.entry.posted_at) %></td>
               <td><%= link_to detail.entry.particulars, entry_path(detail.entry), class: "underline" %></td>
@@ -128,5 +128,6 @@
         </tbody>
       </table>
     </div>
+    <%= render "tudla_accounting/shared/pagination", paginator: @ledger_page, param: :ledger_page %>
   <% end %>
 </section>

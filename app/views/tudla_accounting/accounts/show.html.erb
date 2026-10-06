@@ -1,3 +1,4 @@
+<% sub_accounts = @account.children.order(:code).to_a %>
 <%= tc_page_header @account.code_with_name, subtitle: "#{@account.category.capitalize} account#{" · held in #{@account.currency}" if @account.currency.present?}" do %>
   <% if tc_can?(:record) %>
     <%= link_to "Edit", edit_account_path(@account), class: "tc-btn tc-btn-secondary" %>
@@ -20,7 +21,7 @@
   </div>
   <div class="tc-card tc-card-body">
     <p class="tc-stat-label">Sub-accounts</p>
-    <p class="mt-1"><%= safe_join(@account.children.order(:code).map { |child| link_to(child.code, account_path(child)) }, ", ").presence || "None" %></p>
+    <p class="mt-1"><%= safe_join(sub_accounts.map { |child| link_to(child.code, account_path(child)) }, ", ").presence || "None" %></p>
   </div>
 </div>
 
@@ -62,7 +63,7 @@
   </div>
 
   <div class="flex flex-wrap items-end justify-between gap-4 mb-3">
-    <h2 class="text-lg font-semibold" id="ledger">Ledger<% if @account.children.any? %> <span class="tc-muted text-sm font-normal">(including sub-accounts)</span><% end %></h2>
+    <h2 class="text-lg font-semibold" id="ledger">Ledger<% if sub_accounts.any? %> <span class="tc-muted text-sm font-normal">(including sub-accounts)</span><% end %></h2>
     <%= form_with url: account_path(@account, anchor: "ledger"), method: :get, class: "flex flex-wrap items-end gap-2" do |form| %>
       <%= form.hidden_field :year_id, value: @year.id %>
       <div><%= form.label :from, "From", class: "tc-label" %><%= form.date_field :from, value: @ledger[:from], class: "tc-input" %></div>
@@ -74,7 +75,7 @@
   <div class="tc-card overflow-x-auto">
     <table class="tc-table">
       <thead>
-        <tr><th>Date</th><th>Particulars</th><% if @account.children.any? %><th>Account</th><% end %><th class="tc-num">Debit</th><th class="tc-num">Credit</th><th class="tc-num">Balance</th></tr>
+        <tr><th>Date</th><th>Particulars</th><% if sub_accounts.any? %><th>Account</th><% end %><th class="tc-num">Debit</th><th class="tc-num">Credit</th><th class="tc-num">Balance</th></tr>
       </thead>
       <tbody>
         <% if @ledger[:page].records.empty? %>
@@ -84,7 +85,7 @@
           <tr>
             <td class="whitespace-nowrap"><%= tc_date(row[:line].entry.posted_at) %></td>
             <td><%= link_to row[:line].entry.particulars, entry_path(row[:line].entry) %></td>
-            <% if @account.children.any? %><td class="font-mono"><%= link_to row[:line].account.code, account_path(row[:line].account) %></td><% end %>
+            <% if sub_accounts.any? %><td class="font-mono"><%= link_to row[:line].account.code, account_path(row[:line].account) %></td><% end %>
             <td class="tc-num"><%= tc_money(row[:debit]) %></td>
             <td class="tc-num"><%= tc_money(row[:credit]) %></td>
             <td class="tc-num"><%= tc_money(row[:balance]) %></td>

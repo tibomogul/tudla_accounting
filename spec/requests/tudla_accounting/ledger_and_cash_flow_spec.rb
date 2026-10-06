@@ -63,6 +63,25 @@ RSpec.describe "General ledger and cash flow pages", type: :request do
         expect(CSV.parse(response.body).map { |row| row[3] }).to eq([ "Entry", "Opening balance", "1500/1010", "Closing balance" ])
       end
 
+      it "shows a page of lines at a time, continuing an account across pages" do
+        stub_const("TudlaAccounting::ReportsController::GENERAL_LEDGER_PAGE", 1)
+        ledger = ->(page) { get routes.reports_general_ledger_path(from_id: month(2).id, thru_id: month(2).id, page: page) }
+        headings = -> { css_select("thead tr:first-child th").map { |th| th.text.squish } }
+
+        ledger.call(1)
+        expect(headings.call).to eq([ "1010 - Bank" ])
+        expect(response.body).to include("Opening balance")
+        expect(css_select("[data-closing]")).to be_empty
+
+        ledger.call(2)
+        expect(headings.call).to eq([ "1010 - Bank (continued)" ])
+        expect(response.body).not_to include("Opening balance")
+        expect(css_select("[data-closing]").map { |cell| cell["data-closing"] }).to eq(%w[1010])
+
+        ledger.call(4) # an account with a balance but nothing posted takes a row of its own
+        expect(headings.call).to eq([ "3000 - Capital" ])
+      end
+
       it "says when nothing happened, and refuses another organization's account" do
         get routes.reports_general_ledger_path(account_id: account("4000").id, from_id: month(1).id, thru_id: month(1).id)
         expect(response.body).to include("Nothing posted and no balances in this time.")

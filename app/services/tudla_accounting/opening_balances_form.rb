@@ -33,7 +33,8 @@ module TudlaAccounting
       return @amounts[account.id] if @amounts.key?(account.id)
       return Money.new(0, currency) unless year
 
-      Money.new(TudlaAccounting::Balance.peek(account, year).starting_amount_cents, currency)
+      @year_balances ||= TudlaAccounting::Balance.peek_all(accounts, year)
+      Money.new(@year_balances.fetch(account.id).starting_amount_cents, currency)
     end
 
     def parent_total(account)

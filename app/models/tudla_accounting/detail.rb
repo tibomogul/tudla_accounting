@@ -46,24 +46,21 @@ module TudlaAccounting
       end
     end
 
-    def post(posted_at)
+    # Posts the line into the month containing posted_at (see BalancePoster). An entry
+    # passes one poster for all its lines.
+    def post(posted_at, poster: nil)
       raise ArgumentError, "cannot post a detail without an entry" unless entry
       raise ArgumentError, "cannot post a detail without an account" unless account
       raise ArgumentError, "cannot post a detail without an amount" unless amount
       raise ArgumentError, "posted_at must be a datetime" unless posted_at.is_a?(Time) || posted_at.is_a?(ActiveSupport::TimeWithZone)
 
       transaction do
-        lock_organization!
-        periods = TudlaAccounting::Period.leaf_periods_for_date(organization, posted_at)
-
-        raise ArgumentError, "no valid period found for the posted date" if periods.empty?
-        raise ArgumentError, "multiple periods found for the posted date" if periods.count > 1
-        raise ArgumentError, "the period for the posted date is closed" if periods.first.closed?
-
-        balance = TudlaAccounting::Balance.get(account, periods.first)
-
-        balance.post(amount, tally)
-
+        unless poster
+          lock_organization!
+          poster = BalancePoster.new(organization)
+        end
+        period = poster.leaf_period_for(posted_at)
+        balance = poster.post(account, period, amount_cents, tally)
         self.balance = balance unless self.balance
 
         save!

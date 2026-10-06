@@ -42,42 +42,14 @@ module TudlaAccounting
       end
     end
 
-    def post_to_self_and_associated_period(amount, tally)
-      raise ArgumentError, "amount must be a Money object" unless amount.is_a?(Money)
-      raise ArgumentError, "tally must be debit or credit" unless [ TudlaAccounting::Detail::TALLY_DEBIT, TudlaAccounting::Detail::TALLY_CREDIT ].include?(tally)
-
-      transaction do
-        update_current_amount(amount, tally)
-        delta_cents = signed_cents(amount, tally)
-
-        if period.has_parent?
-          # Later periods in the same year opened from this one.
-          later_periods = period.siblings.where("from_date > ?", period.from_date)
-          self.class.shift_balances(account, later_periods, delta_cents)
-
-          Balance.get(account, period.parent).post_to_self_and_associated_period(amount, tally)
-        else
-          self.class.carry_into_later_years(account, period, delta_cents)
-        end
-
-        true
-      end
-    end
-
+    # Posts amount on tally to this balance's account in its period; see BalancePoster.
     def post(amount, tally)
       raise ArgumentError, "amount must be a Money object" unless amount.is_a?(Money)
       raise ArgumentError, "tally must be debit or credit" unless [ TudlaAccounting::Detail::TALLY_DEBIT, TudlaAccounting::Detail::TALLY_CREDIT ].include?(tally)
 
-      transaction do
-        post_to_self_and_associated_period(amount, tally)
-
-        if account.parent
-          parent_balance = Balance.get(account.parent, period)
-          parent_balance.post(amount, tally)
-        end
-
-        true
-      end
+      BalancePoster.new(organization).post(account, period, amount.cents, tally)
+      reload
+      true
     end
 
     class << self
@@ -91,34 +63,38 @@ module TudlaAccounting
       # The account's balance for a period without storing anything: the stored balance,
       # or a new unsaved one opening at what the period would open at. Use it to read.
       def peek(account, period)
-        balance = find_by(account: account, period: period)
-        return balance if balance
+        peek_all([ account ], period).fetch(account.id)
+      end
 
-        org = period.organization
-        # The account's most recent balance in an earlier period at the same level.
-        # Periods without activity have no balance, so this may be several periods
-        # back (e.g. January when nothing was posted in February).
+      # { account_id => balance } for many accounts in one period, as peek gives each, in a
+      # few queries whatever the number of accounts. A missing balance opens where the
+      # account's most recent balance at the same level closed (periods without activity
+      # have none, so that may be several back), else where its balance in the period
+      # above opens, else by the year-end rules (see opening_for_year).
+      def peek_all(accounts, period)
+        accounts = accounts.to_a
+        found = where(account_id: accounts.map(&:id), period_id: period.id).index_by(&:account_id)
+        missing = accounts.reject { |account| found.key?(account.id) }
+        return found if missing.empty?
+
         earlier_periods = period.root.subtree.at_depth(period.depth).where("from_date < ?", period.from_date)
-        latest_earlier_balance = where(account: account, period: earlier_periods)
-          .joins(:period).order(TudlaAccounting::Period.arel_table[:from_date].desc).first
+        latest = where(account_id: missing.map(&:id), period_id: earlier_periods).includes(:period).group_by(&:account_id)
+          .transform_values { |balances| balances.max_by { |balance| balance.period.from_date } }
+        openings = missing.to_h { |account| [ account.id, latest[account.id]&.ending_amount_cents ] }
 
-        starting_amount = if latest_earlier_balance
-          latest_earlier_balance.ending_amount
-        elsif period.has_parent?
-          peek(account, period.parent).starting_amount
-        else
-          opening_for_year(account, period)
+        unknown = missing.select { |account| openings[account.id].nil? }
+        if unknown.any?
+          from_above = period.has_parent? ? peek_all(unknown, period.parent).transform_values(&:starting_amount_cents) : openings_for_year(unknown, period)
+          openings.merge!(from_above)
         end
 
-        new(
-          account: account,
-          period: period,
-          starting_amount: starting_amount,
-          current_amount: Money.new(0, org.currency),
-          ending_amount: starting_amount,
-          currency: org.currency,
-          organization: org
-        )
+        org = period.organization
+        missing.each do |account|
+          cents = openings.fetch(account.id)
+          found[account.id] = new(account: account, period: period, starting_amount_cents: cents, current_amount_cents: 0,
+                                  ending_amount_cents: cents, currency: org.currency, organization: org)
+        end
+        found
       end
 
       # Moves the account's existing balances in the given periods, and in the periods
@@ -138,16 +114,7 @@ module TudlaAccounting
       # start each year at zero, and their effect on profit moves retained earnings
       # instead (once, at the top of the account tree).
       def carry_into_later_years(account, year, delta_cents)
-        later_years = later_roots(year)
-
-        if account.balance_sheet_account?
-          shift_balances(account, later_years, delta_cents)
-        elsif account.root? && (retained_earnings = retained_earnings_account(year.organization))
-          profit_delta = account.debit_balance? ? -delta_cents : delta_cents
-          [ retained_earnings, *retained_earnings.ancestors ].each do |equity_account|
-            shift_balances(equity_account, later_years, profit_delta)
-          end
-        end
+        BalancePoster.new(year.organization).carry_into_later_years(account, year, delta_cents)
       end
 
       # The configured retained earnings account for an organization, if any.
@@ -169,38 +136,30 @@ module TudlaAccounting
 
       private
 
-      # Each root period is a financial year. Asset, liability and equity accounts open
-      # with their closing balance from the previous year; income and expense accounts
-      # open at zero; retained earnings (and the accounts above it) also take in the
-      # previous year's net profit.
-      def opening_for_year(account, year)
+      # { account_id => cents } each account opens a financial year (a root period) at:
+      # asset, liability and equity accounts at their closing balance from the previous
+      # year; income and expense accounts at zero; retained earnings (and the accounts above
+      # it) also take in the previous year's net profit.
+      def openings_for_year(accounts, year)
         org = year.organization
         previous_year = earlier_roots(year).order(:from_date).last
-        return Money.new(0, org.currency) unless previous_year && account.balance_sheet_account?
+        carried = accounts.select(&:balance_sheet_account?)
+        openings = accounts.to_h { |account| [ account.id, 0 ] }
+        return openings unless previous_year && carried.any?
 
-        opening = peek(account, previous_year).ending_amount
+        closing = peek_all(carried, previous_year)
         retained_earnings = retained_earnings_account(org)
-        if retained_earnings && (retained_earnings == account || retained_earnings.ancestor_ids.include?(account.id))
-          opening += net_profit(org, previous_year)
+        takes_profit = retained_earnings ? [ retained_earnings.id, *retained_earnings.ancestor_ids ] : []
+        profit = carried.any? { |account| takes_profit.include?(account.id) } ? net_profit(org, previous_year).cents : 0
+        carried.each do |account|
+          openings[account.id] = closing.fetch(account.id).ending_amount_cents + (takes_profit.include?(account.id) ? profit : 0)
         end
-        opening
+        openings
       end
 
       def earlier_roots(year)
         TudlaAccounting::Period.roots.where(organization: year.organization).where("from_date < ?", year.from_date)
       end
-
-      def later_roots(year)
-        TudlaAccounting::Period.roots.where(organization: year.organization).where("from_date > ?", year.from_date)
-      end
-    end
-
-    private
-
-    def signed_cents(amount, tally)
-      should_add = (account.debit_balance? && tally == TudlaAccounting::Detail::TALLY_DEBIT) ||
-                   (!account.debit_balance? && tally == TudlaAccounting::Detail::TALLY_CREDIT)
-      should_add ? amount.cents : -amount.cents
     end
   end
 end

@@ -14,24 +14,25 @@ RSpec.describe "Entering a journal entry", type: :system do
     sign_in_as(organization)
   end
 
-  def status = find("[data-entry-lines-target=status]").text
+  # Retries until the status reads so: the line editor updates it as amounts are typed.
+  def expect_status(text) = expect(page).to(have_css("[data-entry-lines-target=status]", exact_text: text))
   # Waits for the row to exist: one just added by "Add line" may not be rendered yet.
   def line(index) = all("tbody[data-entry-lines-target=lines] tr:not([hidden])", minimum: index + 1)[index]
 
   it "totals the lines as they are typed, then saves and posts the entry" do
     visit "/tudla_accounting/entries/new"
-    expect(status).to eq("Enter the amounts for each line.")
+    expect_status("Enter the amounts for each line.")
 
     fill_in "Particulars", with: "Opening capital"
     within(line(0)) { select "1010 - Cash", from: "Account"; fill_in "Debit", with: "1,250.50" }
     within(line(1)) { select "3000 - Capital", from: "Account"; fill_in "Credit", with: "1000" }
 
     expect(page).to have_css("[data-entry-lines-target=debitTotal]", text: "1,250.50")
-    expect(status).to eq("Not balanced: debits are 250.50 more.")
+    expect_status("Not balanced: debits are 250.50 more.")
 
     click_button "Add line"
     within(line(2)) { select "4000 - Sales", from: "Account"; fill_in "Credit", with: "250.50" }
-    expect(status).to eq("Balanced: debits equal credits (1,250.50).")
+    expect_status("Balanced: debits equal credits (1,250.50).")
 
     click_button "Save draft"
     expect(page).to have_content("Draft entry saved.")
@@ -50,10 +51,10 @@ RSpec.describe "Entering a journal entry", type: :system do
     within(line(1)) { select "3000 - Capital", from: "Account"; fill_in "Credit", with: "100" }
     click_button "Add line"
     within(line(2)) { fill_in "Debit", with: "5" }
-    expect(status).to start_with("Not balanced")
+    expect(page).to have_css("[data-entry-lines-target=status]", text: /\ANot balanced/)
 
     within(line(2)) { click_button "Remove line" }
-    expect(status).to eq("Balanced: debits equal credits (100.00).")
+    expect_status("Balanced: debits equal credits (100.00).")
     click_button "Save draft"
     expect(page).to have_content("Draft entry saved.")
 
@@ -61,7 +62,7 @@ RSpec.describe "Entering a journal entry", type: :system do
     click_button "Add line"
     within(line(2)) { select "4000 - Sales", from: "Account"; fill_in "Credit", with: "100" }
     within(line(1)) { click_button "Remove line" } # the saved Capital line
-    expect(status).to eq("Balanced: debits equal credits (100.00).")
+    expect_status("Balanced: debits equal credits (100.00).")
     click_button "Save draft"
 
     expect(page).to have_content("Draft entry saved.")
@@ -77,12 +78,12 @@ RSpec.describe "Entering a journal entry", type: :system do
     within(line(0)) { select "1010 - Cash", from: "Account"; fill_in "Debit", with: "110" }
     within(line(1)) { select "4000 - Sales", from: "Account"; fill_in "Credit", with: "100"; select "GST (10%)", from: "Tax" }
     expect(page).to have_css("[data-entry-lines-target=creditTax]", text: "10.00")
-    expect(status).to eq("Balanced: debits equal credits (110.00).")
+    expect_status("Balanced: debits equal credits (110.00).")
 
     within(line(1)) { fill_in "Credit", with: "110" }
-    expect(status).to eq("Not balanced: credits are 11.00 more.")
+    expect_status("Not balanced: credits are 11.00 more.")
     check "Amounts on taxed lines include the tax"
-    expect(status).to eq("Balanced: debits equal credits (110.00).")
+    expect_status("Balanced: debits equal credits (110.00).")
 
     click_button "Save draft"
     expect(page).to have_content("Draft entry saved.")

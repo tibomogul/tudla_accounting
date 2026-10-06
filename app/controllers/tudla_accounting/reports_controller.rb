@@ -1,5 +1,6 @@
 module TudlaAccounting
   class ReportsController < ApplicationController
+    GENERAL_LEDGER_PAGE = 500 # lines
     def index
     end
 
@@ -51,7 +52,7 @@ module TudlaAccounting
       @account = params[:account_id].present? ? organization_scope(Account).find(params[:account_id]) : nil
       @report = Reports::GeneralLedger.new(accounting_organization, from: @from, thru: @thru, account_ids: @account && [ @account.id ])
       respond_to do |format|
-        format.html
+        format.html { @page = Paginator.new(@report.rows, page: params[:page], per_page: GENERAL_LEDGER_PAGE) }
         format.csv { send_data @report.to_csv, filename: "general-ledger-#{@from.from_date.to_date}-to-#{@thru.thru_date.to_date}.csv", type: "text/csv" }
       end
     end

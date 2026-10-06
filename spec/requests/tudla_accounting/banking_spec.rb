@@ -111,6 +111,16 @@ RSpec.describe "Banking", type: :request do
       expect(css_select("tbody td:last-child").first.text.squish).to eq("Imported a statement for 1000 - Bank: 2 lines new, 0 already there")
     end
 
+    it "pages the ledger lines not yet on a statement" do
+      22.times { |i| post_entry("6100", "1000", 1_00, Time.zone.local(2026, 4, 1 + i), "Small #{i}") }
+      stub_const("TudlaAccounting::BankingController::LEDGER_PAGE", 20)
+      get routes.banking_account_path(bank)
+      expect(css_select("#ledger-heading ~ div tbody tr").size).to eq(20)
+      get routes.banking_account_path(bank, ledger_page: 2)
+      expect(css_select("#ledger-heading ~ div tbody tr").size).to eq(4)
+      expect(response.body).to include("ledger_page=1")
+    end
+
     it "offers matching and recording for a line without a suggestion" do
       get routes.banking_account_path(bank)
       fee_row = css_select("##{ActionView::RecordIdentifier.dom_id(line('Account fee'))}").first

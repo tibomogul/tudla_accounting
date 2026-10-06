@@ -17,16 +17,22 @@
   <div class="tc-card tc-card-body text-center"><p class="tc-muted">Nothing posted and no balances in this time.</p></div>
 <% else %>
   <div class="space-y-6">
-    <% @report.accounts.each do |section| %>
+    <% @page.records.chunk_while { |(a, _), (b, _)| a.equal?(b) }.each do |part| %>
+      <% section = part.first.first %>
+      <% lines = part.filter_map(&:last) %>
+      <% from_start = lines.empty? || lines.first.equal?(section.lines.first) %>
+      <% to_end = lines.empty? || lines.last.equal?(section.lines.last) %>
       <section class="tc-card overflow-x-auto" aria-labelledby="<%= dom_id(section.account, :ledger) %>">
         <table class="tc-table">
           <thead>
-            <tr><th colspan="5" id="<%= dom_id(section.account, :ledger) %>"><%= link_to section.account.code_with_name, account_path(section.account, year_id: @thru.root.id), class: "underline" %></th></tr>
+            <tr><th colspan="5" id="<%= dom_id(section.account, :ledger) %>"><%= link_to section.account.code_with_name, account_path(section.account, year_id: @thru.root_id), class: "underline" %><%= " (continued)" unless from_start %></th></tr>
             <tr><th class="w-32">Date</th><th>Entry</th><th class="tc-num">Debit</th><th class="tc-num">Credit</th><th class="tc-num">Balance</th></tr>
           </thead>
           <tbody>
-            <tr class="tc-muted"><td><%= tc_date(@from.from_date) %></td><td>Opening balance</td><td></td><td></td><td class="tc-num"><%= tc_money(section.opening) %></td></tr>
-            <% section.lines.each do |line| %>
+            <% if from_start %>
+              <tr class="tc-muted"><td><%= tc_date(@from.from_date) %></td><td>Opening balance</td><td></td><td></td><td class="tc-num"><%= tc_money(section.opening) %></td></tr>
+            <% end %>
+            <% lines.each do |line| %>
               <tr>
                 <td class="whitespace-nowrap"><%= tc_date(line.date) %></td>
                 <td><%= link_to line.entry.particulars, entry_path(line.entry), class: "underline" %></td>
@@ -35,12 +41,15 @@
                 <td class="tc-num"><%= tc_money(line.balance) %></td>
               </tr>
             <% end %>
-            <tr class="font-semibold"><td><%= tc_date(@thru.thru_date) %></td><td>Closing balance</td><td></td><td></td><td class="tc-num" data-closing="<%= section.account.code %>"><%= tc_money(section.closing) %></td></tr>
+            <% if to_end %>
+              <tr class="font-semibold"><td><%= tc_date(@thru.thru_date) %></td><td>Closing balance</td><td></td><td></td><td class="tc-num" data-closing="<%= section.account.code %>"><%= tc_money(section.closing) %></td></tr>
+            <% end %>
           </tbody>
         </table>
       </section>
     <% end %>
   </div>
+  <%= render "tudla_accounting/shared/pagination", paginator: @page %>
   <p class="mt-4 text-sm">
     Lines total <span data-total="debits"><%= tc_money(@report.total_debits) %></span> in debits and <span data-total="credits"><%= tc_money(@report.total_credits) %></span> in credits.
   </p>

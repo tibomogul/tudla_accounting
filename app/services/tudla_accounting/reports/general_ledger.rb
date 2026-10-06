@@ -27,7 +27,7 @@ module TudlaAccounting
 
       def accounts
         @accounts ||= candidates.filter_map do |account|
-          opening = Balance.peek(account, from).starting_amount
+          opening = openings.fetch(account.id).starting_amount
           details = details_by_account.fetch(account.id, [])
           next if details.empty? && opening.zero?
 
@@ -39,6 +39,12 @@ module TudlaAccounting
           end
           Section.new(account: account, opening: opening, lines: lines, closing: balance)
         end
+      end
+
+      # [section, line] for every line, account by account ([section, nil] for an account
+      # with a balance but no lines), for showing a page at a time.
+      def rows
+        accounts.flat_map { |section| section.lines.empty? ? [ [ section, nil ] ] : section.lines.map { |line| [ section, line ] } }
       end
 
       def total_debits
@@ -73,6 +79,10 @@ module TudlaAccounting
           parent_ids = all.filter_map(&:parent_id).to_set
           all.reject { |account| parent_ids.include?(account.id) || (@account_ids && !@account_ids.include?(account.id)) }
         end
+      end
+
+      def openings
+        @openings ||= Balance.peek_all(candidates, from)
       end
 
       def details_by_account

@@ -2,6 +2,7 @@ module TudlaAccounting
   # Reconciling bank accounts: importing statements and matching their lines to the
   # books. See BankStatementImporter and BankReconciler.
   class BankingController < ApplicationController
+    LEDGER_PAGE = 100 # ledger lines not yet on a statement, per page
     permits :post, only: %i[import match_suggestions]
 
     before_action :set_account, only: %i[show import match_suggestions]
@@ -22,6 +23,7 @@ module TudlaAccounting
       @page = Paginator.new(@show_all ? lines : lines.unmatched, page: params[:page])
       @suggestions = @reconciler.suggestions
       @unmatched_ledger = @reconciler.unmatched_ledger.to_a
+      @ledger_page = Paginator.new(@unmatched_ledger, page: params[:ledger_page], per_page: LEDGER_PAGE)
       @other_accounts = organization_scope(Account).where.not(id: @account.id).order(:code)
     end
 

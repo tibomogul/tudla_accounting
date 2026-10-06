@@ -31,10 +31,10 @@
           <td><%= month.closed? ? tc_badge("Closed", tone: :warning) : tc_badge("Open") %></td>
           <td class="text-right">
             <% if !tc_can?(:administer) %>
-            <% elsif month.close_blocker.nil? %>
+            <% elsif month == @closable %>
               <%= button_to "Close", close_period_path(month), class: "tc-btn tc-btn-secondary tc-btn-sm",
                             form: { data: { controller: "confirm", confirm_message_value: "Close #{tc_period_label(month)}? Nothing more can be posted to it.", action: "submit->confirm#ask" } } %>
-            <% elsif month.reopen_blocker.nil? %>
+            <% elsif month == @reopenable %>
               <%= render "reopen_form", period: month %>
             <% end %>
           </td>

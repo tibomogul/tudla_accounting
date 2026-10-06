@@ -48,11 +48,13 @@ module TudlaAccounting
       end
 
       def opening
-        cash_accounts.sum(zero) { |account| debit_positive(account, Balance.peek(account, from).starting_amount) }
+        balances = Balance.peek_all(cash_accounts, from)
+        cash_accounts.sum(zero) { |account| debit_positive(account, balances.fetch(account.id).starting_amount) }
       end
 
       def closing
-        cash_accounts.sum(zero) { |account| debit_positive(account, Balance.peek(account, thru).ending_amount) }
+        balances = Balance.peek_all(cash_accounts, thru)
+        cash_accounts.sum(zero) { |account| debit_positive(account, balances.fetch(account.id).ending_amount) }
       end
 
       # The cash accounts' change equals what the sections explain.

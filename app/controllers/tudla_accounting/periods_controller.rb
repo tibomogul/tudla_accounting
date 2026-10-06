@@ -11,6 +11,12 @@ module TudlaAccounting
       @months = @year.children.order(:from_date).to_a
       @line_counts = Detail.joins(:balance).where(tudla_accounting_balances: { period_id: @months.map(&:id) })
         .group("tudla_accounting_balances.period_id").count
+      # Months close in order: only the earliest open one can be closed, and only the latest
+      # closed one reopened (while its year is open). See Period#close_blocker.
+      all_months = organization_scope(Period).at_depth(1)
+      @closable = all_months.where(closed_at: nil).order(:from_date).first
+      @reopenable = all_months.where.not(closed_at: nil).order(:from_date).last
+      @reopenable = nil if @reopenable&.parent&.closed?
     end
 
     def new

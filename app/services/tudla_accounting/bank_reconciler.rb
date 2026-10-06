@@ -63,6 +63,17 @@ module TudlaAccounting
       end
     end
 
+    MATCH_CANDIDATE_DAYS = 60
+    MATCH_CANDIDATE_LIMIT = 50
+
+    # Unmatched ledger lines a statement line could be matched to by hand: money moving the
+    # same way, posted within MATCH_CANDIDATE_DAYS of it, the closest first, at most
+    # MATCH_CANDIDATE_LIMIT. ledger is the unmatched lines, when already loaded.
+    def candidates_for(line, ledger = unmatched_ledger.to_a)
+      ledger.select { |detail| (cents = bank_cents(detail)) && (cents <=> 0) == (line.amount_cents <=> 0) && days_apart(line, detail) <= MATCH_CANDIDATE_DAYS }
+        .min_by(MATCH_CANDIDATE_LIMIT) { |detail| [ days_apart(line, detail), detail.id ] }
+    end
+
     def match_suggestions!
       suggestions.each { |line, detail| match!(line, [ detail ]) }.size
     end

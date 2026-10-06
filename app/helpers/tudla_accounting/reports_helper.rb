@@ -7,7 +7,7 @@ module TudlaAccounting
 
     # The account's page, showing the year the report's period is in.
     def report_account_link(account, period)
-      link_to account.name, account_path(account, year_id: period.root.id)
+      link_to account.name, account_path(account, year_id: period.root_id)
     end
 
     # "Acme Pty Ltd" for anything with a name, otherwise "Organization #4".

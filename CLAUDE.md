@@ -65,6 +65,10 @@ Why: Rails 8.1 does **not** auto-append engine migration paths to the host app's
 - PostgreSQL triggers (`TudlaAccounting::DatabaseProtection`) refuse updates and deletes of posted entries and their lines, posting into closed periods, and changes to audit events. Non-transactional specs must delete the audit events they create too. Specs that need to tamper with posted rows (or clean them up outside a transaction) must wrap it in `TudlaAccounting::DatabaseProtection.allowing_posted_changes { ... }`. `rails_helper` installs the triggers before the suite, since `schema.rb` can't hold them
 - `spec/rails_helper.rb` adds the engine's `db/migrate` to `DatabaseTasks.migrations_paths` so `maintain_test_schema!` sees engine migrations as applied; if specs report pending migrations after a schema change, rebuild the test DB (`RAILS_ENV=test bin/rails db:drop db:create db:schema:load`)
 
+## Performance
+
+`perf/benchmark.rb` (run with `bin/rails runner`, `ENTRIES=` to size it) times posting and every report/page with SQL query counts against a generated organization in the dev database, and verifies balances with `BalanceRebuilder`. Rerun it after changing posting (`BalancePoster`), balance reads (`Balance.peek_all`) or report queries; a page's query count shouldn't grow with the number of accounts or rows.
+
 ## UI Development
 
 ### Dummy App

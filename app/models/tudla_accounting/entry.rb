@@ -101,9 +101,8 @@ module TudlaAccounting
         lock_organization!
         raise ArgumentError, "entry is already posted" if self.class.where(id: id).where.not(posted_at: nil).exists?
 
-        details.each do |detail|
-          detail.post(posted_at)
-        end
+        poster = BalancePoster.new(organization)
+        details.each { |detail| detail.post(posted_at, poster: poster) }
         update!(posted_at: posted_at)
         CarryingAmountProcessor.call(entry: self)
         AuditEvent.record!("entry.posted", organization: organization, subject: self, details: { posted_at: posted_at.iso8601 })

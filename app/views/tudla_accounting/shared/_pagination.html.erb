@@ -1,6 +1,6 @@
-<%# locals: (paginator:) %>
+<%# locals: (paginator:, param: :page) %>
 <% if paginator.total_pages > 1 %>
-  <% page_url = ->(number) { "#{request.path}?#{request.query_parameters.merge("page" => number).to_query}" } %>
+  <% page_url = ->(number) { "#{request.path}?#{request.query_parameters.merge(param.to_s => number).to_query}" } %>
   <nav class="tc-pagination mt-4" aria-label="Pagination">
     <%= link_to "‹ Previous", (paginator.previous_page ? page_url.call(paginator.previous_page) : "#"), class: "tc-page", aria: { disabled: (true unless paginator.previous_page) } %>
     <% paginator.window.each do |number| %>

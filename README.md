@@ -234,6 +234,15 @@ docker compose exec rails bash -lc 'RAILS_ENV=test bundle exec rspec --format do
 ### Code Coverage
 SimpleCov generates an HTML report in `coverage/` after each test run. Open `coverage/index.html` to view detailed metrics.
 
+### Benchmark
+`perf/benchmark.rb` builds a throwaway organization's books (two years, a chart of 30 accounts, taxed and tagged entries on random dates), then times posting and every report and heavy page, with the number of SQL queries each takes. It checks the balances against the posted lines with `BalanceRebuilder`, and deletes the books afterwards (unless `KEEP=1`):
+
+```bash
+docker compose exec rails bash -lc 'ENTRIES=10000 bin/rails runner perf/benchmark.rb'
+```
+
+With 10,000 entries (25,000 lines) posting takes about 21 ms an entry, and every report and page answers in under half a second; reports read balances for all accounts in a handful of queries, and the general ledger and banking pages show their lines a page at a time.
+
 ### Linting
 ```bash
 docker compose exec rails bash -lc 'bundle exec rubocop'     # Check code style

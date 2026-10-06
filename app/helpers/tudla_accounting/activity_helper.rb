@@ -48,18 +48,34 @@ module TudlaAccounting
 
     private
 
+    # { [type, id] => record } for the subjects of the events on the page that still exist,
+    # loaded with a query per type (set by ActivityController, or worked out here).
+    def activity_subjects
+      @activity_subjects ||= ActivityHelper.load_subjects(@page.records)
+    end
+
+    LINKED_SUBJECTS = { "TudlaAccounting::Allocation" => { from: :detail } }.freeze
+
+    def self.load_subjects(events)
+      events.group_by(&:subject_type).except(nil).flat_map do |type, of_type|
+        model = type.safe_constantize
+        next [] unless model && model <= ApplicationRecord
+
+        model.where(id: of_type.map(&:subject_id)).includes(LINKED_SUBJECTS.fetch(type, [])).to_a
+      end.index_by { |record| [ record.class.name, record.id ] }
+    end
+
     def activity_subject_link(event)
-      path = case event.subject_type
-      when Entry.name then (entry_path(event.subject_id) if Entry.exists?(event.subject_id))
-      when Account.name then (account_path(event.subject_id) if Account.exists?(event.subject_id))
-      when Period.name then (period_path(Period.find(event.subject_id).root) if Period.exists?(event.subject_id))
-      when BankStatementLine.name then (banking_account_path(BankStatementLine.find(event.subject_id).account_id, show: "all") if BankStatementLine.exists?(event.subject_id))
-      when Dimension.name then (edit_dimension_path(event.subject_id) if Dimension.exists?(event.subject_id))
-      when DimensionValue.name
-        value = DimensionValue.find_by(id: event.subject_id)
-        value && edit_dimension_dimension_value_path(value.dimension_id, value)
-      when TaxCode.name then (edit_tax_code_path(event.subject_id) if TaxCode.exists?(event.subject_id))
-      when Allocation.name then entry_path(Allocation.find(event.subject_id).from.detail.entry_id)
+      subject = activity_subjects[[ event.subject_type, event.subject_id ]]
+      path = case subject
+      when Entry then entry_path(subject)
+      when Account then account_path(subject)
+      when Period then period_path(subject.root_id)
+      when BankStatementLine then banking_account_path(subject.account_id, show: "all")
+      when Dimension then edit_dimension_path(subject)
+      when DimensionValue then edit_dimension_dimension_value_path(subject.dimension_id, subject)
+      when TaxCode then edit_tax_code_path(subject)
+      when Allocation then entry_path(subject.from.detail.entry_id)
       end
       path ? link_to(event.subject_label, path, class: "underline") : event.subject_label.to_s
     end

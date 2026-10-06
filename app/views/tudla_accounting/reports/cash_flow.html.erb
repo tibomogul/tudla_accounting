@@ -28,7 +28,7 @@
             <tr><td colspan="2" class="tc-muted">No cash moved.</td></tr>
           <% end %>
           <% @report.sections[activity].each do |row| %>
-            <tr><td class="pl-6"><%= link_to row.account.code_with_name, account_path(row.account, year_id: @thru.root.id), class: "underline" %></td><td class="tc-num"><%= tc_money(row.amount) %></td></tr>
+            <tr><td class="pl-6"><%= link_to row.account.code_with_name, account_path(row.account, year_id: @thru.root_id), class: "underline" %></td><td class="tc-num"><%= tc_money(row.amount) %></td></tr>
           <% end %>
           <tr class="font-semibold"><td>Net cash from <%= activity %> activities</td><td class="tc-num" data-total="<%= activity %>"><%= tc_money(@report.total(activity)) %></td></tr>
         <% end %>
