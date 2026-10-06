@@ -1,0 +1,34 @@
+<%= tc_page_header "Banking", subtitle: "Import bank statements and match them to the books" %>
+
+<% if @accounts.empty? %>
+  <div class="tc-card tc-card-body text-center"><p class="tc-muted">Add a bank account (an asset account) first.</p></div>
+<% else %>
+  <div class="tc-card overflow-x-auto">
+    <table class="tc-table">
+      <thead><tr><th>Account</th><th class="tc-num">Statement lines</th><th>Last line</th><th class="tc-num">To match</th></tr></thead>
+      <tbody>
+        <% with_statements, others = @accounts.partition { |account| @statements.key?(account.id) } %>
+        <% with_statements.each do |account| %>
+          <tr>
+            <td><%= link_to account.code_with_name, banking_account_path(account), class: "underline" %></td>
+            <td class="tc-num"><%= @statements[account.id][:count] %></td>
+            <td><%= tc_date(@statements[account.id][:last]) %></td>
+            <td class="tc-num"><% if (count = @unmatched.fetch(account.id, 0)).positive? %><%= tc_badge count.to_s, tone: :warning %><% else %><%= tc_badge "All matched", tone: :success %><% end %></td>
+          </tr>
+        <% end %>
+        <% if with_statements.empty? %>
+          <tr><td colspan="4" class="tc-muted text-center">No statements imported yet.</td></tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+
+  <% if others.any? %>
+    <section class="tc-card tc-card-body mt-6" aria-labelledby="other-accounts">
+      <h2 id="other-accounts" class="tc-card-title mb-2">Reconcile another account</h2>
+      <ul class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+        <% others.each do |account| %><li><%= link_to account.code_with_name, banking_account_path(account), class: "underline" %></li><% end %>
+      </ul>
+    </section>
+  <% end %>
+<% end %>

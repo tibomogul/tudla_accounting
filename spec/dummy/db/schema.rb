@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_06_180000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_06_200000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -103,6 +103,35 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_180000) do
     t.string "name"
     t.datetime "updated_at", null: false
     t.index ["account_id"], name: "tudla_accounting_bank_account_balances_unique_key", unique: true
+  end
+
+  create_table "tudla_accounting_bank_matches", force: :cascade do |t|
+    t.bigint "bank_statement_line_id", null: false
+    t.datetime "created_at", null: false
+    t.bigint "detail_id", null: false
+    t.bigint "organization_id", null: false
+    t.string "organization_type", null: false
+    t.datetime "updated_at", null: false
+    t.index ["bank_statement_line_id"], name: "index_tudla_accounting_bank_matches_on_bank_statement_line_id"
+    t.index ["detail_id"], name: "index_tudla_accounting_bank_matches_on_detail_id", unique: true
+  end
+
+  create_table "tudla_accounting_bank_statement_lines", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "amount_cents", null: false
+    t.bigint "balance_cents"
+    t.datetime "created_at", null: false
+    t.string "currency", null: false
+    t.string "description", null: false
+    t.string "external_id", null: false
+    t.date "occurred_on", null: false
+    t.bigint "organization_id", null: false
+    t.string "organization_type", null: false
+    t.string "reference"
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "external_id"], name: "tudla_accounting_bank_statement_lines_unique_key", unique: true
+    t.index ["account_id", "occurred_on"], name: "idx_on_account_id_occurred_on_9c70487287"
+    t.check_constraint "amount_cents <> 0", name: "tudla_accounting_bank_statement_lines_amount_not_zero"
   end
 
   create_table "tudla_accounting_carrying_amount_forexes", force: :cascade do |t|
@@ -235,6 +264,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_180000) do
   add_foreign_key "tudla_accounting_balances", "tudla_accounting_accounts", column: "account_id"
   add_foreign_key "tudla_accounting_balances", "tudla_accounting_periods", column: "period_id"
   add_foreign_key "tudla_accounting_bank_account_balances", "tudla_accounting_accounts", column: "account_id"
+  add_foreign_key "tudla_accounting_bank_matches", "tudla_accounting_bank_statement_lines", column: "bank_statement_line_id"
+  add_foreign_key "tudla_accounting_bank_matches", "tudla_accounting_details", column: "detail_id"
+  add_foreign_key "tudla_accounting_bank_statement_lines", "tudla_accounting_accounts", column: "account_id"
   add_foreign_key "tudla_accounting_carrying_amount_forexes", "tudla_accounting_carrying_amounts", column: "carrying_amount_id"
   add_foreign_key "tudla_accounting_carrying_amounts", "tudla_accounting_details", column: "detail_id"
   add_foreign_key "tudla_accounting_details", "tudla_accounting_accounts", column: "account_id"

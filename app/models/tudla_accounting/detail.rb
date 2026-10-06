@@ -16,6 +16,7 @@ module TudlaAccounting
 
     has_one :foreign_exchange, class_name: "TudlaAccounting::ForeignExchange", dependent: :destroy
     has_one :carrying_amount, class_name: "TudlaAccounting::CarryingAmount", dependent: :destroy
+    has_one :bank_match, class_name: "TudlaAccounting::BankMatch", dependent: :destroy
 
     accepts_nested_attributes_for :foreign_exchange
 

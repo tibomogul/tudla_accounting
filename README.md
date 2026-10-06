@@ -62,6 +62,17 @@ The entry form has a Tax column once the organization has tax codes: the totals 
 
 `TaxReport.call(organization, from:, thru:)` (Reports → Tax summary) totals, per code, the amounts taxed and the tax for lines posted in that time: sales codes count credits up, purchases codes debits, so credit notes and reversals reduce their own side. `net_tax` is tax on sales less tax on purchases: owed when positive, a refund when negative.
 
+### Bank reconciliation
+`BankStatementImporter.call(account, path, date_order: :dmy)` imports a bank's CSV statement for an account as `BankStatementLine`s (money in positive, money out negative, in the account's currency). It finds columns by their usual headers: a date, a description, one signed amount or money in and out columns, and optionally a reference, the running balance and the bank's transaction id. Lines already imported are skipped, so overlapping statements can be imported safely.
+
+`BankReconciler.new(account)` matches statement lines to the posted ledger lines on the account (`BankMatch`; posted lines themselves are never changed):
+- `suggestions` pairs each unmatched statement line with an unmatched ledger line for the same amount within a week (the closest), and `match_suggestions!` matches them all.
+- `match!(line, ledger_lines)` matches one statement line to one or more ledger lines adding up to it; `unmatch!(line)` takes it off.
+- `create_entry!(line, account:)` posts an entry for something the books don't have yet (a bank fee, interest) against another account, dated with the statement line, and matches it.
+- `summary(as_of:)` shows whether the books agree with the bank: the book balance (opening balance plus posted lines), less ledger lines not on the statement, plus statement lines not in the books, against the balance on the latest statement line, and the difference.
+
+A foreign-currency account's ledger lines are compared by their foreign amount; it has no book balance in its own currency, and entries can't be created from its statement lines yet. Imports and matches are on the audit trail. The **Banking** page does all of this per account.
+
 ### Receivables and payables (carrying amounts)
 After posting, `CarryingAmountProcessor` keeps track of what's still owed. Posting an entry whose source is an invoice or bill opens a `CarryingAmount` on its receivable or payable line, with a due date and any foreign-currency amount. Posting a payment, disbursement or credit note opens a **credit** for the customer or supplier: a carrying amount on its line with a negative amount. If money moves through a bank account held in another currency (`BankAccountBalance`), that balance is updated in its own currency.
 
@@ -130,6 +141,7 @@ Mounted at `/accounting` by the install generator (see [Integration](#integratio
 - **Dashboard:** profit this year, what is owed each way, draft entries, recent entries, and a getting-started checklist.
 - **Accounts:** the chart of accounts as a tree with closing balances. Each account page shows monthly balances and a ledger with running balances. You can create, edit and delete unused accounts.
 - **Entries:** search and filter entries, write drafts with a line editor that keeps live debit/credit totals, post them, and reverse posted entries. A posted payment or credit note shows what it was applied to and what is left, with forms to apply it to the party's open invoices or bills (or oldest first) and to take an allocation off; an invoice or bill shows what was applied to it. Reversing a payment takes it off what it settled and reverses its realized exchange difference. An invoice or bill can be reversed once nothing is applied to it, which closes its receivable or payable.
+- **Banking:** import bank statements, see where the books and the bank stand on a date, match statement lines to the books (suggested matches in one click), post entries for bank fees and the like, and see what is in the books but not yet on a statement.
 - **Reports:** balance sheet, profit and loss, trial balance, receivables and payables aging, and a tax summary for a run of months.
 - **Periods:** create calendar or fiscal years, see each year's months, and close or reopen them (reopening asks for a reason).
 - **Setup:** upload a chart of accounts with opening balances (CSV or Excel), or enter or correct opening balances account by account, with live totals checking that they balance. Manage tax codes. Also import the receivables and payables open at the cut-over, and run the foreign exchange revaluation. A balance check compares the stored balances with the posted entries and can rebuild them.

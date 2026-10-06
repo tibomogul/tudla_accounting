@@ -34,7 +34,7 @@ module TudlaAccounting
       when nil, String then object
       when Entry then object.particulars
       when Account then object.code_with_name
-      when Period, Allocation, TaxCode then object.label
+      when Period, Allocation, TaxCode, BankStatementLine then object.label
       else
         %i[name email].each { |method| return object.public_send(method).to_s if object.respond_to?(method) && object.public_send(method).present? }
         "#{object.class.name} ##{object.id}"

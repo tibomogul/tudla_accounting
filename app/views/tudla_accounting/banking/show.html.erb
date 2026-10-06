@@ -1,0 +1,132 @@
+<%= tc_page_header @account.code_with_name, subtitle: "Bank reconciliation in #{@reconciler.currency}" do %>
+  <% if tc_can?(:post) && @suggestions.any? %>
+    <%= button_to "Match #{pluralize(@suggestions.size, 'suggestion')}", banking_match_suggestions_path(@account), class: "tc-btn" %>
+  <% end %>
+<% end %>
+
+<% money = ->(value) { value.nil? ? "—" : tc_money(value) } %>
+<section class="tc-card tc-card-body mb-6" aria-labelledby="summary-heading">
+  <div class="flex flex-wrap items-end justify-between gap-3 mb-3">
+    <h2 id="summary-heading" class="tc-card-title">As at <%= tc_date(@as_of) %></h2>
+    <%= form_with url: banking_account_path(@account), method: :get, class: "flex items-end gap-2" do |form| %>
+      <div><%= form.label :as_of, "As at", class: "tc-label" %><%= form.date_field :as_of, value: @as_of, class: "tc-input" %></div>
+      <%= form.submit "Show", class: "tc-btn tc-btn-secondary", name: nil %>
+    <% end %>
+  </div>
+  <dl class="grid gap-y-2 max-w-xl text-sm">
+    <% [ [ "Balance in the books", :book_balance ], [ "Less: in the books, not on the statement", :unmatched_ledger ],
+         [ "Add: on the statement, not in the books", :unmatched_statement ], [ "The statement should show", :expected_statement_balance ] ].each do |label, key| %>
+      <div class="flex justify-between gap-4"><dt class="tc-muted"><%= label %></dt><dd class="tc-num" data-total="<%= key %>"><%= money.call(@summary[key]) %></dd></div>
+    <% end %>
+    <div class="flex justify-between gap-4">
+      <dt class="tc-muted">The statement shows<%= " (#{tc_date(@summary[:statement_balance_on])})" if @summary[:statement_balance_on] %></dt>
+      <dd class="tc-num" data-total="statement_balance"><%= money.call(@summary[:statement_balance]) %></dd>
+    </div>
+  </dl>
+  <p class="mt-3">
+    <% if @summary[:difference].nil? %>
+      <span class="tc-hint"><%= @summary[:book_balance] ? "Import a statement with balances to compare with the bank." : "The books keep this account in #{accounting_organization.currency}, so only what is unmatched can be compared." %></span>
+    <% elsif @summary[:difference].zero? %>
+      <%= tc_badge "Reconciled: the books agree with the bank", tone: :success %>
+    <% else %>
+      <%= tc_badge "Out by #{@summary[:difference].format(symbol: false)}", tone: :danger %>
+    <% end %>
+  </p>
+</section>
+
+<% if tc_can?(:post) %>
+  <%= form_with url: banking_import_path(@account), multipart: true, class: "tc-card tc-card-body mb-6 grid gap-3 sm:grid-cols-4 items-end" do |form| %>
+    <div class="sm:col-span-2"><%= form.label :file, "Statement (CSV)", class: "tc-label" %><%= form.file_field :file, accept: ".csv", class: "tc-input", required: true %></div>
+    <div><%= form.label :date_order, "Dates are", class: "tc-label" %>
+      <%= form.select :date_order, [ [ "Day/month/year", "dmy" ], [ "Month/day/year", "mdy" ] ], {}, class: "tc-input" %></div>
+    <div><%= form.submit "Import statement", class: "tc-btn" %></div>
+    <p class="tc-hint sm:col-span-4">Columns: Date, Description, and Amount (or money in and money out); optionally Reference, Balance and the bank's Id. Lines already imported are skipped.</p>
+  <% end %>
+<% end %>
+
+<section class="tc-card mb-6" aria-labelledby="lines-heading">
+  <div class="tc-card-body pb-0 flex flex-wrap items-baseline justify-between gap-2">
+    <h2 id="lines-heading" class="tc-card-title"><%= @show_all ? "Statement lines" : "Statement lines to match" %></h2>
+    <%= link_to (@show_all ? "Show only those to match" : "Show all"), banking_account_path(@account, show: (@show_all ? nil : "all")), class: "underline text-sm" %>
+  </div>
+  <% if @page.total_count.zero? %>
+    <p class="tc-card-body tc-muted text-sm"><%= @reconciler.statement_lines.none? ? "No statement imported yet." : "Every statement line is matched." %></p>
+  <% else %>
+    <div class="overflow-x-auto">
+      <table class="tc-table">
+        <thead><tr><th>Date</th><th>Description</th><th class="tc-num">Amount</th><th>In the books</th></tr></thead>
+        <tbody>
+          <% @page.records.each do |line| %>
+            <tr id="<%= dom_id(line) %>">
+              <td class="whitespace-nowrap"><%= tc_date(line.occurred_on) %></td>
+              <td><%= line.description %><% if line.reference %> <span class="tc-muted text-xs"><%= line.reference %></span><% end %></td>
+              <td class="tc-num"><%= tc_money(line.amount) %></td>
+              <td>
+                <% if line.matched? %>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <% line.details.each do |detail| %><%= link_to detail.entry.particulars, entry_path(detail.entry), class: "underline" %><% end %>
+                    <% if tc_can?(:post) %><%= button_to "Unmatch", unmatch_bank_statement_line_path(line, show: params[:show]), class: "tc-btn tc-btn-ghost tc-btn-sm" %><% end %>
+                  </div>
+                <% elsif (suggested = @suggestions[line]) %>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="tc-muted text-sm">Suggested: <%= link_to "#{suggested.entry.particulars} (#{tc_date(suggested.entry.posted_at)})", entry_path(suggested.entry), class: "underline" %></span>
+                    <% if tc_can?(:post) %><%= button_to "Match", match_bank_statement_line_path(line, show: params[:show]), params: { "detail_ids[]" => suggested.id }, class: "tc-btn tc-btn-secondary tc-btn-sm" %><% end %>
+                  </div>
+                <% elsif tc_can?(:post) %>
+                  <details>
+                    <summary class="cursor-pointer text-sm underline">Match or record it</summary>
+                    <div class="mt-2 space-y-3">
+                      <% candidates = @unmatched_ledger.select { |detail| @reconciler.bank_cents(detail) && (@reconciler.bank_cents(detail) <=> 0) == (line.amount_cents <=> 0) } %>
+                      <% if candidates.any? %>
+                        <%= form_with url: match_bank_statement_line_path(line, show: params[:show]), class: "flex flex-wrap items-end gap-2" do |form| %>
+                          <div><%= form.label "detail_ids_#{line.id}", "Ledger lines that add up to it", class: "tc-label" %>
+                            <%= select_tag "detail_ids[]", options_for_select(candidates.map { |detail| [ "#{tc_date(detail.entry.posted_at)} #{detail.entry.particulars} #{Money.new(@reconciler.bank_cents(detail), @reconciler.currency).format(symbol: false)}", detail.id ] }),
+                                           multiple: true, id: "detail_ids_#{line.id}", class: "tc-input min-w-72", size: [ candidates.size, 4 ].min %></div>
+                          <%= form.submit "Match", class: "tc-btn tc-btn-secondary tc-btn-sm" %>
+                        <% end %>
+                      <% end %>
+                      <% unless @reconciler.foreign? %>
+                        <%= form_with url: create_entry_bank_statement_line_path(line, show: params[:show]), class: "flex flex-wrap items-end gap-2" do |form| %>
+                          <div><%= form.label "counter_account_id_#{line.id}", (line.amount_cents.positive? ? "Record it as received from" : "Record it as spent on"), class: "tc-label" %>
+                            <%= select_tag :counter_account_id, options_for_select(@other_accounts.map { |account| [ account.code_with_name, account.id ] }), id: "counter_account_id_#{line.id}", class: "tc-input" %></div>
+                          <div><%= form.label "particulars_#{line.id}", "Particulars", class: "tc-label" %>
+                            <%= text_field_tag :particulars, line.description, id: "particulars_#{line.id}", class: "tc-input" %></div>
+                          <%= form.submit "Post entry", class: "tc-btn tc-btn-secondary tc-btn-sm" %>
+                        <% end %>
+                      <% end %>
+                    </div>
+                  </details>
+                <% else %>
+                  <span class="tc-muted text-sm">Not matched</span>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+    <%= render "tudla_accounting/shared/pagination", paginator: @page %>
+  <% end %>
+</section>
+
+<section class="tc-card" aria-labelledby="ledger-heading">
+  <h2 id="ledger-heading" class="tc-card-title tc-card-body pb-0">In the books, not on a statement</h2>
+  <% if @unmatched_ledger.empty? %>
+    <p class="tc-card-body tc-muted text-sm">Nothing: every posted line is matched.</p>
+  <% else %>
+    <div class="overflow-x-auto">
+      <table class="tc-table">
+        <thead><tr><th>Posted</th><th>Entry</th><th class="tc-num">Amount</th></tr></thead>
+        <tbody>
+          <% @unmatched_ledger.each do |detail| %>
+            <tr>
+              <td class="whitespace-nowrap"><%= tc_date(detail.entry.posted_at) %></td>
+              <td><%= link_to detail.entry.particulars, entry_path(detail.entry), class: "underline" %></td>
+              <td class="tc-num"><%= (cents = @reconciler.bank_cents(detail)) ? tc_money(Money.new(cents, @reconciler.currency)) : tag.span("no #{@reconciler.currency} amount", class: "tc-muted") %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+</section>

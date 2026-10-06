@@ -32,6 +32,20 @@ TudlaAccounting::Engine.routes.draw do
 
   resources :tax_codes, except: :show
 
+  get "banking", to: "banking#index", as: :banking
+  scope "banking/:account_id", controller: :banking, as: :banking do
+    get "", action: :show, as: :account
+    post :import
+    post :match_suggestions
+  end
+  resources :bank_statement_lines, only: [] do
+    member do
+      post :match
+      post :unmatch
+      post :create_entry
+    end
+  end
+
   resources :allocations, only: :create do
     collection { post :oldest_first }
     member { post :reverse }

@@ -2,7 +2,8 @@ module TudlaAccounting
   module ActivityHelper
     ACTIVITY_KINDS = { "entry" => "Entries", "account" => "Accounts", "period" => "Periods",
                        "opening_balances" => "Opening balances", "balances" => "Balance rebuilds",
-                       "allocation" => "Payments applied", "tax_code" => "Tax codes" }.freeze
+                       "allocation" => "Payments applied", "tax_code" => "Tax codes",
+                       "bank_statement" => "Statement imports", "bank_line" => "Bank matches" }.freeze
 
     # What an audit event did, in words, linking to its subject while it still exists.
     def activity_description(event)
@@ -25,6 +26,9 @@ module TudlaAccounting
       when "tax_code.created" then safe_join([ "Added the tax code ", subject ])
       when "tax_code.updated" then safe_join([ "Changed ", subject, ": #{details.fetch('changes', {}).keys.map(&:humanize).join(', ').downcase}" ])
       when "tax_code.deleted" then safe_join([ "Deleted the tax code ", subject ])
+      when "bank_statement.imported" then safe_join([ "Imported a statement for ", subject, ": #{pluralize(details['imported'], 'line')} new, #{details['skipped']} already there" ])
+      when "bank_line.matched" then safe_join([ "Matched the statement line ", subject ])
+      when "bank_line.unmatched" then safe_join([ "Unmatched the statement line ", subject ])
       when "balances.rebuilt" then "Rebuilt the balances: #{pluralize(details['corrected'], 'balance')} corrected"
       end
     end
@@ -44,6 +48,7 @@ module TudlaAccounting
       when Entry.name then (entry_path(event.subject_id) if Entry.exists?(event.subject_id))
       when Account.name then (account_path(event.subject_id) if Account.exists?(event.subject_id))
       when Period.name then (period_path(Period.find(event.subject_id).root) if Period.exists?(event.subject_id))
+      when BankStatementLine.name then (banking_account_path(BankStatementLine.find(event.subject_id).account_id, show: "all") if BankStatementLine.exists?(event.subject_id))
       when TaxCode.name then (edit_tax_code_path(event.subject_id) if TaxCode.exists?(event.subject_id))
       when Allocation.name then entry_path(Allocation.find(event.subject_id).from.detail.entry_id)
       end
