@@ -185,6 +185,41 @@ RSpec.describe "Bank reconciliation", type: :service do
     end
   end
 
+  describe "posting entries for a foreign-currency account" do
+    let(:eur) { TudlaAccounting::BankReconciler.new(account("1001")) }
+
+    before do
+      TudlaAccounting::AccountsCreator.call([ { code: "1101", name: "Receivables EUR", category: "asset", currency: "EUR" } ], organization)
+      import(<<~CSV, into: account("1001"))
+        Date,Description,Amount
+        2026-03-10,Bank fee,-12.00
+        2026-03-11,Customer paid,100.00
+      CSV
+    end
+
+    def line(description) = TudlaAccounting::BankStatementLine.find_by!(description: description)
+    def lines(entry) = entry.details.map { |d| [ d.account.code, d.tally, d.amount_cents, d.foreign_exchange&.other_currency_cents, d.foreign_exchange&.rate ] }
+
+    it "converts at a given rate, the bank line carrying the statement amount, and matches it" do
+      fee = eur.create_entry!(line("Bank fee"), account: account("6100"), rate: "1.6")
+      expect(lines(fee)).to contain_exactly([ "1001", "credit", 19_20, 12_00, BigDecimal("1.6") ], [ "6100", "debit", 19_20, nil, nil ])
+      expect(line("Bank fee").details).to eq([ fee.details.find { |d| d.account.code == "1001" } ])
+    end
+
+    it "uses the provider's rate for the day, and gives the other line the foreign amount too when it is held in the same currency" do
+      TudlaAccounting::ForexRate.create!(from: "EUR", to: "AUD", year: 2026, month: 3, day: 11, rate: BigDecimal("1.65"))
+      paid = eur.create_entry!(line("Customer paid"), account: account("1101"))
+      expect(lines(paid)).to contain_exactly([ "1001", "debit", 165_00, 100_00, BigDecimal("1.65") ], [ "1101", "credit", 165_00, 100_00, BigDecimal("1.65") ])
+    end
+
+    it "explains when it has no rate, or a bad one" do
+      expect { eur.create_entry!(line("Bank fee"), account: account("6100")) }.to raise_error(ArgumentError, "No EUR rate for 10 Mar 2026; enter one")
+      expect { eur.create_entry!(line("Bank fee"), account: account("6100"), rate: "lots") }.to raise_error(ArgumentError, "The rate lots isn't a number")
+      expect { eur.create_entry!(line("Bank fee"), account: account("6100"), rate: "0") }.to raise_error(ArgumentError, "The rate must be more than zero")
+      expect(line("Bank fee")).not_to be_matched
+    end
+  end
+
   describe "a foreign-currency account" do
     let(:eur) { TudlaAccounting::BankReconciler.new(account("1001")) }
 
@@ -198,7 +233,6 @@ RSpec.describe "Bank reconciliation", type: :service do
       expect(eur.suggestions.values).to eq([ received ])
       line = TudlaAccounting::BankStatementLine.sole
       expect { eur.match!(line, [ bare ]) }.to raise_error(ArgumentError, "A ledger line has no EUR amount to compare")
-      expect { eur.create_entry!(line, account: account("3000")) }.to raise_error(ArgumentError, "Entries can only be created for an account in AUD")
       expect(eur.summary(as_of: Date.new(2026, 3, 31))).to include(book_balance: nil, unmatched_statement: Money.new(100_00, "EUR"), difference: nil)
     end
   end

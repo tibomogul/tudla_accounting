@@ -85,14 +85,16 @@
                           <%= form.submit "Match", class: "tc-btn tc-btn-secondary tc-btn-sm" %>
                         <% end %>
                       <% end %>
-                      <% unless @reconciler.foreign? %>
-                        <%= form_with url: create_entry_bank_statement_line_path(line, show: params[:show]), class: "flex flex-wrap items-end gap-2" do |form| %>
-                          <div><%= form.label "counter_account_id_#{line.id}", (line.amount_cents.positive? ? "Record it as received from" : "Record it as spent on"), class: "tc-label" %>
-                            <%= select_tag :counter_account_id, options_for_select(@other_accounts.map { |account| [ account.code_with_name, account.id ] }), id: "counter_account_id_#{line.id}", class: "tc-input" %></div>
-                          <div><%= form.label "particulars_#{line.id}", "Particulars", class: "tc-label" %>
-                            <%= text_field_tag :particulars, line.description, id: "particulars_#{line.id}", class: "tc-input" %></div>
-                          <%= form.submit "Post entry", class: "tc-btn tc-btn-secondary tc-btn-sm" %>
+                      <%= form_with url: create_entry_bank_statement_line_path(line, show: params[:show]), class: "flex flex-wrap items-end gap-2" do |form| %>
+                        <div><%= form.label "counter_account_id_#{line.id}", (line.amount_cents.positive? ? "Record it as received from" : "Record it as spent on"), class: "tc-label" %>
+                          <%= select_tag :counter_account_id, options_for_select(@other_accounts.map { |account| [ account.code_with_name, account.id ] }), id: "counter_account_id_#{line.id}", class: "tc-input" %></div>
+                        <div><%= form.label "particulars_#{line.id}", "Particulars", class: "tc-label" %>
+                          <%= text_field_tag :particulars, line.description, id: "particulars_#{line.id}", class: "tc-input" %></div>
+                        <% if @reconciler.foreign? %>
+                          <div><%= form.label "rate_#{line.id}", "Rate (#{accounting_organization.currency} per #{@reconciler.currency})", class: "tc-label" %>
+                            <%= text_field_tag :rate, nil, id: "rate_#{line.id}", class: "tc-input w-32", inputmode: "decimal", placeholder: "From the provider" %></div>
                         <% end %>
+                        <%= form.submit "Post entry", class: "tc-btn tc-btn-secondary tc-btn-sm" %>
                       <% end %>
                     </div>
                   </details>

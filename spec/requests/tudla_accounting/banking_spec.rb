@@ -153,6 +153,22 @@ RSpec.describe "Banking", type: :request do
     end
   end
 
+  it "posts an entry for a foreign-currency account's statement line at the rate given" do
+    TudlaAccounting::BankStatementLine.create!(organization: organization, account: account("1001"), occurred_on: Date.new(2026, 3, 10), description: "Fee",
+                                               amount_cents: -10_00, currency: "EUR", external_id: "f")
+    get routes.banking_account_path(account("1001"))
+    expect(css_select("label").map(&:text)).to include("Rate (AUD per EUR)")
+
+    post routes.create_entry_bank_statement_line_path(TudlaAccounting::BankStatementLine.sole), params: { counter_account_id: account("6100").id, rate: "1.5" }
+    expect(flash[:notice]).to eq("Posted Fee and matched it.")
+    expect(TudlaAccounting::Entry.last.details.map(&:amount_cents)).to eq([ 15_00, 15_00 ])
+
+    other = TudlaAccounting::BankStatementLine.create!(organization: organization, account: account("1001"), occurred_on: Date.new(2026, 3, 11), description: "Fee 2",
+                                                       amount_cents: -10_00, currency: "EUR", external_id: "g")
+    post routes.create_entry_bank_statement_line_path(other), params: { counter_account_id: account("6100").id }
+    expect(flash[:alert]).to eq("No entry was posted: no EUR rate for 11 Mar 2026; enter one.")
+  end
+
   it "compares only what is unmatched for a foreign-currency account" do
     get routes.banking_account_path(account("1001"))
     expect(response.body).to include("only what is unmatched can be compared", "Bank reconciliation in EUR")

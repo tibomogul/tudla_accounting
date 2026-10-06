@@ -110,17 +110,31 @@ module TudlaAccounting
 
     # Posts an entry for a statement line the books don't have yet (a bank fee, interest),
     # between the bank account and another account, dated with the line, and matches it.
-    def create_entry!(line, account:, particulars: nil)
-      raise ArgumentError, "Entries can only be created for an account in #{@organization.currency}" if foreign?
+    #
+    # For an account held in a foreign currency the entry is in the organization's
+    # currency, converted at rate (units of the organization's currency per unit of the
+    # account's; by default the forex rate provider's rate for the line's date), and the
+    # bank line carries the statement amount as its foreign amount, as does the other line
+    # when its account is held in the same currency.
+    def create_entry!(line, account:, particulars: nil, rate: nil)
       raise ArgumentError, "Choose another account than the bank account" if account == self.account
       raise ArgumentError, "That statement line is matched already" if line.matched?
+
+      foreign_cents = line.amount_cents.abs
+      rate = foreign? ? rate_for(line, rate) : nil
+      cents = rate ? Money.from_amount(BigDecimal(foreign_cents) / 100 * rate, @organization.currency).cents : foreign_cents
 
       ActiveRecord::Base.transaction do
         at = ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].local(line.occurred_on.year, line.occurred_on.month, line.occurred_on.day)
         money_in = line.amount_cents.positive?
         entry = Entry.new(organization: @organization, transacted_at: at, particulars: particulars.presence || line.description)
-        entry.details.build(account: self.account, tally: money_in ? Detail::TALLY_DEBIT : Detail::TALLY_CREDIT, amount_cents: line.amount_cents.abs, currency: currency)
-        entry.details.build(account: account, tally: money_in ? Detail::TALLY_CREDIT : Detail::TALLY_DEBIT, amount_cents: line.amount_cents.abs, currency: currency)
+        [ [ self.account, money_in ], [ account, !money_in ] ].each do |each_account, debit|
+          detail = entry.details.build(account: each_account, tally: debit ? Detail::TALLY_DEBIT : Detail::TALLY_CREDIT, amount_cents: cents,
+                                       currency: @organization.currency)
+          if rate && each_account.currency == self.account.currency
+            detail.build_foreign_exchange(other_currency: currency, other_currency_cents: foreign_cents, rate: rate)
+          end
+        end
         entry.save!
         entry.post(at)
         match!(line, [ entry.details.find { |detail| detail.account_id == self.account.id } ])
@@ -157,6 +171,23 @@ module TudlaAccounting
       posted = Detail.joins(:entry).where(account: account).where(tudla_accounting_entries: { posted_at: ..end_of(as_of) })
         .group(:tally).sum(:amount_cents)
       opening + posted.fetch(Detail::TALLY_DEBIT, 0) - posted.fetch(Detail::TALLY_CREDIT, 0)
+    end
+
+    # The rate given (units of the organization's currency per unit of the account's), or
+    # the provider's for the line's date.
+    def rate_for(line, given)
+      return ForexRateRetriever.call(from: currency, to: @organization.currency, date: line.occurred_on) if given.blank?
+
+      rate = begin
+        BigDecimal(given.to_s.strip)
+      rescue ArgumentError
+        raise ArgumentError, "The rate #{given} isn't a number"
+      end
+      raise ArgumentError, "The rate must be more than zero" unless rate.positive?
+
+      rate
+    rescue ForexRateRetriever::RateNotFound
+      raise ArgumentError, "No #{currency} rate for #{line.occurred_on.strftime('%-d %b %Y')}; enter one"
     end
 
     def days_apart(line, detail)

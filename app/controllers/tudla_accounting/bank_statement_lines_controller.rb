@@ -23,7 +23,7 @@ module TudlaAccounting
 
     def create_entry
       account = organization_scope(Account).find(params.require(:counter_account_id))
-      entry = @reconciler.create_entry!(@line, account: account, particulars: params[:particulars])
+      entry = @reconciler.create_entry!(@line, account: account, particulars: params[:particulars], rate: params[:rate])
       done "Posted #{entry.particulars} and matched it."
     rescue ArgumentError, ActiveRecord::RecordInvalid, ActionController::ParameterMissing => e
       done alert: "No entry was posted: #{e.message.downcase_first}."
