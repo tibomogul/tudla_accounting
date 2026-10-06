@@ -67,4 +67,26 @@ RSpec.describe "Entering a journal entry", type: :system do
     expect(page).to have_content("Draft entry saved.")
     expect(TudlaAccounting::Entry.find_by(particulars: "Capital").details.map { |detail| detail.account.code }).to contain_exactly("1010", "4000")
   end
+
+  it "adds the tax on taxed lines to the totals, or splits it out of amounts that include it" do
+    gst = TudlaAccounting::Account.create!(organization: organization, code: "2200", name: "GST", category: "liability")
+    TudlaAccounting::TaxCode.create!(organization: organization, code: "GST", name: "GST on sales", rate: "0.1", kind: :sales, account: gst)
+    visit "/tudla_accounting/entries/new"
+
+    fill_in "Particulars", with: "Taxed sale"
+    within(line(0)) { select "1010 - Cash", from: "Account"; fill_in "Debit", with: "110" }
+    within(line(1)) { select "4000 - Sales", from: "Account"; fill_in "Credit", with: "100"; select "GST (10%)", from: "Tax" }
+    expect(page).to have_css("[data-entry-lines-target=creditTax]", text: "10.00")
+    expect(status).to eq("Balanced: debits equal credits (110.00).")
+
+    within(line(1)) { fill_in "Credit", with: "110" }
+    expect(status).to eq("Not balanced: credits are 11.00 more.")
+    check "Amounts on taxed lines include the tax"
+    expect(status).to eq("Balanced: debits equal credits (110.00).")
+
+    click_button "Save draft"
+    expect(page).to have_content("Draft entry saved.")
+    expect(TudlaAccounting::Entry.find_by(particulars: "Taxed sale").details.map { |d| [ d.account.code, d.amount_cents ] })
+      .to contain_exactly([ "1010", 110_00 ], [ "4000", 100_00 ], [ "2200", 10_00 ])
+  end
 end

@@ -1,4 +1,4 @@
-<%# locals: (detail:, index:, account_options:) %>
+<%# locals: (detail:, index:, account_options:, tax_options:) %>
 <% name = ->(field) { "entry[lines][#{index}][#{field}]" } %>
 <tr data-entry-lines-target="line" <%= "hidden" if detail.marked_for_destruction? %>>
   <td class="min-w-64">
@@ -11,6 +11,10 @@
                          aria: { label: "Debit" }, data: { entry_lines_target: "debit", action: "input->entry-lines#recalculate" } %></td>
   <td><%= text_field_tag name.call(:credit), entry_line_amount(detail, "credit"), inputmode: "decimal", class: "tc-input tc-num",
                          aria: { label: "Credit" }, data: { entry_lines_target: "credit", action: "input->entry-lines#recalculate" } %></td>
+  <% if tax_options.any? %>
+    <td><%= select_tag name.call(:tax_code_id), options_for_select(tax_options, detail.tax_code_id), include_blank: "No tax", class: "tc-input",
+                       aria: { label: "Tax" }, data: { entry_lines_target: "tax", action: "change->entry-lines#recalculate" } %></td>
+  <% end %>
   <td class="text-right">
     <button type="button" class="tc-btn tc-btn-ghost tc-btn-sm" data-action="entry-lines#remove" aria-label="Remove line">✕</button>
   </td>

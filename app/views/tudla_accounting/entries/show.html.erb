@@ -30,6 +30,9 @@
         <tr>
           <td>
             <%= link_to line.account.code_with_name, account_path(line.account) %>
+            <% if line.tax_code %>
+              <span class="tc-muted text-xs ml-2" data-tax="<%= line.tax_role %>"><%= line.tax_tax? ? "#{line.tax_code.code} tax" : "taxed #{line.tax_code.label}" %></span>
+            <% end %>
             <% if line.foreign_exchange %>
               <span class="tc-muted text-xs ml-2"><%= line.foreign_exchange.foreign_amount.format %> at <%= line.foreign_exchange.rate.to_s("F") %></span>
             <% end %>

@@ -58,6 +58,8 @@ Who acted comes from `TudlaAccounting::Current.actor`: the engine's pages set it
 
 In `Entry.create_from_ruby_hash`, a line with `tax_code: "GST"` is taxed: its amount excludes the tax, and a line for the tax is added on the code's account, on the same side, so the other lines must include it (e.g. receivable 110, sales 100 with GST). With `tax_inclusive: true` (on the line or the whole hash) the amount includes the tax and is split instead, leaving the totals unchanged. Taxed lines and tax lines are tagged with the code (`tax_role` base or tax), and reversals keep the tags. Foreign-currency lines can't be taxed yet.
 
+The entry form has a Tax column once the organization has tax codes: the totals and the balanced check include the tax as amounts are typed (or, with "amounts include the tax", split it out), and saving adds one tax line per code and side, replacing the ones saved before.
+
 `TaxReport.call(organization, from:, thru:)` (Reports → Tax summary) totals, per code, the amounts taxed and the tax for lines posted in that time: sales codes count credits up, purchases codes debits, so credit notes and reversals reduce their own side. `net_tax` is tax on sales less tax on purchases: owed when positive, a refund when negative.
 
 ### Receivables and payables (carrying amounts)

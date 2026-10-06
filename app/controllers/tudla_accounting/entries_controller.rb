@@ -81,7 +81,7 @@ module TudlaAccounting
     end
 
     def set_entry
-      @entry = organization_scope(Entry).includes(details: %i[account foreign_exchange carrying_amount]).find(params[:id])
+      @entry = organization_scope(Entry).includes(details: %i[account foreign_exchange carrying_amount tax_code]).find(params[:id])
     end
 
     def require_draft
@@ -96,7 +96,7 @@ module TudlaAccounting
     # The form's lines, with separate debit and credit columns, as detail attributes, and
     # anything wrong with them that the model can't tell (e.g. both columns filled in).
     def entry_attributes
-      permitted = params.require(:entry).permit(:particulars, :transacted_at, lines: %i[id account_id debit credit _destroy])
+      permitted = params.require(:entry).permit(:particulars, :transacted_at, :tax_inclusive, lines: %i[id account_id debit credit tax_code_id _destroy])
       currency = accounting_organization.currency
       problems = []
       rows = permitted.fetch(:lines, {}).to_h.values
@@ -111,11 +111,36 @@ module TudlaAccounting
           account_id: (organization_scope(Account).find(line[:account_id]).id if line[:account_id].present?),
           tally: (credit && !debit ? Detail::TALLY_CREDIT : Detail::TALLY_DEBIT),
           amount_cents: (debit || credit).to_i, currency: currency }.compact
+          .merge(tax_code_id: line[:tax_code_id].presence, tax_role: nil) # tagged by tax_lines
       end
+      lines += tax_lines(lines, permitted[:tax_inclusive] == "1", currency)
 
       attributes = { particulars: permitted[:particulars], details_attributes: lines,
                      transacted_at: (day_start(permitted[:transacted_at]) if permitted[:transacted_at].present?) }
       [ attributes, problems ]
+    end
+
+    # Tags the taxed lines and works out their tax: a line for each tax code and side, on
+    # the code's account, replacing the tax lines saved before. With inclusive, the typed
+    # amounts include the tax, which is taken out of them.
+    def tax_lines(lines, inclusive, currency)
+      codes = organization_scope(TaxCode).where(id: lines.filter_map { |line| line[:tax_code_id] }).index_by { |code| code.id.to_s }
+      taxes = Hash.new(0)
+      lines.each do |line|
+        next unless line[:tax_code_id]
+
+        code = codes.fetch(line[:tax_code_id].to_s) { raise ActiveRecord::RecordNotFound }
+        line[:tax_role] = :base
+        next if line[:_destroy] == "1"
+
+        tax = code.tax_cents(line[:amount_cents], inclusive: inclusive)
+        line[:amount_cents] -= tax if inclusive
+        taxes[[ code, line[:tally] ]] += tax if tax.positive?
+      end
+      replaced = @entry&.persisted? ? @entry.details.select(&:tax_tax?).map { |detail| { id: detail.id, _destroy: "1" } } : []
+      replaced + taxes.map do |(code, tally), cents|
+        { account_id: code.account_id, tally: tally, amount_cents: cents, currency: currency, tax_code_id: code.id, tax_role: :tax }
+      end
     end
 
     # Cents for a typed amount ("1,234.50"), nil when blank; yields when it isn't a number.

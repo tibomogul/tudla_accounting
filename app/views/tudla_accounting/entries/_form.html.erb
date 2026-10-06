@@ -1,6 +1,8 @@
 <%# locals: (entry:) %>
 <% currency = Money::Currency.new(accounting_organization.currency) %>
 <% account_options = organization_accounts.map { |account| [ account.code_with_name, account.id ] } %>
+<% tax_options = entry_tax_options(entry) %>
+<% lines = entry.details.reject(&:tax_tax?) # tax lines are worked out from the taxed lines on save %>
 <%= form_with model: entry, scope: :entry, url: (entry.persisted? ? entry_path(entry) : entries_path),
               class: "space-y-4", data: { controller: "entry-lines", entry_lines_exponent_value: currency.exponent } do |form| %>
   <% if entry.errors.any? %>
@@ -20,29 +22,43 @@
   <div class="tc-card overflow-x-auto">
     <table class="tc-table">
       <thead>
-        <tr><th>Account</th><th class="tc-num">Debit (<%= currency.iso_code %>)</th><th class="tc-num">Credit (<%= currency.iso_code %>)</th><th><span class="sr-only">Remove</span></th></tr>
+        <tr><th>Account</th><th class="tc-num">Debit (<%= currency.iso_code %>)</th><th class="tc-num">Credit (<%= currency.iso_code %>)</th><% if tax_options.any? %><th>Tax</th><% end %><th><span class="sr-only">Remove</span></th></tr>
       </thead>
       <tbody data-entry-lines-target="lines">
-        <% entry.details.each_with_index do |detail, index| %>
-          <%= render "line", detail: detail, index: index, account_options: account_options %>
+        <% lines.each_with_index do |detail, index| %>
+          <%= render "line", detail: detail, index: index, account_options: account_options, tax_options: tax_options %>
         <% end %>
       </tbody>
       <tfoot>
+        <% if tax_options.any? %>
+          <tr class="tc-muted" data-entry-lines-target="taxRow">
+            <td>Tax, added on save</td>
+            <td class="tc-num" data-entry-lines-target="debitTax"></td>
+            <td class="tc-num" data-entry-lines-target="creditTax"></td>
+            <td colspan="2"></td>
+          </tr>
+        <% end %>
         <tr class="font-semibold">
           <td>
             <button type="button" class="tc-btn tc-btn-secondary tc-btn-sm" data-action="entry-lines#add">Add line</button>
           </td>
           <td class="tc-num" data-entry-lines-target="debitTotal"></td>
           <td class="tc-num" data-entry-lines-target="creditTotal"></td>
-          <td></td>
+          <td <%= %(colspan="2") if tax_options.any? %>></td>
         </tr>
       </tfoot>
     </table>
   </div>
   <p data-entry-lines-target="status" aria-live="polite" class="text-sm"></p>
+  <% if tax_options.any? %>
+    <label class="flex items-center gap-2 text-sm">
+      <%= check_box_tag "entry[tax_inclusive]", "1", false, data: { entry_lines_target: "inclusive", action: "change->entry-lines#recalculate" } %>
+      Amounts on taxed lines include the tax (it is split out on save)
+    </label>
+  <% end %>
 
   <template data-entry-lines-target="template">
-    <%= render "line", detail: TudlaAccounting::Detail.new, index: "NEW_LINE", account_options: account_options %>
+    <%= render "line", detail: TudlaAccounting::Detail.new, index: "NEW_LINE", account_options: account_options, tax_options: tax_options %>
   </template>
 
   <div class="flex gap-2">
