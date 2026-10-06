@@ -108,6 +108,15 @@ RSpec.describe "General ledger and cash flow pages", type: :request do
         expect(css_select("#cash_account_ids option[selected]").map(&:text)).to eq([ "1010 - Bank" ])
       end
 
+      it "shows the indirect method, starting from net profit" do
+        get routes.reports_cash_flow_path(cash_account_ids: [ account("1010").id ], from_id: month(1).id, thru_id: month(2).id, method: "indirect")
+        expect(response.body).to include("1 Jan 2026 to 28 Feb 2026, indirect method", "The change in cash is fully explained")
+        operating = css_select("#flow-operating").first.ancestors("table").first
+        expect(operating.text.squish).to include("Net profit 250.00")
+        expect([ total("operating"), total("investing"), total("financing"), total("net_change") ]).to eq([ "250.00", "(400.00)", "1,000.00", "850.00" ])
+        expect(css_select("#method option[selected]").text).to eq("Indirect")
+      end
+
       it "takes chosen cash accounts and months" do
         get routes.reports_cash_flow_path(cash_account_ids: [ account("1010").id ], from_id: month(2).id, thru_id: month(2).id)
         expect([ total("opening"), total("net_change"), total("closing") ]).to eq([ "1,000.00", "(150.00)", "850.00" ])

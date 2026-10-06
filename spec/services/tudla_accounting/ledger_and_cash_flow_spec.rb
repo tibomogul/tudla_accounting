@@ -101,6 +101,26 @@ RSpec.describe "General ledger and cash flow", type: :service do
       expect(result).to be_reconciles
     end
 
+    it "starts from net profit and adjusts for balance-sheet changes on the indirect method, arriving at the same totals" do
+      direct = flow(cash_accounts: [ account("1010") ])
+      indirect = TudlaAccounting::Reports::CashFlow.new(organization, from: month(1), thru: month(3), cash_accounts: [ account("1010") ], method: :indirect)
+
+      expect(indirect.flow_method).to eq(:indirect)
+      expect(indirect.sections.transform_values { |rows| rows.map { |r| [ r.label || r.account.code, r.amount ] } }).to eq(
+        "operating" => [ [ "Net profit", aud(400) ], [ "1100", aud(-50) ] ], # sales 500 - rent 100; receivables grew by 50
+        "investing" => [ [ "1500", aud(-800) ] ],
+        "financing" => [ [ "2500", aud(2_000) ], [ "3000", aud(1_000) ] ]
+      )
+      expect(TudlaAccounting::Reports::CashFlow::ACTIVITIES.map { |a| indirect.total(a) }).to eq(TudlaAccounting::Reports::CashFlow::ACTIVITIES.map { |a| direct.total(a) })
+      expect([ indirect.net_change, indirect.closing ]).to eq([ aud(2_550), aud(3_050) ])
+      expect(indirect).to be_reconciles
+    end
+
+    it "refuses an unknown method" do
+      expect { TudlaAccounting::Reports::CashFlow.new(organization, from: month(1), thru: month(1), method: :magic) }
+        .to raise_error(ArgumentError, "method must be one of direct, indirect")
+    end
+
     it "treats a move to an account outside cash as cash going out" do
       result = flow(from: month(3), thru: month(3), cash_accounts: [ account("1011") ])
       expect(result.sections["operating"].map { |r| [ r.account.code, r.amount ] }).to eq([ [ "1012", aud(-400) ], [ "6000", aud(-100) ] ])

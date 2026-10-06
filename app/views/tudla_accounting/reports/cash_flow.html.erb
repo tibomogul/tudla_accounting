@@ -1,4 +1,4 @@
-<%= tc_page_header "Cash flow", subtitle: (@report ? "#{tc_date(@from.from_date)} to #{tc_date(@thru.thru_date)}" : nil) do %>
+<%= tc_page_header "Cash flow", subtitle: (@report ? "#{tc_date(@from.from_date)} to #{tc_date(@thru.thru_date)}, #{@report.flow_method} method" : nil) do %>
   <% if @report %>
     <%= form_with url: reports_cash_flow_path, method: :get, class: "flex flex-wrap items-end gap-2" do |form| %>
       <div><%= form.label :from_id, "From", class: "tc-label" %><%= form.select :from_id, @months.map { |month| [ tc_period_label(month), month.id ] }, { selected: @from.id }, class: "tc-input" %></div>
@@ -6,6 +6,8 @@
       <div><%= form.label :cash_account_ids, "Cash accounts", class: "tc-label" %>
         <%= form.select :cash_account_ids, @accounts.map { |account| [ account.code_with_name, account.id ] }, { selected: @report.cash_accounts.map(&:id) },
                         multiple: true, size: 3, class: "tc-input min-w-64" %></div>
+      <div><%= form.label :method, "Method", class: "tc-label" %>
+        <%= form.select :method, [ [ "Direct", "direct" ], [ "Indirect", "indirect" ] ], { selected: @report.flow_method }, class: "tc-input" %></div>
       <%= form.submit "Show", class: "tc-btn tc-btn-secondary", name: nil %>
     <% end %>
   <% end %>
@@ -28,7 +30,10 @@
             <tr><td colspan="2" class="tc-muted">No cash moved.</td></tr>
           <% end %>
           <% @report.sections[activity].each do |row| %>
-            <tr><td class="pl-6"><%= link_to row.account.code_with_name, account_path(row.account, year_id: @thru.root_id), class: "underline" %></td><td class="tc-num"><%= tc_money(row.amount) %></td></tr>
+            <tr>
+              <td class="pl-6"><%= row.account ? link_to(row.account.code_with_name, account_path(row.account, year_id: @thru.root_id), class: "underline") : row.label %><%= tag.span(" (change in the balance)", class: "tc-muted text-xs") if row.account && @report.flow_method == :indirect %></td>
+              <td class="tc-num"><%= tc_money(row.amount) %></td>
+            </tr>
           <% end %>
           <tr class="font-semibold"><td>Net cash from <%= activity %> activities</td><td class="tc-num" data-total="<%= activity %>"><%= tc_money(@report.total(activity)) %></td></tr>
         <% end %>

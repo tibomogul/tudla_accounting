@@ -10,6 +10,7 @@ All notable changes to this project are documented here. The format follows
 - `Entry.create_from_ruby_hash` stored a foreign amount given as a decrease (`EUR -55.00`) as a negative number; it is now a magnitude, like the line's amount.
 
 ### Added
+- Indirect-method cash flow statement (`Reports::CashFlow.new(..., method: :indirect)`, or the page's Method choice): net profit plus each balance-sheet account's change, by activity, matching the direct method's totals.
 - Entries can be created from a foreign-currency bank account's statement lines, converted at a rate given or the rate provider's rate for the day, with the statement amount as the bank line's foreign amount.
 - Cash-basis tax summary: tax on invoices, bills and taxed credit notes counts as they are settled (each allocation's share, reversed if taken off); entries with no receivable or payable count when posted. Choose it on the page, per call (`basis: :cash`) or with the `tax_basis` setting.
 - Lines with a foreign amount can be taxed: the tax is worked out on the converted amount and posted in the organization's currency (an inclusive line's foreign amount is split too). A tax account held in another currency is refused.
