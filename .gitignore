@@ -9,3 +9,5 @@
 /spec/dummy/app/assets/builds/*
 !/spec/dummy/app/assets/builds/.keep
 coverage/
+/*.gem
+/perf/*.log

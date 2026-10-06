@@ -6,9 +6,20 @@ module TudlaAccounting
   # nothing can be posted into a closed period, and audit events can't be changed or
   # deleted. Does nothing on other databases.
   #
-  # schema.rb can't hold triggers, so they are installed by the engine's migration and
-  # again after db:schema:load (see lib/tasks); hosts can also call install! themselves.
+  # schema.rb can't hold triggers, so they are installed by the engine's migrations and
+  # again whenever Rails loads a schema (db:schema:load, db:prepare, db:migrate on an empty
+  # database, the test database being brought up to date): see SchemaLoading. Hosts can
+  # also call install! themselves, or run tudla_accounting:protect_posted_entries.
   module DatabaseProtection
+    # Prepended to ActiveRecord::Tasks::DatabaseTasks (see the engine): reinstalls the
+    # triggers on the database a schema was just loaded into. Databases without the
+    # engine's tables (Solid Queue's, say) are left alone.
+    module SchemaLoading
+      def load_schema(...)
+        super.tap { DatabaseProtection.install!(migration_connection) }
+      end
+    end
+
     SETTING = "tudla_accounting.allow_posted_changes"
     TRIGGERS = {
       "tudla_accounting_protect_posted_entries" => "tudla_accounting_entries",

@@ -19,6 +19,18 @@ RSpec.describe TudlaAccounting::ApplicationHelper, type: :helper do
     expect(helper.tc_date(nil)).to be_nil
   end
 
+  describe "#tc_host_root_path" do
+    it "links back to the host app's root, or to / when it has no root route" do
+      expect(helper.tc_host_root_path).to eq("/")
+      without_root = Object.new
+      allow(helper).to receive(:main_app).and_return(without_root)
+      expect(helper.tc_host_root_path).to eq("/")
+      with_root = Struct.new(:root_path).new("/home")
+      allow(helper).to receive(:main_app).and_return(with_root)
+      expect(helper.tc_host_root_path).to eq("/home")
+    end
+  end
+
   describe "#tc_badge" do
     it "renders a badge in a tone" do
       expect(helper.tc_badge("AUD")).to eq('<span class="tc-badge">AUD</span>')

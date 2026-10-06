@@ -3,5 +3,5 @@
   <h1 class="text-2xl font-bold mb-2">You can't do that here</h1>
   <p class="tc-muted"><%= { read: "You don't have access to these books.", record: "You can't record entries or change accounts.",
                              post: "You can't post, reverse or apply entries.", administer: "Only an administrator can change periods or setup." }.fetch(permission) %></p>
-  <p class="mt-6"><%= link_to "Back", (tc_can?(:read) ? root_path : main_app.root_path), class: "tc-btn tc-btn-secondary" %></p>
+  <p class="mt-6"><%= link_to "Back", (tc_can?(:read) ? root_path : tc_host_root_path), class: "tc-btn tc-btn-secondary" %></p>
 </div>

@@ -146,11 +146,17 @@ This is a best-effort sync — it only works when the host app uses the same `lo
 
 ### Linking back to the host app from engine views
 
-Use `main_app.root_path` (not a hardcoded path) to link back to the host application:
+Use `tc_host_root_path` (not a hardcoded path) to link back to the host application: it is `main_app.root_path`, or `/` when the host has no root route (a freshly generated app doesn't):
 ```erb
-<a href="<%= main_app.root_path %>">App ↗</a>
+<%= link_to "App ↗", tc_host_root_path %>
 ```
 
 ## Code Style
 
-RuboCop with `rubocop-rails-omakase` (Rails official style). Ruby 3.3.4.
+RuboCop with `rubocop-rails-omakase` (Rails official style). Ruby 3.4 (`.ruby-version`); the gem supports 3.3+.
+
+## Packaging
+
+- `tudla_accounting.gemspec` lists only what host apps need at runtime (Rails, pg, tailwindcss-rails, importmap/stimulus, money-rails, ancestry, csv, roo). The Solid gems and test tools are in the `Gemfile`, for the dummy app and the suite; don't add them back to the gemspec.
+- Record user-facing changes in `CHANGELOG.md` under "Unreleased".
+- CI (`.github/workflows/ci.yml`) runs RuboCop, the suite against PostgreSQL and `gem build --strict`. `spec/dummy/config/database.yml` reads `DATABASE_HOST`/`DATABASE_USERNAME`/`DATABASE_PASSWORD` (defaulting to the Docker `db` service).

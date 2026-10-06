@@ -39,7 +39,3 @@ namespace :tudla_accounting do
     end
   end
 end
-
-if Rake::Task.task_defined?("db:schema:load")
-  Rake::Task["db:schema:load"].enhance { TudlaAccounting::DatabaseProtection.install! }
-end

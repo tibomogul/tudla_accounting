@@ -4,6 +4,11 @@ module TudlaAccounting
   module ApplicationHelper
     BADGE_TONES = %i[neutral primary success danger warning].freeze
 
+    # The host app's home page: its root route, or "/" when it has none (a new app).
+    def tc_host_root_path
+      main_app.respond_to?(:root_path) ? main_app.root_path : "/"
+    end
+
     # An amount in accounting style: thousands separators, no currency symbol (the
     # currency is shown once per table), negatives in parentheses.
     def tc_money(money)

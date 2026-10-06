@@ -4,13 +4,15 @@ module TudlaAccounting
   # Posts an entry in the background, into the period of its transacted_at.
   #
   # Entry#post locks the organization, so concurrent posts are safe; with Solid
-  # Queue, posting jobs for the same organization also run one at a time rather
-  # than waiting on that lock. Failures are logged and the job is discarded
+  # Queue (when the host app uses it), posting jobs for the same organization also
+  # run one at a time rather than waiting on that lock. Failures are logged and the job is discarded
   # without retrying, leaving the entry unposted.
   class EntryPostingJob < ApplicationJob
     queue_as :entry_posting
 
-    limits_concurrency to: 1, key: ->(entry_id) { EntryPostingJob.concurrency_key_for(entry_id) }
+    if respond_to?(:limits_concurrency) # Solid Queue's
+      limits_concurrency to: 1, key: ->(entry_id) { EntryPostingJob.concurrency_key_for(entry_id) }
+    end
 
     rescue_from(StandardError) do |exception|
       Rails.logger.error("EntryPostingJob failed and will not be retried: #{exception.message}")

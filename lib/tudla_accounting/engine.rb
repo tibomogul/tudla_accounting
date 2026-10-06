@@ -22,6 +22,14 @@ module TudlaAccounting
       end
     end
 
+    # Triggers aren't in schema.rb, so they go back in after every schema load.
+    initializer "tudla_accounting.schema_loading" do
+      ActiveSupport.on_load(:active_record) do
+        require "active_record/tasks/database_tasks"
+        ActiveRecord::Tasks::DatabaseTasks.singleton_class.prepend(TudlaAccounting::DatabaseProtection::SchemaLoading)
+      end
+    end
+
     initializer "tudla_accounting.importmap", before: "importmap" do |app|
       if app.config.respond_to?(:importmap)
         app.config.importmap.paths << Engine.root.join("config/importmap.rb")

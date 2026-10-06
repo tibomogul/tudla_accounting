@@ -43,7 +43,7 @@ bin/rails tudla_accounting:balances:rebuild   # ORGANIZATION=Organization:42 lim
 ### Database integrity
 The engine's migrations add unique keys (one balance per account and period, account codes per organization, one carrying amount per line, one exchange rate per currency pair and day) and checks (positive line amounts, known tallies, categories and carrying-amount types). On PostgreSQL, triggers also refuse any change to a posted entry or its lines, or their deletion, from anywhere (a console, a job, raw SQL): correct posted entries by reversing them. Touching `updated_at` is allowed. Triggers likewise refuse posting into a closed period and any change to audit events. Data maintenance that really must change posted rows can run inside `TudlaAccounting::DatabaseProtection.allowing_posted_changes { ... }`, which lifts the protection for that block's transaction only.
 
-Triggers can't be stored in `db/schema.rb`, so the engine reinstalls them after `db:schema:load`; run `bin/rails tudla_accounting:protect_posted_entries` if a database was built some other way.
+Triggers can't be stored in `db/schema.rb`, so the engine reinstalls them whenever Rails loads a schema (`db:schema:load`, `db:prepare`, `db:migrate` on an empty database, the test database being brought up to date); run `bin/rails tudla_accounting:protect_posted_entries` if a database was built some other way.
 
 ### Closing periods
 `period.close!` closes a month, or a year with all its months. Nothing more can be posted into a closed period: posting, reversing into it, revaluation entries and changes to opening balances in it are refused (and on PostgreSQL a trigger refuses it from anywhere). Periods close in order, each after the earlier ones, so later postings can never move a closed period's balances. `period.reopen!(reason: "...")` reopens the most recently closed period (a year before its months); the reason is kept in the audit trail. `close_blocker` and `reopen_blocker` say why either would be refused.
@@ -206,7 +206,8 @@ TudlaAccounting::Balance.find_by(account: cash, period: year).ending_amount   # 
 
 - **Rails 8.1+** mountable engine with `isolate_namespace TudlaAccounting`
 - **money-rails** for amounts and currencies, **ancestry** for the account and period trees
-- **Solid Queue / Solid Cache / Solid Cable** for SQL-backed jobs, caching and Action Cable
+- **PostgreSQL** (the ledger's integrity checks and triggers rely on it)
+- Works with any Active Job backend; with **Solid Queue**, background posting jobs for an organization run one at a time (the dummy app runs the Solid trifecta)
 - **Tailwind CSS v4** for engine views (no DaisyUI dependency) and **Importmap Rails**
 - **RSpec**, **FactoryBot**, **SimpleCov** (100% line coverage), **Capybara**
 - **RuboCop** with `rubocop-rails-omakase`
@@ -249,6 +250,9 @@ docker compose exec rails bash -lc 'bundle exec rubocop'     # Check code style
 docker compose exec rails bash -lc 'bundle exec rubocop -a'  # Auto-fix offenses
 ```
 
+### Continuous integration
+`.github/workflows/ci.yml` runs RuboCop, the whole suite (system specs in headless Chrome) against PostgreSQL, and a strict `gem build` on every push and pull request. The test job sets up the databases with `bin/rails db:create db:schema:load` and points the dummy app at them through `DATABASE_HOST`, `DATABASE_USERNAME` and `DATABASE_PASSWORD`.
+
 ### Dummy App (Development Server)
 ```bash
 docker compose exec rails bash -lc 'bin/setup'                                                    # First-time DB setup
@@ -259,9 +263,11 @@ docker compose exec rails bash -lc 'pkill -f foreman || true'                   
 
 ## Integration into a Host Application
 
+Requirements: Ruby 3.3+, Rails 8.1, PostgreSQL, and (for the engine's pages) tailwindcss-rails 4 and importmap-rails, as a new Rails app with `--css=tailwind` has.
+
 ```ruby
 # Gemfile
-gem "tudla_accounting", path: "../path/to/tudla_accounting"
+gem "tudla_accounting", github: "tibomogul/tudla_accounting"  # or path: "../tudla_accounting"
 ```
 
 Then:

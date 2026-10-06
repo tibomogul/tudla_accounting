@@ -114,4 +114,22 @@ RSpec.describe "Database integrity" do
       expect(described_class.allowing_posted_changes(sqlite) { :ran }).to eq(:ran)
     end
   end
+
+  describe "after a schema load" do
+    it "is prepended to Rails' schema loading" do
+      expect(ActiveRecord::Tasks::DatabaseTasks.singleton_class.ancestors).to include(TudlaAccounting::DatabaseProtection::SchemaLoading)
+    end
+
+    it "puts the triggers back on the database the schema went into" do
+      tasks = Class.new do
+        def load_schema(*_args) = :loaded
+        def migration_connection = ActiveRecord::Base.connection
+      end
+      tasks.prepend(TudlaAccounting::DatabaseProtection::SchemaLoading)
+      TudlaAccounting::DatabaseProtection.uninstall!(ActiveRecord::Base.connection)
+
+      expect(tasks.new.load_schema(:config, :ruby)).to eq(:loaded)
+      expect(TudlaAccounting::DatabaseProtection.installed?(ActiveRecord::Base.connection)).to be(true)
+    end
+  end
 end
