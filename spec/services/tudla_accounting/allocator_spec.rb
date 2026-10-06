@@ -15,6 +15,7 @@ RSpec.describe TudlaAccounting::Allocator, type: :service do
     TudlaAccounting.configuration.realized_fx_gain_account_code = "4950"
     TudlaAccounting::AccountsCreator.call([
       { code: "1000", name: "Cash", category: "asset" },
+      { code: "1001", name: "Bank EUR", category: "asset", currency: "EUR" },
       { code: "1100", name: "Accounts Receivable", category: "asset", children: [
         { code: "1100-EUR", name: "Accounts Receivable - EUR", category: "asset", currency: "EUR" } ] },
       { code: "2100", name: "Accounts Payable", category: "liability" },
@@ -196,6 +197,78 @@ RSpec.describe TudlaAccounting::Allocator, type: :service do
   it "ignores a payment line on the wrong side (a refund), which it can't treat as a credit" do
     refund = post([ [ "1100", :debit, 20 ], [ "1000", :credit, 20 ] ], at: on(3, 5), source: Payment.create!(customer: globex))
     expect(refund.details.filter_map(&:carrying_amount)).to be_empty
+  end
+
+  describe "refunds" do
+    def refund(name, amount, at:, related: nil, customer: globex)
+      post([ [ "1100", :debit, amount ], [ "1000", :credit, amount ] ], at: at, particulars: name,
+           source: Refund.create!(customer: customer), related: related)
+    end
+
+    let!(:inv) { invoice("Invoice 1", 300, due: on(3, 31)) }
+    let!(:overpaid) { payment("Payment 1", 350, at: on(3, 10), related: inv) } # 50.00 credit
+
+    it "pays a customer's credit back, leaving nothing owed either way" do
+      back = refund("Refund 1", 50, at: on(3, 15), related: overpaid)
+
+      expect(open_item(back)).to have_attributes(amount_cents: 0, charge?: true, related_party: globex, due_date: nil)
+      expect(open_item(overpaid).amount_cents).to eq(0)
+      expect(back.refund?).to be(true)
+      expect(owed(Date.new(2026, 3, 14))[:totals][:total]).to eq(aud(-50))
+      expect(owed(Date.new(2026, 3, 15))[:totals][:total]).to eq(aud(0))
+    end
+
+    it "leaves a refund of more than the credit owed by the customer, and one on its own to match later" do
+      too_much = refund("Refund 1", 70, at: on(3, 15), related: overpaid)
+      expect([ open_item(too_much).amount_cents, open_item(overpaid).amount_cents ]).to eq([ 20_00, 0 ])
+
+      unmatched = refund("Refund 2", 30, at: on(3, 16), customer: initech)
+      expect(open_item(unmatched)).to have_attributes(amount_cents: 30_00, related_party: initech)
+      credit = payment("Payment 2", 30, at: on(3, 17), customer: initech)
+      described_class.allocate!(credit, unmatched, at: on(3, 18))
+      expect(open_item(unmatched).amount_cents).to eq(0)
+    end
+
+    it "gives the credit back when the refund is reversed" do
+      back = refund("Refund 1", 50, at: on(3, 15), related: overpaid)
+      expect(back.reload.reversal_blocker).to be_nil
+
+      back.reverse!(on: Date.new(2026, 3, 20))
+      expect(open_item(overpaid).amount_cents).to eq(-50_00)
+      expect(open_item(back).amount_cents).to eq(0)
+    end
+
+    it "is taken by a supplier refund of a supplier's credit too" do
+      credit = post([ [ "2100", :debit, 80 ], [ "5000", :credit, 80 ] ], at: on(3, 5), particulars: "Supplier credit 1", source: SupplierCredit.create!(customer: globex))
+      back = post([ [ "1000", :debit, 80 ], [ "2100", :credit, 80 ] ], at: on(3, 6), particulars: "Supplier refund 1",
+                  source: SupplierRefund.create!(customer: globex), related: credit)
+
+      expect([ open_item(credit).amount_cents, open_item(back).amount_cents ]).to eq([ 0, 0 ])
+      expect(balance("2100")).to eq(aud(0))
+    end
+
+    it "ignores a refund line on the wrong side" do
+      odd = post([ [ "1000", :debit, 5 ], [ "1100", :credit, 5 ] ], at: on(3, 15), source: Refund.create!(customer: globex))
+      expect(odd.details.filter_map(&:carrying_amount)).to be_empty
+    end
+
+    it "books the exchange difference on a foreign credit paid back at another rate, and moves the foreign bank balance" do
+      bank = create(:tudla_accounting_bank_account_balance, account: account("1001"), currency: "EUR", balance_cents: 500_00)
+      paid = post([ [ "1000", :debit, 160 ], [ "1100-EUR", :credit, 160, [ 100, "1.60" ] ] ], at: on(3, 10), particulars: "Payment EUR",
+                  source: Payment.create!(customer: globex))
+      back = post([ [ "1100-EUR", :debit, 170, [ 100, "1.70" ] ], [ "1001", :credit, 170 ] ], at: on(3, 20), particulars: "Refund EUR",
+                  source: Refund.create!(customer: globex), related: paid)
+
+      expect(TudlaAccounting::Allocation.find_by!(from: open_item(paid)).realized_entry.particulars).to eq("Realized exchange loss on Refund EUR")
+      expect(balance("4950")).to eq(aud(-10))
+      expect(balance("1100-EUR")).to eq(aud(0))
+      expect(bank.reload.balance_cents).to eq(400_00)
+
+      back.reload.reverse!(on: Date.new(2026, 3, 25))
+      expect(bank.reload.balance_cents).to eq(500_00)
+      expect(balance("4950")).to eq(aud(0))
+      expect(open_item(paid).amount_cents).to eq(-160_00)
+    end
   end
 
   describe "in a foreign currency" do

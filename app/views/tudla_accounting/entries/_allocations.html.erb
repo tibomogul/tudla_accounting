@@ -6,9 +6,9 @@
   <% allocations = carrying_amount.allocations.includes(from: { detail: :entry }, to: { detail: :entry }).order(:allocated_at, :id) %>
   <section class="tc-card mb-6" aria-labelledby="allocations-heading">
     <div class="tc-card-body pb-0 flex flex-wrap items-baseline justify-between gap-2">
-      <h2 id="allocations-heading" class="tc-card-title"><%= carrying_amount.credit? ? "Applied to" : "Payments and credits applied" %></h2>
+      <h2 id="allocations-heading" class="tc-card-title"><%= carrying_amount.credit? ? "Applied to" : (entry.refund? ? "Credits paid back" : "Payments and credits applied") %></h2>
       <p class="text-sm" data-total="<%= carrying_amount.credit? ? 'left_to_apply' : 'still_owed' %>">
-        <%= carrying_amount.credit? ? "Left to apply" : "Still owed" %>:
+        <%= carrying_amount.credit? ? "Left to apply" : (entry.refund? ? "Not matched to a credit" : "Still owed") %>:
         <span class="font-semibold"><%= tc_money(Money.new(carrying_amount.credit? ? -carrying_amount.amount_cents : carrying_amount.amount_cents, currency)) %></span>
         <% if carrying_amount.forex %><span class="tc-muted">(<%= foreign.call(carrying_amount.credit? ? -carrying_amount.forex.other_currency_amount_cents : carrying_amount.forex.other_currency_amount_cents) %>)</span><% end %>
       </p>

@@ -60,6 +60,7 @@ Credits are applied to what is owed through **allocations** (`TudlaAccounting::A
 - A payment or credit note that names an invoice or bill as `related` is applied to it automatically, up to what is still owed. Anything over stays as the customer's or supplier's credit, so an invoice never goes below zero.
 - `Allocator.allocate!(payment, invoice)` applies a credit to any open invoice or bill of the same party: as much as both allow, or `amount_cents:` (or `other_currency_cents:` for a foreign amount). `Allocator.allocate_oldest_first!(payment)` spreads it over the party's open items, earliest due first, and `Allocator.open_charges(payment)` lists them.
 - `Allocator.unallocate!(allocation, at:)` takes one off again without reversing the payment. Reversing a payment or credit note takes it off everything it was applied to; an invoice or bill can be reversed once nothing is applied to it.
+- A **refund** pays a credit back: cash to a customer (Dr receivable, Cr bank), or from a supplier. It opens a charge like an invoice and uses up the credit it names as `related`; one paid in a foreign currency at another rate books the realized difference, and a refund without `related` waits to be matched like any charge. Reversing a refund gives the credit back.
 - Allocations are dated, so `CarryingAmount#outstanding(as_of:)` and the aging report show what was owed on any day. Dates in a closed period are refused, and each allocation is in the audit trail.
 
 The migration that adds allocations converts payments posted before them: each gets its credit, applied to its related invoice or bill as far as that was owed (`AllocationBackfill`, safe to run again).
@@ -263,7 +264,9 @@ TudlaAccounting.configure do |config|
     "Payment" => :receipt,                # a customer's credit, applied to entry.related if set
     "Disbursement" => :disbursement,      # a credit with a supplier, applied to entry.related if set
     "CreditNote" => :credit_note,         # like a receipt, without cash
-    "SupplierCredit" => :supplier_credit  # like a disbursement, without cash
+    "SupplierCredit" => :supplier_credit, # like a disbursement, without cash
+    "Refund" => :refund,                  # pays a customer's credit (entry.related) back
+    "SupplierRefund" => :supplier_refund  # a supplier pays a credit with them back
   }
   config.due_date_method = :due_date      # read from the source; blank if it doesn't respond
   config.related_party_method = :customer # who owes or is owed, read from the source; the organization if unset

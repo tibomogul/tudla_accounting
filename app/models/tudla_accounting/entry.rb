@@ -41,6 +41,11 @@ module TudlaAccounting
       details.any? { |detail| detail.carrying_amount.present? }
     end
 
+    # Pays a credit back: a refund to a customer, or from a supplier.
+    def refund?
+      %i[refund supplier_refund].include?(CarryingAmountRole.call(entry: self))
+    end
+
     # A credit applied to receivables or payables (a payment, disbursement or credit note).
     def settlement?
       %i[receipt disbursement credit_note supplier_credit].include?(CarryingAmountRole.call(entry: self))
@@ -57,7 +62,7 @@ module TudlaAccounting
       elsif reversal then "This entry has already been reversed"
       elsif realized_exchange? && related.reversal.nil? && !Allocation.where(realized_entry: self).where.not(reversed_at: nil).exists?
         "Reverse the payment this exchange difference came from instead"
-      elsif details.any? { |detail| detail.carrying_amount&.charge? && detail.carrying_amount.allocations_to.active.any? }
+      elsif !refund? && details.any? { |detail| detail.carrying_amount&.charge? && detail.carrying_amount.allocations_to.active.any? }
         "Reverse the payments against it first"
       end
     end
@@ -208,9 +213,10 @@ module TudlaAccounting
 
     # Reversing an invoice or bill closes its receivable or payable; reversing a payment or
     # credit note takes it off what it was applied to (reversing any realized exchange
-    # difference) and closes its credit.
+    # difference) and closes its credit; reversing a refund gives the credit back.
     def undo_carrying_amounts(at)
       CarryingAmountProcessor.new(entry: self).undo_credit(at) if settlement?
+      CarryingAmountProcessor.new(entry: self).undo_refund(at) if refund?
       details.filter_map(&:carrying_amount).each(&:recompute!)
     end
 

@@ -133,6 +133,16 @@ RSpec.describe "Applying payments", type: :request do
     expect(rows).to eq([ [ "Invoice EUR", "12 Mar 2026", "96.00 (€60,00)", "Take off" ] ])
   end
 
+  it "shows what a refund paid back" do
+    back = post_entry([ [ "1100", :debit, 450_00 ], [ "1000", :credit, 450_00 ] ], at: on(3, 25), particulars: "Refund 1",
+                      source: Refund.create!(customer: globex), related: pay)
+
+    get routes.entry_path(back)
+    expect(css_select("#allocations-heading").text).to eq("Credits paid back")
+    expect(total("still_owed")).to eq("Not matched to a credit: 0.00")
+    expect(rows.map(&:first)).to eq([ "Payment 1" ])
+  end
+
   it "refuses another organization's allocation" do
     other = create(:organization)
     sign_in_as(other)
