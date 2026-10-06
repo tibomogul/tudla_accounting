@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    tudla_accounting (0.1.0)
+    tudla_accounting (0.2.0)
       ancestry (~> 5.0)
       csv (~> 3.3)
       importmap-rails (~> 2.0)
