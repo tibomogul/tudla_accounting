@@ -1,7 +1,8 @@
 # Stand-in login for the dummy app: pick the organization whose books to open.
 class SessionsController < ApplicationController
   def new
-    @organizations = Organization.order(:name)
+    # The demo leaves out its own organization, which has a button of its own.
+    @organizations = Rails.configuration.x.sign_in_organizations.call(Organization.order(:name))
   end
 
   def create

@@ -41,6 +41,8 @@ jobs:
         run: cd spec/dummy && bin/rails tailwindcss:build
       - name: Run the specs (system specs use the runner's Chrome)
         run: bundle exec rspec
+      - name: Run the demo app's specs
+        run: cd spec/dummy && bundle exec rspec
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

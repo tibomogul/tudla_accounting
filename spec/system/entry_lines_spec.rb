@@ -16,11 +16,13 @@ RSpec.describe "Entering a journal entry", type: :system do
 
   # Retries until the status reads so: the line editor updates it as amounts are typed.
   def expect_status(text) = expect(page).to(have_css("[data-entry-lines-target=status]", exact_text: text))
+  # A saved entry's page, where saving a draft redirects.
+  def saved_entry_page = %r{\A#{Regexp.escape(entries_path)}/\d+\z}
   # Waits for the row to exist: one just added by "Add line" may not be rendered yet.
   def line(index) = all("tbody[data-entry-lines-target=lines] tr:not([hidden])", minimum: index + 1)[index]
 
   it "totals the lines as they are typed, then saves and posts the entry" do
-    visit "/tudla_accounting/entries/new"
+    visit new_entry_path
     expect_status("Enter the amounts for each line.")
 
     fill_in "Particulars", with: "Opening capital"
@@ -35,6 +37,7 @@ RSpec.describe "Entering a journal entry", type: :system do
     expect_status("Balanced: debits equal credits (1,250.50).")
 
     click_button "Save draft"
+    expect(page).to have_current_path(saved_entry_page)
     expect(page).to have_content("Draft entry saved.")
     click_button "Post"
     expect(page).to have_content("Entry posted.")
@@ -45,7 +48,7 @@ RSpec.describe "Entering a journal entry", type: :system do
   end
 
   it "removes new lines, and saved ones on save" do
-    visit "/tudla_accounting/entries/new"
+    visit new_entry_path
     fill_in "Particulars", with: "Capital"
     within(line(0)) { select "1010 - Cash", from: "Account"; fill_in "Debit", with: "100" }
     within(line(1)) { select "3000 - Capital", from: "Account"; fill_in "Credit", with: "100" }
@@ -56,15 +59,18 @@ RSpec.describe "Entering a journal entry", type: :system do
     within(line(2)) { click_button "Remove line" }
     expect_status("Balanced: debits equal credits (100.00).")
     click_button "Save draft"
+    expect(page).to have_current_path(saved_entry_page)
     expect(page).to have_content("Draft entry saved.")
 
     click_link "Edit"
+    expect(page).to have_current_path(%r{/edit\z})
     click_button "Add line"
     within(line(2)) { select "4000 - Sales", from: "Account"; fill_in "Credit", with: "100" }
     within(line(1)) { click_button "Remove line" } # the saved Capital line
     expect_status("Balanced: debits equal credits (100.00).")
     click_button "Save draft"
 
+    expect(page).to have_current_path(saved_entry_page)
     expect(page).to have_content("Draft entry saved.")
     expect(TudlaAccounting::Entry.find_by(particulars: "Capital").details.map { |detail| detail.account.code }).to contain_exactly("1010", "4000")
   end
@@ -72,7 +78,7 @@ RSpec.describe "Entering a journal entry", type: :system do
   it "adds the tax on taxed lines to the totals, or splits it out of amounts that include it" do
     gst = TudlaAccounting::Account.create!(organization: organization, code: "2200", name: "GST", category: "liability")
     TudlaAccounting::TaxCode.create!(organization: organization, code: "GST", name: "GST on sales", rate: "0.1", kind: :sales, account: gst)
-    visit "/tudla_accounting/entries/new"
+    visit new_entry_path
 
     fill_in "Particulars", with: "Taxed sale"
     within(line(0)) { select "1010 - Cash", from: "Account"; fill_in "Debit", with: "110" }
@@ -86,6 +92,7 @@ RSpec.describe "Entering a journal entry", type: :system do
     expect_status("Balanced: debits equal credits (110.00).")
 
     click_button "Save draft"
+    expect(page).to have_current_path(saved_entry_page)
     expect(page).to have_content("Draft entry saved.")
     expect(TudlaAccounting::Entry.find_by(particulars: "Taxed sale").details.map { |d| [ d.account.code, d.amount_cents ] })
       .to contain_exactly([ "1010", 110_00 ], [ "4000", 100_00 ], [ "2200", 10_00 ])

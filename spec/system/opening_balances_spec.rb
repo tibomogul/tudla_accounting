@@ -18,7 +18,7 @@ RSpec.describe "Entering opening balances", type: :system do
   def status = find("[data-opening-balances-target=status]").text
 
   it "keeps debit and credit totals as amounts are typed, then saves" do
-    visit "/tudla_accounting/setup/opening_balances"
+    visit setup_opening_balances_path
     expect(status).to eq("Balanced.")
 
     fill_in "Cash", with: "1,000"
@@ -31,6 +31,7 @@ RSpec.describe "Entering opening balances", type: :system do
     expect(find("[data-opening-balances-target=debitTotal]").text).to eq("1,800.00")
 
     click_button "Save opening balances"
+    expect(page).to have_current_path(reports_balance_sheet_path, ignore_query: true)
     expect(page).to have_content("Opening balances saved at 1 Jan 2026.")
     expect(page).to have_content("Balanced: assets equal liabilities plus equity")
   end

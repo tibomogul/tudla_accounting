@@ -13,9 +13,11 @@ All commands run inside the Docker container:
 ```bash
 docker compose exec rails bash -lc 'RAILS_ENV=test bundle exec rspec'                            # Run all specs
 docker compose exec rails bash -lc 'RAILS_ENV=test bundle exec rspec spec/integration/solid_stack_spec.rb'  # Run single spec file
+docker compose exec rails bash -lc 'cd spec/dummy && RAILS_ENV=test bundle exec rspec'           # Run the demo app's specs
 docker compose exec rails bash -lc 'bundle exec rubocop'                                          # Lint
 docker compose exec rails bash -lc 'bundle exec rubocop -a'                                       # Auto-fix lint
-docker compose exec rails bash -lc 'bin/setup'                                                    # First-time DB setup + dev server deps
+docker compose exec rails bash -lc 'bin/setup'                                                    # Deps + create/migrate DBs (seeds Demo Co the first time)
+docker compose exec rails bash -lc 'bin/setup --reset'                                            # Drop, recreate and reseed the dev (and test) DBs
 docker compose exec -d rails bash -lc 'bin/dev'                                                   # Start dev server (Foreman: web + css + worker)
 ```
 
@@ -29,6 +31,18 @@ This is a **Rails engine gem** (not a standalone app). All application code live
 - `lib/tudla_accounting/engine.rb` — engine configuration with namespace isolation
 - `spec/dummy/` — full Rails 8.1 app used for testing the engine (has its own config, routes, db); uses **Tailwind CSS v4** and **DaisyUI** for styling
 - Engine is mounted at `/tudla_accounting` in the dummy app's routes
+
+### Dummy app: harness and demo
+
+The dummy app is both the engine's test harness and a demo. Keep the two apart:
+
+- **Harness**: `Organization`, `ApplicationController#current_organization`, the stand-in login (`SessionsController`), `PagesController`, `config/initializers/tudla_accounting.rb`. The engine's specs may rely on these.
+- **Demo**: everything under the `Demo::` namespace (`spec/dummy/app/*/demo/`; Zeitwerk makes the module from those folders), `config/initializers/demo.rb` (configuration such as the retained earnings account), the `demo` routes and `db/seeds.rb` (`Demo::Seeder`).
+- The demo loads only when `config.x.demo` is set (`spec/dummy/config/application.rb`). That's on in development and off in test unless `TUDLA_DEMO=1`. When it's off, Zeitwerk ignores the demo folders.
+- The demo's specs live in `spec/dummy/spec` and are run from `spec/dummy`; their `rails_helper` sets `TUDLA_DEMO=1`. The root `.rspec` excludes them from the engine's run.
+- Engine code, engine specs and the harness must never reference the demo (`Demo::`, its route helpers, `config.x.demo`). The harness offers hooks instead, declared in `config/application.rb` and set by the demo's initializer: `config.x.sign_in_partial` (rendered on the sign-in page) and `config.x.sign_in_organizations` (filters the organizations listed). Only `config/application.rb` and `config/routes.rb` wire the demo in. `spec/integration/demo_isolation_spec.rb` boots the app in a child process to check that the engine's run loads none of it, and checks that no engine or harness file names it. Demo code may use anything from the engine.
+- The isolation covers code and routes, not the schema: a demo table would go into the dummy app's `schema.rb`, which the engine's test database loads too.
+- Both `rails_helper`s share `spec/rails_setup.rb` (test-env check, schema maintenance, triggers, common RSpec config); put setup both suites need there.
 
 ### Multi-Database (Solid Trifecta)
 

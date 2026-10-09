@@ -6,6 +6,10 @@
       <li><%= button_to "#{organization.name} (#{organization.currency})", session_path(organization_id: organization.id) %></li>
     <% end %>
   </ul>
+  <%# Whatever else the app offers here (the demo's button); see config.x.sign_in_partial. %>
+  <% if (partial = Rails.configuration.x.sign_in_partial) %>
+    <%= render partial %>
+  <% end %>
   <% if @organizations.empty? %>
     <p class="mt-4">No organizations yet. Create one in the console: <code>Organization.create!(name: "Acme", currency: "AUD")</code></p>
   <% end %>

@@ -1,0 +1,97 @@
+require "rails_helper"
+
+RSpec.describe Demo::Seeder do
+  around { |example| travel_to(Time.zone.local(2026, 6, 15, 9)) { example.run } }
+
+  it "seeds Demo Co's books once, balanced" do
+    organization = described_class.call(entries: 30)
+
+    expect(organization).to have_attributes(name: "Demo Co", currency: "USD")
+    expect(described_class.call(entries: 30)).to eq(organization)
+    expect(Organization.where(name: "Demo Co").count).to eq(1)
+
+    entries = TudlaAccounting::Entry.where(organization: organization)
+    expect(entries.where.not(posted_at: nil).count).to eq(31)
+    expect(entries.where(posted_at: nil).count).to eq(3)
+    expect(entries.maximum(:transacted_at)).to be <= Time.current
+    expect(entries.pluck(:particulars)).to include(a_string_starting_with("Invoice "))
+    expect(TudlaAccounting::BalanceRebuilder.new(organization).differences).to be_empty
+  end
+
+  it "numbers the invoices, drafts included, without gaps or repeats, in date order" do
+    organization = described_class.call(entries: 30)
+
+    invoices = TudlaAccounting::Entry.where(organization: organization).order(:transacted_at, :id).pluck(:particulars).filter_map { |text| text[/\AInvoice (\d+)/, 1]&.to_i }
+    expect(invoices).to eq((1000...(1000 + invoices.size)).to_a)
+  end
+
+  it "carries last year's profit, so this year's balance sheet balances" do
+    organization = described_class.call(entries: 30)
+
+    month = TudlaAccounting::Period.leaf_periods_for_date(organization, Time.current).first
+    expect(TudlaAccounting::Reports::BalanceSheet.new(organization, month)).to be_balanced
+    retained_earnings = TudlaAccounting::Account.find_by(organization: organization, code: "3900")
+    expect(TudlaAccounting::Balance.peek(retained_earnings, month).ending_amount_cents).to be_positive
+  end
+
+  it "closes the first half of last year" do
+    organization = described_class.call(entries: 30)
+
+    months = TudlaAccounting::Period.where(organization: organization, children_count: 0).order(:from_date)
+    expect(months.first(6)).to all(be_closed)
+    expect(months.drop(6)).to all(have_attributes(closed?: false))
+  end
+
+  it "imports last month's statement for the operating account, with lines the books don't have" do
+    organization = described_class.call(entries: 30)
+
+    account = TudlaAccounting::Account.find_by(organization: organization, code: "1011")
+    lines = TudlaAccounting::BankStatementLine.where(account: account)
+    expect(lines.pluck(:description)).to include("Account keeping fee", "Interest")
+    expect(lines.pluck(:occurred_on)).to all(be_between(Date.new(2026, 5, 1), Date.new(2026, 5, 31)))
+  end
+
+  context "when the engine keeps its books in another time zone than the app's" do
+    around do |example|
+      zone = TudlaAccounting.configuration.time_zone
+      TudlaAccounting.configuration.time_zone = "Pacific/Auckland"
+      example.run
+    ensure
+      TudlaAccounting.configuration.time_zone = zone
+    end
+
+    it "dates the entries and the statement in the engine's" do
+      organization = described_class.call(entries: 30)
+
+      auckland = ActiveSupport::TimeZone["Pacific/Auckland"]
+      times = TudlaAccounting::Entry.where(organization: organization).where.not(posted_at: nil).pluck(:transacted_at).map { |time| time.in_time_zone(auckland) }
+      expect(times.map(&:hour)).to all(eq(12))
+      account = TudlaAccounting::Account.find_by(organization: organization, code: "1011")
+      expect(TudlaAccounting::BankStatementLine.where(account: account).pluck(:occurred_on)).to all(be_between(Date.new(2026, 5, 1), Date.new(2026, 5, 31)))
+      expect(TudlaAccounting::BalanceRebuilder.new(organization).differences).to be_empty
+    end
+  end
+
+  it "adds the new year's periods to books seeded last year" do
+    organization = described_class.call(entries: 30)
+    entry_count = TudlaAccounting::Entry.where(organization: organization).count
+
+    travel_back
+    travel_to(Time.zone.local(2027, 1, 5, 9))
+    expect(described_class.call).to eq(organization)
+    expect(TudlaAccounting::Period.leaf_periods_for_date(organization, Time.current)).to exist
+    expect(TudlaAccounting::Entry.where(organization: organization).count).to eq(entry_count)
+  end
+
+  it "fills in every year since, however long ago the books were seeded" do
+    organization = described_class.call(entries: 30)
+    entry_count = TudlaAccounting::Entry.where(organization: organization).count
+
+    travel_back
+    travel_to(Time.zone.local(2028, 3, 1, 9))
+    expect(described_class.call).to eq(organization)
+    years = TudlaAccounting::Period.roots.where(organization: organization).order(:from_date).map { |year| year.from_date.year }
+    expect(years).to eq([ 2025, 2026, 2027, 2028 ])
+    expect(TudlaAccounting::Entry.where(organization: organization).count).to eq(entry_count)
+  end
+end

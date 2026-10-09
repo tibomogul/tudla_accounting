@@ -11,7 +11,7 @@ RSpec.describe "Switching theme", type: :system do
 
   it "switches between light and dark, remembering the choice across pages" do
     page.execute_script("localStorage.setItem('theme', 'light')")
-    visit "/tudla_accounting/"
+    visit root_path
     expect(page).to have_button("Switch to dark theme")
     expect(html_theme).to eq("light")
 
@@ -24,7 +24,7 @@ RSpec.describe "Switching theme", type: :system do
     expect(page).to have_css("[data-theme-target=moon][hidden]", visible: :all)
     expect([ html_theme, saved_theme ]).to eq(%w[dark dark])
 
-    visit "/tudla_accounting/accounts"
+    visit accounts_path
     expect(html_theme).to eq("dark")
     expect(page).to have_button("Switch to light theme")
 

@@ -16,6 +16,7 @@ module SystemSignInHelpers
   def sign_in_as(organization)
     visit "/session/new"
     click_button "#{organization.name} (#{organization.currency})"
+    expect(page).to have_current_path(root_path) # the redirect has landed, so the queries below can't catch the login page
     expect(page).to have_css("h1", text: "Dashboard")
   end
 end

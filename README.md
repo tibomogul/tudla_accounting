@@ -253,7 +253,7 @@ docker compose exec rails bash -lc 'bundle exec rubocop -a'  # Auto-fix offenses
 ```
 
 ### Continuous integration
-`.github/workflows/ci.yml` runs RuboCop, the whole suite (system specs in headless Chrome) against PostgreSQL, and a strict `gem build` on every push and pull request. The test job sets up the databases with `bin/rails db:create db:schema:load` and points the dummy app at them through `DATABASE_HOST`, `DATABASE_USERNAME` and `DATABASE_PASSWORD`.
+`.github/workflows/ci.yml` runs RuboCop, the whole suite and the demo's specs (system specs in headless Chrome) against PostgreSQL, and a strict `gem build` on every push and pull request. The test job sets up the databases with `bin/rails db:create db:schema:load` and points the dummy app at them through `DATABASE_HOST`, `DATABASE_USERNAME` and `DATABASE_PASSWORD`.
 
 ### Dummy App (Development Server)
 ```bash
@@ -262,6 +262,17 @@ docker compose exec -d rails bash -lc 'bin/dev'                                 
 docker compose exec rails bash -lc "ps aux | grep -E 'foreman' | grep -v grep"                   # Check if running
 docker compose exec rails bash -lc 'pkill -f foreman || true'                                     # Stop dev server
 ```
+
+### Demo
+The dummy app doubles as a demo. The seeds build **Demo Co**: two years of books with a chart of accounts, GST, a department dimension, a couple of hundred posted entries and a few drafts, the first half of last year closed, and a bank statement to reconcile for the operating account. `bin/setup` runs them when it creates the database; `bin/setup --reset` drops the databases and rebuilds them, and `bin/rails app:db:seed` seeds an existing one. With `bin/dev` running, open `/session/new` and choose "Open the demo books"; that seeds Demo Co first if it isn't there yet. Seeding again leaves the books alone, apart from adding the new year's periods once the year turns.
+
+The demo code lives in the dummy app under the `Demo::` namespace (`spec/dummy/app/*/demo`) and has its own specs in `spec/dummy/spec`:
+
+```bash
+docker compose exec rails bash -lc 'cd spec/dummy && RAILS_ENV=test bundle exec rspec'
+```
+
+The engine's specs boot the dummy app without the demo, so they never depend on it.
 
 ## Integration into a Host Application
 

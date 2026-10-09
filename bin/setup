@@ -6,7 +6,7 @@ require 'optparse'
 # path to your application root.
 APP_ROOT = File.expand_path('..', __dir__)
 
-def setup
+def setup(reset:)
   FileUtils.chdir APP_ROOT do
     # This script is a way to set up or update your development environment automatically.
     # This script is idempotent, so that you can run it at any time and get an expectable outcome.
@@ -16,17 +16,20 @@ def setup
     # system! "gem install bundler --conservative"
     system! 'bundle check || bundle install'
 
-    log '== Dropping & recreating the development database =='
-    # Note that the very first time this runs, db:reset
-    # will fail, but this failure is fixed by
-    # doing a db:migrate
-    # system("bin/rails db:drop") || system!("bin/rails db:prepare")
-    system! 'cd spec/dummy && bin/rails db:reset || bin/rails db:migrate'
-
-    log '== Loading schemas for multi-database connections (queue, cable) =='
-    # Load schemas if they exist, but don't fail if they don't
-    system('cd spec/dummy && bin/rails db:schema:load:queue') || log('No queue schema yet (will be created by Solid Queue)')
-    system('cd spec/dummy && bin/rails db:schema:load:cable') || log('No cable schema yet (will be created by Solid Cable)')
+    # From the engine root (whose bin/rails names the dummy app's tasks app:db:*), where
+    # the engine's migrations are visible too: loading the schema from spec/dummy wouldn't
+    # record them, and they'd look pending.
+    if reset
+      log '== Recreating and seeding the development databases =='
+      # Drops them (the test databases too, in development), recreates them from every
+      # schema (primary, queue, cache, cable) and runs the seeds (Demo Co) once.
+      system! 'bin/rails app:db:reset'
+    else
+      log '== Preparing the development databases =='
+      # Creates, loads and seeds the databases that don't exist yet and migrates the rest;
+      # keeps what's in them.
+      system! 'bin/rails app:db:prepare'
+    end
 
     log '== Removing old logs and tempfiles =='
     system! 'cd spec/dummy && bin/rails log:clear tmp:clear'
@@ -46,8 +49,11 @@ end
 def help
   puts "Usage: #{$0}"
   puts ''
-  puts 'Installs gems, recreates dev database, and generally'
-  puts 'prepares the app to be run locally'
+  puts 'Installs gems, prepares the dev databases (creating and seeding them'
+  puts 'the first time), and generally prepares the app to be run locally'
+  puts ''
+  puts ' bin/setup --reset'
+  puts '    # drop, recreate and reseed the dev databases'
   puts ''
   puts 'Other useful commands:'
   puts ''
@@ -82,11 +88,13 @@ end
 
 # end of helpers
 
+reset = false
 OptionParser.new do |parser|
   parser.on('-h', '--help') do
     help
     exit
   end
+  parser.on('--reset') { reset = true }
 end.parse!
 
 if ARGV[0] == 'help'
@@ -95,5 +103,5 @@ elsif !ARGV[0].nil?
   puts "Unknown argument: '#{ARGV[0]}'"
   exit 1
 else
-  setup
+  setup(reset: reset)
 end

@@ -11,7 +11,7 @@ RSpec.describe "Confirming a delete", type: :system do
   def wait_for_confirm = expect(page).to have_css("form[data-confirm-ready]")
 
   it "asks for a second click before deleting" do
-    visit "/tudla_accounting/accounts/#{account.id}"
+    visit account_path(account)
     wait_for_confirm
 
     click_button "Delete"
@@ -19,15 +19,17 @@ RSpec.describe "Confirming a delete", type: :system do
     expect(TudlaAccounting::Account.exists?(account.id)).to be(true)
 
     click_button "Delete 1013 - Petty Cash? Click again to confirm"
+    expect(page).to have_current_path(accounts_path)
     expect(page).to have_content("Account 1013 - Petty Cash was deleted.")
     expect(TudlaAccounting::Account.exists?(account.id)).to be(false)
   end
 
   it "dismisses flash messages" do
-    visit "/tudla_accounting/accounts/#{account.id}"
+    visit account_path(account)
     wait_for_confirm
     click_button "Delete"
     click_button "Delete 1013 - Petty Cash? Click again to confirm"
+    expect(page).to have_current_path(accounts_path)
 
     within(".tc-alert") { click_button "Dismiss" }
     expect(page).to have_no_css(".tc-alert")
@@ -42,13 +44,15 @@ RSpec.describe "Confirming a delete", type: :system do
     entry.save!
     entry.post(entry.transacted_at)
 
-    visit "/tudla_accounting/entries/#{entry.id}"
+    visit entry_path(entry)
     wait_for_confirm
     click_button "Reverse"
     expect(page).to have_button("Reverse this entry? Click again to confirm")
     expect(entry.reload.reversal).to be_nil
 
     click_button "Reverse this entry? Click again to confirm"
+    # Only proves we left the entry's page: the reversal's id isn't known in advance.
+    expect(page).to have_no_current_path(entry_path(entry))
     expect(page).to have_content("Entry reversed on")
     expect(entry.reload.reversal).to be_present
   end

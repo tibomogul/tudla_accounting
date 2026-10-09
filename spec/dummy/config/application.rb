@@ -40,5 +40,18 @@ module Dummy
 
     # Don't generate system test files.
     config.generators.system_tests = nil
+
+    # Hooks into the stand-in login (SessionsController#new), set by the demo's initializer:
+    # a partial rendered below the organizations, and a filter on the organizations listed.
+    config.x.sign_in_partial = nil
+    config.x.sign_in_organizations = ->(organizations) { organizations }
+
+    # The demo (the Demo:: namespace in app/*/demo, its initializer, routes and seeds)
+    # runs in development and in the demo's own specs (spec/dummy/spec, which set
+    # TUDLA_DEMO=1). The engine's specs boot without it, so they see only the harness.
+    config.x.demo = ENV.fetch("TUDLA_DEMO") { Rails.env.test? ? "0" : "1" } == "1"
+    unless config.x.demo
+      Rails.autoloaders.main.ignore(*Dir[File.expand_path("../app/*/demo", __dir__)])
+    end
   end
 end
