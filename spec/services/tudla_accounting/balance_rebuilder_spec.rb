@@ -9,12 +9,11 @@ RSpec.describe TudlaAccounting::BalanceRebuilder, type: :service do
   let!(:y2027) { TudlaAccounting::PeriodCreator.call(organization, 2027) }
 
   before do
-    TudlaAccounting.configuration.retained_earnings_account_code = "3900"
     TudlaAccounting::AccountsCreator.call([
       { code: "1000", name: "Cash", category: "asset" },
       { code: "3000", name: "Equity", category: "equity", children: [
         { code: "3100", name: "Capital", category: "equity" },
-        { code: "3900", name: "Retained Earnings", category: "equity" }
+        { code: "3900", name: "Retained Earnings", category: "equity", role: "retained_earnings" }
       ] },
       { code: "4000", name: "Income", category: "income", children: [
         { code: "4010", name: "Sales", category: "income" },
@@ -90,8 +89,8 @@ RSpec.describe TudlaAccounting::BalanceRebuilder, type: :service do
     expect(TudlaAccounting::Balance.find_by(account: account("1000"), period: month(y2026, 1)).starting_amount_cents).to eq(400_00)
   end
 
-  it "doesn't carry profit when no retained earnings account is configured" do
-    TudlaAccounting.configuration.retained_earnings_account_code = nil
+  it "doesn't carry profit when no account is marked retained earnings" do
+    account("3900").update_column(:role, nil) # leaves the stored balances alone, unlike update!
     expect(rebuilder.expected(account("3900"), y2027)[:starting_amount_cents]).to eq(0)
   end
 

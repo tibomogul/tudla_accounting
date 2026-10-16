@@ -88,6 +88,13 @@ RSpec.describe "General ledger and cash flow", type: :service do
       expect(flow.cash_accounts).to eq([ account("1010") ])
     end
 
+    it "takes each organization's own cash accounts when they're set per organization" do
+      TudlaAccounting.configuration.cash_account_codes = ->(org) { %w[1011] if org == organization }
+      expect(flow.cash_accounts).to eq([ account("1011") ])
+      TudlaAccounting.configuration.cash_account_codes = ->(_org) { nil }
+      expect(flow).not_to be_configured
+    end
+
     it "explains the change in cash by activity, leaving out moves between cash accounts" do
       result = flow(cash_accounts: [ account("1010"), account("1011") ]) # 1011 is inside 1010: counted once
       expect(result.cash_accounts).to eq([ account("1010") ])

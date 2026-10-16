@@ -32,6 +32,18 @@
     <%= tc_field form, :cash_flow_activity, as: :select, label: "In the cash flow statement",
                  choices: [ [ "As its parent (or by category)", "" ], [ "Operating", "operating" ], [ "Investing", "investing" ], [ "Financing", "financing" ] ],
                  hint: "e.g. investing for equipment, financing for loans" %>
+    <% if tc_can?(:administer) %>
+      <%= tc_field form, :role, as: :select, label: "Role",
+                   choices: [ [ "None", "" ] ] + account_role_options,
+                   hint: "The account the books use for this; taking a role from another account moves it here. " \
+                         "Mark receivables and payables before posting to them. " \
+                         "Changing retained earnings recomputes all the balances, " \
+                         "and needs the periods after the first year open" %>
+    <% else %>
+      <%= tc_field form, :role, as: :select, label: "Role", disabled: true,
+                   choices: [ [ "None", "" ] ] + account_role_options,
+                   hint: "Only administrators change roles" %>
+    <% end %>
   </div>
 
   <div class="flex gap-2">

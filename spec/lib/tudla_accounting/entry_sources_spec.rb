@@ -25,7 +25,7 @@ RSpec.describe "TudlaAccounting entry sources" do
     include_context "with entry source models"
 
     let(:organization) { create(:organization) }
-    let!(:receivable) { create(:tudla_accounting_account, code: "1100", category: :asset, organization: organization) }
+    let!(:receivable) { create(:tudla_accounting_account, code: "1100", category: :asset, organization: organization, role: :receivable) }
     let!(:sales) { create(:tudla_accounting_account, code: "4000", category: :income, organization: organization) }
     let(:invoice) { Invoice.create!(due_date: Time.zone.local(2026, 4, 30)) }
 

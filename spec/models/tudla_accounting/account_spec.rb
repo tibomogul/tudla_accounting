@@ -1,4 +1,5 @@
 require "rails_helper"
+require_relative "../../support/configuration"
 
 RSpec.describe TudlaAccounting::Account, type: :model do
   it "builds from the factory" do
@@ -105,6 +106,81 @@ RSpec.describe TudlaAccounting::Account, type: :model do
       expect(equipment.update(category: :expense)).to be(false)
       expect(equipment.errors[:base]).to include("Category, parent and contra account can't change once the account has postings")
       expect(equipment.reload.update(name: "Plant")).to be(true)
+    end
+
+    describe "roles" do
+      let(:receivables) { create(:tudla_accounting_account, code: "1100", category: :asset, organization: organization, role: :receivable) }
+
+      it "marks at most one account of each role per organization, looked up by role" do
+        receivables
+        expect(TudlaAccounting::Account.for_role(organization, :receivable)).to eq(receivables)
+        expect(TudlaAccounting::Account.for_role(create(:organization), :receivable)).to be_nil
+        expect { TudlaAccounting::Account.for_role!(organization, :payable) }
+          .to raise_error(ArgumentError, "No account is marked as the Payables account for Organization #{organization.id}; mark one in the chart of accounts")
+      end
+
+      it "knows only its roles, each on accounts of a suitable category" do
+        role_errors = ->(account, role) { account.tap { TudlaAccounting::AccountRoleAssigner.save(account, role) }.errors[:role] }
+
+        expect(role_errors.call(build(:tudla_accounting_account, organization: organization), "petty_cash")).to eq([ "is not included in the list" ])
+        expect(role_errors.call(build(:tudla_accounting_account, category: :asset, organization: organization), :retained_earnings)).to eq([ "needs an equity account for Retained earnings" ])
+        expect(role_errors.call(build(:tudla_accounting_account, category: :asset, organization: organization), :realized_fx_gain)).to eq([ "needs an income or expense account for Realized exchange gains and losses" ])
+        expect(TudlaAccounting::AccountRoleAssigner.save(build(:tudla_accounting_account, category: :expense, organization: organization), :realized_fx_gain)).to be(true)
+        expect(build(:tudla_accounting_account).tap { |account| account.role = "" }).to have_attributes(role: nil)
+      end
+
+      # Its rules (what posting and closed periods leave in place) are AccountRoleAssigner's.
+      it "changes its role only through AccountRoleAssigner" do
+        message = [ "changes only through TudlaAccounting::AccountRoleAssigner" ]
+        other = create(:tudla_accounting_account, code: "1150", category: :asset, organization: organization)
+
+        expect(other.update(role: :receivable)).to be(false)
+        expect(other.errors[:role]).to eq(message)
+        expect(TudlaAccounting::Account.new(organization: organization, code: "1160", name: "Debtors", category: :asset, role: :receivable)
+                 .tap(&:validate).errors[:role]).to eq(message)
+        expect(receivables.update(role: nil)).to be(false)
+        expect(receivables.reload.role).to eq("receivable")
+      end
+
+      # So nothing else saved meanwhile, by a callback say, skips AccountRoleAssigner's checks.
+      it "lets only the account being assigned change its role, and only in the block" do
+        other = create(:tudla_accounting_account, code: "2100", category: :liability, organization: organization)
+
+        receivables.allowing_role_change { expect(other.update(role: :payable)).to be(false) }
+        expect(other.errors[:role]).to eq([ "changes only through TudlaAccounting::AccountRoleAssigner" ])
+        expect(receivables.update(role: nil)).to be(false)
+      end
+
+      # Nothing raises without them, so the dashboard and balances:check warn instead.
+      describe ".missing_roles" do
+        include_context "with isolated TudlaAccounting configuration"
+
+        it "expects retained earnings, and receivables or payables once a source records them" do
+          expect(TudlaAccounting::Account.missing_roles(organization)).to eq(%w[retained_earnings])
+
+          TudlaAccounting.configuration.carrying_amount_sources = { "Invoice" => :receivable }
+          expect(TudlaAccounting::Account.missing_roles(organization)).to eq(%w[receivable retained_earnings])
+          receivables
+          expect(TudlaAccounting::Account.missing_roles(organization)).to eq(%w[retained_earnings])
+        end
+
+        it "expects the exchange roles once an account is held in another currency" do
+          create(:tudla_accounting_account, code: "1010", category: :asset, organization: organization, currency: organization.currency)
+          expect(TudlaAccounting::Account.missing_roles(organization)).to eq(%w[retained_earnings])
+
+          create(:tudla_accounting_account, code: "1020", category: :asset, organization: organization, currency: "EUR")
+          expect(TudlaAccounting::Account.missing_roles(organization)).to eq(%w[retained_earnings unrealized_fx_gain realized_fx_gain])
+
+          create(:tudla_accounting_account, code: "4900", category: :income, organization: organization, role: :realized_fx_gain)
+          expect(TudlaAccounting::Account.missing_roles(organization)).to eq(%w[retained_earnings unrealized_fx_gain])
+        end
+      end
+
+      it "lets an account with postings be renumbered, roles included" do
+        post_to(receivables)
+        expect(receivables.reload.update(code: "1199")).to be(true)
+        expect(TudlaAccounting::Account.for_role(organization, :receivable).code).to eq("1199")
+      end
     end
 
     it "can only be deleted with no postings, sub-accounts or contra accounts" do

@@ -57,7 +57,7 @@ TudlaAccounting::AccountsCreator.call([
     { code: "1100", name: "Receivables", category: "asset" }, { code: "1500", name: "Equipment", category: "asset" } ] },
   { code: "2000", name: "Liabilities", category: "liability", children: [
     { code: "2100", name: "Payables", category: "liability" }, { code: "2200", name: "GST", category: "liability" }, { code: "2500", name: "Loan", category: "liability" } ] },
-  { code: "3000", name: "Equity", category: "equity", children: [ { code: "3100", name: "Capital", category: "equity" }, { code: "3900", name: "Retained earnings", category: "equity" } ] },
+  { code: "3000", name: "Equity", category: "equity", children: [ { code: "3100", name: "Capital", category: "equity" }, { code: "3900", name: "Retained earnings", category: "equity", role: "retained_earnings" } ] },
   { code: "4000", name: "Income", category: "income", children: (1..4).map { |i| { code: "40#{i}0", name: "Sales #{i}", category: "income" } } },
   { code: "6000", name: "Expenses", category: "expense", children: (1..9).map { |i| { code: "60#{i}0", name: "Expense #{i}", category: "expense" } } }
 ], organization)
@@ -121,6 +121,30 @@ measure("bank summary (one account)") { TudlaAccounting::BankReconciler.new(bank
 measure("bank suggestions (one account)") { TudlaAccounting::BankReconciler.new(bank).suggestions }
 differences = measure("balance check (differences)") { TudlaAccounting::BalanceRebuilder.new(organization).differences.size }
 puts "  !! #{differences} balances differ from the posted entries" unless differences.zero?
+# What moving retained earnings costs: the assigner rebuilds the balances under the
+# posting lock, in its own transaction. An entry posted meanwhile waits for it: how long is
+# how long the organization's posting stops. Moved back afterwards, unmeasured.
+waiting = build_entry.call(ENTRY_COUNT)
+locked = Queue.new
+move = Thread.new do
+  ActiveRecord::Base.connection_pool.with_connection do
+    ActiveRecord::Base.transaction do
+      organization.class.lock.find(organization.id) # held through the assigner's rebuild, which takes it too
+      locked << true
+      moved = measure("move retained earnings (with rebuild)") { TudlaAccounting::AccountRoleAssigner.save(accounts["3100"], :retained_earnings) }
+      puts "  !! #{accounts['3100'].errors.full_messages.to_sentence}" unless moved
+    end
+  end
+end
+locked.pop
+started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+waiting.post(waiting.transacted_at)
+puts format("%-44s %9.3fs", "  an entry posted meanwhile, waiting", Process.clock_gettime(Process::CLOCK_MONOTONIC) - started)
+move.join
+TudlaAccounting::AccountRoleAssigner.save(accounts["3900"].reload, :retained_earnings)
+measure("full rebuild (Setup, rake), nothing to fix") { TudlaAccounting::BalanceRebuilder.new(organization).rebuild! }
+first_month = years.first.children.order(:from_date).first
+measure("close a month") { first_month.close! }
 
 puts "\nPages"
 ActionController::Base.allow_forgery_protection = false # this script signs in with a plain POST

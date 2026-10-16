@@ -53,6 +53,24 @@ RSpec.describe TudlaAccounting::AccountsCreator, type: :service do
     expect(account("2000").contra_account).to eq(parent)
   end
 
+  it "marks the accounts given a role, moving it from another account" do
+    old = create(:tudla_accounting_account, code: "3000", category: :equity, organization: organization, role: "retained_earnings")
+
+    described_class.call([ { code: "1100", name: "Receivables", category: :asset, role: :receivable },
+                           { code: "3900", name: "Retained Earnings", category: :equity, role: "retained_earnings" } ], organization)
+
+    expect([ account("1100").role, account("3900").role, old.reload.role ]).to eq([ "receivable", "retained_earnings", nil ])
+  end
+
+  it "creates nothing when a role is given to more than one account" do
+    chart = [ { code: "1100", name: "Trade debtors", category: :asset, role: :receivable },
+              { code: "1150", name: "Other debtors", category: :asset, role: "receivable" } ]
+
+    expect { described_class.call(chart, organization) }
+      .to raise_error(ArgumentError, "Role Receivables is given to more than one account: 1100, 1150")
+    expect(TudlaAccounting::Account.where(organization: organization)).to be_empty
+  end
+
   it "rejects a child whose category differs from its parent's" do
     parent = create(:tudla_accounting_account, code: "9999", category: :asset, organization: organization)
     expect { described_class.call([ { "code" => "2000", "name" => "Loan", "category" => "liability" } ], organization, parent.id) }

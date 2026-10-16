@@ -9,15 +9,14 @@ RSpec.describe "Realized exchange gains and losses", type: :service do
   let!(:year) { TudlaAccounting::PeriodCreator.call(organization, 2026) }
 
   before do
-    TudlaAccounting.configuration.realized_fx_gain_account_code = "4950"
     TudlaAccounting::AccountsCreator.call([
       { code: "1000", name: "Cash", category: "asset" },
-      { code: "1100", name: "Accounts Receivable", category: "asset", children: [
+      { code: "1100", name: "Accounts Receivable", category: "asset", role: "receivable", children: [
         { code: "1100-EUR", name: "Accounts Receivable - EUR", category: "asset", currency: "EUR" } ] },
-      { code: "2100", name: "Accounts Payable", category: "liability", children: [
+      { code: "2100", name: "Accounts Payable", category: "liability", role: "payable", children: [
         { code: "2100-EUR", name: "Accounts Payable - EUR", category: "liability", currency: "EUR" } ] },
       { code: "4000", name: "Sales", category: "income" },
-      { code: "4950", name: "Realized FX Gain", category: "income" },
+      { code: "4950", name: "Realized FX Gain", category: "income", role: "realized_fx_gain" },
       { code: "5000", name: "Purchases", category: "expense" }
     ], organization)
   end
@@ -179,7 +178,7 @@ RSpec.describe "Realized exchange gains and losses", type: :service do
     end
 
     it "does not count revaluations of the invoice as payments" do
-      TudlaAccounting.configuration.unrealized_fx_gain_account_code = "4950"
+      TudlaAccounting::AccountRoleAssigner.save!(TudlaAccounting::Account.new(organization: organization, code: "4900", name: "Unrealized FX Gain", category: "income"), "unrealized_fx_gain")
       TudlaAccounting::ForexRate.create!(from: "EUR", to: "AUD", year: 2026, month: 3, day: 31, rate: BigDecimal("1.60"))
       invoice(100, "1.54")
       TudlaAccounting::RevaluationEntryGenerator.call(organization, Date.new(2026, 3, 31), Date.new(2026, 4, 1))
@@ -190,7 +189,7 @@ RSpec.describe "Realized exchange gains and losses", type: :service do
   end
 
   context "without a realized gain account" do
-    before { TudlaAccounting.configuration.realized_fx_gain_account_code = nil }
+    before { TudlaAccounting::AccountRoleAssigner.save!(account("4950"), nil) }
 
     it "still settles the carrying amount at book value, but cannot post the difference" do
       inv = invoice(100, "1.54")
@@ -200,7 +199,15 @@ RSpec.describe "Realized exchange gains and losses", type: :service do
 
       expect(carrying_amount(inv, "1100-EUR").amount_cents).to eq(0)
       expect(balance("1100-EUR")).to eq(aud(-6))
-      expect(Rails.logger).to have_received(:warn).with(/realized_fx_gain_account_code is not set; exchange difference on Invoice 1001 not posted/)
+      expect(Rails.logger).to have_received(:warn).with(/No account is marked as the Realized exchange gains and losses account for Organization #{organization.id}; mark one in the chart of accounts; exchange difference on Invoice 1001 not posted/)
     end
+  end
+
+  it "books the difference to the account marked for it, whatever its code" do
+    account("4950").update!(code: "7950")
+    payment = receive_payment(invoice(100, "1.54"), 100, "1.60")
+
+    realized = TudlaAccounting::Entry.find_by(related: payment)
+    expect(realized.details.map { |d| [ d.account.code, d.tally, d.amount ] }).to contain_exactly([ "1100-EUR", "debit", aud(6) ], [ "7950", "credit", aud(6) ])
   end
 end

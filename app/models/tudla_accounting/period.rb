@@ -87,11 +87,14 @@ module TudlaAccounting
       end
     end
 
+    # Under the posting lock, as role changes check for closed periods (AccountRoleAssigner).
     def close!(at: Time.current)
-      blocker = close_blocker
-      raise ArgumentError, blocker if blocker
-
       transaction do
+        organization.class.lock.find(organization.id)
+        reload # as another close may have left it
+        blocker = close_blocker
+        raise ArgumentError, blocker if blocker
+
         subtree.where(closed_at: nil).update_all(closed_at: at)
         reload
         AuditEvent.record!("period.closed", organization: organization, subject: self)
@@ -100,10 +103,12 @@ module TudlaAccounting
 
     # Reopening needs a reason, kept on the audit event.
     def reopen!(reason:)
-      blocker = reopen_blocker || ("Give a reason for reopening #{label}" if reason.blank?)
-      raise ArgumentError, blocker if blocker
-
       transaction do
+        organization.class.lock.find(organization.id)
+        reload
+        blocker = reopen_blocker || ("Give a reason for reopening #{label}" if reason.blank?)
+        raise ArgumentError, blocker if blocker
+
         update!(closed_at: nil)
         AuditEvent.record!("period.reopened", organization: organization, subject: self, details: { reason: reason })
       end

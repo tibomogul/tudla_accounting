@@ -19,9 +19,14 @@ namespace :tudla_accounting do
       "#{organization.class.name}:#{organization.id}"
     end
 
-    desc "Compare stored balances with the posted entries (ORGANIZATION=Type:id for one); exits 1 on a difference"
+    desc "Compare stored balances with the posted entries (ORGANIZATION=Type:id for one); exits 1 on a difference. " \
+         "Also warns about missing receivable, payable or retained earnings accounts"
     task check: :environment do
       differences = organizations.call.flat_map do |organization|
+        # Warnings only: books without receivables, say, are fine.
+        TudlaAccounting::Account.missing_roles(organization).each do |role|
+          puts "#{describe.call(organization)}  warning: no account is marked as the #{TudlaAccounting::Account.role_name(role)} account"
+        end
         TudlaAccounting::BalanceRebuilder.new(organization).differences.each do |difference|
           puts [ describe.call(organization), difference.account.code, difference.period.from_date.to_date, difference.field,
                  "stored #{difference.stored.inspect}", "expected #{difference.expected}" ].join("  ")

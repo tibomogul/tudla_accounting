@@ -29,9 +29,11 @@ An entry can point at a `source` record in the host app, such as the invoice it 
 **Year end.** Each top-level period is a financial year, and balances carry across years automatically, with no closing step:
 - asset, liability and equity accounts open each year with their closing balance from the year before;
 - income and expense accounts start each year at zero;
-- the previous year's net profit (income less expenses) is added to the retained earnings account set in `retained_earnings_account_code`, and to the accounts above it.
+- the previous year's net profit (income less expenses) is added to the organization's retained earnings account (the one with `role: "retained_earnings"`; see account roles below), and to the accounts above it.
 
-Back-dated entries into an earlier year follow the same rules, so later years stay correct whatever order entries are posted in. `Balance.net_profit(organization, year)` returns a year's profit. Without `retained_earnings_account_code`, income and expenses still restart each year, but the profit isn't carried, so later years' balance sheets won't balance.
+Back-dated entries into an earlier year follow the same rules, so later years stay correct whatever order entries are posted in. `Balance.net_profit(organization, year)` returns a year's profit. Without a retained earnings account, income and expenses still restart each year, but the profit isn't carried, so later years' balance sheets won't balance. Marking one later, moving the role to another account or taking it off rebuilds the organization's balances (see below) as part of the change, so every earlier year's profit lands where it now belongs: a client taken on mid-stream can have its years posted first.
+
+**Account roles.** Each organization marks the accounts the books treat specially, at most one of each, on its own chart: `Account#role` is `receivable` (an asset: what customers owe, with the accounts beneath it), `payable` (a liability), `retained_earnings` (equity), `unrealized_fx_gain` or `realized_fx_gain` (income or expense). Set it in the account form, with a `Role` column in the chart of accounts import, or with `role:` in `AccountsCreator`; `Account.for_role(organization, :receivable)` finds it. Since the engine goes by the role and never by code, accounts can be renumbered freely, and every organization's chart can differ. Roles change only through `AccountRoleAssigner.save(account, role)`, which the form (for those with `:administer`), the import and `AccountsCreator` use; a plain `account.update(role:)` is refused. Taking a role another account holds moves it, except that receivables and payables stay on an account once it, or an account beneath it, has posted lines (its open items would be left behind). See [USAGE.md](USAGE.md) for setting up an organization's books step by step.
 
 **Checking and rebuilding balances.** Balances are a running total kept by posting; the posted entries and the first year's opening balances are the record. `TudlaAccounting::BalanceRebuilder.new(organization).differences` works every balance out again from those, independently of the posting code, and lists any stored figure that differs (or a balance with activity that is missing). `rebuild!` rewrites the stored balances to match, under the same organization lock as posting, and never touches entries. From the command line:
 
@@ -86,7 +88,7 @@ By default tax counts when its lines are posted (accrual basis). With `basis: :c
 A foreign-currency account's ledger lines are compared by their foreign amount, and it has no book balance in its own currency. An entry created from one of its statement lines is in the organization's currency, converted at the rate given (`create_entry!(line, account:, rate:)`, or the Rate field) or else the rate provider's rate for the line's date; the bank line carries the statement amount as its foreign amount, and so does the other line when its account is held in the same currency. Imports and matches are on the audit trail. The **Banking** page does all of this per account.
 
 ### Receivables and payables (carrying amounts)
-After posting, `CarryingAmountProcessor` keeps track of what's still owed. Posting an entry whose source is an invoice or bill opens a `CarryingAmount` on its receivable or payable line, with a due date and any foreign-currency amount. Posting a payment, disbursement or credit note opens a **credit** for the customer or supplier: a carrying amount on its line with a negative amount. If money moves through a bank account held in another currency (`BankAccountBalance`), that balance is updated in its own currency.
+After posting, `CarryingAmountProcessor` keeps track of what's still owed. Posting an entry whose source is an invoice or bill opens a `CarryingAmount` on its receivable or payable line (on the account marked `receivable` or `payable`, or one beneath it), with a due date and any foreign-currency amount. Posting a payment, disbursement or credit note opens a **credit** for the customer or supplier: a carrying amount on its line with a negative amount. If money moves through a bank account held in another currency (`BankAccountBalance`), that balance is updated in its own currency.
 
 Credits are applied to what is owed through **allocations** (`TudlaAccounting::Allocation`):
 - A payment or credit note that names an invoice or bill as `related` is applied to it automatically, up to what is still owed. Anything over stays as the customer's or supplier's credit, so an invoice never goes below zero.
@@ -140,8 +142,8 @@ TudlaAccounting::EntryPostingJob.perform_later(entry.id)
 - **`ForexRateRetriever.call(from:, to:, date:)`** returns how many `to` one `from` was worth on a date. Rates are cached in `ForexRate`, and missing ones come from `forex_rate_provider`.
 - **`RbaForexRateProvider`** reads the Reserve Bank of Australia's published rates. It needs the `spreadsheet` gem in the host app and network access. A weekend or holiday uses the latest earlier business day.
 - **`ForexGainOrLossCalculator`** gives the gain or loss on a foreign amount of a receivable or payable between its booked rate and a date's rate.
-- **Settlement at a different rate.** When a foreign-currency payment or credit is applied to a foreign-currency invoice or bill, its carrying amount goes down by the book value of the foreign amount, at the rate it was booked at. The difference from the credit's own value for that foreign amount is posted as a realized exchange gain or loss against `realized_fx_gain_account_code`, dated with the allocation (and reversed if the allocation is taken off). Each part payment books its own share, and the final one books what remains, so the receivable or payable ends at zero. An overpayment books a gain or loss only on what was owed, and leaves the extra as a credit in the foreign currency. Without that setting, the carrying amount is still correct, but the difference stays on the receivable or payable account and a warning is logged.
-- **`RevaluationEntryGenerator.call(organization, period_end, next_period_start)`** revalues open foreign-currency receivables and payables at the period-end rate. It posts the unrealized gain or loss against `unrealized_fx_gain_account_code`, then posts a reversal on the next period's start, so the later settlement isn't double-counted. Running it twice for the same date does nothing more.
+- **Settlement at a different rate.** When a foreign-currency payment or credit is applied to a foreign-currency invoice or bill, its carrying amount goes down by the book value of the foreign amount, at the rate it was booked at. The difference from the credit's own value for that foreign amount is posted as a realized exchange gain or loss to the account marked `realized_fx_gain`, dated with the allocation (and reversed if the allocation is taken off). Each part payment books its own share, and the final one books what remains, so the receivable or payable ends at zero. An overpayment books a gain or loss only on what was owed, and leaves the extra as a credit in the foreign currency. Without that account, the carrying amount is still correct, but the difference stays on the receivable or payable account and a warning is logged.
+- **`RevaluationEntryGenerator.call(organization, period_end, next_period_start)`** revalues open foreign-currency receivables and payables at the period-end rate. It posts the unrealized gain or loss to the account marked `unrealized_fx_gain` (needed only when there's something to revalue), then posts a reversal on the next period's start, so the later settlement isn't double-counted. Running it twice for the same date does nothing more.
 
 ### Multi-tenancy
 Accounts, periods, entries, lines and balances all belong to a polymorphic `organization`, provided by the host app. The organization must respond to `currency`, which is the currency its books are kept in.
@@ -216,6 +218,8 @@ TudlaAccounting::Balance.find_by(account: cash, period: year).ending_amount   # 
 - A full dummy Rails app in `spec/dummy/` for running the engine
 
 ## Getting Started
+
+TudlaAccounting is pre-1.0 and no version has been published yet: the tags (0.1.0, 0.2.0) are milestones, and later versions don't support upgrading from them. Start from a fresh install.
 
 ```bash
 docker compose up -d
@@ -313,13 +317,16 @@ TudlaAccounting.configure do |config|
 
   config.base_currency = "USD"
   config.time_zone = "UTC"                # zone PeriodCreator builds periods in; plain Dates are read in it
-  config.retained_earnings_account_code = "3900" # takes in each year's net profit at year end
-  config.cash_account_codes = %w[1010]    # cash for the cash flow statement, with sub-accounts
+  # Retained earnings, receivables, payables and exchange gains are accounts marked by
+  # role in each organization's chart (see account roles), not settings.
+  config.cash_account_codes = %w[1010]    # the cash flow statement's default cash, with sub-accounts;
+  # or a callable given the organization, for books whose charts differ (a bookkeeper's clients):
+  # config.cash_account_codes = ->(organization) { organization.cash_account_codes }
+  config.organization_label = ->(organization) { organization.name } # names it in errors (default: class and id)
 
-  # Receivables and payables (carrying amounts). Off until configured: entries
-  # still post normally, but no carrying amounts are tracked.
-  config.receivable_account_code = "1100" # this account and every account beneath it
-  config.payable_account_code = "2100"
+  # Receivables and payables (carrying amounts). Off until the organization has an
+  # account marked receivable or payable: entries still post normally, but no
+  # carrying amounts are tracked.
   config.carrying_amount_sources = {      # entry source class => role
     "Invoice" => :receivable,             # opens a receivable
     "Bill" => :payable,                   # opens a payable
@@ -333,10 +340,9 @@ TudlaAccounting.configure do |config|
   config.due_date_method = :due_date      # read from the source; blank if it doesn't respond
   config.related_party_method = :customer # who owes or is owed, read from the source; the organization if unset
 
-  # Foreign exchange: where missing rates come from, and where revaluation gains/losses go
+  # Foreign exchange: where missing rates come from (gains and losses go to the accounts
+  # marked unrealized_fx_gain and realized_fx_gain)
   config.forex_rate_provider = TudlaAccounting::RbaForexRateProvider.new # or any ->(from:, to:, date:) { rate }
-  config.unrealized_fx_gain_account_code = "4900"
-  config.realized_fx_gain_account_code = "4950"   # gains/losses when foreign invoices and bills are settled
 end
 ```
 

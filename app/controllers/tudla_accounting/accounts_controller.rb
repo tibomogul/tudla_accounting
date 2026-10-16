@@ -27,8 +27,8 @@ module TudlaAccounting
     end
 
     def create
-      @account = organization_scope(Account).new(account_params)
-      if @account.save
+      @account = organization_scope(Account).new(account_params.except(:role))
+      if save_account(account_params[:role])
         redirect_to account_path(@account), notice: "Account #{@account.code_with_name} was created."
       else
         render :new, status: :unprocessable_entity
@@ -39,7 +39,8 @@ module TudlaAccounting
     end
 
     def update
-      if @account.update(account_params)
+      @account.assign_attributes(account_params.except(:role))
+      if save_account(account_params.fetch(:role, @account.role))
         redirect_to account_path(@account), notice: "Account #{@account.code_with_name} was updated."
       else
         render :edit, status: :unprocessable_entity
@@ -56,6 +57,18 @@ module TudlaAccounting
 
     private
 
+    # Through AccountRoleAssigner only when the role changes, as it takes the posting lock.
+    # Changing a role needs :administer: moving retained earnings restates every year after
+    # the first and rebuilds all the balances.
+    def save_account(role)
+      role = role.presence
+      return @account.save if role == @account.role
+      return AccountRoleAssigner.save(@account, role) if tc_can?(:administer)
+
+      @account.errors.add(:role, "can only be changed by an administrator")
+      false
+    end
+
     def organization_accounts
       organization_scope(Account).order(:code)
     end
@@ -64,13 +77,16 @@ module TudlaAccounting
       @account = organization_scope(Account).find(params[:id])
     end
 
-    # Parent and contra accounts can only be the organization's own.
+    # Parent and contra accounts can only be the organization's own. The role is saved
+    # through AccountRoleAssigner, which moves it from another account.
     def account_params
-      permitted = params.require(:account).permit(:code, :name, :category, :currency, :parent_id, :contra_account_id, :cash_flow_activity)
-      %i[parent_id contra_account_id].each do |key|
-        permitted[key] = organization_scope(Account).find(permitted[key]).id if permitted[key].present?
+      @account_params ||= begin
+        permitted = params.require(:account).permit(:code, :name, :category, :currency, :parent_id, :contra_account_id, :cash_flow_activity, :role)
+        %i[parent_id contra_account_id].each do |key|
+          permitted[key] = organization_scope(Account).find(permitted[key]).id if permitted[key].present?
+        end
+        permitted
       end
-      permitted
     end
 
     def year_for(time)

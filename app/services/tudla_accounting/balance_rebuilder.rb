@@ -27,11 +27,7 @@ module TudlaAccounting
 
     def initialize(organization)
       @organization = organization
-      @accounts = TudlaAccounting::Account.where(organization: organization).to_a
-      @periods = TudlaAccounting::Period.where(organization: organization).to_a
-      @children = @periods.group_by(&:parent_id).transform_values { |periods| periods.sort_by(&:from_date) }
-      @roots = @children.fetch(nil, [])
-      @expected = {}
+      load_books
     end
 
     def differences
@@ -39,11 +35,14 @@ module TudlaAccounting
     end
 
     # Rewrites the stored balances to the expected ones (creating any that are missing)
-    # under the organization's posting lock. Returns how many balances changed.
+    # under the organization's posting lock. Returns how many balances changed. The
+    # balances.rebuilt audit event names the accounts corrected, so a rebuild can't quietly
+    # cover up drift.
     def rebuild!
       ActiveRecord::Base.transaction do
         organization.class.lock.find(organization.id)
-        @expected = {}
+        # Again under the lock: an account's role, say, may have changed since.
+        load_books
         @movements = @openings = @differences = nil
         fixes = differences.group_by { |difference| [ difference.account, difference.period ] }
         fixes.each_key do |account, period|
@@ -52,7 +51,8 @@ module TudlaAccounting
           balance.assign_attributes(values.merge(organization: organization, currency: currency))
           balance.save!
         end
-        TudlaAccounting::AuditEvent.record!("balances.rebuilt", organization: organization, details: { corrected: fixes.size })
+        corrected = fixes.keys.map { |account, _period| account.code }.uniq.sort
+        TudlaAccounting::AuditEvent.record!("balances.rebuilt", organization: organization, details: { corrected: fixes.size, accounts: corrected })
         fixes.size
       end
     end
@@ -68,6 +68,15 @@ module TudlaAccounting
     end
 
     private
+
+    def load_books
+      @accounts = TudlaAccounting::Account.where(organization: organization).to_a
+      @periods = TudlaAccounting::Period.where(organization: organization).to_a
+      @children = @periods.group_by(&:parent_id).transform_values { |periods| periods.sort_by(&:from_date) }
+      @roots = @children.fetch(nil, [])
+      @expected = {}
+      remove_instance_variable(:@retained_earnings) if defined?(@retained_earnings)
+    end
 
     def currency
       organization.currency
@@ -169,8 +178,7 @@ module TudlaAccounting
     def retained_earnings
       return @retained_earnings if defined?(@retained_earnings)
 
-      code = TudlaAccounting.configuration.retained_earnings_account_code
-      @retained_earnings = code.present? ? @accounts.find { |account| account.code == code } : nil
+      @retained_earnings = @accounts.find(&:role_retained_earnings?)
     end
   end
 end

@@ -34,8 +34,16 @@ module TudlaAccounting
       when "dimension_value.created" then safe_join([ "Added ", subject ])
       when "dimension.updated", "dimension_value.updated"
         safe_join([ "Changed ", subject, ": #{details.fetch('changes', {}).keys.map(&:humanize).join(', ').downcase}" ])
-      when "balances.rebuilt" then "Rebuilt the balances: #{pluralize(details['corrected'], 'balance')} corrected"
+      when "balances.rebuilt" then rebuilt_description(details)
       end
+    end
+
+    # Which accounts a rebuild corrected. Events from before the accounts were recorded
+    # give the count only.
+    def rebuilt_description(details)
+      text = "Rebuilt the balances: #{pluralize(details['corrected'], 'balance')} corrected"
+      text += " (#{details['accounts'].to_sentence})" if details["accounts"].present?
+      text
     end
 
     def activity_kind_options

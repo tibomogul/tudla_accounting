@@ -21,7 +21,6 @@ RSpec.describe "Reports", type: :service do
   end
 
   before do
-    TudlaAccounting.configuration.retained_earnings_account_code = "3900"
     TudlaAccounting::AccountsCreator.call([
       { code: "1000", name: "Assets", category: "asset", children: [
         { code: "1010", name: "Cash", category: "asset" },
@@ -31,7 +30,7 @@ RSpec.describe "Reports", type: :service do
       { code: "2000", name: "Loan", category: "liability" },
       { code: "3000", name: "Equity", category: "equity", children: [
         { code: "3100", name: "Capital", category: "equity" },
-        { code: "3900", name: "Retained Earnings", category: "equity" }
+        { code: "3900", name: "Retained Earnings", category: "equity", role: "retained_earnings" }
       ] },
       { code: "4000", name: "Sales", category: "income" },
       { code: "4090", name: "Sales Returns", category: "income", contra_account: "4000" },

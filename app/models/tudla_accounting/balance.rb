@@ -117,10 +117,9 @@ module TudlaAccounting
         BalancePoster.new(year.organization).carry_into_later_years(account, year, delta_cents)
       end
 
-      # The configured retained earnings account for an organization, if any.
+      # The organization's retained earnings account (Account#role), if it has one.
       def retained_earnings_account(organization)
-        code = TudlaAccounting.configuration.retained_earnings_account_code
-        TudlaAccounting::Account.find_by(organization: organization, code: code) if code.present?
+        TudlaAccounting::Account.for_role(organization, :retained_earnings)
       end
 
       # Net profit for a year (income less expenses), from the top-level income and

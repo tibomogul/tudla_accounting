@@ -11,6 +11,13 @@
   </div>
 <% end %>
 
+<% if @missing_roles.any? %>
+  <div class="tc-alert tc-alert-warning mb-6" role="status" data-missing-roles>
+    <span><%= missing_roles_warning(@missing_roles) %>
+      <%= link_to "Mark #{@missing_roles.one? ? 'it' : 'them'} in the chart of accounts", accounts_path, class: "underline" %>.</span>
+  </div>
+<% end %>
+
 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
   <div class="tc-card tc-card-body">
     <p class="tc-stat-label">Profit this year</p>

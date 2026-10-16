@@ -12,12 +12,11 @@ RSpec.describe "Year-end carry-forward" do
   let!(:y2027) { TudlaAccounting::PeriodCreator.call(organization, 2027) }
 
   before do
-    TudlaAccounting.configuration.retained_earnings_account_code = "3900"
     TudlaAccounting::AccountsCreator.call([
       { code: "1000", name: "Cash", category: "asset" },
       { code: "3000", name: "Equity", category: "equity", children: [
         { code: "3100", name: "Capital", category: "equity" },
-        { code: "3900", name: "Retained Earnings", category: "equity" }
+        { code: "3900", name: "Retained Earnings", category: "equity", role: "retained_earnings" }
       ] },
       { code: "4000", name: "Income", category: "income", children: [
         { code: "4010", name: "Sales", category: "income" },
@@ -121,8 +120,75 @@ RSpec.describe "Year-end carry-forward" do
     expect(opening("1000", y2026)).to eq(usd(0))
   end
 
-  context "without a retained earnings account configured" do
-    before { TudlaAccounting.configuration.retained_earnings_account_code = nil }
+  context "with the retained earnings account marked by role" do
+    def rebuilds = TudlaAccounting::AuditEvent.where(action: "balances.rebuilt", organization: organization)
+
+    it "carries the profit into it whatever its code" do
+      account("3900").update!(code: "3950")
+      record_2026
+
+      expect(opening("3950", y2027)).to eq(usd(330))
+      expect(TudlaAccounting::BalanceRebuilder.new(organization).differences).to be_empty
+    end
+
+    # A client taken on mid-stream: years posted before any account was marked.
+    it "carries the earlier years' profit into an account marked late, rebuilding the balances" do
+      TudlaAccounting::AccountRoleAssigner.save!(account("3900"), nil)
+      record_2026
+      expect(opening("3900", y2027)).to eq(usd(0))
+
+      expect { expect(TudlaAccounting::AccountRoleAssigner.save(account("3900"), :retained_earnings)).to be(true) }
+        .to change { rebuilds.count }.by(1)
+      expect_2027_books
+      expect(TudlaAccounting::BalanceRebuilder.new(organization).differences).to be_empty
+    end
+
+    it "carries it into a retained earnings account created late" do
+      TudlaAccounting::AccountRoleAssigner.save!(account("3900"), nil)
+      record_2026
+      TudlaAccounting::AccountsCreator.call([ { code: "3950", name: "Accumulated profits", category: "equity", role: "retained_earnings" } ],
+                                            organization, account("3000").id)
+
+      expect(opening("3950", y2027)).to eq(usd(330))
+      expect(TudlaAccounting::BalanceRebuilder.new(organization).differences).to be_empty
+    end
+
+    it "moves the carried profit when the role moves to another account" do
+      record_2026
+      other = TudlaAccounting::Account.create!(organization: organization, parent: account("3000"), code: "3950", name: "Accumulated profits", category: "equity")
+
+      expect { TudlaAccounting::AccountRoleAssigner.save(other, :retained_earnings) }
+        .to change { rebuilds.count }.by(1)
+      expect(account("3900").role).to be_nil
+      expect(opening("3950", y2027)).to eq(usd(330))
+      expect(opening("3900", y2027)).to eq(usd(0))
+      expect(TudlaAccounting::BalanceRebuilder.new(organization).differences).to be_empty
+    end
+
+    it "rebuilds once for several changes" do
+      record_2026
+      other = TudlaAccounting::Account.create!(organization: organization, parent: account("3000"), code: "3950", name: "Accumulated profits", category: "equity")
+
+      expect do
+        TudlaAccounting::AccountRoleAssigner.batch(organization) do |assigner|
+          assigner.save(other, :retained_earnings)
+          assigner.save(account("3900"), :retained_earnings)
+        end
+      end.to change { rebuilds.count }.by(1)
+      expect_2027_books
+    end
+
+    it "stops carrying it when the role is removed" do
+      record_2026
+      expect(TudlaAccounting::AccountRoleAssigner.save(account("3900"), nil)).to be(true)
+
+      expect(opening("3900", y2027)).to eq(usd(0))
+      expect(TudlaAccounting::BalanceRebuilder.new(organization).differences).to be_empty
+    end
+  end
+
+  context "without a retained earnings account marked" do
+    before { TudlaAccounting::AccountRoleAssigner.save!(account("3900"), nil) }
 
     it "still restarts income and expenses each year, but cannot carry the profit" do
       record_2026

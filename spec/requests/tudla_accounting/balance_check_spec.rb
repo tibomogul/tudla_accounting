@@ -1,7 +1,10 @@
 require "rails_helper"
 require_relative "../../support/sign_in"
+require_relative "../../support/configuration"
 
 RSpec.describe "Balance check", type: :request do
+  include_context "with isolated TudlaAccounting configuration"
+
   let(:routes) { TudlaAccounting::Engine.routes.url_helpers }
   let(:organization) { create(:organization, name: "Acme", currency: "USD") }
   let!(:year) { TudlaAccounting::PeriodCreator.call(organization, 2026) }

@@ -9,8 +9,8 @@ module TudlaAccounting
   # For each open amount (booked by the period end, foreign balance not yet settled), its
   # foreign balance is valued at the period-end rate (see ForexRateRetriever) and compared
   # with its book value. The difference is posted on the period-end date between the
-  # receivable/payable account and the account named by the unrealized_fx_gain_account_code
-  # setting, then reversed on the next period's start date, so settlement later is not
+  # receivable/payable account and the organization's account marked unrealized_fx_gain
+  # (Account#role), then reversed on the next period's start date, so settlement later is not
   # double-counted. Both entries are posted and linked to the original entry through
   # `related`. Running it again for the same date does nothing more. Returns the entries.
   class RevaluationEntryGenerator
@@ -22,8 +22,6 @@ module TudlaAccounting
       @organization = organization
       @period_end = period_end_date.to_date
       @next_start = next_period_start_date.to_date
-      @gain_account_code = TudlaAccounting.configuration.unrealized_fx_gain_account_code
-      raise ArgumentError, "TudlaAccounting.configuration.unrealized_fx_gain_account_code is not set" if @gain_account_code.blank?
     end
 
     def call
@@ -33,6 +31,12 @@ module TudlaAccounting
     end
 
     private
+
+    # Only needed when there's something to revalue: books without foreign currency
+    # don't need the account.
+    def gain_account_code
+      @gain_account_code ||= Account.for_role!(@organization, :unrealized_fx_gain).code
+    end
 
     def zone
       ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone]
@@ -74,7 +78,7 @@ module TudlaAccounting
         organization_type: @organization.class.name, organization_id: @organization.id,
         particulars: particulars, transacted_at: start_of(date).iso8601,
         details: [ { account_code: account.code, amount: amount(account_change) },
-                   { account_code: @gain_account_code, amount: amount(gain) } ]
+                   { account_code: gain_account_code, amount: amount(gain) } ]
       )
       entry.update!(related: original)
       entry.post(entry.transacted_at)

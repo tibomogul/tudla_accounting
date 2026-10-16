@@ -6,7 +6,24 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- **Breaking:** the accounts the books treat specially are marked by role on each organization's own accounts (`Account#role`: `receivable`, `payable`, `retained_earnings`, `unrealized_fx_gain`, `realized_fx_gain`), instead of named by code in the settings, so organizations' charts can differ (a bookkeeper's clients) and accounts can be renumbered. Set a role in the account form, with a `Role` column in the chart of accounts import, with `role:` in `AccountsCreator` (either refuses a role given to more than one of its accounts), or with `AccountRoleAssigner.save(account, role)`; `Account.for_role(organization, role)` finds it. Each role needs a suitable category. Roles change only through `AccountRoleAssigner` (`save`, or `save!` to raise), which the form, the import and `AccountsCreator` use; it moves a role from the account holding it, and a plain `account.update(role:)` is refused. In the form, only those with the `:administer` permission can change a role. Receivables and payables stay on an account once it, or an account beneath it, has posted lines (its open items would be left behind), and can't be given to such an account, whose lines opened nothing owed; either way, opening balances and drafts don't count.
+- Marking the retained earnings account, moving it or taking it off rebuilds the organization's balances in the same transaction, so the earlier years' profit is carried where it now belongs (a client taken on mid-stream). `AccountRoleAssigner.batch(organization) { |assigner| ... }` makes several changes with one rebuild. Retained earnings can't change while a period after the first year is closed (reopen them first), so closed periods keep the balances they were closed with.
+- Every rebuild's `balances.rebuilt` audit event now lists the accounts it corrected (`accounts`).
+- Revaluation needs an unrealized gains account only when there's something to revalue.
+- Errors about a missing account name the organization, through the new `organization_label` setting (default: class and id).
+
+### Removed
+- **Breaking:** the `receivable_account_code`, `payable_account_code`, `retained_earnings_account_code`, `unrealized_fx_gain_account_code` and `realized_fx_gain_account_code` settings: mark the accounts' roles instead (in your chart templates, `AccountsCreator` data and import files). Setting one raises `TudlaAccounting::ConfigurationError` saying which role to mark. There's no upgrade path from 0.2.0, which was never published.
+
+### Added
+- `USAGE.md`: setting up an organization's books step by step, in the pages or from the console and rake tasks. Its examples run in the suite.
+- The dashboard warns, and `tudla_accounting:balances:check` prints a warning (without failing), when an organization with accounts has none marked retained earnings, receivable or payable while `carrying_amount_sources` records that side, or unrealized or realized exchange gains once one of its accounts is held in another currency: without them nothing is tracked or carried, and nothing else says so.
+- `cash_account_codes` can be a callable given the organization; `TudlaAccounting.configuration.cash_account_codes_for(organization)` reads it.
+
 ## [0.2.0] - 2026-10-06
+
+Tagged but never published. Later versions don't support upgrading from it (or from 0.1.0): until a release is published, start from a fresh install.
 
 ### Added
 - Indirect-method cash flow statement (`Reports::CashFlow.new(..., method: :indirect)`, or the page's Method choice): net profit plus each balance-sheet account's change, by activity, matching the direct method's totals.

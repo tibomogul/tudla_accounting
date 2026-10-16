@@ -1,13 +1,13 @@
 <%= tc_page_header "Setup", subtitle: "Load the books, import what was open at the cut-over, and revalue foreign currency" %>
 
-<% setting = ->(name) { value = @config.public_send(name); value.present? ? tag.code(value.is_a?(String) ? value : value.class.name, class: "text-xs") : tc_badge("not set", tone: :warning) } %>
-
 <div class="space-y-6">
   <section class="tc-card tc-card-body space-y-4" aria-labelledby="chart-heading">
     <div>
       <h2 id="chart-heading" class="tc-card-title mb-1">Chart of accounts and opening balances</h2>
-      <p class="tc-muted text-sm">A CSV or Excel file with the columns <code class="text-xs">Account Code, Account Name, Account Type, Contra Code, Starting Balance, Parent Account Code</code>.
+      <p class="tc-muted text-sm">A CSV or Excel file with the columns <code class="text-xs">Account Code, Account Name, Account Type, Contra Code, Starting Balance, Parent Account Code</code>
+        and, optionally, <code class="text-xs">Role</code> (receivable, payable, retained_earnings, unrealized_fx_gain or realized_fx_gain) to mark the accounts the books use for those.
         Opening balances go into the first month of the first year; enter contra accounts as negative amounts.</p>
+      <p class="text-sm mt-2">Retained earnings account: <%= role_account_link(@role_accounts, :retained_earnings) %></p>
     </div>
     <% if @first_year.nil? %>
       <div class="tc-alert tc-alert-warning"><span><%= link_to "Create a financial year", new_period_path, class: "underline" %> first: opening balances need a period.</span></div>
@@ -51,7 +51,7 @@
       <p class="tc-muted text-sm">Invoices and bills still open at the cut-over, as a CSV with <code class="text-xs">particulars, amount, type, due_date</code>
         and, for foreign currency, <code class="text-xs">other_currency, other_currency_amount, transaction_rate, conversion_date</code>.
         They are recorded without changing balances, which the opening balances already include.</p>
-      <p class="text-sm mt-2">Receivables account: <%= setting.call(:receivable_account_code) %> · Payables account: <%= setting.call(:payable_account_code) %></p>
+      <p class="text-sm mt-2">Receivables account: <%= role_account_link(@role_accounts, :receivable) %> · Payables account: <%= role_account_link(@role_accounts, :payable) %></p>
     </div>
     <%= form_with url: setup_open_items_path, multipart: true, class: "grid gap-4 sm:grid-cols-4 items-end" do |form| %>
       <div class="sm:col-span-2"><%= form.label :file, "CSV file", class: "tc-label", for: "open_items_file" %><%= form.file_field :file, id: "open_items_file", accept: ".csv", class: "tc-input", required: true %></div>
@@ -68,7 +68,7 @@
     <div>
       <h2 id="revaluation-heading" class="tc-card-title mb-1">Foreign exchange revaluation</h2>
       <p class="tc-muted text-sm">Revalues open foreign-currency receivables and payables at a month end's rate, and reverses it the next day.</p>
-      <p class="text-sm mt-2">Gains and losses account: <%= setting.call(:unrealized_fx_gain_account_code) %> · Exchange rates from: <%= setting.call(:forex_rate_provider) %></p>
+      <p class="text-sm mt-2">Unrealized gains and losses account: <%= role_account_link(@role_accounts, :unrealized_fx_gain) %> · Realized gains and losses account: <%= role_account_link(@role_accounts, :realized_fx_gain) %> · Exchange rates from: <%= forex_provider_label(@config) %></p>
     </div>
     <% if @months.none? %>
       <p class="tc-muted text-sm">No month has ended yet.</p>

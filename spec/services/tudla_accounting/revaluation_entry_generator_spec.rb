@@ -12,15 +12,14 @@ RSpec.describe TudlaAccounting::RevaluationEntryGenerator, type: :service do
   let(:april) { year.children.order(:from_date).fourth }
 
   before do
-    TudlaAccounting.configuration.unrealized_fx_gain_account_code = "4900"
     TudlaAccounting::AccountsCreator.call([
       { code: "1000", name: "Cash", category: "asset" },
-      { code: "1100", name: "Accounts Receivable", category: "asset", children: [
+      { code: "1100", name: "Accounts Receivable", category: "asset", role: "receivable", children: [
         { code: "1100-EUR", name: "Accounts Receivable - EUR", category: "asset", currency: "EUR" } ] },
-      { code: "2100", name: "Accounts Payable", category: "liability", children: [
+      { code: "2100", name: "Accounts Payable", category: "liability", role: "payable", children: [
         { code: "2100-EUR", name: "Accounts Payable - EUR", category: "liability", currency: "EUR" } ] },
       { code: "4000", name: "Sales", category: "income" },
-      { code: "4900", name: "Unrealized FX Gain", category: "income" },
+      { code: "4900", name: "Unrealized FX Gain", category: "income", role: "unrealized_fx_gain" },
       { code: "5000", name: "Purchases", category: "expense" }
     ], organization)
   end
@@ -136,8 +135,21 @@ RSpec.describe TudlaAccounting::RevaluationEntryGenerator, type: :service do
     expect(TudlaAccounting::Entry.where(particulars: "Revaluation of Accounts Receivable - EUR")).to be_empty
   end
 
-  it "needs the unrealized gain account configured" do
-    TudlaAccounting.configuration.unrealized_fx_gain_account_code = nil
-    expect { run }.to raise_error(ArgumentError, "TudlaAccounting.configuration.unrealized_fx_gain_account_code is not set")
+  it "needs an account marked for unrealized gains and losses when there's something to revalue" do
+    TudlaAccounting::AccountRoleAssigner.save!(account("4900"), nil)
+    expect(run).to eq([])
+
+    eur_invoice(100, "1.54")
+    eur_rate("1.60")
+    expect { run }.to raise_error(ArgumentError, "No account is marked as the Unrealized exchange gains and losses account for Organization #{organization.id}; mark one in the chart of accounts")
+  end
+
+  it "books to the account marked for it, whatever its code" do
+    account("4900").update!(code: "7900")
+    eur_invoice(100, "1.54")
+    eur_rate("1.60")
+
+    revaluation, = run
+    expect(revaluation.details.map { |d| [ d.account.code, d.tally, d.amount ] }).to contain_exactly([ "1100-EUR", "debit", aud(6) ], [ "7900", "credit", aud(6) ])
   end
 end

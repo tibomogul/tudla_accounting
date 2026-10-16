@@ -52,7 +52,7 @@ RSpec.describe TudlaAccounting::AuditEvent, type: :model do
     expect(last_event).to have_attributes(action: "opening_balances.saved", details: { "date" => "2026-01-01", "overwrite" => false })
 
     TudlaAccounting::BalanceRebuilder.new(organization).rebuild!
-    expect(last_event).to have_attributes(action: "balances.rebuilt", details: { "corrected" => 0 })
+    expect(last_event).to have_attributes(action: "balances.rebuilt", details: { "corrected" => 0, "accounts" => [] })
 
     spare = TudlaAccounting::PeriodCreator.call(organization, 2030)
     spare.destroy_with_subtree!

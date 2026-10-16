@@ -12,8 +12,8 @@ RSpec.describe TudlaAccounting::CarryingAmountsCreator, type: :service do
     TudlaAccounting::PeriodCreator.call(organization, 2026)
     TudlaAccounting::AccountsCreator.call([
       { code: "1000", name: "Cash", category: "asset" },
-      { code: "1100", name: "Accounts Receivable", category: "asset" },
-      { code: "2100", name: "Accounts Payable", category: "liability" },
+      { code: "1100", name: "Accounts Receivable", category: "asset", role: "receivable" },
+      { code: "2100", name: "Accounts Payable", category: "liability", role: "payable" },
       { code: "4000", name: "Sales", category: "income" },
       { code: "5000", name: "Purchases", category: "expense" }
     ], organization)
@@ -122,18 +122,26 @@ RSpec.describe TudlaAccounting::CarryingAmountsCreator, type: :service do
       expect(amount.detail.account).to eq(account("1100"))
     end
 
-    it "needs the receivable account to exist in the organization" do
-      account("1100").update!(code: "1199")
-      expect { import_rows([ "Invoice 1", "100", "receivable", "" ]) }.to raise_error(ArgumentError, "Receivable account 1100 not found")
+    it "needs an account marked receivable in the organization" do
+      TudlaAccounting::AccountRoleAssigner.save!(account("1100"), nil)
+      expect { import_rows([ "Invoice 1", "100", "receivable", "" ]) }
+        .to raise_error(ArgumentError, "No account is marked as the Receivables account for Organization #{organization.id}; mark one in the chart of accounts")
     end
   end
 
   describe "settings" do
     include_context "with isolated TudlaAccounting configuration"
 
-    it "needs receivable and payable account codes configured" do
-      TudlaAccounting.configuration.payable_account_code = nil
-      expect { import }.to raise_error(ArgumentError, "TudlaAccounting.configuration.payable_account_code is not set")
+    it "needs accounts marked receivable and payable" do
+      TudlaAccounting::AccountRoleAssigner.save!(account("2100"), nil)
+      expect { import }.to raise_error(ArgumentError, "No account is marked as the Payables account for Organization #{organization.id}; mark one in the chart of accounts")
+    end
+
+    it "uses the account marked receivable, whatever its code" do
+      account("1100").update!(code: "1199")
+
+      # The foreign-currency row goes on a sub-account of it.
+      expect(import.select(&:receivable?).map { |amount| amount.detail.account.code }.uniq).to contain_exactly("1199", "1199-EUR")
     end
 
     it "needs sales and purchase account codes" do

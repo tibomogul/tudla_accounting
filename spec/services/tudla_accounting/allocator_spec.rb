@@ -12,16 +12,15 @@ RSpec.describe TudlaAccounting::Allocator, type: :service do
 
   before do
     TudlaAccounting.configuration.related_party_method = :customer
-    TudlaAccounting.configuration.realized_fx_gain_account_code = "4950"
     TudlaAccounting::AccountsCreator.call([
       { code: "1000", name: "Cash", category: "asset" },
       { code: "1001", name: "Bank EUR", category: "asset", currency: "EUR" },
-      { code: "1100", name: "Accounts Receivable", category: "asset", children: [
+      { code: "1100", name: "Accounts Receivable", category: "asset", role: "receivable", children: [
         { code: "1100-EUR", name: "Accounts Receivable - EUR", category: "asset", currency: "EUR" } ] },
-      { code: "2100", name: "Accounts Payable", category: "liability" },
+      { code: "2100", name: "Accounts Payable", category: "liability", role: "payable" },
       { code: "4000", name: "Sales", category: "income" },
       { code: "4100", name: "Sales Returns", category: "income" },
-      { code: "4950", name: "Realized FX Gain", category: "income" },
+      { code: "4950", name: "Realized FX Gain", category: "income", role: "realized_fx_gain" },
       { code: "5000", name: "Purchases", category: "expense" }
     ], organization)
   end
@@ -331,7 +330,7 @@ RSpec.describe TudlaAccounting::Allocator, type: :service do
     end
 
     it "revalues a foreign credit held on account, as it is owed back in the foreign currency" do
-      TudlaAccounting.configuration.unrealized_fx_gain_account_code = "4950"
+      TudlaAccounting::AccountRoleAssigner.save!(TudlaAccounting::Account.new(organization: organization, code: "4900", name: "Unrealized FX Gain", category: "income"), "unrealized_fx_gain")
       TudlaAccounting::ForexRate.create!(from: "EUR", to: "AUD", year: 2026, month: 3, day: 31, rate: BigDecimal("1.70"))
       eur_payment("Payment EUR", 100, "1.60", at: on(3, 10)) # 160.00 for 100 EUR, not yet applied
 
@@ -339,11 +338,11 @@ RSpec.describe TudlaAccounting::Allocator, type: :service do
 
       march = year.children.order(:from_date).third
       expect(TudlaAccounting::Balance.find_by(account: account("1100-EUR"), period: march).ending_amount).to eq(aud(-170)) # 100 EUR at 1.70 owed back
-      expect(TudlaAccounting::Balance.find_by(account: account("4950"), period: march).ending_amount).to eq(aud(-10))      # a loss
+      expect(TudlaAccounting::Balance.find_by(account: account("4900"), period: march).ending_amount).to eq(aud(-10))      # a loss
     end
 
     it "posts no difference without a realized gain account" do
-      TudlaAccounting.configuration.realized_fx_gain_account_code = nil
+      TudlaAccounting::AccountRoleAssigner.save!(account("4950"), nil)
       allow(Rails.logger).to receive(:warn)
       inv = eur_invoice("Invoice EUR", 100, "1.54")
       eur_payment("Payment EUR", 100, "1.60", at: on(3, 10), related: inv)

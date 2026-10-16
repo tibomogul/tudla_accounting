@@ -5,8 +5,8 @@ RSpec.describe TudlaAccounting::CarryingAmountProcessor, type: :service do
   include_context "with entry source models"
 
   let(:organization) { create(:organization) }
-  let(:receivable_account) { create(:tudla_accounting_account, code: "1100", category: :asset, organization: organization) }
-  let(:payable_account) { create(:tudla_accounting_account, code: "2100", category: :liability, organization: organization) }
+  let(:receivable_account) { create(:tudla_accounting_account, code: "1100", category: :asset, organization: organization, role: :receivable) }
+  let(:payable_account) { create(:tudla_accounting_account, code: "2100", category: :liability, organization: organization, role: :payable) }
   let(:income_account) { create(:tudla_accounting_account, code: "4000", category: :income, organization: organization) }
   let(:expense_account) { create(:tudla_accounting_account, code: "5000", category: :expense, organization: organization) }
   let(:cash_account) { create(:tudla_accounting_account, code: "1000", category: :asset, organization: organization) }

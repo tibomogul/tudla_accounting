@@ -39,6 +39,7 @@ RSpec.describe "Dashboard", type: :request do
       expect(response.body).to include("Getting started", "Create a financial year", "Load a chart of accounts")
       expect([ stat("profit"), stat("receivables"), stat("drafts") ]).to eq([ "—", "0.00", "0" ])
       expect(response.body).to include("No period covers today", "No entries yet.")
+      expect(css_select("[data-missing-roles]")).to be_empty # nothing to mark until there's a chart
     end
 
     context "with books under way" do
@@ -47,8 +48,8 @@ RSpec.describe "Dashboard", type: :request do
       before do
         TudlaAccounting::PeriodCreator.call(organization, 2026)
         TudlaAccounting::AccountsCreator.call([
-          { code: "1010", name: "Cash", category: "asset" }, { code: "1100", name: "Receivables", category: "asset" },
-          { code: "2100", name: "Payables", category: "liability" }, { code: "4000", name: "Sales", category: "income" },
+          { code: "1010", name: "Cash", category: "asset" }, { code: "1100", name: "Receivables", category: "asset", role: "receivable" },
+          { code: "2100", name: "Payables", category: "liability", role: "payable" }, { code: "4000", name: "Sales", category: "income" },
           { code: "6000", name: "Rent", category: "expense" }
         ], organization)
         post_entry("1100", "4000", 500_00, Time.zone.local(2026, 2, 1), source: Invoice.create!(due_date: Time.zone.local(2026, 3, 1)))
@@ -65,6 +66,29 @@ RSpec.describe "Dashboard", type: :request do
         expect(response.body).to include("To 30 Apr 2026", "500.00 overdue", "0.00 overdue")
         expect(css_select("table tbody tr").size).to eq(4)
         expect(response.body).to include("5 accounts · 1 financial year · current period Apr 2026")
+      end
+
+      it "warns about the roles no account has" do
+        get routes.root_path
+
+        alert = css_select("[data-missing-roles]").first.text.squish
+        expect(alert).to eq("No account is marked as retained earnings: each year's profit isn't carried into equity. Mark it in the chart of accounts.")
+
+        TudlaAccounting::AccountsCreator.call([ { code: "3900", name: "Retained earnings", category: "equity", role: "retained_earnings" } ], organization)
+        get routes.root_path
+        expect(css_select("[data-missing-roles]")).to be_empty
+      end
+
+      it "warns about the exchange roles once foreign currency is held" do
+        TudlaAccounting::AccountsCreator.call([ { code: "1020", name: "Bank EUR", category: "asset", currency: "EUR" },
+                                                { code: "3900", name: "Retained earnings", category: "equity", role: "retained_earnings" },
+                                                { code: "4900", name: "Unrealized exchange", category: "income", role: "unrealized_fx_gain" } ], organization)
+        get routes.root_path
+
+        expect(css_select("[data-missing-roles]").first.text.squish).to eq(
+          "No account is marked as realized exchange gains and losses: exchange differences on settlement stay on receivables and payables. " \
+          "Mark it in the chart of accounts."
+        )
       end
 
       it "leaves out other organizations' figures" do

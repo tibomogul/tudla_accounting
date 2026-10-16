@@ -13,13 +13,12 @@ RSpec.describe "Cash-basis tax", type: :service do
     TudlaAccounting.configuration.related_party_method = :customer
     TudlaAccounting::AccountsCreator.call([
       { code: "1000", name: "Bank", category: "asset" },
-      { code: "1100", name: "Receivables", category: "asset", children: [
+      { code: "1100", name: "Receivables", category: "asset", role: "receivable", children: [
         { code: "1100-EUR", name: "Receivables EUR", category: "asset", currency: "EUR" } ] },
-      { code: "2100", name: "Payables", category: "liability" }, { code: "2200", name: "GST", category: "liability" },
+      { code: "2100", name: "Payables", category: "liability", role: "payable" }, { code: "2200", name: "GST", category: "liability" },
       { code: "4000", name: "Sales", category: "income" }, { code: "4100", name: "Returns", category: "income" },
-      { code: "4950", name: "FX gains", category: "income" }, { code: "6000", name: "Supplies", category: "expense" }
+      { code: "4950", name: "FX gains", category: "income", role: "realized_fx_gain" }, { code: "6000", name: "Supplies", category: "expense" }
     ], organization)
-    TudlaAccounting.configuration.realized_fx_gain_account_code = "4950"
     TudlaAccounting::TaxCode.create!(organization: organization, code: "GST", name: "GST on sales", rate: "0.1", kind: :sales, account: account("2200"))
     TudlaAccounting::TaxCode.create!(organization: organization, code: "GSTP", name: "GST on purchases", rate: "0.1", kind: :purchases, account: account("2200"))
   end

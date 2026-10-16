@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_06_220000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_10_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -33,6 +33,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_220000) do
     t.string "name", null: false
     t.bigint "organization_id", null: false
     t.string "organization_type", null: false
+    t.string "role"
     t.datetime "updated_at", null: false
     t.index ["ancestry"], name: "index_tudla_accounting_accounts_on_ancestry"
     t.index ["category"], name: "index_tudla_accounting_accounts_on_category"
@@ -40,9 +41,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_06_220000) do
     t.index ["contra_account_id"], name: "index_tudla_accounting_accounts_on_contra_account_id"
     t.index ["name"], name: "index_tudla_accounting_accounts_on_name"
     t.index ["organization_type", "organization_id", "code"], name: "tudla_accounting_accounts_unique_key", unique: true
+    t.index ["organization_type", "organization_id", "role"], name: "index_tudla_accounting_accounts_on_organization_and_role", unique: true, where: "(role IS NOT NULL)"
     t.index ["organization_type", "organization_id"], name: "index_tudla_accounting_accounts_on_organization"
     t.check_constraint "cash_flow_activity IS NULL OR (cash_flow_activity = ANY (ARRAY[0, 1, 2]))", name: "tudla_accounting_accounts_cash_flow_activity_known"
     t.check_constraint "category = ANY (ARRAY[0, 1, 2, 3, 4])", name: "tudla_accounting_accounts_category_known"
+    t.check_constraint "role::text = ANY (ARRAY['receivable'::character varying, 'payable'::character varying, 'retained_earnings'::character varying, 'unrealized_fx_gain'::character varying, 'realized_fx_gain'::character varying]::text[])", name: "tudla_accounting_accounts_role_known"
   end
 
   create_table "tudla_accounting_allocations", force: :cascade do |t|

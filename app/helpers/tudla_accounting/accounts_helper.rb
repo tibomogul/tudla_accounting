@@ -7,6 +7,24 @@ module TudlaAccounting
       Account.categories.keys.map { |category| [ category.capitalize, category ] }
     end
 
+    def account_role_options
+      Account::ROLES.map { |role, details| [ details[:name], role ] }
+    end
+
+    MISSING_ROLE_EFFECTS = {
+      "receivable" => "what customers owe isn't tracked",
+      "payable" => "what's owed to suppliers isn't tracked",
+      "retained_earnings" => "each year's profit isn't carried into equity",
+      "unrealized_fx_gain" => "foreign-currency balances can't be revalued",
+      "realized_fx_gain" => "exchange differences on settlement stay on receivables and payables"
+    }.freeze
+
+    # What goes unrecorded while no account has these roles (Account.missing_roles).
+    def missing_roles_warning(roles)
+      names = roles.map { |role| Account.role_name(role).downcase }.to_sentence
+      "No account is marked as #{names}: #{MISSING_ROLE_EFFECTS.values_at(*roles).to_sentence}."
+    end
+
     # The organization's accounts as [account, depth] in tree order, sub-accounts under
     # their parent, grouped by category.
     def account_tree_rows(accounts)

@@ -247,7 +247,7 @@ RSpec.describe "Entries", type: :request do
     include_context "with entry source models"
 
     let(:invoice) do
-      TudlaAccounting.configuration.receivable_account_code = "1010"
+      TudlaAccounting::AccountRoleAssigner.save!(account("1010"), :receivable)
       record = build(:tudla_accounting_entry, organization: organization, particulars: "Invoice", transacted_at: on(3), source: Invoice.create!)
       record.details.build(account: account("1010"), tally: :debit, amount_cents: 100, currency: "AUD", organization: organization)
       record.details.build(account: account("4000"), tally: :credit, amount_cents: 100, currency: "AUD", organization: organization)

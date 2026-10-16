@@ -13,13 +13,12 @@ RSpec.describe "Applying payments", type: :request do
   before do
     sign_in_as(organization)
     TudlaAccounting.configuration.related_party_method = :customer
-    TudlaAccounting.configuration.realized_fx_gain_account_code = "4950"
     TudlaAccounting::AccountsCreator.call([
       { code: "1000", name: "Cash", category: "asset" },
-      { code: "1100", name: "Accounts Receivable", category: "asset", children: [
+      { code: "1100", name: "Accounts Receivable", category: "asset", role: "receivable", children: [
         { code: "1100-EUR", name: "Accounts Receivable - EUR", category: "asset", currency: "EUR" } ] },
       { code: "4000", name: "Sales", category: "income" },
-      { code: "4950", name: "Realized FX Gain", category: "income" }
+      { code: "4950", name: "Realized FX Gain", category: "income", role: "realized_fx_gain" }
     ], organization)
   end
 

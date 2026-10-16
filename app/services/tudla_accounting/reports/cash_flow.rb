@@ -80,7 +80,7 @@ module TudlaAccounting
       private
 
       def configured_cash_accounts
-        codes = Array(TudlaAccounting.configuration.cash_account_codes)
+        codes = TudlaAccounting.configuration.cash_account_codes_for(@organization)
         codes.empty? ? [] : Account.where(organization: @organization, code: codes).to_a
       end
 

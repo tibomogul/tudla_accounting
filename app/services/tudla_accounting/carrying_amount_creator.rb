@@ -16,8 +16,8 @@ module TudlaAccounting
   # A row in another currency (other_currency, other_currency_amount, transaction_rate,
   # conversion_date) goes to a sub-account in that currency under the receivable or payable
   # account, e.g. "1100-EUR", created if needed; `amount` is always in the organization's
-  # currency. The receivable/payable accounts come from the receivable_account_code and
-  # payable_account_code settings. `source` optionally turns the row into a host record
+  # currency. The receivable/payable accounts are the organization's accounts marked with
+  # those roles (Account#role). `source` optionally turns the row into a host record
   # for the entry's source (and the related_party_method setting).
   class CarryingAmountCreator
     TYPES = %w[receivable payable].freeze
@@ -49,9 +49,7 @@ module TudlaAccounting
     private
 
     def check_settings!
-      %i[receivable_account_code payable_account_code].each do |setting|
-        raise ArgumentError, "TudlaAccounting.configuration.#{setting} is not set" if TudlaAccounting.configuration.public_send(setting).blank?
-      end
+      %i[receivable payable].each { |role| TudlaAccounting::Account.for_role!(organization, role) }
       @offset_codes.each { |type, code| raise ArgumentError, "No #{type == 'receivable' ? 'sales' : 'purchase'} account code given" if code.blank? }
     end
 
@@ -89,9 +87,7 @@ module TudlaAccounting
 
     # The receivable or payable account, or its sub-account in a foreign currency.
     def account_for(type, foreign_currency)
-      code = TudlaAccounting.configuration.public_send("#{type}_account_code")
-      base = TudlaAccounting::Account.find_by(organization: organization, code: code)
-      raise ArgumentError, "#{type.capitalize} account #{code} not found" unless base
+      base = TudlaAccounting::Account.for_role!(organization, type)
       return base.children.find_by(currency: currency) || base unless foreign_currency
 
       base.children.find_by(currency: foreign_currency) ||

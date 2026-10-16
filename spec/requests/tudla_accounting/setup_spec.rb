@@ -23,13 +23,16 @@ RSpec.describe "Setup", type: :request do
   context "with a financial year" do
     let!(:year) { TudlaAccounting::PeriodCreator.call(organization, 2026) }
 
-    it "shows the forms and which settings they need" do
-      TudlaAccounting.configuration.receivable_account_code = "1020"
+    it "shows the forms and which accounts they need" do
+      create(:tudla_accounting_account, organization: organization, code: "1020", name: "Receivables", category: :asset, role: :receivable)
       get routes.setup_path
 
       expect(css_select("#opening_date").first["value"]).to eq("2026-01-01")
       expect(css_select("#date_prior").first["value"]).to eq("2025-12-31")
-      expect(response.body).to include("<code class=\"text-xs\">1020</code>", "not set")
+      expect(response.body).to include("<code class=\"text-xs\">1020 - Receivables</code>", "none marked")
+      %w[Payables Retained\ earnings Unrealized\ gains\ and\ losses Realized\ gains\ and\ losses].each do |role|
+        expect(response.body).to match(/#{role} account: <span[^>]*>none marked/)
+      end
     end
 
     it "loads a chart of accounts from a CSV" do
@@ -66,9 +69,9 @@ RSpec.describe "Setup", type: :request do
 
     context "with receivables and payables accounts" do
       before do
-        TudlaAccounting.configuration.receivable_account_code = "1020"
-        TudlaAccounting.configuration.payable_account_code = "2011"
         post routes.setup_chart_of_accounts_path, params: { file: upload("coa_saas_services.csv"), opening_date: "2026-01-01" }
+        TudlaAccounting::AccountRoleAssigner.save!(account("1020"), :receivable)
+        TudlaAccounting::AccountRoleAssigner.save!(account("2011"), :payable)
       end
 
       it "offers income and expense accounts to offset against" do
@@ -98,12 +101,10 @@ RSpec.describe "Setup", type: :request do
       let(:march) { year.children.order(:from_date).third }
 
       before do
-        TudlaAccounting.configuration.receivable_account_code = "1100"
         TudlaAccounting.configuration.carrying_amount_sources = { "TudlaAccounting::Period" => :receivable }
-        TudlaAccounting.configuration.unrealized_fx_gain_account_code = "4900"
         TudlaAccounting::AccountsCreator.call([
-          { code: "1100", name: "Receivables", category: "asset", children: [ { code: "1100-EUR", name: "Receivables EUR", category: "asset", currency: "EUR" } ] },
-          { code: "4000", name: "Sales", category: "income" }, { code: "4900", name: "FX gains", category: "income" }
+          { code: "1100", name: "Receivables", category: "asset", role: "receivable", children: [ { code: "1100-EUR", name: "Receivables EUR", category: "asset", currency: "EUR" } ] },
+          { code: "4000", name: "Sales", category: "income" }, { code: "4900", name: "FX gains", category: "income", role: "unrealized_fx_gain" }
         ], organization)
         invoice = build(:tudla_accounting_entry, organization: organization, particulars: "Invoice", transacted_at: Time.zone.local(2026, 3, 1), source: year)
         line = invoice.details.build(account: account("1100-EUR"), tally: :debit, amount_cents: 154_00, currency: "USD", organization: organization)

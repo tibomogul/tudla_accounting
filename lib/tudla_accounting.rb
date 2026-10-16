@@ -55,11 +55,9 @@ module TudlaAccounting
     CARRYING_AMOUNT_ROLES = %i[receivable payable receipt disbursement credit_note supplier_credit refund supplier_refund].freeze
 
     attr_accessor :base_currency, :rounding, :time_zone, :organization_class,
-                  :receivable_account_code, :payable_account_code, :due_date_method,
-                  :retained_earnings_account_code, :related_party_method,
-                  :forex_rate_provider, :unrealized_fx_gain_account_code,
-                  :realized_fx_gain_account_code, :parent_controller, :current_organization,
-                  :current_actor, :authorize, :cash_account_codes, :tax_basis
+                  :due_date_method, :related_party_method, :forex_rate_provider,
+                  :parent_controller, :current_organization, :current_actor, :authorize,
+                  :cash_account_codes, :tax_basis, :organization_label
     attr_reader :carrying_amount_sources, :entry_sources
 
     def initialize
@@ -67,15 +65,10 @@ module TudlaAccounting
       @rounding = BigDecimal::ROUND_HALF_UP
       @time_zone = "UTC"
       @organization_class = "Organization"
-      @receivable_account_code = nil
-      @payable_account_code = nil
       @carrying_amount_sources = {}
       @due_date_method = :due_date
-      @retained_earnings_account_code = nil
       @related_party_method = nil
       @forex_rate_provider = nil
-      @unrealized_fx_gain_account_code = nil
-      @realized_fx_gain_account_code = nil
       # UI: engine controllers inherit from this host controller (so its authentication and
       # helpers apply), and current_organization is called with the controller to find the
       # organization whose books are shown, e.g. ->(controller) { controller.current_organization }
@@ -95,7 +88,37 @@ module TudlaAccounting
       # When the tax summary counts tax: :accrual (as lines are posted) or :cash (as
       # invoices and bills are paid). The report can choose either.
       @tax_basis = :accrual
+      # How error messages and warnings name an organization (one with no account marked
+      # for a role, say), e.g. ->(organization) { organization.name }
+      @organization_label = ->(organization) { "#{organization.class.name} #{organization.id}" }
       @entry_sources = {}
+    end
+
+    # The cash flow statement's cash account codes for an organization: the
+    # cash_account_codes setting, a list or a callable given the organization, whose
+    # charts may differ (a bookkeeper's clients, say). Only the report reads it, as its
+    # default, so it can change at any time. Codes are strings, as accounts' are: a
+    # callable may return numbers.
+    def cash_account_codes_for(organization)
+      raise ArgumentError, "an organization is required" if organization.nil?
+
+      codes = cash_account_codes.respond_to?(:call) ? cash_account_codes.call(organization) : cash_account_codes
+      Array(codes).filter_map { |code| code.to_s.presence }
+    end
+
+    # Settings replaced by account roles (Account#role); reading or setting one says so.
+    REMOVED_ACCOUNT_CODE_SETTINGS = {
+      receivable_account_code: "receivable", payable_account_code: "payable",
+      retained_earnings_account_code: "retained_earnings",
+      unrealized_fx_gain_account_code: "unrealized_fx_gain", realized_fx_gain_account_code: "realized_fx_gain"
+    }.freeze
+
+    REMOVED_ACCOUNT_CODE_SETTINGS.each do |setting, role|
+      message = "TudlaAccounting.configuration.#{setting} was removed: mark the organization's account with " \
+                "role #{role.inspect} instead (AccountRoleAssigner.save(account, #{role.to_sym.inspect}), the account " \
+                "form, or a Role column in the chart of accounts import); see the CHANGELOG"
+      define_method(setting) { raise ConfigurationError, message }
+      define_method(:"#{setting}=") { |_code| raise ConfigurationError, message }
     end
 
     def initialize_copy(source)
@@ -117,6 +140,11 @@ module TudlaAccounting
 
   def self.init_config
     self.configuration ||= Configuration.new
+  end
+
+  # The organization_label setting's name for an organization.
+  def self.organization_label(organization)
+    configuration.organization_label.call(organization)
   end
 
   def self.configure

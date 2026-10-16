@@ -1,8 +1,10 @@
 # frozen_string_literal: true
 
 module TudlaAccounting
-  # Checks whether a Detail posts to the configured accounts payable account
-  # (TudlaAccounting.configuration.payable_account_code) or any account beneath it.
+  # Checks whether a Detail posts to its organization's accounts payable account (the
+  # one marked payable, Account#role) or any account beneath it. The role is read from the
+  # database, not the loaded account: posting loads its accounts before taking the posting
+  # lock, and a role assigned meanwhile (AccountRoleAssigner, under that lock) must count.
   class IsAccountPayableChecker
     def self.call(detail:)
       new(detail: detail).call
@@ -13,11 +15,10 @@ module TudlaAccounting
     end
 
     def call
-      code = TudlaAccounting.configuration.payable_account_code
       account = @detail&.account
-      return false if code.blank? || account.nil?
+      return false if account.nil?
 
-      account.code == code || account.ancestors.exists?(code: code)
+      Account.where(id: account.path_ids).role_payable.exists?
     end
   end
 end

@@ -34,6 +34,13 @@ RSpec.describe Demo::Seeder do
     expect(TudlaAccounting::Balance.peek(retained_earnings, month).ending_amount_cents).to be_positive
   end
 
+  it "marks Demo Co's receivables, payables and retained earnings accounts" do
+    organization = described_class.call(entries: 30)
+
+    roles = TudlaAccounting::Account.where(organization: organization).where.not(role: nil).pluck(:role, :code).to_h
+    expect(roles).to eq("receivable" => "1100", "payable" => "2100", "retained_earnings" => "3900")
+  end
+
   it "closes the first half of last year" do
     organization = described_class.call(entries: 30)
 

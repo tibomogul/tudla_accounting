@@ -5,5 +5,9 @@ FactoryBot.define do
     category { :asset }
     currency { "USD" }
     association :organization, factory: :organization
+
+    # Roles change only through AccountRoleAssigner, so create gives it one afterwards.
+    transient { role { nil } }
+    after(:create) { |account, factory| TudlaAccounting::AccountRoleAssigner.save!(account, factory.role) if factory.role }
   end
 end

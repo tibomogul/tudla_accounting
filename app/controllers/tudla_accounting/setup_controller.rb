@@ -15,6 +15,7 @@ module TudlaAccounting
     def index
       @first_year = organization_scope(Period).roots.order(:from_date).first
       @accounts = organization_scope(Account).order(:code)
+      @role_accounts = @accounts.where.not(role: nil).index_by(&:role)
       @months = organization_scope(Period).where.not(ancestry: "/").where(thru_date: ..Time.current.end_of_day).order(from_date: :desc)
       @config = TudlaAccounting.configuration
     end

@@ -2,7 +2,8 @@ require_relative "configuration"
 
 # Temporary host-app models (Invoice, Bill, Payment, Disbursement, CreditNote,
 # SupplierCredit, Refund, SupplierRefund) that act as polymorphic entry sources, configured as the carrying amount
-# roles with accounts receivable at code 1100 and accounts payable at 2100. Each can name
+# roles. Specs mark their receivable and payable accounts (role: "receivable" on 1100,
+# role: "payable" on 2100, by convention). Each can name
 # a customer (an Organization standing in for the customer or supplier).
 RSpec.shared_context "with entry source models" do
   include_context "with isolated TudlaAccounting configuration"
@@ -12,8 +13,6 @@ RSpec.shared_context "with entry source models" do
 
   before do
     TudlaAccounting.configure do |config|
-      config.receivable_account_code = "1100"
-      config.payable_account_code = "2100"
       config.carrying_amount_sources = sources
     end
   end

@@ -9,15 +9,14 @@ RSpec.describe "Reversing receivables and payables", type: :service do
   let!(:year) { TudlaAccounting::PeriodCreator.call(organization, 2026) }
 
   before do
-    TudlaAccounting.configuration.realized_fx_gain_account_code = "4950"
     TudlaAccounting::AccountsCreator.call([
       { code: "1000", name: "Cash", category: "asset" },
       { code: "1001", name: "Bank EUR", category: "asset", currency: "EUR" },
-      { code: "1100", name: "Accounts Receivable", category: "asset", children: [
+      { code: "1100", name: "Accounts Receivable", category: "asset", role: "receivable", children: [
         { code: "1100-EUR", name: "Accounts Receivable - EUR", category: "asset", currency: "EUR" } ] },
-      { code: "2100", name: "Accounts Payable", category: "liability" },
+      { code: "2100", name: "Accounts Payable", category: "liability", role: "payable" },
       { code: "4000", name: "Sales", category: "income" },
-      { code: "4950", name: "Realized FX Gain", category: "income" },
+      { code: "4950", name: "Realized FX Gain", category: "income", role: "realized_fx_gain" },
       { code: "5000", name: "Purchases", category: "expense" }
     ], organization)
   end

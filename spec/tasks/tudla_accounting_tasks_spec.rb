@@ -1,7 +1,10 @@
 require "rails_helper"
 require "rake"
+require_relative "../support/configuration"
 
 RSpec.describe "tudla_accounting:balances rake tasks" do
+  include ActiveSupport::Testing::TimeHelpers
+
   let(:organization) { create(:organization) }
   let(:other) { create(:organization) }
 
@@ -33,15 +36,31 @@ RSpec.describe "tudla_accounting:balances rake tasks" do
 
   it "lists the differences and exits with a failure, then rebuilds them away" do
     expect { expect { run(:check) }.to raise_error(SystemExit) { |exit| expect(exit.status).to eq(1) } }
-      .to output(/Organization:#{organization.id}  1000  2026-01-01  ending_amount_cents  stored 1  expected 10000\n1 difference\(s\) found/).to_stdout
+      .to output(/^Organization:#{organization.id}  1000  2026-01-01  ending_amount_cents  stored 1  expected 10000\n.*^1 difference\(s\) found/m).to_stdout
 
     expect { run(:rebuild) }.to output(/Organization:#{organization.id}: 1 balance\(s\) corrected\nOrganization:#{other.id}: 0/).to_stdout
-    expect { run(:check) }.to output("Balances agree with the posted entries.\n").to_stdout
+    expect { run(:check) }.to output(/^Balances agree with the posted entries.\n\z/).to_stdout
   end
 
-  it "checks just one organization when asked" do
-    ENV["ORGANIZATION"] = "Organization:#{other.id}"
-    expect { run(:check) }.to output("Balances agree with the posted entries.\n").to_stdout
+  # Books without them are allowed, so these are warnings, not failures. Receivables and
+  # payables are only expected once a carrying amount source records them.
+  context "with invoices recorded as receivables" do
+    include_context "with isolated TudlaAccounting configuration"
+
+    before { TudlaAccounting.configuration.carrying_amount_sources = { "Invoice" => :receivable } }
+
+    it "warns about the accounts with no receivable or retained earnings account marked" do
+      ENV["ORGANIZATION"] = "Organization:#{other.id}"
+      expect { run(:check) }.to output(<<~OUTPUT).to_stdout
+        Organization:#{other.id}  warning: no account is marked as the Receivables account
+        Organization:#{other.id}  warning: no account is marked as the Retained earnings account
+        Balances agree with the posted entries.
+      OUTPUT
+
+      TudlaAccounting::AccountsCreator.call([ { code: "1100", name: "Receivables", category: "asset", role: "receivable" },
+                                              { code: "3900", name: "Retained earnings", category: "equity", role: "retained_earnings" } ], other)
+      expect { run(:check) }.to output("Balances agree with the posted entries.\n").to_stdout
+    end
   end
 end
 

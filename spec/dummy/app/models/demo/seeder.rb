@@ -80,12 +80,12 @@ class Demo::Seeder
       { code: "1000", name: "Assets", category: "asset", children: [
         { code: "1010", name: "Cash and bank", category: "asset", children: [
           { code: "1011", name: "Operating account", category: "asset" }, { code: "1012", name: "Savings account", category: "asset" } ] },
-        { code: "1100", name: "Receivables", category: "asset" }, { code: "1500", name: "Equipment", category: "asset" } ] },
+        { code: "1100", name: "Receivables", category: "asset", role: "receivable" }, { code: "1500", name: "Equipment", category: "asset" } ] },
       { code: "2000", name: "Liabilities", category: "liability", children: [
-        { code: "2100", name: "Payables", category: "liability" }, { code: "2200", name: "GST", category: "liability" },
+        { code: "2100", name: "Payables", category: "liability", role: "payable" }, { code: "2200", name: "GST", category: "liability" },
         { code: "2500", name: "Loan", category: "liability" } ] },
       { code: "3000", name: "Equity", category: "equity", children: [
-        { code: "3100", name: "Owner's capital", category: "equity" }, { code: "3900", name: "Retained earnings", category: "equity" } ] },
+        { code: "3100", name: "Owner's capital", category: "equity" }, { code: "3900", name: "Retained earnings", category: "equity", role: "retained_earnings" } ] },
       { code: "4000", name: "Income", category: "income", children: [
         { code: "4010", name: "Consulting", category: "income" }, { code: "4020", name: "Subscriptions", category: "income" } ] },
       { code: "6000", name: "Expenses", category: "expense", children: [

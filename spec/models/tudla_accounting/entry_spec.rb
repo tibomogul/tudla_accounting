@@ -65,8 +65,8 @@ RSpec.describe TudlaAccounting::Entry, type: :model do
 
     let(:organization) { create(:organization) }
     let(:cash) { create(:tudla_accounting_account, code: "1000", category: :asset, organization: organization) }
-    let(:receivable) { create(:tudla_accounting_account, code: "1100", category: :asset, organization: organization) }
-    let(:payable) { create(:tudla_accounting_account, code: "2100", category: :liability, organization: organization) }
+    let(:receivable) { create(:tudla_accounting_account, code: "1100", category: :asset, organization: organization, role: :receivable) }
+    let(:payable) { create(:tudla_accounting_account, code: "2100", category: :liability, organization: organization, role: :payable) }
     let(:capital) { create(:tudla_accounting_account, code: "3000", category: :equity, organization: organization) }
     let(:sales) { create(:tudla_accounting_account, code: "4000", category: :income, organization: organization) }
     let!(:period) { create(:tudla_accounting_period, organization: organization, from_date: Date.new(2026, 1, 1), thru_date: Date.new(2026, 12, 31).end_of_day) }
@@ -164,11 +164,11 @@ RSpec.describe TudlaAccounting::Entry, type: :model do
   describe ".create_from_ruby_hash" do
     let(:organization) { create(:organization, currency: "USD") }
     let!(:cash) { create(:tudla_accounting_account, code: "1000", category: :asset, organization: organization) }
-    let!(:receivable) { create(:tudla_accounting_account, code: "1100", category: :asset, organization: organization) }
+    let!(:receivable) { create(:tudla_accounting_account, code: "1100", category: :asset, organization: organization, role: :receivable) }
     let!(:receivable_eur) do
       create(:tudla_accounting_account, code: "1100-EUR", category: :asset, currency: "EUR", organization: organization, parent: receivable)
     end
-    let!(:tax_payable) { create(:tudla_accounting_account, code: "2100", category: :liability, organization: organization) }
+    let!(:tax_payable) { create(:tudla_accounting_account, code: "2100", category: :liability, organization: organization, role: :payable) }
     let!(:sales) { create(:tudla_accounting_account, code: "4100", category: :income, organization: organization) }
 
     let(:invoice_hash) do

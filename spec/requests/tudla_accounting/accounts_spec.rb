@@ -2,6 +2,7 @@ require "rails_helper"
 require_relative "../../support/sign_in"
 
 RSpec.describe "Accounts", type: :request do
+  include_context "with isolated TudlaAccounting configuration"
   include ActiveSupport::Testing::TimeHelpers
 
   let(:routes) { TudlaAccounting::Engine.routes.url_helpers }
@@ -246,6 +247,80 @@ RSpec.describe "Accounts", type: :request do
 
       patch routes.account_path(account("1010")), params: { account: { name: "Cash at bank" } }
       expect(account("1010").name).to eq("Cash at bank")
+    end
+
+    it "marks an account's role, showing it in the chart, and says when the category doesn't suit it" do
+      patch routes.account_path(account("3000")), params: { account: { role: "retained_earnings" } }
+      expect(account("3000").role).to eq("retained_earnings")
+      get routes.accounts_path
+      expect(response.body).to include("Retained earnings")
+
+      patch routes.account_path(account("1010")), params: { account: { role: "payable" } }
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.body).to include("Role needs a liability account for Payables")
+
+      patch routes.account_path(account("3000")), params: { account: { role: "" } }
+      expect(account("3000").role).to be_nil
+    end
+
+    # AccountRoleAssigner takes the posting lock, so only a change of role goes through it.
+    it "saves an edit leaving the role alone without AccountRoleAssigner" do
+      patch routes.account_path(account("3000")), params: { account: { role: "retained_earnings" } }
+      expect(TudlaAccounting::AccountRoleAssigner).not_to receive(:save)
+
+      patch routes.account_path(account("3000")), params: { account: { name: "Owner's equity", role: "retained_earnings" } }
+      patch routes.account_path(account("1500")), params: { account: { name: "Plant", role: "" } }
+
+      expect([ account("3000").name, account("1500").name ]).to eq([ "Owner's equity", "Plant" ])
+    end
+
+    it "recomputes the balances after a change to retained earnings" do
+      post_entry("1010", "3000", 500, in_year(2))
+
+      patch routes.account_path(account("3000")), params: { account: { role: "retained_earnings" } }
+      expect(response).to redirect_to(routes.account_path(account("3000")))
+      expect(TudlaAccounting::AuditEvent.where(organization: organization, action: "balances.rebuilt")).to exist
+      expect(TudlaAccounting::BalanceRebuilder.new(organization).differences).to be_empty
+    end
+
+    it "says to reopen the later years' closed periods before retained earnings changes" do
+      year.close!
+      TudlaAccounting::PeriodCreator.call(organization, year.from_date.year + 1).children.order(:from_date).first.close!
+
+      patch routes.account_path(account("3000")), params: { account: { role: "retained_earnings" } }
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.body).to include("reopen them first")
+      expect(account("3000").role).to be_nil
+    end
+
+    # Moving retained earnings restates every year after the first and rebuilds the balances.
+    it "leaves roles to administrators" do
+      TudlaAccounting::AccountRoleAssigner.save!(account("3000"), :retained_earnings)
+      TudlaAccounting.configuration.authorize = ->(_controller, permission) { permission != :administer }
+
+      get routes.edit_account_path(account("3000"))
+      expect(css_select("#account_role").first["disabled"]).to eq("disabled")
+      expect(response.body).to include("Only administrators change roles")
+
+      patch routes.account_path(account("3000")), params: { account: { name: "Owner's equity" } }
+      expect(account("3000")).to have_attributes(name: "Owner's equity", role: "retained_earnings")
+
+      patch routes.account_path(account("3000")), params: { account: { role: "" } }
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.body).to include("Role can only be changed by an administrator")
+      expect(account("3000").role).to eq("retained_earnings")
+
+      post routes.accounts_path, params: { account: { code: "3950", name: "Accumulated profits", category: "equity", currency: "AUD", role: "retained_earnings" } }
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(account("3950")).to be_nil
+    end
+
+    it "moves a role taken from another account" do
+      patch routes.account_path(account("3000")), params: { account: { role: "retained_earnings" } }
+      post routes.accounts_path, params: { account: { code: "3950", name: "Accumulated profits", category: "equity", currency: "USD", role: "retained_earnings" } }
+
+      expect(account("3950").role).to eq("retained_earnings")
+      expect(account("3000").role).to be_nil
     end
   end
 

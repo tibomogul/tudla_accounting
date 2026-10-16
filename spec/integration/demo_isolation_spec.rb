@@ -45,6 +45,8 @@ RSpec.describe "Demo isolation" do
     # ("demo/sessions/button", "/demo/session").
     reference = /\bDemo::|\bmodule Demo\b|\bdemo_\w*(?:path|url)\b|\bx\.demo\b|["'\/]demo(?:\/|["'])/
     naming = (engine + harness).select { |file| file.read.match?(reference) }
-    expect(naming.map { |file| file.relative_path_from(root).to_s }).to be_empty
+    expect(naming.map { |file| file.relative_path_from(root).to_s }).to be_empty,
+      "These engine or harness files name the demo (#{reference.inspect}): #{naming.map { |file| file.relative_path_from(root) }.join(', ')}. " \
+      "Only the demo's own files and the dummy app's wiring may; the harness offers hooks instead (CLAUDE.md, \"Dummy app: harness and demo\")."
   end
 end

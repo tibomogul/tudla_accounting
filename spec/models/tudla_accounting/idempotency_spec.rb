@@ -5,7 +5,7 @@ RSpec.describe "Idempotent entry creation" do
   let(:organization) { create(:organization) }
 
   before do
-    create(:tudla_accounting_account, code: "1100", category: :asset, organization: organization)
+    create(:tudla_accounting_account, code: "1100", category: :asset, organization: organization, role: :receivable)
     create(:tudla_accounting_account, code: "4000", category: :income, organization: organization)
   end
 
@@ -25,7 +25,7 @@ RSpec.describe "Idempotent entry creation" do
 
   it "keeps keys apart per organization, and creates every entry without one" do
     other = create(:organization)
-    create(:tudla_accounting_account, code: "1100", category: :asset, organization: other)
+    create(:tudla_accounting_account, code: "1100", category: :asset, organization: other, role: :receivable)
     create(:tudla_accounting_account, code: "4000", category: :income, organization: other)
 
     expect { TudlaAccounting::Entry.create_from_ruby_hash(entry_hash(idempotency_key: "k")) }.to change(TudlaAccounting::Entry, :count).by(1)

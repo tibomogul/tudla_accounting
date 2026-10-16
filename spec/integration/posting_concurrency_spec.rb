@@ -126,6 +126,38 @@ RSpec.describe "Concurrent posting" do
     expect(other_org_entry.reload.posted_at).to be_present
   end
 
+  # Posting takes the posting lock before writing accounts, so AccountRoleAssigner must
+  # too: holding the account's row while waiting for the lock would deadlock with it.
+  it "takes the posting lock before writing an account's role" do
+    org, _cash, capital = books
+    locked = Queue.new
+    release = Queue.new
+
+    holder = Thread.new do
+      ActiveRecord::Base.connection_pool.with_connection do
+        ActiveRecord::Base.transaction do
+          Organization.lock.find(org.id)
+          locked << true
+          release.pop
+        end
+      end
+    end
+    locked.pop
+
+    begin
+      update = Thread.new { ActiveRecord::Base.connection_pool.with_connection { TudlaAccounting::AccountRoleAssigner.save(capital, "retained_earnings") } }
+
+      expect(update.join(0.5)).to be_nil # waits for the posting lock...
+      row_free = TudlaAccounting::Account.transaction { TudlaAccounting::Account.lock("FOR UPDATE NOWAIT").find(capital.id) }
+      expect(row_free).to eq(capital)    # ...without holding the account's row
+    ensure
+      release << true # never leave the lock held, or cleanup would wait on it forever
+      holder.join(5)
+    end
+    expect(update.join(5).value).to be(true)
+    expect(capital.reload.role).to eq("retained_earnings")
+  end
+
   it "locks when a detail is posted on its own" do
     org, cash, capital = books
     detail = entry_for(org, cash, capital).details.first

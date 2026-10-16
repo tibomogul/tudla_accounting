@@ -14,8 +14,8 @@ module TudlaAccounting
   # credit can't use more than it has left, and the charge can't take more than is owed.
   # A foreign-currency credit applied to a foreign-currency charge settles the foreign
   # amount at the rate the charge was booked at, and the difference from the credit's own
-  # value for it is posted as a realized exchange gain or loss (when a
-  # realized_fx_gain_account_code is set).
+  # value for it is posted as a realized exchange gain or loss (when the
+  # organization has an account marked realized_fx_gain).
   class Allocator
     class << self
       # backfill: true records the allocation only (no closed-period check, realized
@@ -160,19 +160,20 @@ module TudlaAccounting
 
     # The credit's line moved the receivable/payable by the credit's own value; move it by
     # the difference so it reflects the book value settled, and recognize the difference.
-    # Without a realized_fx_gain_account_code nothing is posted (and the difference stays on
+    # Without an account marked realized_fx_gain nothing is posted (and the difference stays on
     # the receivable/payable account).
     def post_realized(credit, charge, difference_cents)
       return if difference_cents.zero?
 
-      gain_account_code = TudlaAccounting.configuration.realized_fx_gain_account_code
       charge_entry = charge.detail.entry
-      if gain_account_code.blank?
-        Rails.logger.warn("TudlaAccounting: realized_fx_gain_account_code is not set; exchange difference on #{charge_entry.particulars} not posted")
+      credit_entry = credit.detail.entry
+      organization = credit_entry.organization
+      gain_account = Account.for_role(organization, :realized_fx_gain)
+      unless gain_account
+        Rails.logger.warn("TudlaAccounting: #{Account.missing_role_message(organization, :realized_fx_gain)}; exchange difference on #{charge_entry.particulars} not posted")
         return
       end
 
-      credit_entry = credit.detail.entry
       currency = credit.detail.currency
       difference = Money.new(difference_cents, currency)
       gain = charge.payable? ? -difference : difference # paying more for a liability is a loss
@@ -181,7 +182,7 @@ module TudlaAccounting
         particulars: "#{CarryingAmountProcessor::REALIZED_PREFIX}#{gain.positive? ? 'gain' : 'loss'} on #{charge_entry.particulars}",
         transacted_at: @at.iso8601,
         details: [ { account_code: credit.detail.account.code, amount: "#{currency} #{difference}" },
-                   { account_code: gain_account_code, amount: "#{currency} #{gain}" } ]
+                   { account_code: gain_account.code, amount: "#{currency} #{gain}" } ]
       )
       entry.update!(related: credit_entry) # no source, so posting it opens or settles nothing
       entry.post(entry.transacted_at)

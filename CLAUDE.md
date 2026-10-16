@@ -37,7 +37,7 @@ This is a **Rails engine gem** (not a standalone app). All application code live
 The dummy app is both the engine's test harness and a demo. Keep the two apart:
 
 - **Harness**: `Organization`, `ApplicationController#current_organization`, the stand-in login (`SessionsController`), `PagesController`, `config/initializers/tudla_accounting.rb`. The engine's specs may rely on these.
-- **Demo**: everything under the `Demo::` namespace (`spec/dummy/app/*/demo/`; Zeitwerk makes the module from those folders), `config/initializers/demo.rb` (configuration such as the retained earnings account), the `demo` routes and `db/seeds.rb` (`Demo::Seeder`).
+- **Demo**: everything under the `Demo::` namespace (`spec/dummy/app/*/demo/`; Zeitwerk makes the module from those folders), `config/initializers/demo.rb` (the sign-in hooks), the `demo` routes and `db/seeds.rb` (`Demo::Seeder`).
 - The demo loads only when `config.x.demo` is set (`spec/dummy/config/application.rb`). That's on in development and off in test unless `TUDLA_DEMO=1`. When it's off, Zeitwerk ignores the demo folders.
 - The demo's specs live in `spec/dummy/spec` and are run from `spec/dummy`; their `rails_helper` sets `TUDLA_DEMO=1`. The root `.rspec` excludes them from the engine's run.
 - Engine code, engine specs and the harness must never reference the demo (`Demo::`, its route helpers, `config.x.demo`). The harness offers hooks instead, declared in `config/application.rb` and set by the demo's initializer: `config.x.sign_in_partial` (rendered on the sign-in page) and `config.x.sign_in_organizations` (filters the organizations listed). Only `config/application.rb` and `config/routes.rb` wire the demo in. `spec/integration/demo_isolation_spec.rb` boots the app in a child process to check that the engine's run loads none of it, and checks that no engine or harness file names it. Demo code may use anything from the engine.
@@ -70,6 +70,8 @@ Why: Rails 8.1 does **not** auto-append engine migration paths to the host app's
 
 ## Testing Gotchas
 
+- The accounts the engine treats specially are marked by `role` on the account (`Account::ROLES`), not by settings. Specs using `"with entry source models"` must mark their receivable and payable accounts themselves (`role: "receivable"` on 1100, `role: "payable"` on 2100, by convention), and give the retained earnings or exchange gain accounts their roles when they need them. Roles change only through `AccountRoleAssigner` (`save`, or `save!` to raise); a plain `update(role:)` is refused. The account factory's `role:` goes through it after create, and `Account.create!(role:)` doesn't work. Changing retained earnings on books with balances rebuilds them (`BalanceRebuilder#rebuild!`) in the same transaction
+- `USAGE.md` is tested: `spec/integration/usage_guide_spec.rb` runs its ```ruby blocks in order as one console session (picking them by the heading they're under, and running its `bin/rails tudla_accounting:*` lines as rake tasks), and `spec/system/usage_guide_spec.rb` follows its UI steps by the labels it names. Keep every Ruby block runnable after the ones before it (write alternatives as comments), and update both specs when a heading or a UI label changes
 - Use `stub_const` for inline job classes in specs (Solid Queue requires named classes)
 - SolidCache hashes keys internally — don't query the DB by raw key name
 - Use `TudlaAccounting::Engine.routes.url_helpers` for engine route helpers in specs

@@ -121,8 +121,8 @@ RSpec.describe "Report pages", type: :request do
       TudlaAccounting.configuration.related_party_method = :customer
       TudlaAccounting::PeriodCreator.call(organization, 2026)
       TudlaAccounting::AccountsCreator.call([
-        { code: "1000", name: "Cash", category: "asset" }, { code: "1100", name: "Receivables", category: "asset" },
-        { code: "2100", name: "Payables", category: "liability" }, { code: "4000", name: "Sales", category: "income" }
+        { code: "1000", name: "Cash", category: "asset" }, { code: "1100", name: "Receivables", category: "asset", role: "receivable" },
+        { code: "2100", name: "Payables", category: "liability", role: "payable" }, { code: "4000", name: "Sales", category: "income" }
       ], organization)
       post_entry("1100", "4000", 300, Time.zone.local(2026, 3, 1), particulars: "Invoice 7",
            source: Invoice.create!(due_date: Time.zone.local(2026, 3, 31), customer: customer))

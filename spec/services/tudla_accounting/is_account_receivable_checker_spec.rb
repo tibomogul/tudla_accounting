@@ -1,22 +1,17 @@
 require "rails_helper"
-require_relative "../../support/configuration"
 
 RSpec.describe TudlaAccounting::IsAccountReceivableChecker, type: :service do
-  include_context "with isolated TudlaAccounting configuration"
-
   let(:organization) { create(:organization) }
-  let(:receivable_account) { create(:tudla_accounting_account, code: "1100", category: :asset, organization: organization) }
-
-  before { TudlaAccounting.configuration.receivable_account_code = "1100" }
+  let(:receivable_account) { create(:tudla_accounting_account, code: "1100", category: :asset, organization: organization, role: :receivable) }
 
   def detail_on(account) = build(:tudla_accounting_detail, account: account, organization: organization)
 
   describe ".call" do
-    it "returns true for the configured account" do
+    it "returns true for the account marked receivable" do
       expect(described_class.call(detail: detail_on(receivable_account))).to be(true)
     end
 
-    it "returns true for accounts beneath the configured account" do
+    it "returns true for accounts beneath it" do
       child = create(:tudla_accounting_account, code: "1105", category: :asset, organization: organization, parent: receivable_account)
       grandchild = create(:tudla_accounting_account, code: "1106", category: :asset, organization: organization, parent: child)
 
@@ -24,23 +19,38 @@ RSpec.describe TudlaAccounting::IsAccountReceivableChecker, type: :service do
       expect(described_class.call(detail: detail_on(grandchild))).to be(true)
     end
 
-    it "returns false for an account outside the configured account's tree, even with a similar code" do
+    it "returns false for an account outside its tree, even with a similar code" do
       receivable_account
       lookalike = create(:tudla_accounting_account, code: "1150", category: :asset, organization: organization)
       expect(described_class.call(detail: detail_on(lookalike))).to be(false)
     end
 
-    it "returns false when no receivable account code is configured" do
-      TudlaAccounting.configuration.receivable_account_code = nil
+    # Posting loads its accounts before taking the posting lock, under which roles change.
+    it "goes by the role in the database, not on an account loaded before it changed" do
+      loaded = create(:tudla_accounting_account, code: "1100", category: :asset, organization: organization)
+      TudlaAccounting::AccountRoleAssigner.save!(TudlaAccounting::Account.find(loaded.id), :receivable)
+      expect(described_class.call(detail: detail_on(loaded))).to be(true)
+
+      TudlaAccounting::AccountRoleAssigner.save!(TudlaAccounting::Account.find(loaded.id), nil)
+      expect(described_class.call(detail: detail_on(loaded.tap { |account| account.role = "receivable" }))).to be(false)
+    end
+
+    it "returns false when no account is marked receivable" do
+      TudlaAccounting::AccountRoleAssigner.save!(receivable_account, nil)
       expect(described_class.call(detail: detail_on(receivable_account))).to be(false)
+    end
+
+    it "goes by the role, not the code: another organization's 1100 isn't one, and a renumbered one still is" do
+      other = create(:organization)
+      lookalike = create(:tudla_accounting_account, code: "1100", category: :asset, organization: other)
+      expect(described_class.call(detail: build(:tudla_accounting_detail, account: lookalike, organization: other))).to be(false)
+
+      receivable_account.update!(code: "1150")
+      expect(described_class.call(detail: detail_on(receivable_account))).to be(true)
     end
 
     it "returns false when the detail has no account" do
       expect(described_class.call(detail: detail_on(nil))).to be(false)
-    end
-
-    it "returns false when the account code is nil" do
-      expect(described_class.call(detail: detail_on(build(:tudla_accounting_account, code: nil)))).to be(false)
     end
 
     it "returns false when the detail is nil" do

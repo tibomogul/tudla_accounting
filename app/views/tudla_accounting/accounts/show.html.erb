@@ -1,5 +1,5 @@
 <% sub_accounts = @account.children.order(:code).to_a %>
-<%= tc_page_header @account.code_with_name, subtitle: "#{@account.category.capitalize} account#{" · held in #{@account.currency}" if @account.currency.present?}" do %>
+<%= tc_page_header @account.code_with_name, subtitle: "#{@account.category.capitalize} account#{" · held in #{@account.currency}" if @account.currency.present?}#{" · #{@account.role_name} account" if @account.role}" do %>
   <% if tc_can?(:record) %>
     <%= link_to "Edit", edit_account_path(@account), class: "tc-btn tc-btn-secondary" %>
     <%= link_to "Add sub-account", new_account_path(parent_id: @account.id, category: @account.category), class: "tc-btn tc-btn-secondary" %>

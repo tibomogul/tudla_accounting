@@ -14,8 +14,8 @@ RSpec.describe TudlaAccounting::AgingReportGenerator, type: :service do
     TudlaAccounting::PeriodCreator.call(organization, 2026)
     TudlaAccounting::AccountsCreator.call([
       { code: "1000", name: "Cash", category: "asset" },
-      { code: "1100", name: "Accounts Receivable", category: "asset" },
-      { code: "2100", name: "Accounts Payable", category: "liability" },
+      { code: "1100", name: "Accounts Receivable", category: "asset", role: "receivable" },
+      { code: "2100", name: "Accounts Payable", category: "liability", role: "payable" },
       { code: "4000", name: "Sales", category: "income" },
       { code: "5000", name: "Purchases", category: "expense" }
     ], organization)

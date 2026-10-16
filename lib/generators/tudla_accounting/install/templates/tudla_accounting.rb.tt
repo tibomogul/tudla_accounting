@@ -14,13 +14,16 @@ TudlaAccounting.configure do |config|
   # --- Books ---
   config.base_currency = "USD"
   config.time_zone = "UTC" # financial years and months are built in this zone
-  # config.retained_earnings_account_code = "3900" # takes in each year's profit at year end
+  # The accounts the books treat specially (receivables, payables, retained earnings,
+  # exchange gains and losses) are marked by role on each organization's own accounts:
+  # in the account form, a Role column in the chart import, or AccountsCreator's role:.
   # config.tax_basis = :cash # tax summary counts tax as invoices and bills are paid (default :accrual)
   # config.cash_account_codes = %w[1010] # cash for the cash flow statement (with sub-accounts)
+  # or a callable given the organization, when charts differ (a bookkeeper's clients):
+  # config.cash_account_codes = ->(organization) { organization.cash_account_codes }
+  # config.organization_label = ->(organization) { organization.name } # names it in errors (default: class and id)
 
-  # --- Receivables and payables (off until configured) ---
-  # config.receivable_account_code = "1100" # this account and every account beneath it
-  # config.payable_account_code = "2100"
+  # --- Receivables and payables (off until an account is marked receivable or payable) ---
   # config.carrying_amount_sources = {
   #   "Invoice" => :receivable, "Bill" => :payable,
   #   "Payment" => :receipt, "Disbursement" => :disbursement,
@@ -32,8 +35,6 @@ TudlaAccounting.configure do |config|
 
   # --- Foreign exchange ---
   # config.forex_rate_provider = TudlaAccounting::RbaForexRateProvider.new # or ->(from:, to:, date:) { rate }
-  # config.unrealized_fx_gain_account_code = "4900"
-  # config.realized_fx_gain_account_code = "4950"
 end
 
 # Entries from your own records (Entry hashes; one entry per record by default):
