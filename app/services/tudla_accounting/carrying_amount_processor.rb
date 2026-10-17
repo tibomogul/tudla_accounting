@@ -55,15 +55,20 @@ module TudlaAccounting
 
     private
 
+    # Which lines post to the receivable or payable account, each role looked up once for
+    # the entry (and the entry it's related to) rather than per line.
+    def receivable_checker = @receivable_checker ||= IsAccountReceivableChecker.new(@entry.organization)
+    def payable_checker = @payable_checker ||= IsAccountPayableChecker.new(@entry.organization)
+
     def create_receivable_carrying_amount
-      receivable_detail = @entry.details.find { |d| IsAccountReceivableChecker.call(detail: d) }
+      receivable_detail = @entry.details.find { |d| receivable_checker.call(detail: d) }
       return unless receivable_detail
 
       create_carrying_amount(receivable_detail, :receivable)
     end
 
     def create_payable_carrying_amount
-      payable_detail = @entry.details.find { |d| IsAccountPayableChecker.call(detail: d) }
+      payable_detail = @entry.details.find { |d| payable_checker.call(detail: d) }
       return unless payable_detail
 
       create_carrying_amount(payable_detail, :payable)
@@ -153,8 +158,8 @@ module TudlaAccounting
 
     def refund_side
       case CarryingAmountRole.call(entry: @entry)
-      when :refund then [ :receivable, IsAccountReceivableChecker, -1 ]
-      when :supplier_refund then [ :payable, IsAccountPayableChecker, 1 ]
+      when :refund then [ :receivable, receivable_checker, -1 ]
+      when :supplier_refund then [ :payable, payable_checker, 1 ]
       end
     end
 
@@ -168,8 +173,8 @@ module TudlaAccounting
 
     def credit_side
       case CarryingAmountRole.call(entry: @entry)
-      when :receipt, :credit_note then [ IsAccountReceivableChecker, 1 ]
-      when :disbursement, :supplier_credit then [ IsAccountPayableChecker, -1 ]
+      when :receipt, :credit_note then [ receivable_checker, 1 ]
+      when :disbursement, :supplier_credit then [ payable_checker, -1 ]
       end
     end
 

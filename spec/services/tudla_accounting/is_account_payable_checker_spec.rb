@@ -57,4 +57,26 @@ RSpec.describe TudlaAccounting::IsAccountPayableChecker, type: :service do
       expect(described_class.call(detail: nil)).to be(false)
     end
   end
+
+  describe "#call" do
+    # CarryingAmountProcessor checks every line of an entry, and of the entry it's related to.
+    it "looks the role up once for several lines" do
+      child = create(:tudla_accounting_account, code: "2105", category: payable_account.category, organization: organization, parent: payable_account)
+      lookalike = create(:tudla_accounting_account, code: "2150", category: payable_account.category, organization: organization)
+      details = [ payable_account, child, lookalike, nil ].map { |account| detail_on(account) }
+      checker = described_class.new(organization)
+
+      queries = 0
+      count = ->(*, payload) { queries += 1 unless payload[:name] == "SCHEMA" }
+      results = ActiveSupport::Notifications.subscribed(count, "sql.active_record") { details.map { |detail| checker.call(detail: detail) } }
+
+      expect(results).to eq([ true, true, false, false ])
+      expect(queries).to eq(0)
+    end
+
+    it "finds nothing when no account has the role" do
+      account = create(:tudla_accounting_account, code: "2100", category: :liability, organization: organization)
+      expect(described_class.new(organization).call(detail: detail_on(account))).to be(false)
+    end
+  end
 end
