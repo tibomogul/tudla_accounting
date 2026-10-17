@@ -50,7 +50,7 @@ The generator writes `config/initializers/tudla_accounting.rb`, mounts the engin
 ```ruby
 TudlaAccounting.configure do |config|
   config.parent_controller = "::ApplicationController"
-  config.current_organization = ->(controller) { controller.current_organization }
+  config.current_organization = ->(controller) { controller.send(:current_organization) }
   config.base_currency = "USD"
   config.time_zone = "Australia/Sydney" # financial years and months are built in this zone
 end
@@ -98,14 +98,16 @@ The file has these columns:
 | `Parent Account Code` | The parent's code; it must be in the same file |
 | `Role` | Optional: `receivable`, `payable`, `retained_earnings`, `unrealized_fx_gain` or `realized_fx_gain` (see step 4) |
 
-Each parent's starting balance must equal the sum of its children's. See `spec/fixtures/files/coa_saas_services.csv` for a complete example:
+Each parent's starting balance must equal the sum of its children's. See `spec/fixtures/files/coa_saas_services.csv` for a complete example, which leaves the roles to step 4. These are its first rows, with a `Role` column added to mark accounts receivable:
 
 ```csv
 Account Code,Account Name,Account Type,Contra Code,Starting Balance,Parent Account Code,Role
 1000,Assets,Asset,,94000,,
 1010,Current Assets,Asset,,64000,1000,
 1011,Operating Cash Account,Asset,,25000,1010,
-1100,Accounts Receivable,Asset,,12000,1010,receivable
+1012,Savings Account,Asset,,10000,1010,
+1020,Accounts Receivable,Asset,,20000,1010,receivable
+1025,Allowance for Doubtful Accounts,Asset,1020,-1000,1010,
 ```
 
 **In the UI:** Setup → Chart of accounts and opening balances. Choose the file and the date of the opening balances (the start of the first year), and tick "Replace accounts and opening balances that already exist" to load over earlier accounts.
@@ -361,7 +363,9 @@ The books are now ready. Record entries under Entries, or from host records with
 
 ## Revaluing foreign currency
 
-At a month end, open foreign-currency receivables and payables can be revalued at that day's rate. The unrealized gain or loss is posted to the `unrealized_fx_gain` account and reversed the next day. Rates come from the `forex_rate_provider` setting, and running it again for the same date does nothing more.
+At a month end, open foreign-currency receivables and payables can be revalued at that day's rate. The unrealized gain or loss is posted to the `unrealized_fx_gain` account and reversed the next day. Running it again for the same date does nothing more.
+
+Rates stored in `TudlaAccounting::ForexRate` are used first (one per currency pair and day; the inverse pair works too), and the `forex_rate_provider` setting supplies and stores any that are missing. Without either, revaluation refuses to run and names the missing rate. To record a rate by hand: `TudlaAccounting::ForexRate.create!(from: "EUR", to: "USD", year: 2026, month: 3, day: 31, rate: "1.6")`.
 
 **In the UI:** Setup → Foreign exchange revaluation; choose a month that has ended.
 

@@ -71,16 +71,16 @@ module TudlaAccounting
       @forex_rate_provider = nil
       # UI: engine controllers inherit from this host controller (so its authentication and
       # helpers apply), and current_organization is called with the controller to find the
-      # organization whose books are shown, e.g. ->(controller) { controller.current_organization }
+      # organization whose books are shown, e.g. ->(controller) { controller.send(:current_organization) }
       @parent_controller = "::ApplicationController"
       @current_organization = nil
       # Called with the controller for whoever is acting, recorded on audit events: a
-      # record (a user) or a plain label, e.g. ->(controller) { controller.current_user }
+      # record (a user) or a plain label, e.g. ->(controller) { controller.send(:current_user) }
       @current_actor = nil
       # Called with the controller and the permission a page or action needs (:read,
       # :record for drafts and accounts, :post for posting, reversing and applying
       # payments, :administer for periods and setup); a falsy result refuses it (403).
-      # Everything is allowed when nil. e.g. ->(controller, permission) { controller.current_user.can?(permission) }
+      # Everything is allowed when nil. e.g. ->(controller, permission) { controller.send(:current_user).can?(permission) }
       @authorize = nil
       # The cash flow statement's cash: these accounts and every account beneath them
       # (e.g. %w[1010] for a "Cash and bank" parent). The report can choose others.
