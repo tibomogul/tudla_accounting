@@ -16,7 +16,7 @@ module TudlaAccounting
   #   AccountRoleAssigner.save(account, "retained_earnings") # => true, or false with account.errors
   #   AccountRoleAssigner.save!(account, nil)                # or ActiveRecord::RecordInvalid
   #
-  # Several changes in one transaction, with at most one rebuild, at the end:
+  # Several changes in one transaction, all or nothing, with at most one rebuild, at the end:
   #
   #   AccountRoleAssigner.batch(organization) do |assigner|
   #     assigner.save(receivables, "receivable")
@@ -29,14 +29,21 @@ module TudlaAccounting
     LOCKED_ROLES = %w[receivable payable].freeze
 
     # Yields an assigner, then rebuilds the balances if its changes need it; returns the
-    # block's value.
+    # block's value. All or nothing: when a save in the block returns false, every change
+    # made in it is rolled back, nothing is rebuilt, and batch returns false (the account
+    # refused has the errors). A savepoint, so this holds inside a caller's transaction too.
     def self.batch(organization)
-      ActiveRecord::Base.transaction do
+      result = false
+      ActiveRecord::Base.transaction(requires_new: true) do
         assigner = new(organization)
         result = yield assigner
+        if assigner.failed?
+          result = false
+          raise ActiveRecord::Rollback
+        end
         assigner.rebuild_if_needed!
-        result
       end
+      result
     end
 
     def self.save(account, role)
@@ -66,20 +73,27 @@ module TudlaAccounting
       raise ArgumentError, "#{account.code} isn't one of #{TudlaAccounting.organization_label(@organization)}'s accounts" unless account.organization == @organization
 
       account.role = role
-      return account.save unless account.will_save_change_to_role?
-
-      ActiveRecord::Base.transaction(requires_new: true) do
-        # The posting lock, so the checks see what posting and other role changes leave, and
-        # two assignments of one role can't both find it free.
-        @organization.class.lock.find(@organization.id)
-        account.allowing_role_change { assign(account) } or raise ActiveRecord::Rollback
-        true
-      end || false
+      saved = if account.will_save_change_to_role?
+        ActiveRecord::Base.transaction(requires_new: true) do
+          # The posting lock, so the checks see what posting and other role changes leave, and
+          # two assignments of one role can't both find it free.
+          @organization.class.lock.find(@organization.id)
+          account.allowing_role_change { assign(account) } or raise ActiveRecord::Rollback
+          true
+        end || false
+      else
+        account.save
+      end
+      @failed ||= !saved
+      saved
     end
 
     def save!(account, role)
       save(account, role) or raise ActiveRecord::RecordInvalid, account
     end
+
+    # Whether a save returned false (batch then rolls back).
+    def failed? = @failed || false
 
     # Rebuilds the balances if a change moved retained earnings on books that have them.
     # batch calls it; a caller using new directly calls it once the balances the rebuild

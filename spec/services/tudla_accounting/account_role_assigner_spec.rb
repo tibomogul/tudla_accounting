@@ -145,6 +145,38 @@ RSpec.describe TudlaAccounting::AccountRoleAssigner do
     end
   end
 
+  it "rolls back the whole batch when one of its saves is refused" do
+    receivables
+    other
+    payables = create(:tudla_accounting_account, code: "2100", category: :liability, organization: organization)
+    equipment = create(:tudla_accounting_account, code: "1500", category: :asset, organization: organization)
+
+    result = described_class.batch(organization) do |assigner|
+      assigner.save(other, :receivable)
+      assigner.save(payables, :payable)
+      assigner.save(equipment, :retained_earnings) # not an equity account
+    end
+
+    expect(result).to be(false)
+    expect(equipment.errors[:role]).to be_present
+    expect([ receivables, other, payables, equipment ].map { |account| account.reload.role }).to eq([ "receivable", nil, nil, nil ])
+  end
+
+  it "rolls back only its own batch inside a caller's transaction" do
+    receivables
+    ActiveRecord::Base.transaction do
+      other.update!(name: "Trade debtors")
+      result = described_class.batch(organization) do |assigner|
+        assigner.save(other, :receivable)
+        assigner.save(receivables, :retained_earnings) # not an equity account
+      end
+      expect(result).to be(false)
+    end
+
+    expect(other.reload).to have_attributes(name: "Trade debtors", role: nil)
+    expect(receivables.reload.role).to eq("receivable")
+  end
+
   it "raises with save! when the role can't change" do
     post_to(receivables)
     expect { described_class.save!(other, :receivable) }.to raise_error(ActiveRecord::RecordInvalid, /held by 1100/)
@@ -181,6 +213,20 @@ RSpec.describe TudlaAccounting::AccountRoleAssigner do
         end
       end.to change { rebuilds.count }.by(1)
       expect(TudlaAccounting::BalanceRebuilder.new(organization).differences).to be_empty
+    end
+
+    it "doesn't rebuild a batch it rolls back" do
+      post_to(other)
+      retained
+
+      expect do
+        result = described_class.batch(organization) do |assigner|
+          assigner.save(retained, :retained_earnings)
+          assigner.save(other, :payable) # not a liability account
+        end
+        expect(result).to be(false)
+      end.not_to change { rebuilds.count }
+      expect(retained.reload.role).to be_nil
     end
 
     it "doesn't rebuild when the change is refused" do

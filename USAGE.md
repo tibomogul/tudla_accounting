@@ -216,7 +216,7 @@ The rules:
 
 Marking retained earnings late is fine. If years were posted before any account was marked (a client taken on mid-stream), marking it has the balances rebuilt so every earlier year's profit lands in the account.
 
-The rebuild runs as part of the change, in the same transaction, so the balances are never left behind: if it fails, the role doesn't change either. It rewrites every balance that differs from the posted entries, and the activity log names the accounts it corrected. Several changes made with `AccountRoleAssigner.batch(org) { |assigner| ... }` cost one rebuild between them.
+The rebuild runs as part of the change, in the same transaction, so the balances are never left behind: if it fails, the role doesn't change either. It rewrites every balance that differs from the posted entries, and the activity log names the accounts it corrected. Several changes made with `AccountRoleAssigner.batch(org) { |assigner| ... }` cost one rebuild between them, and are all or nothing: if one is refused, none is made and `batch` returns false.
 
 **How long it takes.** The rebuild reads every posted line of the organization while holding its posting lock, so the change, and any posting for that organization (and only that one), waits until it finishes. `perf/benchmark.rb` measures it, on two years of books with about 30 accounts:
 
