@@ -11,3 +11,5 @@
 coverage/
 /*.gem
 /perf/*.log
+/spec/dummy/storage/
+/spec/dummy/spec/dummy/storage/

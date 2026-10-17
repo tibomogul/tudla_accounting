@@ -75,7 +75,7 @@ module TudlaAccounting
       @children = @periods.group_by(&:parent_id).transform_values { |periods| periods.sort_by(&:from_date) }
       @roots = @children.fetch(nil, [])
       @expected = {}
-      remove_instance_variable(:@retained_earnings) if defined?(@retained_earnings)
+      @retained_earnings = @accounts.find(&:role_retained_earnings?)
     end
 
     def currency
@@ -175,10 +175,6 @@ module TudlaAccounting
       retained.present? && (retained.id == account.id || retained.ancestor_ids.include?(account.id))
     end
 
-    def retained_earnings
-      return @retained_earnings if defined?(@retained_earnings)
-
-      @retained_earnings = @accounts.find(&:role_retained_earnings?)
-    end
+    attr_reader :retained_earnings
   end
 end

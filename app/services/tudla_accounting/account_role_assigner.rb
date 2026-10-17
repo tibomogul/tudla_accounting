@@ -63,6 +63,8 @@ module TudlaAccounting
     end
 
     def save(account, role)
+      raise ArgumentError, "#{account.code} isn't one of #{TudlaAccounting.organization_label(@organization)}'s accounts" unless account.organization == @organization
+
       account.role = role
       return account.save unless account.will_save_change_to_role?
 

@@ -33,6 +33,16 @@ RSpec.describe TudlaAccounting::AccountRoleAssigner do
     expect(receivables.reload.role).to be_nil
   end
 
+  it "refuses another organization's account, leaving its own roles alone" do
+    receivables
+    stranger = create(:tudla_accounting_account, code: "1150", category: :asset, organization: create(:organization))
+
+    expect {
+      described_class.batch(organization) { |assigner| assigner.save(stranger, :receivable) }
+    }.to raise_error(ArgumentError, /1150 isn't one of/)
+    expect([ receivables, stranger ].map { |account| account.reload.role }).to eq([ "receivable", nil ])
+  end
+
   it "leaves receivables and payables on an account with postings" do
     post_to(receivables)
 
