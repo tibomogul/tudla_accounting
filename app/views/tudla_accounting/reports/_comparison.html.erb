@@ -1,0 +1,52 @@
+<%# locals: (comparison:, sections:, figures:) %>
+<%# One table for the whole statement, so the periods' columns line up from section to
+    section, with the labels kept in view while the periods scroll sideways.
+    sections: [[category, total label or nil]]; figures: [[figure, label]] after them. %>
+<% change = comparison.periods.size == 2 && @compare != "months" %>
+<% width = comparison.periods.size + 1 + (change ? 2 : 0) %>
+<% label_cell = "sticky left-0 z-10 bg-[var(--tc-surface)] whitespace-nowrap" %>
+<% money_cells = lambda do |amounts| %>
+  <% amounts.each do |amount| %><td class="tc-num"><%= tc_money(amount) %></td><% end %>
+  <% if change %><td class="tc-num"><%= tc_money(amounts[0] - amounts[1]) %></td><td class="tc-num tc-muted"><%= comparison_percent(amounts) %></td><% end %>
+<% end %>
+<div class="tc-card overflow-x-auto">
+  <table class="tc-table" data-comparison>
+    <thead>
+      <tr>
+        <th class="<%= label_cell %>">Account</th>
+        <% comparison.periods.each do |period| %><th class="tc-num whitespace-nowrap"><%= comparison_label(period, @compare) %></th><% end %>
+        <% if change %><th class="tc-num">Change</th><th class="tc-num">%</th><% end %>
+      </tr>
+    </thead>
+    <% sections.each do |category, total_label| %>
+      <% title = TudlaAccounting::ReportsHelper::SECTION_TITLES.fetch(category) %>
+      <% rows = comparison.rows(category) %>
+      <tbody data-section="<%= category %>" aria-label="<%= title %>">
+        <tr><th class="<%= label_cell %> text-left pt-4"><%= title %></th><th colspan="<%= width - 1 %>"></th></tr>
+        <% if rows.empty? %>
+          <tr><td class="<%= label_cell %> tc-muted">Nothing to report.</td><td colspan="<%= width - 1 %>"></td></tr>
+        <% end %>
+        <% rows.each do |row| %>
+          <tr>
+            <td class="<%= label_cell %>"><div style="padding-left: <%= row.depth * 1.25 %>rem" class="<%= "font-semibold" if row.depth.zero? %>">
+              <span class="font-mono tc-muted mr-2"><%= row.account.code %></span><%= report_account_link(row.account, comparison.periods.first) %>
+            </div></td>
+            <% money_cells.call(row.amounts) %>
+          </tr>
+        <% end %>
+        <tr class="font-semibold" data-total="<%= category %>">
+          <td class="<%= label_cell %>"><%= total_label || "Total #{title.downcase}" %></td>
+          <% money_cells.call(comparison.total(category)) %>
+        </tr>
+      </tbody>
+    <% end %>
+    <tbody data-section="figures">
+      <% figures.each do |figure, label| %>
+        <tr class="font-semibold" data-total="<%= figure %>">
+          <td class="<%= label_cell %>"><%= label %></td>
+          <% money_cells.call(comparison.values(figure)) %>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

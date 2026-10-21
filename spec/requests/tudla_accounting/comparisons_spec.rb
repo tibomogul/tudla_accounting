@@ -36,9 +36,11 @@ RSpec.describe "Comparative statements", type: :request do
     record.post(at)
   end
 
+  # The headings, then the section's rows (its title row aside).
   def table(category)
-    section = css_select("section[aria-labelledby='section-#{category}'] table").first
-    [ section.css("thead th").map { |cell| cell.text.squish }, *section.css("tbody tr").map { |row| row.css("td").map { |cell| cell.text.squish } } ]
+    headings = css_select("table[data-comparison] thead th").map { |cell| cell.text.squish }
+    rows = css_select("table[data-comparison] tbody[data-section='#{category}'] tr").reject { |row| row.css("td").empty? }
+    [ headings, *rows.map { |row| row.css("td").map { |cell| cell.text.squish } } ]
   end
 
   def figure(name) = css_select("tr[data-total='#{name}'] td").map { |cell| cell.text.squish }
@@ -47,7 +49,7 @@ RSpec.describe "Comparative statements", type: :request do
     get routes.reports_profit_and_loss_path(period_id: month(year, 3).id, compare: "previous")
 
     expect(table("income")).to eq([
-      [ "Income", "Mar 2026", "Feb 2026", "Change", "%" ],
+      [ "Account", "Mar 2026", "Feb 2026", "Change", "%" ],
       [ "4000Sales", "120.00", "100.00", "20.00", "20.0%" ],
       [ "4100Interest", "0.00", "5.00", "(5.00)", "-100.0%" ], # in February only, still shown
       [ "Total income", "120.00", "105.00", "15.00", "14.3%" ]
@@ -59,21 +61,21 @@ RSpec.describe "Comparative statements", type: :request do
 
   it "compares a year with the year before" do
     get routes.reports_profit_and_loss_path(period_id: year.id, compare: "last_year")
-    expect(table("income").first(2)).to eq([ [ "Income", "Year 2026", "Year 2025", "Change", "%" ], [ "4000Sales", "220.00", "50.00", "170.00", "340.0%" ] ])
+    expect(table("income").first(2)).to eq([ [ "Account", "Year 2026", "Year 2025", "Change", "%" ], [ "4000Sales", "220.00", "50.00", "170.00", "340.0%" ] ])
   end
 
   it "shows each month of a year and its total" do
     get routes.reports_profit_and_loss_path(period_id: year.id, compare: "months")
 
     headings = table("income").first
-    expect(headings).to eq([ "Income", *%w[Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec].map { |name| "#{name} 2026" }, "Total" ])
+    expect(headings).to eq([ "Account", *%w[Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec].map { |name| "#{name} 2026" }, "Total" ])
     expect(table("income")[1]).to eq([ "4000Sales", "0.00", "100.00", "120.00", *Array.new(9, "0.00"), "220.00" ])
   end
 
   it "shows a balance sheet at each month end so far, balanced at each" do
     get routes.reports_balance_sheet_path(period_id: month(year, 3).id, compare: "months")
 
-    expect(table("asset")).to eq([ [ "Assets", "Jan 2026", "Feb 2026", "Mar 2026" ], [ "1010Cash", "50.00", "155.00", "245.00" ], [ "Total assets", "50.00", "155.00", "245.00" ] ])
+    expect(table("asset")).to eq([ [ "Account", "Jan 2026", "Feb 2026", "Mar 2026" ], [ "1010Cash", "50.00", "155.00", "245.00" ], [ "Total assets", "50.00", "155.00", "245.00" ] ])
     expect(figure("current_year_earnings")).to eq([ "Current-year earnings", "0.00", "105.00", "195.00" ])
     expect(response.body).to include("Balanced at each date")
   end
@@ -93,6 +95,6 @@ RSpec.describe "Comparative statements", type: :request do
   it "ignores an unknown comparison" do
     get routes.reports_balance_sheet_path(period_id: month(year, 3).id, compare: "sideways")
     expect(response).to have_http_status(:ok)
-    expect(css_select("section[aria-labelledby='section-asset'] thead th").size).to eq(2)
+    expect(css_select("table[data-comparison]")).to be_empty
   end
 end
