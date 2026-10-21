@@ -32,6 +32,10 @@
 
 <%= render "document", document: @document %>
 
+<% if TudlaAccounting.attachments? %>
+  <div class="mt-6 print:hidden"><%= render "tudla_accounting/attachments/list", record: @document, label: "Attach files", empty: "No files attached." %></div>
+<% end %>
+
 <%= render "tudla_accounting/emails/list", deliveries: @deliveries %>
 
 <% if @applied.any? %>

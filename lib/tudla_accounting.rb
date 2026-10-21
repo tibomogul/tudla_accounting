@@ -37,6 +37,7 @@ module TudlaAccounting
     tax_return.filed tax_return.withdrawn
     contact.created contact.updated contact.deleted
     document.created document.updated document.deleted document.approved document.voided
+    document.attachment_added document.attachment_removed
     payment.recorded payment.voided
     api_token.created api_token.revoked
     email.sent email.failed

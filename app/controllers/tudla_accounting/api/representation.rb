@@ -30,7 +30,7 @@ module TudlaAccounting
         { id: entry.id, number: entry.number_label, status: entry.posted? ? "posted" : "draft", particulars: entry.particulars, reference: entry.reference,
           transacted_at: time(entry.transacted_at), posted_at: time(entry.posted_at), reverse_on: date(entry.reverse_on),
           related_entry_id: (entry.related_id if entry.related_type == Entry.name), source: source, idempotency_key: entry.idempotency_key,
-          currency: entry.details.first&.currency, lines: entry.details.map { |detail| line_json(detail) },
+          currency: entry.details.first&.currency, lines: entry.details.map { |detail| line_json(detail) }, attachments: attachments_json(entry),
           created_at: time(entry.created_at), updated_at: time(entry.updated_at) }
       end
 
@@ -58,6 +58,7 @@ module TudlaAccounting
             { description: line.description, quantity: line.quantity.to_s("F"), unit_price: amount(line.unit_price), amount: amount(line.amount),
               account_code: line.account.code, tax_code: line.tax_code&.code, tax: amount(Money.new(line.tax_cents, document.organization.currency)) }
           end,
+          attachments: attachments_json(document),
           approved_at: time(document.approved_at), voided_on: date(document.voided_on), void_reason: document.void_reason,
           created_at: time(document.created_at), updated_at: time(document.updated_at) }
       end
@@ -71,6 +72,15 @@ module TudlaAccounting
               entry_id: (target.is_a?(Document) ? target.entry_id : target.id), amount: amount(applied), applied_at: time(allocation.allocated_at), active: allocation.active? }
           end,
           voided_on: date(payment.voided_on), void_reason: payment.void_reason, created_at: time(payment.created_at), updated_at: time(payment.updated_at) }
+      end
+
+      # Its files (none without Active Storage), each fetched from its attachments endpoint.
+      def attachments_json(record)
+        return [] unless TudlaAccounting.attachments?
+
+        record.attachments.includes(:blob).sort_by(&:created_at).map do |attachment|
+          { id: attachment.id, filename: attachment.filename.to_s, content_type: attachment.content_type, byte_size: attachment.byte_size, created_at: time(attachment.created_at) }
+        end
       end
 
       def tax_code_json(code)

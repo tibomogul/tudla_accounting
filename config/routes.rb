@@ -11,6 +11,7 @@ TudlaAccounting::Engine.routes.draw do
           post :post
           post :reverse
         end
+        resources :attachments, only: %i[show create]
       end
       resources :contacts, only: %i[index show create update]
       resources :documents, only: %i[index show create update destroy] do
@@ -18,6 +19,7 @@ TudlaAccounting::Engine.routes.draw do
           post :approve
           post :void
         end
+        resources :attachments, only: %i[show create]
       end
       resources :payments, only: %i[index show create] do
         member { post :void }
@@ -124,6 +126,7 @@ TudlaAccounting::Engine.routes.draw do
       post :approve
       post :void
     end
+    resources :attachments, only: %i[show create destroy]
   end
 
   resources :allocations, only: :create do

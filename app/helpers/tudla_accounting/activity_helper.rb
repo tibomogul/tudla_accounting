@@ -17,8 +17,8 @@ module TudlaAccounting
       when "entry.posted" then safe_join([ "Posted ", subject ])
       when "entry.reversed" then safe_join([ "Reversed ", subject, " on #{tc_date(details['on'])}" ])
       when "entry.deleted" then safe_join([ "Deleted the draft ", subject ])
-      when "entry.attachment_added" then safe_join([ "Attached #{details['filename']} to ", subject ])
-      when "entry.attachment_removed"
+      when "entry.attachment_added", "document.attachment_added" then safe_join([ "Attached #{details['filename']} to ", subject ])
+      when "entry.attachment_removed", "document.attachment_removed"
         safe_join([ "Removed #{details['filename']} from ", subject, (": “#{details['reason']}”" if details["reason"]) ].compact)
       when "account.created" then safe_join([ "Added the account ", subject ])
       when "account.updated" then safe_join([ "Changed ", subject, ": #{details.fetch('changes', {}).keys.map(&:humanize).join(', ').downcase}" ])

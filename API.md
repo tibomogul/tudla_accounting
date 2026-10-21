@@ -190,6 +190,8 @@ Idempotency-Key: shop-order-1042
 
 `kind` is `sales_invoice`, `sales_credit`, `bill` or `supplier_credit`. `due_on` defaults to the contact's payment terms after `issued_on`. Lines need a `description`, `unit_price` and `account_code` (not the receivables or payables account); `quantity` is 1 if not given; `tax_code` must be of the document's side. `tax_inclusive` says the prices include the tax. A credit note can name the approved invoice (or bill) it credits, `credited_document_id`, and is applied to it when approved.
 
+Their files: an entry's or document's JSON lists them under `attachments` (`id`, `filename`, `content_type`, `byte_size`, `created_at`; empty when the app keeps no attachments). `POST /documents/:id/attachments` and `POST /entries/:id/attachments` (`record`) upload them as multipart form data, `file` (or several as `files[]`), each checked as on the pages (the `attachment_content_types` and `attachment_max_size` settings); the answer lists the record's files. `GET /documents/:id/attachments/:attachment_id` (and the same for entries) downloads one.
+
 `PATCH /documents/:id` (`record`) changes a draft: the fields sent, and with `lines`, all its lines. `DELETE /documents/:id` (`record`) deletes a draft. `POST /documents/:id/approve` (`post`) approves a draft. `POST /documents/:id/void` (`post`) voids an approved one, reversing its entry on `on` (a date) with a `reason`; it is refused while payments or credit notes are applied to it.
 
 ### Payments

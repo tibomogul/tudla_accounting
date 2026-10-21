@@ -32,6 +32,9 @@ module TudlaAccounting
     belongs_to :entry, class_name: "TudlaAccounting::Entry", optional: true
     has_many :lines, -> { order(:position, :id) }, class_name: "TudlaAccounting::DocumentLine", dependent: :destroy, inverse_of: :document
     has_many :credit_notes, class_name: "TudlaAccounting::Document", foreign_key: :credited_document_id, inverse_of: :credited_document
+    # The supplier's PDF on a bill, a signed order on an invoice; see Attachable. An
+    # approved document's are part of its record.
+    include Attachable
 
     accepts_nested_attributes_for :lines, allow_destroy: true
 
@@ -123,6 +126,10 @@ module TudlaAccounting
       else "unpaid"
       end
     end
+
+    def attachment_event_prefix = "document"
+    def attachments_locked? = !draft?
+    def attachments_locked_label = "an approved document"
 
     # An approved invoice past its due date with something still owing.
     def overdue?(today)

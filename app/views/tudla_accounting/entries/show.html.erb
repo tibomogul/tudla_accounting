@@ -68,7 +68,7 @@
 </div>
 
 <% if TudlaAccounting.attachments? %>
-  <%= render "attachments", entry: @entry %>
+  <%= render "tudla_accounting/attachments/list", record: @entry %>
 <% end %>
 
 <% if @entry.posted? %>
