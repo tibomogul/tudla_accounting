@@ -27,6 +27,7 @@ module TudlaAccounting
       @unmatched_ledger = @reconciler.unmatched_ledger.to_a
       @ledger_page = Paginator.new(@unmatched_ledger, page: params[:ledger_page], per_page: LEDGER_PAGE)
       @other_accounts = organization_scope(Account).active.where.not(id: @account.id).order(:code)
+      @open_documents = @reconciler.foreign? ? [] : open_documents
     end
 
     def import
@@ -52,6 +53,15 @@ module TudlaAccounting
     end
 
     private
+
+    OPEN_DOCUMENTS = 200
+
+    # The approved invoices and bills with something still owed (the latest
+    # OPEN_DOCUMENTS), that a statement line can be recorded as paying.
+    def open_documents
+      organization_scope(Document).approved.where(kind: %w[sales_invoice bill]).with_open_cents.includes(:contact).order(issued_on: :desc, id: :desc)
+        .limit(OPEN_DOCUMENTS).to_a.select { |document| document.amount_due.positive? }
+    end
 
     def set_account
       @account = organization_scope(Account).find(params[:account_id])

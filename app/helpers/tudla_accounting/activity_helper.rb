@@ -7,7 +7,7 @@ module TudlaAccounting
                        "dimension" => "Dimensions", "dimension_value" => "Dimension values",
                        "recurring_entry" => "Recurring entries", "bank_rule" => "Bank rules",
                        "budget" => "Budgets", "tax_return_form" => "Tax returns", "tax_return" => "Tax returns filed",
-                       "contact" => "Contacts", "document" => "Invoices and bills" }.freeze
+                       "contact" => "Contacts", "document" => "Invoices and bills", "payment" => "Payments" }.freeze
 
     # What an audit event did, in words, linking to its subject while it still exists.
     def activity_description(event)
@@ -74,6 +74,10 @@ module TudlaAccounting
       when "document.updated" then safe_join([ "Changed ", subject, ": #{details.fetch('changes', {}).keys.map { |key| key.delete_suffix('_cents').humanize }.join(', ').downcase}" ])
       when "document.deleted" then safe_join([ "Deleted ", subject ])
       when "document.approved" then safe_join([ "Approved ", subject ])
+      when "payment.recorded"
+        applied = details["documents"].presence
+        safe_join([ "Recorded ", subject, (" for #{applied.to_sentence}" if applied) ].compact)
+      when "payment.voided" then safe_join([ "Voided ", subject, " on #{tc_date(details['on'])}: “#{details['reason']}”" ])
       when "document.voided" then safe_join([ "Voided ", subject, " on #{tc_date(details['on'])}: “#{details['reason']}”" ])
       when "tax_return.filed" then safe_join([ "Filed the tax return ", subject ])
       when "tax_return.withdrawn" then safe_join([ "Withdrew the tax return ", subject, ": “#{details['reason']}”" ])
@@ -134,6 +138,7 @@ module TudlaAccounting
       when FiledTaxReturn then filed_tax_return_path(subject)
       when Contact then contact_path(subject)
       when Document then document_path(subject)
+      when Payment then payment_path(subject)
       end
       path ? link_to(event.subject_label, path, class: "underline") : event.subject_label.to_s
     end

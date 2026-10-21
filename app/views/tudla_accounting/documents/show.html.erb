@@ -12,8 +12,9 @@
       <%= button_to "Approve", approve_document_path(@document), class: "tc-btn",
                     form: { data: { controller: "confirm", confirm_message_value: "Approve it? It is numbered and posted, and can then only be voided.", action: "submit->confirm#ask" } } %>
     <% end %>
-  <% elsif @document.approved? && !@document.credit? && tc_can?(:record) %>
-    <%= link_to (sales ? "Credit note" : "Supplier credit"), new_document_path(credit: @document.id), class: "tc-btn tc-btn-secondary" %>
+  <% elsif @document.approved? && !@document.credit? %>
+    <% if tc_can?(:record) %><%= link_to (sales ? "Credit note" : "Supplier credit"), new_document_path(credit: @document.id), class: "tc-btn tc-btn-secondary" %><% end %>
+    <% if tc_can?(:post) && @document.amount_due.positive? %><%= link_to "Record payment", new_payment_path(document_id: @document.id), class: "tc-btn" %><% end %>
   <% end %>
 <% end %>
 

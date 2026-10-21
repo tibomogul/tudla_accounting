@@ -3,8 +3,9 @@ require "csv"
 # Seeds Demo Co: last year and this year, a small chart of accounts, GST, a department
 # dimension, a couple of hundred posted entries up to today, a few drafts, the first half
 # of last year closed, a bank statement for the operating account, recurring entries,
-# this year's budget, customers with invoices on account (the engine's contacts and
-# invoices), a supplier's bills, and a BAS with last quarter's filed. Returns the organization; running it again returns the existing one, only
+# this year's budget, customers with invoices on account and their payments (the engine's
+# contacts, invoices and payments), a supplier's bills, and a BAS with last quarter's
+# filed. Returns the organization; running it again returns the existing one, only
 # adding the years' periods up to this one if the year has turned since it was seeded.
 #
 # The name is the demo's identity: an organization someone else names "Demo Co" is
@@ -201,11 +202,8 @@ class Demo::Seeder
         next if customer.name == "Umbrella" || paid_on > today
 
         paid = customer.name == "Globex" ? invoice.total_cents / 2 : invoice.total_cents
-        post(paid_on) do |entry|
-          entry.assign_attributes(particulars: "Payment – #{customer.name} (#{invoice.number_label})", source: Demo::Payment.create!(customer: customer), related: invoice.entry)
-          line(entry, accounts["1011"], :debit, paid)
-          line(entry, accounts["1100"], :credit, paid)
-        end
+        TudlaAccounting::Payment.record!(organization: organization, kind: "received", contact: customer, account: accounts["1011"], paid_on: paid_on,
+                                         amount_cents: paid, reference: "EFT #{invoice.number_label}", applications: [ { document: invoice, amount_cents: paid } ])
       end
     end
     consulting_invoice(customers.third, today, 6)

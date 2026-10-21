@@ -3,7 +3,7 @@
 module TudlaAccounting
   # Returns the carrying amount role (:receivable, :payable, :receipt or :disbursement...)
   # configured for an Entry's source_type, or nil when it plays none. The engine's own
-  # sources (invoices, bills and credit notes) say theirs themselves.
+  # sources (invoices, bills, credit notes and payments) say theirs themselves.
   class CarryingAmountRole
     def self.call(entry:)
       new(entry: entry).call
@@ -19,6 +19,6 @@ module TudlaAccounting
       TudlaAccounting.configuration.carrying_amount_sources[@entry&.source_type]
     end
 
-    ENGINE_SOURCES = %w[TudlaAccounting::Document].freeze
+    ENGINE_SOURCES = %w[TudlaAccounting::Document TudlaAccounting::Payment].freeze
   end
 end

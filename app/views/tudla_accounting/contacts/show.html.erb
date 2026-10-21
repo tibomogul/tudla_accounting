@@ -5,6 +5,13 @@
       <% if @contact.customer? %><%= link_to "New invoice", new_document_path(kind: "sales_invoice", contact_id: @contact.id), class: "tc-btn tc-btn-secondary" %><% end %>
       <% if @contact.supplier? %><%= link_to "New bill", new_document_path(kind: "bill", contact_id: @contact.id), class: "tc-btn tc-btn-secondary" %><% end %>
     <% end %>
+  <% end %>
+  <% if tc_can?(:post) %>
+    <% @contact.party_types.each do |type| %>
+      <%= link_to (type == :receivable ? "Record payment from them" : "Record payment to them"), new_payment_path(kind: type == :receivable ? "received" : "paid", contact_id: @contact.id), class: "tc-btn tc-btn-secondary" %>
+    <% end %>
+  <% end %>
+  <% if tc_can?(:record) %>
     <%= link_to "Edit", edit_contact_path(@contact), class: "tc-btn tc-btn-secondary" %>
     <% if @contact.deletable? %>
       <%= button_to "Delete", contact_path(@contact), method: :delete, class: "tc-btn tc-btn-danger",

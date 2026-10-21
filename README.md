@@ -85,6 +85,21 @@ invoice.void!(on: Date.current, reason: "Issued twice") # reverses its entry
 
 The **Sales** and **Purchases** pages list them, searched by number, reference or contact, by kind and status (draft, awaiting payment, part paid, overdue, paid, void), with what is still owed, and download as CSV. The form fills in the contact's payment terms, default account and tax code, and adds up the lines as they're typed. Each document's page prints (or saves as a PDF) as the document itself, headed by the `document_header` setting, and shows the payments and credits applied to it; an approved invoice or bill offers a credit note copying its lines. Drafting needs `:record`; approving and voiding need `:post`.
 
+### Payments
+`TudlaAccounting::Payment` is money received from a customer (`kind: "received"`) or paid to a supplier (`"paid"`), through a bank or cash account in the organization's currency. `Payment.record!` saves it and posts its entry straight away, dated `paid_on`, with the payment as its source: the bank account against the account marked receivable (or payable), opening a credit for the contact that is applied to the invoices or bills given, as much to each as said. What isn't applied stays as a credit, applied later from the entry's page as any credit is. With `bank_line:` it is matched to that bank statement line too. All or nothing; `ArgumentError` says what's wrong.
+
+```ruby
+payment = TudlaAccounting::Payment.record!(organization: organization, kind: "received", contact: northwind, account: bank,
+                                           paid_on: Date.current, amount_cents: 500_00, reference: "EFT 88213",
+                                           applications: [ { document: invoice, amount_cents: 330_00 } ])
+payment.unapplied # $170.00, a credit to apply
+payment.void!(on: Date.current, reason: "Bounced") # reverses its entry and takes it off the invoice
+```
+
+The engine maps its payments to the receipt and disbursement roles itself (see `carrying_amount_sources`). A payment isn't changed or deleted once recorded: `void!` reverses its entry (refused while it is matched to a bank statement line), and reversing the entry itself voids it too. Payments are on the audit trail (`payment.recorded`, `payment.voided`).
+
+**Record payment** on an approved invoice or bill (or on a contact's page) opens a form listing the contact's open invoices or bills, oldest due first, to apply it to. **Payments received** and **Payments made** (from the Sales and Purchases pages) list them, searched and downloadable as CSV, and each payment's page shows what it was applied to. On the banking page, an unmatched statement line can be recorded as a payment of an open invoice (money in) or bill (money out), those owing exactly its amount first: it applies as much as is owed, keeps the rest as a credit, and matches the line. Recording and voiding payments need `:post`.
+
 ### Customer and supplier statements
 `TudlaAccounting::PartyStatement` is a statement of account for one customer (`type: :receivable`) or supplier (`:payable`) over a run of days, as it would be sent to them:
 

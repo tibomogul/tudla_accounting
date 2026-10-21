@@ -83,7 +83,7 @@ module TudlaAccounting
     end
 
     # Posts an entry on `on` (a date) with every line on the other side, linked back to
-    # this one, and returns it. An invoice or bill it was posted for becomes void.
+    # this one, and returns it. An invoice, bill or payment it was posted for becomes void.
     def reverse!(on:)
       blocker = reversal_blocker
       raise ArgumentError, blocker if blocker
@@ -103,7 +103,7 @@ module TudlaAccounting
         reversing.save!
         reversing.post(at)
         undo_carrying_amounts(at)
-        source.entry_reversed!(on.to_date) if source.is_a?(Document)
+        source.entry_reversed!(on.to_date) if source.is_a?(Document) || source.is_a?(Payment)
         AuditEvent.record!("entry.reversed", organization: organization, subject: self, details: { reversal_id: reversing.id, on: on.to_date.iso8601 })
         reversing
       end

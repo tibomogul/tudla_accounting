@@ -69,6 +69,7 @@ TudlaAccounting::Engine.routes.draw do
       post :unmatch
       post :create_entry
       post :record_by_rule
+      post :record_payment
     end
   end
   resources :bank_rules, except: :show
@@ -77,6 +78,11 @@ TudlaAccounting::Engine.routes.draw do
   end
   get "sales", to: "documents#index", defaults: { side: "sales" }, as: :sales_documents
   get "purchases", to: "documents#index", defaults: { side: "purchases" }, as: :purchase_documents
+  get "sales/payments", to: "payments#index", defaults: { kind: "received" }, as: :received_payments
+  get "purchases/payments", to: "payments#index", defaults: { kind: "paid" }, as: :paid_payments
+  resources :payments, only: %i[show new create] do
+    member { post :void }
+  end
   resources :documents, except: :index do
     member do
       post :approve

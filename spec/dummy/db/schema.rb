@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_21_235000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_22_001000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -40,13 +40,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_235000) do
     t.bigint "blob_id", null: false
     t.string "variation_digest", null: false
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
-  end
-
-  create_table "demo_payments", force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.bigint "customer_id", null: false
-    t.datetime "updated_at", null: false
-    t.index ["customer_id"], name: "index_demo_payments_on_customer_id"
   end
 
   create_table "organizations", force: :cascade do |t|
@@ -443,6 +436,31 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_235000) do
     t.index ["from", "to", "year", "month", "day"], name: "tudla_accounting_forex_rates_unique_key", unique: true
   end
 
+  create_table "tudla_accounting_payments", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "amount_cents", null: false
+    t.bigint "contact_id", null: false
+    t.datetime "created_at", null: false
+    t.bigint "entry_id"
+    t.string "kind", null: false
+    t.text "notes"
+    t.bigint "organization_id", null: false
+    t.string "organization_type", null: false
+    t.date "paid_on", null: false
+    t.string "reference"
+    t.string "status", default: "posted", null: false
+    t.datetime "updated_at", null: false
+    t.string "void_reason"
+    t.date "voided_on"
+    t.index ["account_id"], name: "index_tudla_accounting_payments_on_account"
+    t.index ["contact_id"], name: "index_tudla_accounting_payments_on_contact"
+    t.index ["entry_id"], name: "index_tudla_accounting_payments_on_entry", unique: true
+    t.index ["organization_type", "organization_id", "paid_on"], name: "index_tudla_accounting_payments_on_paid_on"
+    t.check_constraint "amount_cents > 0", name: "tudla_accounting_payments_amount_positive"
+    t.check_constraint "kind::text = ANY (ARRAY['received'::character varying, 'paid'::character varying]::text[])", name: "tudla_accounting_payments_kind_known"
+    t.check_constraint "status::text = ANY (ARRAY['posted'::character varying, 'void'::character varying]::text[])", name: "tudla_accounting_payments_status_known"
+  end
+
   create_table "tudla_accounting_periods", force: :cascade do |t|
     t.string "ancestry", default: "/", null: false
     t.integer "ancestry_depth", default: 0, null: false
@@ -565,7 +583,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_235000) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
-  add_foreign_key "demo_payments", "tudla_accounting_contacts", column: "customer_id"
   add_foreign_key "tudla_accounting_accounts", "tudla_accounting_accounts", column: "contra_account_id"
   add_foreign_key "tudla_accounting_allocations", "tudla_accounting_carrying_amounts", column: "from_id"
   add_foreign_key "tudla_accounting_allocations", "tudla_accounting_carrying_amounts", column: "to_id"
@@ -603,6 +620,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_235000) do
   add_foreign_key "tudla_accounting_documents", "tudla_accounting_entries", column: "entry_id"
   add_foreign_key "tudla_accounting_filed_tax_returns", "tudla_accounting_tax_return_forms", column: "form_id"
   add_foreign_key "tudla_accounting_foreign_exchanges", "tudla_accounting_details", column: "detail_id"
+  add_foreign_key "tudla_accounting_payments", "tudla_accounting_accounts", column: "account_id"
+  add_foreign_key "tudla_accounting_payments", "tudla_accounting_contacts", column: "contact_id"
+  add_foreign_key "tudla_accounting_payments", "tudla_accounting_entries", column: "entry_id"
   add_foreign_key "tudla_accounting_recurring_entry_lines", "tudla_accounting_accounts", column: "account_id"
   add_foreign_key "tudla_accounting_recurring_entry_lines", "tudla_accounting_recurring_entries", column: "recurring_entry_id"
   add_foreign_key "tudla_accounting_recurring_entry_lines", "tudla_accounting_tax_codes", column: "tax_code_id"

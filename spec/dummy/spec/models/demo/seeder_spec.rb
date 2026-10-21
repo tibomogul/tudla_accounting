@@ -89,7 +89,7 @@ RSpec.describe Demo::Seeder do
     expect(statement).to have_attributes(opening: Money.new(0, "USD"), closing: Money.new(0, "USD"))
   end
 
-  it "keeps the customers and a supplier as contacts, with the engine's invoices and bills" do
+  it "keeps the customers and a supplier as contacts, with the engine's invoices, bills and payments" do
     organization = described_class.call(entries: 30)
 
     contacts = TudlaAccounting::Contact.where(organization: organization).order(:name)
@@ -100,6 +100,7 @@ RSpec.describe Demo::Seeder do
     expect(documents.purchases.approved.map(&:total)).to eq([ Money.new(165_00, "USD") ] * 2)
     paid = documents.sales.approved.with_open_cents.to_a.group_by(&:payment_status)
     expect(paid.keys).to contain_exactly("paid", "part_paid", "unpaid")
+    expect(TudlaAccounting::Payment.where(organization: organization).received.count).to eq(9)
   end
 
   it "sets up a BAS, with last quarter's filed as the books still give it" do
@@ -138,7 +139,7 @@ RSpec.describe Demo::Seeder do
 
       auckland = ActiveSupport::TimeZone["Pacific/Auckland"]
       times = TudlaAccounting::Entry.where(organization: organization).where.not(posted_at: nil).pluck(:transacted_at).map { |time| time.in_time_zone(auckland) }
-      expect(times.map(&:hour)).to all(eq(12).or(eq(0))) # invoices and bills are dated at the start of their day
+      expect(times.map(&:hour)).to all(eq(12).or(eq(0))) # invoices, bills and payments are dated at the start of their day
       account = TudlaAccounting::Account.find_by(organization: organization, code: "1011")
       expect(TudlaAccounting::BankStatementLine.where(account: account).pluck(:occurred_on)).to all(be_between(Date.new(2026, 5, 1), Date.new(2026, 5, 31)))
       expect(TudlaAccounting::BalanceRebuilder.new(organization).differences).to be_empty

@@ -109,6 +109,16 @@
                         <% end %>
                         <%= form.submit "Post entry", class: "tc-btn tc-btn-secondary tc-btn-sm" %>
                       <% end %>
+                      <% documents = @open_documents.select { |document| document.kind == (line.amount_cents.positive? ? "sales_invoice" : "bill") }
+                                                    .sort_by { |document| [ document.amount_due.cents == line.amount_cents.abs ? 0 : 1, (document.issued_on - line.occurred_on).abs ] } %>
+                      <% if documents.any? %>
+                        <%= form_with url: record_payment_bank_statement_line_path(line, show: params[:show]), class: "flex flex-wrap items-end gap-2" do |form| %>
+                          <div><%= form.label "document_id_#{line.id}", (line.amount_cents.positive? ? "Record it as a payment of" : "Record it as paying"), class: "tc-label" %>
+                            <%= select_tag :document_id, options_for_select(documents.map { |document| [ "#{document.number_label} #{document.contact.name} (#{document.amount_due.format(symbol: false)} owed)", document.id ] }),
+                                           id: "document_id_#{line.id}", class: "tc-input" %></div>
+                          <%= form.submit "Record payment", class: "tc-btn tc-btn-secondary tc-btn-sm" %>
+                        <% end %>
+                      <% end %>
                       <%= link_to "Create a rule from it", new_bank_rule_path(line_id: line.id), class: "underline text-sm" %>
                     </div>
                   </details>

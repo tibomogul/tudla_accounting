@@ -1,0 +1,56 @@
+<% received = @payment.received? %>
+<%= tc_page_header "#{@payment.title} of #{@payment.amount.format}", subtitle: tc_date(@payment.paid_on) do %>
+  <%= link_to (received ? "Payments received" : "Payments made"), (received ? received_payments_path : paid_payments_path), class: "tc-btn tc-btn-ghost" %>
+<% end %>
+
+<div class="mb-4 flex flex-wrap items-center gap-3 text-sm">
+  <%= @payment.void? ? tc_badge("Void", tone: :danger) : (@payment.unapplied.zero? ? tc_badge("Applied", tone: :success) : tc_badge("Credit to apply", tone: :primary)) %>
+  <% if @payment.entry %><span class="tc-muted">Posted as <%= link_to entry_title(@payment.entry), entry_path(@payment.entry), class: "underline" %></span><% end %>
+  <% if @payment.void? %><span class="tc-muted">Voided <%= tc_date(@payment.voided_on) %><%= ": “#{@payment.void_reason}”" if @payment.void_reason %></span><% end %>
+</div>
+
+<div class="grid gap-6 lg:grid-cols-3">
+  <section class="tc-card tc-card-body space-y-2 text-sm" aria-label="Details" data-details>
+    <% { (received ? "From" : "To") => link_to(@payment.contact.name, contact_path(@payment.contact), class: "underline"), (received ? "Into" : "Out of") => @payment.account.code_with_name,
+         "Reference" => @payment.reference, "Amount" => @payment.amount.format, "Not applied yet" => (@payment.unapplied.format unless @payment.void?) }.each do |label, value| %>
+      <div class="flex justify-between gap-4"><span class="tc-muted"><%= label %></span><span class="text-right"><%= value || "—" %></span></div>
+    <% end %>
+    <% if @payment.notes %><div><p class="tc-muted">Notes</p><p class="whitespace-pre-line"><%= @payment.notes %></p></div><% end %>
+  </section>
+
+  <section class="lg:col-span-2 tc-card overflow-x-auto" aria-labelledby="applied">
+    <h2 id="applied" class="tc-card-body tc-card-title pb-0">Applied to</h2>
+    <% applications = @payment.applications %>
+    <% if applications.any? %>
+      <table class="tc-table">
+        <thead><tr><th>Date</th><th>Invoice or bill</th><th class="tc-num">Amount</th></tr></thead>
+        <tbody>
+          <% applications.each do |target, amount, allocation| %>
+            <tr class="<%= "tc-muted line-through" unless allocation.active? %>">
+              <td class="whitespace-nowrap"><%= tc_date(allocation.allocated_at) %></td>
+              <td><%= target.is_a?(TudlaAccounting::Document) ? link_to(target.title, document_path(target), class: "underline") : link_to(entry_title(target), entry_path(target), class: "underline") %><%= " (taken off)" unless allocation.active? %></td>
+              <td class="tc-num"><%= tc_money(amount) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <p class="tc-card-body tc-muted text-sm">Nothing yet.</p>
+    <% end %>
+    <% if !@payment.void? && @payment.unapplied.positive? && tc_can?(:post) %>
+      <p class="tc-card-body text-sm"><%= link_to "Apply the rest", entry_path(@payment.entry), class: "underline" %> to other <%= received ? "invoices" : "bills" %> from its entry's page.</p>
+    <% end %>
+  </section>
+</div>
+
+<% if !@payment.void? && tc_can?(:post) %>
+  <details class="tc-card tc-card-body mt-6">
+    <summary class="cursor-pointer font-medium">Void this payment</summary>
+    <%= form_with url: void_payment_path(@payment), class: "mt-4 grid gap-3 sm:grid-cols-4 items-end",
+                  data: { controller: "confirm", confirm_message_value: "Void it? Its entry is reversed and it comes off what it paid.", action: "submit->confirm#ask" } do |form| %>
+      <div><%= form.label :on, "Reverse its entry on", class: "tc-label" %><%= form.date_field :on, value: @payment.paid_on, required: true, class: "tc-input" %></div>
+      <div class="sm:col-span-2"><%= form.label :reason, "Reason", class: "tc-label" %><%= form.text_field :reason, required: true, maxlength: 255, class: "tc-input", placeholder: "Recorded twice" %></div>
+      <div><%= form.submit "Void", class: "tc-btn tc-btn-danger" %></div>
+    <% end %>
+  </details>
+<% end %>

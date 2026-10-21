@@ -1,0 +1,41 @@
+<% received = @kind == "received" %>
+<% list_path = received ? received_payments_path : paid_payments_path %>
+<%= tc_page_header (received ? "Payments received" : "Payments made"), subtitle: (received ? "From customers" : "To suppliers") do %>
+  <%= link_to (received ? "Sales" : "Purchases"), (received ? sales_documents_path : purchase_documents_path), class: "tc-btn tc-btn-ghost" %>
+  <% query = request.query_parameters.to_query.presence %>
+  <%= link_to "Download CSV", "#{list_path}.csv#{"?#{query}" if query}", class: "tc-btn tc-btn-ghost", data: { turbo: false } %>
+  <% if tc_can?(:post) %><%= link_to "Record a payment", new_payment_path(kind: @kind), class: "tc-btn" %><% end %>
+<% end %>
+
+<%= form_with url: list_path, method: :get, class: "tc-card tc-card-body mb-6 flex flex-wrap items-end gap-3" do |form| %>
+  <div class="grow"><%= form.label :q, "Search", class: "tc-label" %><%= form.search_field :q, value: params[:q], placeholder: "Reference or #{received ? 'customer' : 'supplier'}", class: "tc-input" %></div>
+  <div><%= form.label :status, "Status", class: "tc-label" %>
+    <%= form.select :status, [ [ "Any", "" ], [ "Recorded", "posted" ], [ "Void", "void" ] ], { selected: params[:status] }, class: "tc-input" %></div>
+  <%= form.submit "Search", class: "tc-btn tc-btn-secondary", name: nil %>
+<% end %>
+
+<div class="tc-card overflow-x-auto mb-4">
+  <table class="tc-table">
+    <thead>
+      <tr><th>Date</th><th><%= received ? "Customer" : "Supplier" %></th><th>Reference</th><th>Account</th>
+        <th class="tc-num">Amount (<%= accounting_organization.currency %>)</th><th class="tc-num">Unapplied</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+      <% if @page.records.empty? %>
+        <tr><td colspan="7" class="tc-muted text-center"><%= request.query_parameters.any? ? "Nothing matches." : "No payments yet." %></td></tr>
+      <% end %>
+      <% @page.records.each do |payment| %>
+        <tr data-payment-row>
+          <td class="whitespace-nowrap"><%= link_to tc_date(payment.paid_on), payment_path(payment), class: "underline" %></td>
+          <td><%= link_to payment.contact.name, contact_path(payment.contact), class: "underline" %></td>
+          <td><%= payment.reference %></td>
+          <td><%= payment.account.code_with_name %></td>
+          <td class="tc-num"><%= tc_money(payment.amount) %></td>
+          <td class="tc-num"><%= tc_money(payment.unapplied) unless payment.void? %></td>
+          <td><%= payment.void? ? tc_badge("Void", tone: :danger) : (payment.unapplied.zero? ? tc_badge("Applied", tone: :success) : tc_badge("Credit to apply", tone: :primary)) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+<%= render "tudla_accounting/shared/pagination", paginator: @page %>

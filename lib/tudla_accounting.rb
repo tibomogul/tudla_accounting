@@ -37,6 +37,7 @@ module TudlaAccounting
     tax_return.filed tax_return.withdrawn
     contact.created contact.updated contact.deleted
     document.created document.updated document.deleted document.approved document.voided
+    payment.recorded payment.voided
   ].freeze
 
   # Calls the block with each TudlaAccounting::AuditEvent for an action (or for every
