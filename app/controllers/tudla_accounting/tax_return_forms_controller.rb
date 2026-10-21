@@ -40,8 +40,11 @@ module TudlaAccounting
     end
 
     def destroy
-      @form.destroy!
-      redirect_to tax_return_forms_path, notice: "Tax return #{@form.name} deleted."
+      if @form.destroy
+        redirect_to tax_return_forms_path, notice: "Tax return #{@form.name} deleted."
+      else
+        redirect_to tax_return_form_path(@form), alert: @form.errors.full_messages.to_sentence
+      end
     end
 
     private

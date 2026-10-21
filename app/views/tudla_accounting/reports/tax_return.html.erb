@@ -10,6 +10,7 @@
     <% end %>
     <%= render "download" %>
   <% end %>
+  <%= link_to "Filed returns", filed_tax_returns_path, class: "tc-btn tc-btn-ghost print:hidden" %>
 <% end %>
 
 <% if @forms.empty? %>
@@ -19,6 +20,18 @@
 <% elsif @report.nil? %>
   <%= render "no_periods" %>
 <% else %>
+  <% if @filed.any? %>
+    <div class="tc-alert tc-alert-warning mb-4" role="status" data-filed>
+      <span><% @filed.each do |filed| %><%= link_to filed.label, filed_tax_return_path(filed), class: "underline" %> was filed <%= tc_date(filed.filed_at) %>. <% end %></span>
+    </div>
+  <% elsif tc_can?(:administer) %>
+    <%= form_with url: filed_tax_returns_path, class: "flex flex-wrap items-center gap-3 mb-4 print:hidden",
+                  data: { controller: "confirm", confirm_message_value: "Keep these figures as the #{@form.name} filed for these months?", action: "submit->confirm#ask" } do |form| %>
+      <%= hidden_field_tag :form_id, @form.id %><%= hidden_field_tag :from_id, @from.id %><%= hidden_field_tag :thru_id, @thru.id %><%= hidden_field_tag :basis, @report[:basis] %>
+      <%= form.submit "Mark as filed", class: "tc-btn" %>
+      <span class="tc-hint">Once you have lodged it: its figures are kept, and later changes to the books are shown against them.</span>
+    <% end %>
+  <% end %>
   <div class="tc-card overflow-x-auto">
     <table class="tc-table" data-tax-return>
       <thead><tr><th>Box</th><th>Name</th><th class="tc-num">Amount</th></tr></thead>

@@ -1,0 +1,45 @@
+<%= tc_page_header @filed.label, subtitle: "#{@filed.basis.capitalize} basis, filed #{tc_date(@filed.filed_at)}#{" by #{@filed.filed_by}" if @filed.filed_by}, in #{accounting_organization.currency}" do %>
+  <%= link_to "Tax returns filed", filed_tax_returns_path, class: "tc-btn tc-btn-ghost print:hidden" %>
+  <button type="button" class="tc-btn tc-btn-ghost print:hidden" data-controller="print" data-action="print#print">Print or save as PDF</button>
+<% end %>
+
+<% changed = @comparison.reject { |box| box[:filed] == box[:now] } %>
+<% if @filed.withdrawn? %>
+  <div class="tc-alert tc-alert-warning mb-4" role="status"><span>Withdrawn <%= tc_date(@filed.withdrawn_at) %><%= " by #{@filed.withdrawn_by}" if @filed.withdrawn_by %>: “<%= @filed.withdrawn_reason %>”</span></div>
+<% elsif changed.any? %>
+  <div class="tc-alert tc-alert-warning mb-4" role="status" data-changed>
+    <span><%= pluralize(changed.size, "box") %> no longer <%= changed.size == 1 ? "agrees" : "agree" %> with the books: something was posted into these months since, or the boxes were changed.
+      Correct the books, or withdraw this return and file a corrected one.</span>
+  </div>
+<% else %>
+  <div class="tc-alert tc-alert-success mb-4" role="status"><span>The books still give the figures filed.</span></div>
+<% end %>
+<% if !@filed.withdrawn? && @open_months.any? %>
+  <p class="tc-hint mb-4 print:hidden"><%= @open_months.map { |month| tc_period_label(month) }.to_sentence %> <%= @open_months.size == 1 ? "is" : "are" %> still open, so postings can still change these figures.
+    <%= link_to "Close them", periods_path, class: "underline" %> once the return is lodged.</p>
+<% end %>
+
+<div class="tc-card overflow-x-auto mb-6">
+  <table class="tc-table" data-filed-figures>
+    <thead><tr><th>Box</th><th>Name</th><th class="tc-num">As filed</th><th class="tc-num">The books now</th><th class="tc-num">Difference</th></tr></thead>
+    <tbody>
+      <% @comparison.each do |box| %>
+        <% differs = box[:filed] != box[:now] %>
+        <tr class="<%= "font-semibold bg-[var(--tc-warning-bg)]" if differs %>" data-box="<%= box[:label] %>">
+          <td class="font-mono whitespace-nowrap"><%= box[:label] %></td>
+          <td><%= box[:name] %></td>
+          <td class="tc-num"><%= box[:filed] ? tc_money(box[:filed]) : tag.span("not on the return filed", class: "tc-muted text-xs") %></td>
+          <td class="tc-num"><%= box[:now] ? tc_money(box[:now]) : tag.span("no longer on the form", class: "tc-muted text-xs") %></td>
+          <td class="tc-num"><%= tc_money((box[:now] || Money.new(0, accounting_organization.currency)) - (box[:filed] || Money.new(0, accounting_organization.currency))) if differs %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+
+<% if tc_can?(:administer) && !@filed.withdrawn? %>
+  <%= form_with url: withdraw_filed_tax_return_path(@filed), class: "tc-card tc-card-body grid gap-3 sm:grid-cols-4 items-end max-w-3xl print:hidden" do |form| %>
+    <div class="sm:col-span-3"><%= form.label :reason, "Withdraw it, to file a corrected return: why", class: "tc-label" %><%= form.text_field :reason, class: "tc-input", required: true, placeholder: "An invoice was missed" %></div>
+    <div><%= form.submit "Withdraw", class: "tc-btn tc-btn-danger" %></div>
+  <% end %>
+<% end %>

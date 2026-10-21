@@ -115,6 +115,59 @@ RSpec.describe "Tax returns", type: :request do
     expect(css_select("tbody tr").map { |row| row.css("td").last.text.squish }.first(2)).to eq([ "Deleted the tax return Yearly", "Changed the tax return Yearly: name" ])
   end
 
+  it "marks a return as filed, shows later changes against it, and withdraws it to file a corrected one" do
+    bas = TudlaAccounting::TaxReturnForm.from_template!(organization, "au_bas")
+    bas.boxes.find_by!(label: "1A").parts.create!(source: "tax_code_tax", tax_code: @gst)
+    march = @year.children.order(:from_date).third
+    get routes.reports_tax_return_path
+    expect(css_select("form[action='#{routes.filed_tax_returns_path}'] input[type=submit]").map { |button| button["value"] }).to eq([ "Mark as filed" ])
+
+    post routes.filed_tax_returns_path, params: { form_id: bas.id, from_id: march.id, thru_id: march.id, basis: "accrual" }
+    filed = TudlaAccounting::FiledTaxReturn.sole
+    expect(response).to redirect_to(routes.filed_tax_return_path(filed))
+    expect(flash[:notice]).to eq("BAS, 1 Mar 2026 to 31 Mar 2026 marked as filed.")
+    get routes.filed_tax_return_path(filed)
+    expect(response.body).to include("The books still give the figures filed.", "Mar 2026 is still open")
+    get routes.reports_tax_return_path
+    expect(css_select("[data-filed] a").map(&:text)).to eq([ "BAS, 1 Mar 2026 to 31 Mar 2026" ])
+    expect(response.body).not_to include("Mark as filed")
+
+    post routes.filed_tax_returns_path, params: { form_id: bas.id, from_id: march.id, thru_id: march.id }
+    expect(flash[:alert]).to start_with("It was not marked as filed: BAS, 1 Mar 2026 to 31 Mar 2026 was filed already")
+
+    entry = TudlaAccounting::Entry.create_from_ruby_hash(organization_type: "Organization", organization_id: organization.id, particulars: "Late sale", transacted_at: "2026-03-12T00:00:00Z",
+                                                         details: [ { account_code: "1100", amount: "AUD 110.00" }, { account_code: "4000", amount: "AUD 100.00", tax_code: "GST" } ])
+    entry.post(entry.transacted_at)
+    get routes.filed_tax_return_path(filed)
+    expect(css_select("[data-changed]").first.text.squish).to start_with("2 boxes no longer agree with the books") # 1A, and the net GST from it
+    expect(css_select("tr[data-box='1A'] td").map { |cell| cell.text.squish }).to eq([ "1A", "GST on sales", "100.00", "110.00", "10.00" ])
+    get routes.filed_tax_returns_path
+    expect(css_select("tr[data-filed-return] td").map { |cell| cell.text.squish }).to eq([ "BAS", "1 Mar 2026 to 31 Mar 2026", "Accrual", "20 Mar 2026 by Demo user", "2 boxes changed" ])
+
+    post routes.withdraw_filed_tax_return_path(filed), params: { reason: "" }
+    expect(flash[:alert]).to eq("Say why it is withdrawn")
+    post routes.withdraw_filed_tax_return_path(filed), params: { reason: "Missed the late sale" }
+    expect(flash[:notice]).to eq("BAS, 1 Mar 2026 to 31 Mar 2026 withdrawn. A corrected return can now be filed for these months.")
+    get routes.filed_tax_return_path(filed)
+    expect(response.body).to include("“Missed the late sale”")
+    post routes.filed_tax_returns_path, params: { form_id: bas.id, from_id: march.id, thru_id: march.id }
+    get routes.filed_tax_returns_path
+    expect(css_select("tr[data-filed-return] td:last-child").map { |cell| cell.text.squish }).to eq([ "As filed", "Withdrawn" ])
+
+    delete routes.tax_return_form_path(bas)
+    expect(flash[:alert]).to eq("Returns of BAS have been filed; it stays with them")
+    get routes.activity_path(kind: "tax_return")
+    expect(css_select("tbody tr").map { |row| row.css("td").last.text.squish }).to eq([
+      "Filed the tax return BAS, 1 Mar 2026 to 31 Mar 2026", "Withdrew the tax return BAS, 1 Mar 2026 to 31 Mar 2026: “Missed the late sale”",
+      "Filed the tax return BAS, 1 Mar 2026 to 31 Mar 2026"
+    ])
+  end
+
+  it "has no returns filed yet" do
+    get routes.filed_tax_returns_path
+    expect(response.body).to include("None yet.")
+  end
+
   it "asks for a return to be set up first" do
     get routes.reports_tax_return_path
     expect(response.body).to include("No tax returns set up yet.")
@@ -129,7 +182,13 @@ RSpec.describe "Tax returns", type: :request do
       TudlaAccounting::TaxReturnForm.from_template!(organization, "uk_vat")
       get routes.reports_tax_return_path
       expect(response.body).not_to include("add its tax codes", "Change the boxes")
+      expect(response.body).not_to include("Mark as filed")
       get routes.tax_return_forms_path
+      expect(response).to have_http_status(:forbidden)
+      filed = TudlaAccounting::FiledTaxReturn.file!(TudlaAccounting::TaxReturnForm.sole, from: @year.from_date, thru: @year.thru_date)
+      get routes.filed_tax_return_path(filed)
+      expect(response.body).not_to include("Withdraw")
+      post routes.withdraw_filed_tax_return_path(filed), params: { reason: "x" }
       expect(response).to have_http_status(:forbidden)
     end
   end

@@ -1,0 +1,27 @@
+<%= tc_page_header "Tax returns filed", subtitle: "Each return's figures as filed, and whether the books still agree" do %>
+  <%= link_to "Tax return report", reports_tax_return_path, class: "tc-btn tc-btn-ghost" %>
+<% end %>
+
+<div class="tc-card overflow-x-auto">
+  <table class="tc-table">
+    <thead><tr><th>Return</th><th>Months</th><th>Basis</th><th>Filed</th><th>Now</th></tr></thead>
+    <tbody>
+      <% if @filed.empty? %>
+        <tr><td colspan="5" class="tc-muted text-center">None yet. Mark a return as filed from the Tax return report once you have lodged it.</td></tr>
+      <% end %>
+      <% @filed.each do |filed| %>
+        <tr data-filed-return class="<%= "tc-muted" if filed.withdrawn? %>">
+          <td><%= link_to filed.form.name, filed_tax_return_path(filed), class: "underline" %></td>
+          <td class="whitespace-nowrap"><%= tc_date(filed.from_date) %> to <%= tc_date(filed.thru_date) %></td>
+          <td><%= filed.basis.capitalize %></td>
+          <td class="whitespace-nowrap"><%= tc_date(filed.filed_at) %><% if filed.filed_by %> <span class="tc-muted text-xs">by <%= filed.filed_by %></span><% end %></td>
+          <td>
+            <% if filed.withdrawn? %><%= tc_badge "Withdrawn" %>
+            <% elsif @changed[filed.id].zero? %><%= tc_badge "As filed", tone: :success %>
+            <% else %><%= tc_badge "#{pluralize(@changed[filed.id], 'box')} changed", tone: :warning %><% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

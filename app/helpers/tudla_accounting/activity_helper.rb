@@ -6,7 +6,7 @@ module TudlaAccounting
                        "bank_statement" => "Statement imports", "bank_line" => "Bank matches",
                        "dimension" => "Dimensions", "dimension_value" => "Dimension values",
                        "recurring_entry" => "Recurring entries", "bank_rule" => "Bank rules",
-                       "budget" => "Budgets", "tax_return_form" => "Tax returns" }.freeze
+                       "budget" => "Budgets", "tax_return_form" => "Tax returns", "tax_return" => "Tax returns filed" }.freeze
 
     # What an audit event did, in words, linking to its subject while it still exists.
     def activity_description(event)
@@ -66,6 +66,8 @@ module TudlaAccounting
           safe_join([ "Changed the tax return ", subject, ": #{details.fetch('changes', {}).keys.map(&:humanize).join(', ').downcase}" ])
         end
       when "tax_return_form.deleted" then safe_join([ "Deleted the tax return ", subject ])
+      when "tax_return.filed" then safe_join([ "Filed the tax return ", subject ])
+      when "tax_return.withdrawn" then safe_join([ "Withdrew the tax return ", subject, ": “#{details['reason']}”" ])
       when "balances.rebuilt" then rebuilt_description(details)
       end
     end
@@ -120,6 +122,7 @@ module TudlaAccounting
       when BankRule then edit_bank_rule_path(subject)
       when Budget then budget_path(subject)
       when TaxReturnForm then tax_return_form_path(subject)
+      when FiledTaxReturn then filed_tax_return_path(subject)
       end
       path ? link_to(event.subject_label, path, class: "underline") : event.subject_label.to_s
     end

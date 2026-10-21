@@ -89,6 +89,16 @@ RSpec.describe Demo::Seeder do
     expect(statement).to have_attributes(opening: Money.new(0, "USD"), closing: Money.new(0, "USD"))
   end
 
+  it "sets up a BAS, with last quarter's filed as the books still give it" do
+    organization = described_class.call(entries: 60)
+
+    filed = TudlaAccounting::FiledTaxReturn.find_by!(organization: organization)
+    expect(filed).to have_attributes(from_date: Time.zone.local(2026, 1, 1), basis: "accrual", filed_by: "Demo seed")
+    expect(filed.thru_date.to_date).to eq(Date.new(2026, 3, 31))
+    expect(filed.figures.to_h { |box| [ box["label"], box["cents"] ] }.values_at("G1", "1A")).to all(be_positive)
+    expect(filed.changes).to be_empty
+  end
+
   it "attaches the landlord's receipt to the latest rent payments" do
     organization = described_class.call(entries: 60)
 

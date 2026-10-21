@@ -9,10 +9,12 @@ module TudlaAccounting
   class TaxReturnForm < ApplicationRecord
     belongs_to :organization, polymorphic: true
     has_many :boxes, -> { order(:position, :id) }, class_name: "TudlaAccounting::TaxReturnBox", foreign_key: :form_id, inverse_of: :form
+    has_many :filed_returns, class_name: "TudlaAccounting::FiledTaxReturn", foreign_key: :form_id, inverse_of: :form
 
     normalizes :name, with: ->(name) { name.strip }
     validates :name, presence: true, uniqueness: { scope: %i[organization_type organization_id] }
 
+    before_destroy :ensure_never_filed
     after_create { audit("tax_return_form.created") }
     after_update { audit("tax_return_form.updated", changes: saved_changes.except("created_at", "updated_at")) if saved_changes.except("created_at", "updated_at").any? }
     after_destroy { audit("tax_return_form.deleted") }
@@ -39,6 +41,14 @@ module TudlaAccounting
     end
 
     private
+
+    # Filed returns keep their form.
+    def ensure_never_filed
+      return unless filed_returns.exists?
+
+      errors.add(:base, "Returns of #{name} have been filed; it stays with them")
+      throw :abort
+    end
 
     def audit(action, **details)
       AuditEvent.record!(action, organization: organization, subject: self, details: details)

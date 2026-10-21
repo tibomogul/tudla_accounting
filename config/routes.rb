@@ -46,6 +46,9 @@ TudlaAccounting::Engine.routes.draw do
   end
 
   resources :tax_codes, except: :show
+  resources :filed_tax_returns, only: %i[index show create] do
+    member { post :withdraw }
+  end
   resources :tax_return_forms do
     resources :boxes, controller: :tax_return_boxes, except: %i[index show]
   end

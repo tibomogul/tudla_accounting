@@ -62,6 +62,7 @@ module TudlaAccounting
 
       @form = params[:form_id].present? ? (@forms.find { |form| form.id == params[:form_id].to_i } || raise(ActiveRecord::RecordNotFound)) : @forms.first
       @report = TaxReturnCalculator.call(@form, from: @from.from_date, thru: @thru.thru_date, basis: params[:basis].presence_in(TaxReport::BASES.map(&:to_s)))
+      @filed = FiledTaxReturn.active.where(form: @form).where("from_date <= ? AND thru_date >= ?", @thru.thru_date, @from.from_date).newest_first.to_a
       respond_with_table("#{@form.name.parameterize}-#{@report[:basis]}-#{span_name}") { Reports::Tables.tax_return(@report) }
     end
 

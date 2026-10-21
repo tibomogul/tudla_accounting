@@ -3,9 +3,9 @@ require "csv"
 # Seeds Demo Co: last year and this year, a small chart of accounts, GST, a department
 # dimension, a couple of hundred posted entries up to today, a few drafts, the first half
 # of last year closed, a bank statement for the operating account, recurring entries,
-# this year's budget, and customers with invoices on account. Returns the organization;
-# running it again returns the existing one, only adding the years' periods up to this
-# one if the year has turned since it was seeded.
+# this year's budget, customers with invoices on account, and a BAS with last quarter's
+# filed. Returns the organization; running it again returns the existing one, only
+# adding the years' periods up to this one if the year has turned since it was seeded.
 #
 # The name is the demo's identity: an organization someone else names "Demo Co" is
 # taken for the demo. That's fine in the dummy app.
@@ -78,6 +78,7 @@ class Demo::Seeder
     add_recurring_entries
     add_budget
     add_customer_accounts
+    add_tax_return
   end
 
   def create_accounts
@@ -204,6 +205,18 @@ class Demo::Seeder
         end
       end
     end
+  end
+
+  # A BAS mapped to the GST code and the wages account, with last quarter's filed.
+  def add_tax_return
+    bas = TudlaAccounting::TaxReturnForm.from_template!(organization, "au_bas")
+    box = ->(label) { bas.boxes.find_by!(label: label) }
+    box.call("G1").parts.create!(source: "tax_code_gross", tax_code: @gst)
+    box.call("1A").parts.create!(source: "tax_code_tax", tax_code: @gst)
+    box.call("W1").parts.create!(source: "account", account: accounts["6040"])
+    quarter = today.beginning_of_quarter.prev_day.beginning_of_quarter
+    months = [ quarter, quarter.end_of_quarter ].map { |date| TudlaAccounting::Period.leaf_periods_for_date(organization, date.in_time_zone(zone).change(hour: 12)).first }
+    TudlaAccounting::FiledTaxReturn.file!(bas.reload, from: months.first.from_date, thru: months.last.thru_date)
   end
 
   def invoice_on_account(entry, customer, reference, net, due:)

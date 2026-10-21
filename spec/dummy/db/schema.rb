@@ -344,6 +344,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_240000) do
     t.check_constraint "(posted_at IS NULL) = (number IS NULL)", name: "tudla_accounting_entries_numbered_when_posted"
   end
 
+  create_table "tudla_accounting_filed_tax_returns", force: :cascade do |t|
+    t.string "basis", null: false
+    t.datetime "created_at", null: false
+    t.jsonb "figures", default: [], null: false
+    t.datetime "filed_at", null: false
+    t.string "filed_by"
+    t.bigint "form_id", null: false
+    t.datetime "from_date", null: false
+    t.bigint "organization_id", null: false
+    t.string "organization_type", null: false
+    t.datetime "thru_date", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "withdrawn_at"
+    t.string "withdrawn_by"
+    t.text "withdrawn_reason"
+    t.index ["form_id"], name: "index_tudla_accounting_filed_tax_returns_on_form"
+    t.index ["organization_type", "organization_id", "filed_at"], name: "index_tudla_accounting_filed_tax_returns_on_organization"
+  end
+
   create_table "tudla_accounting_foreign_exchanges", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.bigint "detail_id", null: false
@@ -517,6 +536,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_240000) do
   add_foreign_key "tudla_accounting_details", "tudla_accounting_entries", column: "entry_id"
   add_foreign_key "tudla_accounting_details", "tudla_accounting_tax_codes", column: "tax_code_id"
   add_foreign_key "tudla_accounting_dimension_values", "tudla_accounting_dimensions", column: "dimension_id"
+  add_foreign_key "tudla_accounting_filed_tax_returns", "tudla_accounting_tax_return_forms", column: "form_id"
   add_foreign_key "tudla_accounting_foreign_exchanges", "tudla_accounting_details", column: "detail_id"
   add_foreign_key "tudla_accounting_recurring_entry_lines", "tudla_accounting_accounts", column: "account_id"
   add_foreign_key "tudla_accounting_recurring_entry_lines", "tudla_accounting_recurring_entries", column: "recurring_entry_id"
