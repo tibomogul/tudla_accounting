@@ -10,8 +10,8 @@ module TudlaAccounting
   #   Delivery.request!(subject: invoice, kind: "document", to: "ap@northwind.test",
   #                     subject_line: "Invoice INV-0001", message: "Please find attached...")
   #
-  # Its subject is the document or payment, or for a statement the contact (with the
-  # statement's type and dates in details).
+  # Its subject is the document or payment, or for a statement its customer or supplier
+  # (a contact, or a host app's record), with the statement's type and dates in details.
   class Delivery < ApplicationRecord
     KINDS = %w[document reminder statement receipt payment_notice].freeze
     ADDRESS = URI::MailTo::EMAIL_REGEXP
@@ -33,9 +33,10 @@ module TudlaAccounting
     scope :sent, -> { where(status: "sent") }
     scope :newest_first, -> { order(created_at: :desc, id: :desc) }
 
-    # Records the email and queues it, as whoever is acting (Current.actor).
-    def self.request!(subject:, **attributes)
-      create!(subject: subject, organization: subject.organization, requested_by: AuditEvent.label_for(Current.actor), **attributes)
+    # Records the email and queues it, as whoever is acting (Current.actor). A statement's
+    # party may not know its organization, so it can be given.
+    def self.request!(subject:, organization: subject.organization, **attributes)
+      create!(subject: subject, organization: organization, requested_by: AuditEvent.label_for(Current.actor), **attributes)
     end
 
     def recipients = to.to_s.split(", ")
@@ -45,7 +46,7 @@ module TudlaAccounting
 
     # Another of the same, queued again (after a failure, say).
     def resend!
-      self.class.request!(subject: subject, **attributes.symbolize_keys.slice(:kind, :stage, :to, :cc, :subject_line, :message, :details))
+      self.class.request!(subject: subject, organization: organization, **attributes.symbolize_keys.slice(:kind, :stage, :to, :cc, :subject_line, :message, :details))
     end
 
     # Sends it, once: the PDF made and the mail delivered, then kept sent; or, when either
@@ -69,7 +70,15 @@ module TudlaAccounting
       case kind
       when "document", "reminder" then [ PdfMaker.document(subject), "#{subject.number_label}.pdf" ]
       when "receipt", "payment_notice" then [ PdfMaker.payment(subject), "#{kind.dasherize}-#{subject.paid_on.iso8601}.pdf" ]
+      when "statement" then [ PdfMaker.statements([ statement ], open_items: details["open_items"]), "statement-#{details['thru']}.pdf" ]
       end
+    end
+
+    # The statement a statement's email is of, made again from its details (as it stands
+    # when it is sent).
+    def statement
+      PartyStatement.call(organization: organization, type: details.fetch("type").to_sym, party: subject,
+                          from: Date.iso8601(details.fetch("from")), thru: Date.iso8601(details.fetch("thru")))
     end
 
     private

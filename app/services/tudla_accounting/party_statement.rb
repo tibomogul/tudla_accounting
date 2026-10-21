@@ -45,6 +45,13 @@ module TudlaAccounting
         .sort_by { |party| party_name(party).downcase }
     end
 
+    # Every party's statement with something to send: a balance at either end or activity in
+    # between, or (open_items) anything open at the end.
+    def self.to_send(organization, type:, from:, thru:, open_items:)
+      parties(organization, type).map { |party| call(organization: organization, type: type, party: party, from: from, thru: thru) }
+                                 .reject { |statement| open_items ? statement.open_items.empty? : statement.empty? }
+    end
+
     # "Customer_12", for a URL.
     def self.key(party)
       "#{party.class.name}_#{party.id}"

@@ -33,6 +33,27 @@ RSpec.describe TudlaAccounting::EmailDraft, type: :service do
     expect { TudlaAccounting.configuration.document_email_templates = { fax: {} } }.to raise_error(ArgumentError, /unknown email template "fax"/)
   end
 
+  it "starts a statement's email, with what it is made from, to a party with or without an email address" do
+    statement = TudlaAccounting::PartyStatement.call(organization: organization, type: :receivable, party: northwind, from: Date.new(2026, 3, 1), thru: Date.new(2026, 3, 31))
+    expect(described_class.for_statement(statement, open_items: true)).to eq(
+      kind: "statement", to: "ap@northwind.test", subject_line: "Your statement from Acme",
+      message: "Hello Northwind,\n\nPlease find attached your statement for 1 Mar 2026 to 31 Mar 2026. The balance is $0.00.\n\nThank you,\nAcme",
+      details: { "type" => "receivable", "from" => "2026-03-01", "thru" => "2026-03-31", "open_items" => true }
+    )
+    host_party = Struct.new(:id, :name).new(7, "Host Co")
+    expect(described_class.for_statement(statement.tap { |each| allow(each).to receive(:party).and_return(host_party) }, open_items: false)).to include(to: nil, message: start_with("Hello Host Co"))
+  end
+
+  it "starts a payment's email: a receipt, or a payment notice" do
+    TudlaAccounting::AccountsCreator.call([ { code: "1000", name: "Bank", category: "asset" }, { code: "2100", name: "Payables", category: "liability", role: "payable" } ], organization)
+    northwind.update!(kind: "both")
+    pay = ->(kind) { TudlaAccounting::Payment.record!(organization: organization, kind: kind, contact: northwind, account: TudlaAccounting::Account.find_by!(organization: organization, code: "1000"),
+                                                      paid_on: Date.new(2026, 3, 20), amount_cents: 50_00, reference: "EFT 9") }
+    expect(described_class.for_payment(pay.call("received"))).to include(kind: "receipt", to: "ap@northwind.test", subject_line: "Receipt for your payment to Acme",
+                                                                        message: include("Thank you for your payment of $50.00 on 20 Mar 2026."))
+    expect(described_class.for_payment(pay.call("paid"))).to include(kind: "payment_notice", subject_line: "Payment from Acme", message: include("We have paid you $50.00 on 20 Mar 2026."))
+  end
+
   it "names an organization without a name by its label" do
     expect(described_class.organization_name(Struct.new(:id).new(4))).to eq(TudlaAccounting.organization_label(Struct.new(:id).new(4)))
   end

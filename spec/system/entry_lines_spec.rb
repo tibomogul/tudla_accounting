@@ -39,7 +39,7 @@ RSpec.describe "Entering a journal entry", type: :system do
     click_button "Save draft"
     expect(page).to have_current_path(saved_entry_page)
     expect(page).to have_content("Draft entry saved.")
-    click_button "Post"
+    click_button_and_reload "Post"
     expect(page).to have_content("Entry posted.")
 
     entry = TudlaAccounting::Entry.find_by(particulars: "Opening capital")

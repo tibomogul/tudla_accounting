@@ -5,6 +5,9 @@
     <%= link_to (received ? "Download receipt" : "Download payment notice"), payment_path(@payment, format: :pdf), class: "tc-btn tc-btn-ghost", data: { turbo: false } %>
   <% end %>
   <button type="button" class="tc-btn tc-btn-ghost" data-controller="print" data-action="print#print"><%= received ? "Print receipt" : "Print payment notice" %></button>
+  <% if tc_can?(:post) && !@payment.void? %>
+    <%= link_to (received ? "Email receipt" : "Email payment notice"), new_email_path(payment_id: @payment.id), class: "tc-btn tc-btn-secondary" %>
+  <% end %>
 <% end %>
 
 <div class="mb-4 flex flex-wrap items-center gap-3 text-sm">
@@ -46,6 +49,8 @@
     <% end %>
   </section>
 </div>
+
+<%= render "tudla_accounting/emails/list", deliveries: @deliveries %>
 
 <% if !@payment.void? && tc_can?(:post) %>
   <details class="tc-card tc-card-body mt-6">

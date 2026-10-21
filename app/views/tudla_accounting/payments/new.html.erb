@@ -49,7 +49,13 @@
       <% end %>
       <p class="tc-card-body tc-hint">Whatever isn't applied stays as a credit for <%= @payment.contact.name %>.</p>
     </div>
-    <div class="tc-card tc-card-body"><%= form.label :notes, class: "tc-label" %><%= form.text_area :notes, value: @payment.notes, rows: 2, class: "tc-input" %></div>
+    <div class="tc-card tc-card-body space-y-3">
+      <div><%= form.label :notes, class: "tc-label" %><%= form.text_area :notes, value: @payment.notes, rows: 2, class: "tc-input" %></div>
+      <label class="flex items-center gap-2 text-sm">
+        <%= form.check_box :email_it, { checked: params.dig(:payment, :email_it) == "1" }, "1", "0" %>
+        Email <%= received ? "a receipt" : "a payment notice" %> to <%= @payment.contact.name %><%= @payment.contact.email ? " (#{@payment.contact.email})" : " (they have no email address yet)" %>
+      </label>
+    </div>
     <div class="flex gap-2">
       <%= form.submit "Record payment", class: "tc-btn" %>
       <%= link_to "Cancel", (received ? received_payments_path : paid_payments_path), class: "tc-btn tc-btn-ghost" %>

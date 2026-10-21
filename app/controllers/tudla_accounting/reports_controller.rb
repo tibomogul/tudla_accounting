@@ -108,6 +108,7 @@ module TudlaAccounting
       party = @parties.find { |each| PartyStatement.key(each) == params[:party] } # none when the type changed
       if party
         @statement = PartyStatement.call(organization: accounting_organization, type: @type, party: party, from: @from, thru: @thru)
+        @deliveries = organization_scope(Delivery).where(subject: party, kind: "statement").newest_first.limit(10).to_a
       end
       name = "statement-#{PartyStatement.party_name(party).parameterize if party}-#{@open_items ? "open-items-#{@thru}" : "#{@from}-to-#{@thru}"}"
       respond_with_table(name, available: !@statement.nil?, pdf: -> { PdfMaker.statements([ @statement ], open_items: @open_items) }) do
@@ -120,8 +121,7 @@ module TudlaAccounting
     # anything open at the end.
     def statements
       statement_options
-      @statements = @parties.map { |party| PartyStatement.call(organization: accounting_organization, type: @type, party: party, from: @from, thru: @thru) }
-                            .reject { |statement| @open_items ? statement.open_items.empty? : statement.empty? }
+      @statements = PartyStatement.to_send(accounting_organization, type: @type, from: @from, thru: @thru, open_items: @open_items)
       name = "statements-#{PartyStatement::PARTY_NAMES.fetch(@type).downcase.pluralize}-#{@open_items ? "open-items-#{@thru}" : "#{@from}-to-#{@thru}"}"
       respond_with_table(name, available: true, pdf: -> { PdfMaker.statements(@statements, open_items: @open_items) }) do
         Reports::Tables.party_statements(@statements, type: @type, open_items: @open_items)

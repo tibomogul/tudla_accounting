@@ -74,8 +74,8 @@ module TudlaAccounting
       when "document.updated" then safe_join([ "Changed ", subject, ": #{details.fetch('changes', {}).keys.map { |key| key.delete_suffix('_cents').humanize }.join(', ').downcase}" ])
       when "document.deleted" then safe_join([ "Deleted ", subject ])
       when "document.approved" then safe_join([ "Approved ", subject ])
-      when "email.sent" then safe_join([ "Emailed ", subject, " to #{details['to']}" ])
-      when "email.failed" then safe_join([ "Couldn't email ", subject, " to #{details['to']}: #{details['error']}" ])
+      when "email.sent" then safe_join([ "Emailed ", *emailed_what(details["kind"], subject), " to #{details['to']}" ])
+      when "email.failed" then safe_join([ "Couldn't email ", *emailed_what(details["kind"], subject), " to #{details['to']}: #{details['error']}" ])
       when "api_token.created" then safe_join([ "Issued ", subject, " (#{details['permissions'].to_sentence})" ])
       when "api_token.revoked" then safe_join([ "Revoked ", subject ])
       when "payment.recorded"
@@ -86,6 +86,17 @@ module TudlaAccounting
       when "tax_return.filed" then safe_join([ "Filed the tax return ", subject ])
       when "tax_return.withdrawn" then safe_join([ "Withdrew the tax return ", subject, ": “#{details['reason']}”" ])
       when "balances.rebuilt" then rebuilt_description(details)
+      end
+    end
+
+    # What an email was, around its subject's link: "Invoice INV-0001 – Northwind",
+    # "Northwind's statement", "the receipt for Payment from Northwind of $10.00".
+    def emailed_what(kind, subject)
+      case kind
+      when "statement" then [ subject, "'s statement" ]
+      when "receipt" then [ "the receipt for ", subject ]
+      when "payment_notice" then [ "the payment notice for ", subject ]
+      else [ subject ]
       end
     end
 

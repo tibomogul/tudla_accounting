@@ -64,6 +64,8 @@
       </section>
     <% end %>
 
+    <%= render "tudla_accounting/emails/list", deliveries: @deliveries %>
+
     <section class="tc-card overflow-x-auto" aria-labelledby="documents" data-documents>
       <h2 id="documents" class="tc-card-body tc-card-title">Latest invoices and bills</h2>
       <% if @documents.any? %>

@@ -3,6 +3,11 @@
                    subtitle: "#{@statements.size} to send: #{@open_items ? "every #{party_name} with anything open at the end" : "every #{party_name} with a balance or activity"}, one to a printed page" do %>
   <%= link_to "One #{party_name}", reports_statement_path(type: @type, from: @from, thru: @thru, show: (@open_items ? "open_items" : nil)), class: "tc-btn tc-btn-ghost print:hidden" %>
   <%= render "download", pdf: true %>
+  <% if tc_can?(:post) && @statements.any? %>
+    <%= button_to "Email them all", statements_emails_path, params: { type: @type, from: @from, thru: @thru, show: (@open_items ? "open_items" : nil) }.compact,
+                  class: "tc-btn tc-btn-secondary print:hidden",
+                  form: { class: "print:hidden", data: { controller: "confirm", confirm_message_value: "Email #{pluralize(@statements.size, 'statement')}, each as its template says?", action: "submit->confirm#ask" } } %>
+  <% end %>
 <% end %>
 
 <%= render "statement_form", url: reports_statements_path, chosen: false %>

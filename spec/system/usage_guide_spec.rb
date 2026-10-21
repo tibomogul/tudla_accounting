@@ -39,16 +39,6 @@ RSpec.describe "USAGE.md, in the UI", type: :system do
 
   def wait_for_confirm = expect(page).to have_css("form[data-confirm-ready]")
 
-  # For a click that comes back to the same URL, where have_current_path can't tell the new
-  # page has loaded: a mark on the old page's window can, as each click loads a whole page.
-  def click_button_and_reload(name)
-    page.execute_script("window.tcPageBeforeClick = true")
-    click_button name
-    page.document.synchronize do
-      raise Capybara::ExpectationNotMet, "the page didn't reload" if page.evaluate_script("window.tcPageBeforeClick")
-    end
-  end
-
   def account(code) = TudlaAccounting::Account.find_by!(organization: organization, code: code)
 
   it "sets up the books step by step" do

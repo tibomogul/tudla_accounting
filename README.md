@@ -96,12 +96,14 @@ TudlaAccounting::PdfMaker.payment(payment)
 
 The page is rendered with the engine's styles inline (the host's compiled `tailwind.css`, or the `pdf_stylesheet` setting) and the browser is barred from fetching anything, so making a PDF reaches nothing on the network. `pdf_browser_options` passes options to `Ferrum::Browser` (Chrome's path, a timeout; in a container that can't sandbox Chrome, `browser_options: { "no-sandbox" => nil }`), and `pdf_paper` picks A4 or Letter. A PDF that can't be made raises `PdfMaker::Error`; the pages say why.
 
-### Emailing invoices and credit notes
-An approved invoice or credit note has an **Email** button (`:post`): the email starts from its template, to the contact's email address, and can be changed (To, Cc, subject, message) before it goes. It is recorded (`TudlaAccounting::Delivery`) and sent in the background (`DeliveryJob`, so the host's Active Job backend must run jobs), with the PDF attached when the engine can make PDFs. The document's page lists its emails, who asked for each, and whether it was sent or failed (with the error, and **Send again**); the Sales list marks those emailed; and the activity log has `email.sent` and `email.failed`.
+### Emailing invoices, statements and payments
+An approved invoice or credit note, a statement of account, and a payment (as its receipt, or a payment notice) each have an **Email** button (`:post`): the email starts from its template, to the contact's email address, and can be changed (To, Cc, subject, message) before it goes. It is recorded (`TudlaAccounting::Delivery`) and sent in the background (`DeliveryJob`, so the host's Active Job backend must run jobs), with the PDF attached when the engine can make PDFs. The page it came from lists its emails, who asked for each, and whether it was sent or failed (with the error, and **Send again**); a contact's page lists their statements' emails; the Sales list marks invoices emailed; and the activity log has `email.sent` and `email.failed`. **Email them all** on the statements page emails every statement it shows, naming the customers or suppliers with no email address. Recording a payment can email its receipt (or payment notice) at once. A statement is made again as it stands when it is sent.
 
 ```ruby
 draft = TudlaAccounting::EmailDraft.for_document(invoice) # { kind:, to:, subject_line:, message: }
 TudlaAccounting::Delivery.request!(subject: invoice, **draft, cc: "boss@northwind.test")
+TudlaAccounting::EmailDraft.for_statement(statement, open_items: false) # with the details it is made from
+TudlaAccounting::EmailDraft.for_payment(payment)                        # a receipt, or a payment notice
 ```
 
 Emails go through the host's own ActionMailer setup (delivery method, SMTP), from `document_mail_from` (text, or a callable given the organization; the host's ActionMailer default otherwise) and replying to `document_mail_reply_to`. `document_email_templates` changes each kind's subject and message, with placeholders such as `%{number}`, `%{total}`, `%{amount_due}` and `%{due_on}`. To send them another way, point `document_mailer` at a mailer of your own whose `delivery(delivery, pdf:, filename:)` returns the mail. The dummy app writes them to files in `spec/dummy/tmp/mails` in development.

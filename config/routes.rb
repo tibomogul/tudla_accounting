@@ -114,6 +114,7 @@ TudlaAccounting::Engine.routes.draw do
     member { post :void }
   end
   resources :emails, only: %i[new create] do
+    collection { post :statements }
     member { post :resend }
   end
   resources :documents, except: :index do

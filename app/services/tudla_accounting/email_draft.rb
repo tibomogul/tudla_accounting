@@ -1,10 +1,13 @@
 # frozen_string_literal: true
 
 module TudlaAccounting
-  # The email a document starts with, from the document_email_templates setting: who it
-  # goes to (the contact's email), its subject line and message, the placeholders filled in.
+  # The email something starts with, from the document_email_templates setting: who it
+  # goes to (the contact's email), its subject line and message, the placeholders filled
+  # in, and for a statement the details it is made from.
   #
   #   EmailDraft.for_document(invoice) # => { kind: "document", to:, subject_line:, message: }
+  #   EmailDraft.for_statement(statement, open_items: false)
+  #   EmailDraft.for_payment(payment)  # a receipt, or a payment notice
   module EmailDraft
     module_function
 
@@ -15,10 +18,23 @@ module TudlaAccounting
       draft("document", template, document.organization, document.contact, values)
     end
 
-    def draft(kind, template, organization, contact, values)
+    # A statement's (a PartyStatement), to its customer or supplier: their contact, or a host
+    # app's record with an email.
+    def for_statement(statement, open_items:)
+      values = { from: day(statement.from), thru: day(statement.thru), balance: statement.closing.format }
+      details = { "type" => statement.type.to_s, "from" => statement.from.iso8601, "thru" => statement.thru.iso8601, "open_items" => open_items }
+      draft("statement", "statement", statement.organization, statement.party, values).merge(details: details)
+    end
+
+    def for_payment(payment)
+      kind = payment.received? ? "receipt" : "payment_notice"
+      draft(kind, kind, payment.organization, payment.contact, amount: payment.amount.format, paid_on: day(payment.paid_on), reference: payment.reference)
+    end
+
+    def draft(kind, template, organization, party, values)
       text = TudlaAccounting.configuration.document_email_templates.fetch(template)
-      values = values.merge(organization: organization_name(organization), contact: contact.name)
-      { kind: kind, to: contact.email, subject_line: fill(text[:subject], values), message: fill(text[:body], values) }
+      values = values.merge(organization: organization_name(organization), contact: PartyStatement.party_name(party))
+      { kind: kind, to: (party.email if party.respond_to?(:email)), subject_line: fill(text[:subject], values), message: fill(text[:body], values) }
     end
 
     # The text with each %{placeholder} it knows replaced; others are left as they are.

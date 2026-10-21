@@ -1,20 +1,20 @@
-<%= tc_page_header "Email #{@document.title.downcase_first}", subtitle: @document.contact.name %>
-<%= form_with model: @delivery, scope: :delivery, url: emails_path(document_id: @document.id), class: "space-y-4 max-w-3xl" do |form| %>
+<%= tc_page_header "Email #{@title}", subtitle: @recipient %>
+<%= form_with model: @delivery, scope: :delivery, url: emails_path(@target), class: "space-y-4 max-w-3xl" do |form| %>
   <% if @delivery.errors.any? %>
     <div class="tc-alert tc-alert-danger" role="alert"><ul class="list-disc pl-4"><% @delivery.errors.full_messages.uniq.each do |message| %><li><%= message %></li><% end %></ul></div>
   <% end %>
   <div class="tc-card tc-card-body grid gap-4">
-    <%= tc_field form, :to, label: "To", required: true, hint: (@document.contact.email ? "Separate addresses with commas" : "#{@document.contact.name} has no email address yet; add one to their contact to have it filled in") %>
+    <%= tc_field form, :to, label: "To", required: true, hint: (@draft[:to] ? "Separate addresses with commas" : "#{@recipient} has no email address yet; add one to their contact to have it filled in") %>
     <%= tc_field form, :cc, label: "Cc (optional)" %>
     <%= tc_field form, :subject_line, label: "Subject", required: true %>
     <%= tc_field form, :message, as: :text_area, rows: 9, required: true %>
     <p class="text-sm tc-muted" data-attachment>
-      <% if TudlaAccounting.pdf? %>Attached: <%= @document.number_label %>.pdf<% else %>No PDF is attached: the app can't make PDFs (it needs the ferrum gem).<% end %>
+      <% if TudlaAccounting.pdf? %>Attached: <%= @attachment %><% else %>No PDF is attached: the app can't make PDFs (it needs the ferrum gem).<% end %>
     </p>
   </div>
   <div class="flex gap-2">
     <%= form.submit "Send", class: "tc-btn" %>
-    <%= link_to "Cancel", document_path(@document), class: "tc-btn tc-btn-ghost" %>
-    <span class="tc-hint self-center">It is sent in the background; the invoice's page shows when it has gone.</span>
+    <%= link_to "Cancel", @back, class: "tc-btn tc-btn-ghost" %>
+    <span class="tc-hint self-center">It is sent in the background; the page it came from shows when it has gone.</span>
   </div>
 <% end %>

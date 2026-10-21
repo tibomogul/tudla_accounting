@@ -24,7 +24,7 @@ module TudlaAccounting
 
     def show
       respond_to do |format|
-        format.html
+        format.html { @deliveries = Delivery.where(subject: @payment).newest_first.to_a }
         format.pdf do
           name = "#{@payment.received? ? 'receipt' : 'payment-notice'}-#{@payment.contact.name}-#{@payment.paid_on}"
           send_pdf(name, fallback: payment_path(@payment)) { PdfMaker.payment(@payment) }
@@ -45,7 +45,7 @@ module TudlaAccounting
     end
 
     def create
-      permitted = params.require(:payment).permit(:kind, :contact_id, :account_id, :paid_on, :amount, :reference, :notes, applications: {})
+      permitted = params.require(:payment).permit(:kind, :contact_id, :account_id, :paid_on, :amount, :reference, :notes, :email_it, applications: {})
       currency = accounting_organization.currency
       problems = []
       cents = ->(text, label) { amount_cents(text, currency) { problems << "#{text} isn't an amount (#{label})" } }
@@ -53,7 +53,7 @@ module TudlaAccounting
       @payment = organization_scope(Payment).new(kind: permitted[:kind].presence_in(Payment::KINDS.keys) || "received", contact: contact, paid_on: permitted[:paid_on],
                                                  account_id: (organization_scope(Account).find(permitted[:account_id]).id if permitted[:account_id].present?),
                                                  amount_cents: cents.call(permitted[:amount], "the payment"), reference: permitted[:reference], notes: permitted[:notes])
-      @applied = permitted.fetch(:applications, {}).to_h.filter_map { |id, text| [ id.to_i, cents.call(text, "applied") ] if text.present? }.to_h.compact
+      @applied = (permitted[:applications]&.to_h || {}).filter_map { |id, text| [ id.to_i, cents.call(text, "applied") ] if text.present? }.to_h.compact
       @open = open_documents(@payment)
       raise ArgumentError, problems.to_sentence if problems.any?
 
@@ -61,7 +61,7 @@ module TudlaAccounting
       applications = @applied.map { |id, applied| { document: documents.fetch(id) { raise ActiveRecord::RecordNotFound }, amount_cents: applied } }
       @payment = Payment.record!(**@payment.attributes.symbolize_keys.slice(:kind, :contact_id, :account_id, :paid_on, :amount_cents, :reference, :notes),
                                  organization: accounting_organization, applications: applications)
-      redirect_to payment_path(@payment), notice: "#{@payment.title} of #{@payment.amount.format} recorded."
+      redirect_to payment_path(@payment), notice: "#{@payment.title} of #{@payment.amount.format} recorded.#{email_it(@payment) if permitted[:email_it] == '1'}"
     rescue ArgumentError => e
       @payment.errors.add(:base, e.message)
       render :new, status: :unprocessable_entity
@@ -76,6 +76,16 @@ module TudlaAccounting
     end
 
     private
+
+    # Queues its receipt or payment notice, as its template says; what the notice says
+    # about it.
+    def email_it(payment)
+      draft = EmailDraft.for_payment(payment)
+      return " It wasn't emailed: #{payment.contact.name} has no email address." if draft[:to].blank?
+
+      Delivery.request!(subject: payment, **draft)
+      " Emailing the #{payment.received? ? 'receipt' : 'payment notice'} to #{draft[:to]}."
+    end
 
     def set_payment
       @payment = organization_scope(Payment).includes(:contact, :account).find(params[:id])

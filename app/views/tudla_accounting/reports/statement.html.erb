@@ -3,7 +3,12 @@
 <%= tc_page_header "Statements", subtitle: "A customer's or supplier's account with #{accounting_organization.name}, to send them" do %>
   <%= link_to "All #{party_name.downcase.pluralize}", reports_statements_path(type: @type, from: @from, thru: @thru, show: (@open_items ? "open_items" : nil)),
               class: "tc-btn tc-btn-ghost print:hidden" %>
-  <% if @statement %><%= render "download", pdf: true %><% end %>
+  <% if @statement %>
+    <%= render "download", pdf: true %>
+    <% if tc_can?(:post) %>
+      <%= link_to "Email", new_email_path(type: @type, party: chosen, from: @from, thru: @thru, show: (@open_items ? "open_items" : nil)), class: "tc-btn tc-btn-secondary print:hidden" %>
+    <% end %>
+  <% end %>
 <% end %>
 
 <%= render "statement_form", url: reports_statement_path, chosen: chosen %>
@@ -14,4 +19,5 @@
   </div>
 <% else %>
   <%= render "party_statement", statement: @statement, open_items: @open_items %>
+  <div class="print:hidden"><%= render "tudla_accounting/emails/list", deliveries: @deliveries %></div>
 <% end %>
