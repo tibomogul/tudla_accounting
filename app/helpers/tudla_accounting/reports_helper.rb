@@ -23,6 +23,20 @@ module TudlaAccounting
       "#{number_with_precision((amounts[0] - base).cents.to_f / base.cents.abs * 100, precision: 1)}%"
     end
 
+    # The column groups of budget vs actual: the period ("Mar 2026", "Year 2026"), then
+    # the year to date for a month.
+    def budget_column_groups(comparison)
+      [ comparison_label(comparison.period, nil), *("Year to date" if comparison.year_to_date?) ]
+    end
+
+    # Whether a variance is good news: more income or profit than budgeted, or less
+    # spending. Nil when there is none.
+    def favourable_variance?(variance, category)
+      return if variance.zero?
+
+      category == Account::CATEGORY_EXPENSE ? variance.negative? : variance.positive?
+    end
+
     def report_account_link(account, period)
       link_to account.name, account_path(account, year_id: period.root_id)
     end

@@ -2,9 +2,10 @@ require "csv"
 
 # Seeds Demo Co: last year and this year, a small chart of accounts, GST, a department
 # dimension, a couple of hundred posted entries up to today, a few drafts, the first half
-# of last year closed and a bank statement for the operating account. Returns the
-# organization; running it again returns the existing one, only adding the years'
-# periods up to this one if the year has turned since it was seeded.
+# of last year closed, a bank statement for the operating account, recurring entries
+# and this year's budget. Returns the organization; running it again returns the
+# existing one, only adding the years' periods up to this one if the year has turned
+# since it was seeded.
 #
 # The name is the demo's identity: an organization someone else names "Demo Co" is
 # taken for the demo. That's fine in the dummy app.
@@ -75,6 +76,7 @@ class Demo::Seeder
     import_bank_statement
     attach_receipts
     add_recurring_entries
+    add_budget
   end
 
   def create_accounts
@@ -169,6 +171,12 @@ class Demo::Seeder
         lines.each { |code, tally, cents| template.lines.build(account: accounts[code], tally: tally, amount_cents: cents) }
         template.save!
       end
+  end
+
+  # This year's main budget: last year's results, month for month, plus 10%.
+  def add_budget
+    last_year, this_year = years.map { |year| TudlaAccounting::Period.periods_for_date(organization, Date.new(year, 1, 1)).roots.first }
+    TudlaAccounting::Budget.create!(organization: organization, period: this_year, name: "Plan", main: true).fill_from_actuals!(last_year, percent: 10)
   end
 
   # The landlord's receipt on the three latest rent payments, when the app has Active Storage.

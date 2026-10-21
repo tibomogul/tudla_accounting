@@ -22,8 +22,10 @@ module TudlaAccounting
     def profit_and_loss
       @period = chosen_period(years + months, default: current_year)
       @report = Reports::ProfitAndLoss.new(accounting_organization, @period) if @period
-      @comparison = comparison(Reports::ProfitAndLoss) if @period
-      respond_with_table("profit-and-loss-#{@period&.from_date&.to_date}-to-#{@period&.thru_date&.to_date}") do
+      @budgets = @period ? organization_scope(Budget).where(period_id: @period.root_id).order(main: :desc, name: :asc).to_a : []
+      @comparison = (budget_comparison || (comparison(Reports::ProfitAndLoss) unless @compare)) if @period
+      name = "profit-and-loss-#{@period&.from_date&.to_date}-to-#{@period&.thru_date&.to_date}#{"-vs-budget-#{@budget.name.parameterize}" if @budget && @comparison}"
+      respond_with_table(name) do
         statement_table(Reports::ProfitAndLoss, sections: [ [ "income" ], [ "expense" ] ], figures: [ [ :net_profit, "Net profit (loss)" ] ])
       end
     end
@@ -106,6 +108,11 @@ module TudlaAccounting
     # The statement on the page as a table: its comparison, or the period alone.
     def statement_table(report_class, sections:, figures:)
       comparison = @comparison || Reports::Comparison.new(report_class, accounting_organization, [ @period ])
+      if comparison.is_a?(Reports::BudgetComparison)
+        groups = helpers.budget_column_groups(comparison)
+        return Reports::Tables.statement(comparison, labels: groups.flat_map { |group| [ "#{group} actual", "#{group} budget" ] }, sections: sections, figures: figures,
+                                                     change: true, change_headings: groups.map { |group| [ "#{group} variance", "#{group} variance %" ] })
+      end
       Reports::Tables.statement(comparison, labels: comparison.periods.map { |period| helpers.comparison_label(period, @compare) },
                                             sections: sections, figures: figures, change: comparison.periods.size == 2 && @compare != "months")
     end
@@ -166,6 +173,18 @@ module TudlaAccounting
 
       periods = compared_periods(@period)
       periods.size > 1 ? Reports::Comparison.new(report_class, accounting_organization, periods) : nil
+    end
+
+    # Budget vs actual for @period, when the compare parameter asks for a budget: "budget"
+    # for the year's main budget (or its first), "budget-<id>" for another of its budgets.
+    # Nil, with @compare set, when the year has none.
+    def budget_comparison
+      match = params[:compare].to_s.match(/\Abudget(?:-(\d+))?\z/)
+      return unless match
+
+      @compare = "budget"
+      @budget = @budgets.find { |budget| budget.id == match[1].to_i } || @budgets.first
+      @budget && Reports::BudgetComparison.new(@budget, @period)
     end
 
     # The columns, the chosen period's among them. Beside the previous period or the same

@@ -1,22 +1,44 @@
 <%# locals: (comparison:, sections:, figures:) %>
 <%# One table for the whole statement, so the periods' columns line up from section to
     section, with the labels kept in view while the periods scroll sideways.
-    sections: [[category, total label or nil]]; figures: [[figure, label]] after them. %>
-<% change = comparison.periods.size == 2 && @compare != "months" %>
-<% width = comparison.periods.size + 1 + (change ? 2 : 0) %>
+    sections: [[category, total label or nil]]; figures: [[figure, label]] after them.
+    Beside one other period, the change follows. Against a budget (a BudgetComparison),
+    the columns go in pairs, actual and budget, each pair followed by the variance (marked
+    favourable or not) and its percentage, under the period and the year to date. %>
+<% budget = comparison.is_a?(TudlaAccounting::Reports::BudgetComparison) %>
+<% change = budget || (comparison.periods.size == 2 && @compare != "months") %>
+<% width = comparison.periods.size + 1 + (change ? comparison.periods.size : 0) %>
 <% label_cell = "sticky left-0 z-10 bg-[var(--tc-surface)] whitespace-nowrap" %>
-<% money_cells = lambda do |amounts| %>
-  <% amounts.each do |amount| %><td class="tc-num"><%= tc_money(amount) %></td><% end %>
-  <% if change %><td class="tc-num"><%= tc_money(amounts[0] - amounts[1]) %></td><td class="tc-num tc-muted"><%= comparison_percent(amounts) %></td><% end %>
+<% money_cells = lambda do |amounts, category| %>
+  <% (change ? amounts.each_slice(2).to_a : amounts.map { |amount| [ amount ] }).each do |pair| %>
+    <% pair.each do |amount| %><td class="tc-num"><%= tc_money(amount) %></td><% end %>
+    <% if change %>
+      <% variance = pair[0] - pair[1] %>
+      <td class="tc-num whitespace-nowrap"><%= tc_money(variance) %><% if budget && !(good = favourable_variance?(variance, category)).nil? %>
+        <span class="ml-1 text-xs font-semibold <%= good ? "text-[var(--tc-success)]" : "text-[var(--tc-danger)]" %>" title="<%= good ? "Favourable" : "Unfavourable" %>"><%= good ? "F" : "U" %></span><% end %></td>
+      <td class="tc-num tc-muted"><%= comparison_percent(pair) %></td>
+    <% end %>
+  <% end %>
 <% end %>
-<div class="tc-card overflow-x-auto <%= "tc-print-wide" if comparison.periods.size > 3 %>">
+<div class="tc-card overflow-x-auto <%= "tc-print-wide" if comparison.periods.size > 3 || budget %>">
   <table class="tc-table" data-comparison>
     <thead>
-      <tr>
-        <th class="<%= label_cell %>">Account</th>
-        <% comparison.periods.each do |period| %><th class="tc-num whitespace-nowrap"><%= comparison_label(period, @compare) %></th><% end %>
-        <% if change %><th class="tc-num">Change</th><th class="tc-num">%</th><% end %>
-      </tr>
+      <% if budget %>
+        <tr>
+          <th class="<%= label_cell %>"></th>
+          <% budget_column_groups(comparison).each do |group| %><th colspan="4" class="text-center whitespace-nowrap border-b border-[var(--tc-border)]"><%= group %></th><% end %>
+        </tr>
+        <tr>
+          <th class="<%= label_cell %>">Account</th>
+          <% budget_column_groups(comparison).size.times do %><th class="tc-num">Actual</th><th class="tc-num">Budget</th><th class="tc-num">Variance</th><th class="tc-num">%</th><% end %>
+        </tr>
+      <% else %>
+        <tr>
+          <th class="<%= label_cell %>">Account</th>
+          <% comparison.periods.each do |period| %><th class="tc-num whitespace-nowrap"><%= comparison_label(period, @compare) %></th><% end %>
+          <% if change %><th class="tc-num">Change</th><th class="tc-num">%</th><% end %>
+        </tr>
+      <% end %>
     </thead>
     <% sections.each do |category, total_label| %>
       <% title = TudlaAccounting::ReportsHelper::SECTION_TITLES.fetch(category) %>
@@ -31,12 +53,12 @@
             <td class="<%= label_cell %>"><div style="padding-left: <%= row.depth * 1.25 %>rem" class="<%= "font-semibold" if row.depth.zero? %>">
               <span class="font-mono tc-muted mr-2"><%= row.account.code %></span><%= report_account_link(row.account, comparison.periods.first) %>
             </div></td>
-            <% money_cells.call(row.amounts) %>
+            <% money_cells.call(row.amounts, category) %>
           </tr>
         <% end %>
         <tr class="font-semibold" data-total="<%= category %>">
           <td class="<%= label_cell %>"><%= total_label || "Total #{title.downcase}" %></td>
-          <% money_cells.call(comparison.total(category)) %>
+          <% money_cells.call(comparison.total(category), category) %>
         </tr>
       </tbody>
     <% end %>
@@ -44,9 +66,13 @@
       <% figures.each do |figure, label| %>
         <tr class="font-semibold" data-total="<%= figure %>">
           <td class="<%= label_cell %>"><%= label %></td>
-          <% money_cells.call(comparison.values(figure)) %>
+          <% money_cells.call(comparison.values(figure), nil) %>
         </tr>
       <% end %>
     </tbody>
   </table>
 </div>
+<% if budget %>
+  <p class="tc-hint mt-2">Compared with the budget <%= link_to comparison.budget.label, budget_path(comparison.budget), class: "underline" %>.
+    Variance is actual less budget: F marks a favourable one (more income or profit, or less spending, than budgeted), U an unfavourable one.</p>
+<% end %>

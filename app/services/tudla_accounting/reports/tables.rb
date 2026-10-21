@@ -9,11 +9,12 @@ module TudlaAccounting
 
       # A balance sheet or profit and loss (a Comparison, of one period or several): a row
       # per account, with its section, code and level in the account tree, then the
-      # section's total; the figures after the sections. With change, the change from the
-      # second period to the first and as a percentage of the second (blank when it is zero).
-      def statement(comparison, labels:, sections:, figures:, change: false)
-        headings = [ "Section", "Code", "Account", "Level", *labels, *([ "Change", "Change %" ] if change) ]
-        amounts = ->(values) { [ *values, *([ values[0] - values[1], percent(values) ] if change) ] }
+      # section's total; the figures after the sections. With change, the columns go in
+      # pairs, each followed by the change from its second to its first and as a percentage
+      # of the second (blank when it is zero), headed by change_headings, a pair for each.
+      def statement(comparison, labels:, sections:, figures:, change: false, change_headings: [ [ "Change", "Change %" ] ])
+        headings = [ "Section", "Code", "Account", "Level", *(change ? labels.each_slice(2).zip(change_headings).flat_map { |pair, extra| [ *pair, *extra ] } : labels) ]
+        amounts = ->(values) { change ? values.each_slice(2).flat_map { |pair| [ *pair, pair[0] - pair[1], percent(pair) ] } : values }
         rows = sections.flat_map do |category, total_label|
           title = ReportsHelper::SECTION_TITLES.fetch(category)
           [ *comparison.rows(category).map { |row| [ title, row.account.code, row.account.name, row.depth, *amounts.call(row.amounts) ] },

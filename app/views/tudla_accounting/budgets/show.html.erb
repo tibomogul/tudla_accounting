@@ -1,5 +1,6 @@
 <%= tc_page_header @budget.name, subtitle: "Budget for #{tc_period_label(@budget.period)}, in #{accounting_organization.currency}#{" · the year's main budget" if @budget.main?}" do %>
   <%= link_to "Budgets", budgets_path, class: "tc-btn tc-btn-ghost print:hidden" %>
+  <%= link_to "Compare with actual", reports_profit_and_loss_path(period_id: @budget.period_id, compare: "budget-#{@budget.id}"), class: "tc-btn tc-btn-secondary print:hidden" %>
   <%= render "tudla_accounting/reports/download" %>
   <% if tc_can?(:record) %><%= link_to "Edit amounts", edit_budget_path(@budget), class: "tc-btn print:hidden" %><% end %>
 <% end %>

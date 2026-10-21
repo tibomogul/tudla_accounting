@@ -1,5 +1,9 @@
 <div class="tc-alert tc-alert-warning mb-4" role="status">
-  <%= { "previous" => "There is no earlier period to compare with yet.",
-        "last_year" => "There is no period a year earlier to compare with yet.",
-        "months" => "This is the first month of its year: there are no earlier months to compare with." }.fetch(@compare) %>
+  <% if @compare == "budget" %>
+    <span>There is no budget for <%= tc_period_label(@period.root) %> yet. <%= link_to "Add one", budgets_path, class: "underline" %> to compare with.</span>
+  <% else %>
+    <%= { "previous" => "There is no earlier period to compare with yet.",
+          "last_year" => "There is no period a year earlier to compare with yet.",
+          "months" => "This is the first month of its year: there are no earlier months to compare with." }.fetch(@compare) %>
+  <% end %>
 </div>

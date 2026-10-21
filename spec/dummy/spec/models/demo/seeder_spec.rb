@@ -68,6 +68,15 @@ RSpec.describe Demo::Seeder do
     ])
   end
 
+  it "budgets this year from last year's results" do
+    organization = described_class.call(entries: 60)
+
+    budget = TudlaAccounting::Budget.find_by!(organization: organization)
+    expect(budget).to have_attributes(name: "Plan", main: true, period: TudlaAccounting::Period.periods_for_date(organization, Date.new(2026, 1, 1)).roots.first)
+    expect(budget.lines).not_to be_empty
+    expect(budget.lines.map(&:amount_cents)).to all(satisfy { |cents| (cents % 100).zero? })
+  end
+
   it "attaches the landlord's receipt to the latest rent payments" do
     organization = described_class.call(entries: 60)
 

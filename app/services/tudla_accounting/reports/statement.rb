@@ -59,6 +59,11 @@ module TudlaAccounting
         @accounts
       end
 
+      # The statement itself, so one can stand in a Comparison as a report does.
+      def statement
+        self
+      end
+
       # The category's top-level accounts.
       def roots(category)
         @accounts.select { |account| account.parent_id.nil? && account.category == category }
