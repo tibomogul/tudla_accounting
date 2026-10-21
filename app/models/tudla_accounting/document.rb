@@ -82,6 +82,15 @@ module TudlaAccounting
       number_label ? "#{kind_label} #{number_label}" : "Draft #{kind_label.downcase}"
     end
 
+    # For the audit trail: "Invoice INV-0001 – Northwind", or before it is numbered "an
+    # invoice for Northwind".
+    def label
+      return "#{title} – #{contact.name}" if number_label
+
+      kind = kind_label.downcase
+      "#{kind == 'invoice' ? 'an' : 'a'} #{kind} for #{contact.name}"
+    end
+
     # The receivable or payable it opens, for CarryingAmountProcessor.
     def carrying_amount_role = KINDS.fetch(kind)[:role]
     def carrying_amount_party = contact

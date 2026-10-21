@@ -182,7 +182,7 @@ RSpec.describe TudlaAccounting::Document do
     events = TudlaAccounting::AuditEvent.where(organization: organization, subject_type: described_class.name, subject_id: draft.id).order(:id)
     expect(events.map(&:action)).to eq(%w[document.created document.updated document.deleted])
     expect(events.second.details["changes"].keys).to include("reference", "subtotal_cents")
-    expect(events.last.subject_label).to eq("Draft invoice – Northwind")
+    expect(events.last.subject_label).to eq("an invoice for Northwind")
   end
 
   it "voids by reversing its entry, once nothing is applied to it, and so does reversing the entry" do

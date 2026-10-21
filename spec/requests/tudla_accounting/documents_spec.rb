@@ -80,8 +80,9 @@ RSpec.describe "Invoices and bills", type: :request do
     expect(css_select("tfoot").first.text.squish).to include("2,750.00")
     get routes.contact_path(northwind)
     expect(css_select("[data-documents]").first.text.squish).to include("Invoice INV-0001", "2,750.00", "Awaiting payment")
+    expect(css_select("[data-open=receivable] a[href='#{routes.document_path(document)}']").map(&:text)).to eq([ "Invoice INV-0001" ])
     get routes.activity_path(kind: "document")
-    expect(css_select("table").first.text.squish).to include("Drafted Draft invoice – Northwind", "Changed Draft invoice – Northwind: tax, total, subtotal", "Approved Invoice INV-0001")
+    expect(css_select("table").first.text.squish).to include("Drafted an invoice for Northwind", "Changed an invoice for Northwind: tax, total, subtotal", "Approved Invoice INV-0001")
   end
 
   it "says what's wrong with a draft and keeps what was typed" do
@@ -124,8 +125,10 @@ RSpec.describe "Invoices and bills", type: :request do
     get routes.document_path(invoice)
     expect(css_select("[data-document] tfoot").first.text.squish).to include("Paid or credited(44.00)", "Amount due66.00")
     expect(response.body).to include("Part paid", "CN-0001")
+    expect(css_select("a[href='#{routes.document_path(credit)}']").map(&:text)).to include("Credit note CN-0001")
     get routes.document_path(credit)
     expect(response.body).to include("Applied to", "INV-0001", "Credits")
+    expect(css_select("a[href='#{routes.document_path(invoice)}']").map(&:text)).to include("Invoice INV-0001")
 
     { "part_paid" => [ "INV-0001" ], "paid" => [ "CN-0001" ], "unpaid" => [], "draft" => [], "void" => [] }.each do |status, expected|
       get routes.sales_documents_path(status: status)
@@ -179,7 +182,7 @@ RSpec.describe "Invoices and bills", type: :request do
     expect(response).to redirect_to(routes.purchase_documents_path)
     expect(TudlaAccounting::Document.count).to eq(0)
     get routes.activity_path(kind: "document")
-    expect(response.body).to include("Deleted Draft bill – Acme Supplies")
+    expect(response.body).to include("Deleted a bill for Acme Supplies")
 
     approved = TudlaAccounting::Document.create!(organization: organization, kind: "bill", contact: supplier, issued_on: Date.new(2026, 4, 2),
                                                  lines_attributes: [ { description: "Paper", unit_price_cents: 55_00, account: account("6000") } ]).approve!

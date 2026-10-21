@@ -35,7 +35,7 @@ module TudlaAccounting
       when Entry then [ object.number_label, object.particulars ].compact.join(" ")
       when Account then object.code_with_name
       when RecurringEntry, BankRule, TaxReturnForm then object.name
-      when Document then "#{object.title} – #{object.contact.name}"
+      when Document then object.label
       when Payment then "#{object.title} of #{object.amount.format}"
       when ApiToken then "API token #{object.name}"
       when Period, Budget, FiledTaxReturn, Allocation, TaxCode, BankStatementLine, Dimension, DimensionValue then object.label

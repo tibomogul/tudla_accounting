@@ -96,6 +96,7 @@ RSpec.describe Demo::Seeder do
     expect(contacts.map { |contact| [ contact.name, contact.kind ] }).to eq([ %w[Cloudware supplier], %w[Globex customer], %w[Initech customer], %w[Northwind customer], %w[Umbrella customer] ])
     documents = TudlaAccounting::Document.where(organization: organization)
     expect(documents.sales.approved.order(:number).pluck(:number_label)).to eq((1..12).map { |number| format("INV-%04d", number) })
+    expect(documents.sales.approved.order(:number).pluck(:issued_on)).to eq(documents.sales.approved.order(:issued_on, :number).pluck(:issued_on)) # in date order
     expect(documents.where(status: "draft").sole).to have_attributes(kind: "sales_invoice", issued_on: Date.current, contact: contacts.find_by!(name: "Initech"))
     expect(documents.purchases.approved.map(&:total)).to eq([ Money.new(165_00, "USD") ] * 2)
     paid = documents.sales.approved.with_open_cents.to_a.group_by(&:payment_status)

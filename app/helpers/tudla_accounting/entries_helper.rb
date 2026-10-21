@@ -35,6 +35,17 @@ module TudlaAccounting
       end
     end
 
+    # A link to what the entry was posted for (an invoice, bill, credit note or payment),
+    # or to the entry itself.
+    def entry_source_link(entry)
+      source = entry.source if entry.source_type.in?([ Document.name, Payment.name ])
+      case source
+      when Document then link_to(source.title, document_path(source), class: "underline")
+      when Payment then link_to(source.title, payment_path(source), class: "underline")
+      else link_to(entry_title(entry), entry_path(entry), class: "underline")
+      end
+    end
+
     def entry_total(entry)
       entry.details.select(&:debit?).sum(Money.new(0, accounting_organization.currency), &:amount)
     end

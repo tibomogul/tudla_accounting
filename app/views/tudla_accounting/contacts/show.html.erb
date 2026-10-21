@@ -46,12 +46,12 @@
         <% lines = report[:details].values.first || [] %>
         <% if lines.any? %>
           <table class="tc-table">
-            <thead><tr><th>Date</th><th>Entry</th><th>Due</th><th class="tc-num">Outstanding</th></tr></thead>
+            <thead><tr><th>Date</th><th>For</th><th>Due</th><th class="tc-num">Outstanding</th></tr></thead>
             <tbody>
               <% lines.each do |line| %>
                 <tr>
                   <td class="whitespace-nowrap"><%= tc_date(line[:entry].transacted_at) %></td>
-                  <td><%= link_to entry_title(line[:entry]), entry_path(line[:entry]), class: "underline" %></td>
+                  <td><%= entry_source_link(line[:entry]) %></td>
                   <td class="whitespace-nowrap"><%= line[:credit] ? tc_badge("Credit to apply") : (tc_date(line[:carrying_amount].due_date) || "—") %></td>
                   <td class="tc-num"><%= tc_money(line[:outstanding]) %></td>
                 </tr>

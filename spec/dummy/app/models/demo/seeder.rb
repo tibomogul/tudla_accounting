@@ -195,16 +195,18 @@ class Demo::Seeder
                                        address: "#{name.length * 7} #{name} Way\nSydney NSW 2000", default_account: accounts["4010"], default_tax_code: @gst)
     end
     start = today.prev_month(3).beginning_of_month
-    customers.each_with_index do |customer, index|
-      (0..2).map { |month| start.next_month(month) + (index * 6).days }.select { |date| date <= today }.each do |date|
-        invoice = consulting_invoice(customer, date, hours.rand(4..20)).approve!
-        paid_on = date + 25
-        next if customer.name == "Umbrella" || paid_on > today
+    invoices = customers.each_with_index.flat_map do |customer, index|
+      (0..2).map { |month| [ start.next_month(month) + (index * 6).days, customer ] }.select { |date, _| date <= today }
+    end
+    # Approved in date order, so they are numbered in it.
+    invoices.sort_by(&:first).each do |date, customer|
+      invoice = consulting_invoice(customer, date, hours.rand(4..20)).approve!
+      paid_on = date + 25
+      next if customer.name == "Umbrella" || paid_on > today
 
-        paid = customer.name == "Globex" ? invoice.total_cents / 2 : invoice.total_cents
-        TudlaAccounting::Payment.record!(organization: organization, kind: "received", contact: customer, account: accounts["1011"], paid_on: paid_on,
-                                         amount_cents: paid, reference: "EFT #{invoice.number_label}", applications: [ { document: invoice, amount_cents: paid } ])
-      end
+      paid = customer.name == "Globex" ? invoice.total_cents / 2 : invoice.total_cents
+      TudlaAccounting::Payment.record!(organization: organization, kind: "received", contact: customer, account: accounts["1011"], paid_on: paid_on,
+                                       amount_cents: paid, reference: "EFT #{invoice.number_label}", applications: [ { document: invoice, amount_cents: paid } ])
     end
     consulting_invoice(customers.third, today, 6)
   end

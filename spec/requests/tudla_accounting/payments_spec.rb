@@ -52,6 +52,10 @@ RSpec.describe "Payments", type: :request do
     expect(response).to redirect_to(routes.payment_path(payment))
     expect(flash[:notice]).to eq("Payment from Northwind of $120.00 recorded.")
     expect(invoice.reload.payment_status).to eq("paid")
+    get routes.document_path(invoice)
+    expect(css_select("a[href='#{routes.payment_path(payment)}']").map(&:text)).to eq([ "Payment from Northwind" ])
+    get routes.contact_path(northwind)
+    expect(css_select("[data-open=receivable] a[href='#{routes.payment_path(payment)}']").map(&:text)).to eq([ "Payment from Northwind" ]) # its credit, still to apply
 
     get routes.payment_path(payment)
     expect(css_select("[data-details]").first.text.squish).to include("1000 - Bank", "EFT 1", "$120.00", "Not applied yet$20.00")
