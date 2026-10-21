@@ -24,9 +24,12 @@
   <section class="tc-card tc-card-body flex flex-wrap items-center justify-between gap-4" aria-labelledby="tax-heading">
     <div>
       <h2 id="tax-heading" class="tc-card-title mb-1">Tax codes</h2>
-      <p class="tc-muted text-sm">The taxes lines can be taxed under (GST, VAT, sales tax), their rates and the accounts their tax is posted to.</p>
+      <p class="tc-muted text-sm">The taxes lines can be taxed under (GST, VAT, sales tax), their rates and the accounts their tax is posted to, and the boxes of the returns you file.</p>
     </div>
-    <%= link_to "Manage tax codes", tax_codes_path, class: "tc-btn tc-btn-secondary" %>
+    <div class="flex flex-wrap gap-2">
+      <%= link_to "Manage tax codes", tax_codes_path, class: "tc-btn tc-btn-secondary" %>
+      <%= link_to "Tax returns", tax_return_forms_path, class: "tc-btn tc-btn-secondary" %>
+    </div>
   </section>
 
   <section class="tc-card tc-card-body flex flex-wrap items-center justify-between gap-4" aria-labelledby="dimensions-heading">

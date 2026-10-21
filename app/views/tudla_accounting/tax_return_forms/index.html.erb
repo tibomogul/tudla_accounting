@@ -1,0 +1,22 @@
+<%= tc_page_header "Tax returns", subtitle: "The boxes of the returns you file, and the tax codes and accounts that fill them" do %>
+  <%= link_to "Tax codes", tax_codes_path, class: "tc-btn tc-btn-ghost" %>
+  <%= link_to "New tax return", new_tax_return_form_path, class: "tc-btn" %>
+<% end %>
+
+<div class="tc-card overflow-x-auto">
+  <table class="tc-table">
+    <thead><tr><th>Return</th><th class="tc-num">Boxes</th><th></th></tr></thead>
+    <tbody>
+      <% if @forms.empty? %>
+        <tr><td colspan="3" class="tc-muted text-center">None yet. Start one from the Australian BAS or the UK VAT return, or lay one out yourself.</td></tr>
+      <% end %>
+      <% @forms.each do |form| %>
+        <tr data-tax-return-form>
+          <td><%= link_to form.name, tax_return_form_path(form), class: "underline" %></td>
+          <td class="tc-num"><%= form.boxes.size %></td>
+          <td class="text-right"><%= link_to "See the return", reports_tax_return_path(form_id: form.id), class: "tc-muted text-sm underline" %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

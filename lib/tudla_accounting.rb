@@ -33,6 +33,7 @@ module TudlaAccounting
     recurring_entry.created recurring_entry.updated recurring_entry.deleted recurring_entry.generated
     bank_rule.created bank_rule.updated bank_rule.deleted
     budget.created budget.updated budget.deleted
+    tax_return_form.created tax_return_form.updated tax_return_form.deleted
   ].freeze
 
   # Calls the block with each TudlaAccounting::AuditEvent for an action (or for every

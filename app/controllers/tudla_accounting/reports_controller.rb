@@ -48,9 +48,21 @@ module TudlaAccounting
     def tax
       return respond_with_table("tax-summary") unless month_range
 
+      @tax_return_forms = organization_scope(TaxReturnForm).order(:name).to_a
       @report = TaxReport.call(accounting_organization, from: @from.from_date, thru: @thru.thru_date,
                                basis: params[:basis].presence_in(TaxReport::BASES.map(&:to_s)))
       respond_with_table("tax-summary-#{@report[:basis]}-#{span_name}") { Reports::Tables.tax(@report) }
+    end
+
+    # A tax return form's boxes (form_id; the first form by default) for a run of months
+    # (this month by default) on a basis, as TaxReturnCalculator works them out.
+    def tax_return
+      @forms = organization_scope(TaxReturnForm).order(:name).to_a
+      return respond_with_table("tax-return") if @forms.empty? || !month_range
+
+      @form = params[:form_id].present? ? (@forms.find { |form| form.id == params[:form_id].to_i } || raise(ActiveRecord::RecordNotFound)) : @forms.first
+      @report = TaxReturnCalculator.call(@form, from: @from.from_date, thru: @thru.thru_date, basis: params[:basis].presence_in(TaxReport::BASES.map(&:to_s)))
+      respond_with_table("#{@form.name.parameterize}-#{@report[:basis]}-#{span_name}") { Reports::Tables.tax_return(@report) }
     end
 
     # Profit and loss with a column per value of a dimension, over a run of months (the

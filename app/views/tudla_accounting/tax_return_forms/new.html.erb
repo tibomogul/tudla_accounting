@@ -1,0 +1,19 @@
+<%= tc_page_header "New tax return", subtitle: "Its boxes come from a template, or you add them one by one" %>
+<%= form_with model: @form, scope: :tax_return_form, url: tax_return_forms_path, class: "space-y-4 max-w-2xl" do |form| %>
+  <% if @form.errors.any? %>
+    <div class="tc-alert tc-alert-danger" role="alert"><ul class="list-disc pl-4"><% @form.errors.full_messages.uniq.each do |message| %><li><%= message %></li><% end %></ul></div>
+  <% end %>
+  <div class="tc-card tc-card-body grid gap-4">
+    <div>
+      <%= label_tag :template, "Start from", class: "tc-label" %>
+      <%= select_tag :template, options_for_select([ [ "Nothing: add the boxes yourself", "" ] ] + TudlaAccounting::TaxReturnTemplates.choices, @template), class: "tc-input" %>
+      <p class="tc-hint">A template lays out the boxes, their names and their totals of other boxes. You add the tax codes and accounts that fill the rest.
+        Check the box names against the current form before filing.</p>
+    </div>
+    <%= tc_field form, :name, placeholder: "The template's, or e.g. BAS", hint: "Several returns need different names" %>
+  </div>
+  <div class="flex gap-2">
+    <%= form.submit "Add tax return", class: "tc-btn" %>
+    <%= link_to "Cancel", tax_return_forms_path, class: "tc-btn tc-btn-secondary" %>
+  </div>
+<% end %>

@@ -1,0 +1,30 @@
+<%= tc_page_header @form.name, subtitle: "Its boxes, from the top, and what fills each" do %>
+  <%= link_to "Tax returns", tax_return_forms_path, class: "tc-btn tc-btn-ghost" %>
+  <%= link_to "See the return", reports_tax_return_path(form_id: @form.id), class: "tc-btn tc-btn-secondary" %>
+  <%= link_to "Rename", edit_tax_return_form_path(@form), class: "tc-btn tc-btn-secondary" %>
+  <%= button_to "Delete", tax_return_form_path(@form), method: :delete, class: "tc-btn tc-btn-danger",
+                form: { data: { controller: "confirm", confirm_message_value: "Delete the tax return #{@form.name} and its boxes?", action: "submit->confirm#ask" } } %>
+<% end %>
+
+<div class="tc-card overflow-x-auto mb-4">
+  <table class="tc-table">
+    <thead><tr><th>Box</th><th>Name</th><th>Made up of</th><th></th></tr></thead>
+    <tbody>
+      <% if @boxes.empty? %>
+        <tr><td colspan="4" class="tc-muted text-center">No boxes yet.</td></tr>
+      <% end %>
+      <% @boxes.each do |box| %>
+        <tr data-box="<%= box.label %>">
+          <td class="font-mono whitespace-nowrap"><%= link_to box.label, edit_tax_return_form_box_path(@form, box), class: "underline" %></td>
+          <td><%= box.name %><% if box.whole_units? %> <%= tc_badge "whole units" %><% end %></td>
+          <td class="text-sm">
+            <% if box.parts.empty? %><%= tc_badge "Nothing yet", tone: :warning %><% end %>
+            <% box.parts.each do |part| %><div><%= part.description %></div><% end %>
+          </td>
+          <td class="text-right"><%= link_to "Edit", edit_tax_return_form_box_path(@form, box), class: "tc-muted text-sm underline" %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+<%= link_to "Add a box", new_tax_return_form_box_path(@form), class: "tc-btn" %>

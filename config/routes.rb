@@ -38,6 +38,7 @@ TudlaAccounting::Engine.routes.draw do
     get :cash_flow
     get :statement
     get :statements
+    get :tax_return
   end
 
   resources :budgets do
@@ -45,6 +46,9 @@ TudlaAccounting::Engine.routes.draw do
   end
 
   resources :tax_codes, except: :show
+  resources :tax_return_forms do
+    resources :boxes, controller: :tax_return_boxes, except: %i[index show]
+  end
   resources :dimensions, except: %i[show destroy] do
     resources :dimension_values, path: "values", only: %i[new create edit update]
   end

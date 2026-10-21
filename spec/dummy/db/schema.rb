@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_21_230000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_21_240000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -451,6 +451,41 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_230000) do
     t.check_constraint "rate >= 0::numeric", name: "tudla_accounting_tax_codes_rate_not_negative"
   end
 
+  create_table "tudla_accounting_tax_return_box_parts", force: :cascade do |t|
+    t.bigint "account_id"
+    t.bigint "box_id", null: false
+    t.bigint "from_box_id"
+    t.integer "sign", default: 1, null: false
+    t.string "source", null: false
+    t.bigint "tax_code_id"
+    t.index ["account_id"], name: "index_tudla_accounting_tax_return_box_parts_on_account"
+    t.index ["box_id"], name: "index_tudla_accounting_tax_return_box_parts_on_box"
+    t.index ["from_box_id"], name: "index_tudla_accounting_tax_return_box_parts_on_from_box"
+    t.index ["tax_code_id"], name: "index_tudla_accounting_tax_return_box_parts_on_tax_code"
+    t.check_constraint "sign = ANY (ARRAY[1, '-1'::integer])", name: "tudla_accounting_tax_return_box_parts_sign"
+    t.check_constraint "source::text ~~ 'tax_code_%'::text AND tax_code_id IS NOT NULL AND account_id IS NULL AND from_box_id IS NULL OR source::text = 'account'::text AND account_id IS NOT NULL AND tax_code_id IS NULL AND from_box_id IS NULL OR source::text = 'box'::text AND from_box_id IS NOT NULL AND tax_code_id IS NULL AND account_id IS NULL", name: "tudla_accounting_tax_return_box_parts_one_source"
+  end
+
+  create_table "tudla_accounting_tax_return_boxes", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "form_id", null: false
+    t.string "label", null: false
+    t.string "name", null: false
+    t.integer "position", null: false
+    t.datetime "updated_at", null: false
+    t.boolean "whole_units", default: false, null: false
+    t.index ["form_id", "label"], name: "index_tudla_accounting_tax_return_boxes_on_label", unique: true
+  end
+
+  create_table "tudla_accounting_tax_return_forms", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.bigint "organization_id", null: false
+    t.string "organization_type", null: false
+    t.datetime "updated_at", null: false
+    t.index ["organization_type", "organization_id", "name"], name: "index_tudla_accounting_tax_return_forms_on_name", unique: true
+  end
+
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "demo_invoices", "demo_customers", column: "customer_id"
@@ -487,4 +522,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_230000) do
   add_foreign_key "tudla_accounting_recurring_entry_lines", "tudla_accounting_recurring_entries", column: "recurring_entry_id"
   add_foreign_key "tudla_accounting_recurring_entry_lines", "tudla_accounting_tax_codes", column: "tax_code_id"
   add_foreign_key "tudla_accounting_tax_codes", "tudla_accounting_accounts", column: "account_id"
+  add_foreign_key "tudla_accounting_tax_return_box_parts", "tudla_accounting_accounts", column: "account_id"
+  add_foreign_key "tudla_accounting_tax_return_box_parts", "tudla_accounting_tax_codes", column: "tax_code_id"
+  add_foreign_key "tudla_accounting_tax_return_box_parts", "tudla_accounting_tax_return_boxes", column: "box_id", on_delete: :cascade
+  add_foreign_key "tudla_accounting_tax_return_box_parts", "tudla_accounting_tax_return_boxes", column: "from_box_id", on_delete: :cascade
+  add_foreign_key "tudla_accounting_tax_return_boxes", "tudla_accounting_tax_return_forms", column: "form_id", on_delete: :cascade
 end

@@ -1,0 +1,11 @@
+<%= tc_page_header "Rename #{@form.name}" %>
+<%= form_with model: @form, scope: :tax_return_form, url: tax_return_form_path(@form), method: :patch, class: "space-y-4 max-w-2xl" do |form| %>
+  <% if @form.errors.any? %>
+    <div class="tc-alert tc-alert-danger" role="alert"><ul class="list-disc pl-4"><% @form.errors.full_messages.uniq.each do |message| %><li><%= message %></li><% end %></ul></div>
+  <% end %>
+  <div class="tc-card tc-card-body"><%= tc_field form, :name, required: true %></div>
+  <div class="flex gap-2">
+    <%= form.submit "Save", class: "tc-btn" %>
+    <%= link_to "Cancel", tax_return_form_path(@form), class: "tc-btn tc-btn-secondary" %>
+  </div>
+<% end %>

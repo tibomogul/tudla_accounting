@@ -1,0 +1,46 @@
+<%= tc_page_header (@form ? @form.name : "Tax return"),
+                   subtitle: (@report ? "#{tc_date(@from.from_date)} to #{tc_date(@thru.thru_date)}, #{@report[:basis] == :cash ? "cash basis" : "accrual basis"}, in #{accounting_organization.currency}" : nil) do %>
+  <% if @report %>
+    <%= form_with url: reports_tax_return_path, method: :get, class: "flex flex-wrap items-end gap-2" do |form| %>
+      <div><%= form.label :form_id, "Return", class: "tc-label" %><%= form.select :form_id, @forms.map { |each| [ each.name, each.id ] }, { selected: @form.id }, class: "tc-input" %></div>
+      <div><%= form.label :from_id, "From", class: "tc-label" %><%= form.select :from_id, @months.map { |month| [ tc_period_label(month), month.id ] }, { selected: @from.id }, class: "tc-input" %></div>
+      <div><%= form.label :thru_id, "To", class: "tc-label" %><%= form.select :thru_id, @months.map { |month| [ tc_period_label(month), month.id ] }, { selected: @thru.id }, class: "tc-input" %></div>
+      <div><%= form.label :basis, "Basis", class: "tc-label" %><%= form.select :basis, [ [ "Accrual", "accrual" ], [ "Cash", "cash" ] ], { selected: @report[:basis] }, class: "tc-input" %></div>
+      <%= form.submit "Show", class: "tc-btn tc-btn-secondary", name: nil %>
+    <% end %>
+    <%= render "download" %>
+  <% end %>
+<% end %>
+
+<% if @forms.empty? %>
+  <div class="tc-card tc-card-body text-center">
+    <p class="tc-muted">No tax returns set up yet.<% if tc_can?(:administer) %> <%= link_to "Set one up", tax_return_forms_path, class: "underline" %> from a template, then map your tax codes to its boxes.<% end %></p>
+  </div>
+<% elsif @report.nil? %>
+  <%= render "no_periods" %>
+<% else %>
+  <div class="tc-card overflow-x-auto">
+    <table class="tc-table" data-tax-return>
+      <thead><tr><th>Box</th><th>Name</th><th class="tc-num">Amount</th></tr></thead>
+      <% @report[:boxes].each do |row| %>
+        <tbody data-box="<%= row.box.label %>">
+          <tr class="font-semibold">
+            <td class="font-mono whitespace-nowrap"><%= row.box.label %></td>
+            <td><%= row.box.name %></td>
+            <td class="tc-num"><%= tc_money(row.amount) %></td>
+          </tr>
+          <% row.parts.each do |part| %>
+            <tr class="tc-muted text-sm" data-part>
+              <td></td><td class="pl-6"><%= part.part.description %></td><td class="tc-num"><%= tc_money(part.amount) %></td>
+            </tr>
+          <% end %>
+          <% if row.parts.empty? %>
+            <tr class="tc-muted text-sm"><td></td><td class="pl-6" colspan="2">Nothing fills this box yet<% if tc_can?(:administer) %>: <%= link_to "add its tax codes or accounts", edit_tax_return_form_box_path(@form, row.box), class: "underline" %><% end %>.</td></tr>
+          <% end %>
+        </tbody>
+      <% end %>
+    </table>
+  </div>
+  <p class="tc-hint mt-3">Each box's parts are shown under it<%= "; boxes in whole units drop their cents" if @report[:boxes].any? { |row| row.box.whole_units? } %>.
+    <% if tc_can?(:administer) %><%= link_to "Change the boxes", tax_return_form_path(@form), class: "underline print:hidden" %>.<% end %></p>
+<% end %>

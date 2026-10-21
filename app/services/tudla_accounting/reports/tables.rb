@@ -82,6 +82,11 @@ module TudlaAccounting
                     Table.total([ nil, nil, "Cash at the end", report.closing ]) ])
       end
 
+      # A tax return (TaxReturnCalculator's): each box's label, name and figure.
+      def tax_return(report)
+        Table.new([ [ "Box", "Name", "Amount" ], *report[:boxes].map { |row| [ row.box.label, row.box.name, row.amount ] } ])
+      end
+
       # A customer's or supplier's statement (a PartyStatement): the opening balance, a row
       # per line with the running balance, and the closing balance; or (open_items) what
       # was still open at the end, then the closing balance by how overdue it is. With

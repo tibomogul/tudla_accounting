@@ -1,0 +1,5 @@
+<%= tc_page_header "Box #{@box.label}", subtitle: "On #{@form.name}" do %>
+  <%= button_to "Delete", tax_return_form_box_path(@form, @box), method: :delete, class: "tc-btn tc-btn-danger",
+                form: { data: { controller: "confirm", confirm_message_value: "Delete the box #{@box.label}?", action: "submit->confirm#ask" } } %>
+<% end %>
+<%= render "form", box: @box %>

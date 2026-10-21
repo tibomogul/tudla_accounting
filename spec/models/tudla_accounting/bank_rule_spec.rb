@@ -116,7 +116,7 @@ RSpec.describe TudlaAccounting::BankRule do
     expect(account("1020").deactivation_blocker).to eq("1020 - Savings is used by the bank rule Software; change it or make it inactive first")
     expect(account("6200")).not_to be_deletable
     expect(gst.destroy).to be(false)
-    expect(gst.errors[:base]).to eq([ "Recurring entries or bank rules use GST; change them first" ])
+    expect(gst.errors[:base]).to eq([ "Recurring entries, bank rules or tax returns use GST; change them first" ])
   end
 
   it "keeps a tax code a recurring entry uses from being deleted" do

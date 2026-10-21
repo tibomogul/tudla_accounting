@@ -44,6 +44,23 @@ production:
 
 The **Recurring entries** page (from Entries) lists them with their schedule and next date, makes the due ones now, and adds, edits, deactivates and deletes them with the entry form's line editor; an entry's **Make recurring** starts one from its lines, and a template's **Make a draft for today** makes a one-off entry from it. They are on the audit trail, as is each entry made.
 
+### Tax returns
+`TudlaAccounting::TaxReturnForm` lays out a return you file (a BAS, a VAT return): its boxes (`TaxReturnBox`: label, name, order, and `whole_units` to drop the cents as the form asks), each the sum of its parts (`TaxReturnBoxPart`), added or subtracted:
+
+- a tax code's net amount (`tax_code_base`), tax (`tax_code_tax`) or the two together (`tax_code_gross`), as the tax summary has them on the chosen basis;
+- an account's movement in the months (`account`), its sub-accounts included, on its natural side, for wages, amounts withheld and the like that no tax code carries;
+- an earlier box's figure (`box`), as reported, for totals such as 1A less 1B.
+
+```ruby
+bas = TudlaAccounting::TaxReturnForm.from_template!(organization, "au_bas") # or "uk_vat"; the boxes and their totals
+bas.boxes.find_by!(label: "1A").parts.create!(source: "tax_code_tax", tax_code: gst)
+bas.boxes.find_by!(label: "W1").parts.create!(source: "account", account: wages)
+TudlaAccounting::TaxReturnCalculator.call(bas, from: july.from_date, thru: september.thru_date, basis: :cash)
+# => { boxes: [#<Box box=G1 amount=... parts=[...]>, ...], basis:, from:, thru: }
+```
+
+A box uses only boxes above it, which then stay above it and can't be deleted while it does. A tax code or account a box uses can't be deleted. The templates (`TaxReturnTemplates`) lay out Australia's BAS (G1 to G11, 1A, 1B, W1, W2 and the net GST, in whole dollars) and the UK VAT return (boxes 1 to 9, 6 to 9 in whole pounds) with their totals; map your own tax codes and accounts to the rest, and check the box names against the current form before filing. Forms are set up under Setup → Tax returns (`:administer`), on the audit trail as `tax_return_form.created`, `.updated` (box changes included) and `.deleted`. The **Tax return** report shows a form's boxes for a run of months, each with the parts that fill it, and downloads as CSV or Excel; the tax summary links to it for the same months.
+
 ### Customer and supplier statements
 `TudlaAccounting::PartyStatement` is a statement of account for one customer (`type: :receivable`) or supplier (`:payable`) over a run of days, as it would be sent to them:
 

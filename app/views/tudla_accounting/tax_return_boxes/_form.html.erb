@@ -1,0 +1,42 @@
+<%# locals: (box:) %>
+<% form_url = box.persisted? ? tax_return_form_box_path(@form, box) : tax_return_form_boxes_path(@form) %>
+<%= form_with model: box, scope: :tax_return_box, url: form_url, method: (box.persisted? ? :patch : :post), class: "space-y-4 max-w-6xl" do |form| %>
+  <% if box.errors.any? %>
+    <div class="tc-alert tc-alert-danger" role="alert"><ul class="list-disc pl-4"><% box.errors.full_messages.uniq.each do |message| %><li><%= message %></li><% end %></ul></div>
+  <% end %>
+
+  <div class="tc-card tc-card-body grid gap-4 sm:grid-cols-6 max-w-4xl">
+    <div><%= tc_field form, :label, required: true, placeholder: "G1" %></div>
+    <div class="sm:col-span-4"><%= tc_field form, :name, required: true, placeholder: "Total sales" %></div>
+    <div><%= tc_field form, :position, as: :number_field, label: "Order", hint: "Lower first" %></div>
+    <label class="sm:col-span-6 flex items-center gap-2 text-sm"><%= form.check_box :whole_units %> Whole units: drop the cents, as the form asks</label>
+  </div>
+
+  <fieldset class="tc-card overflow-x-auto">
+    <legend class="tc-card-title px-4 pt-4">Made up of</legend>
+    <p class="tc-hint px-4">Each row adds or subtracts one thing; pick its kind, then the tax code, account or box it is about. Blank rows are left out.</p>
+    <table class="tc-table">
+      <thead><tr><th>Add or less</th><th>What</th><th>Tax code</th><th>Account</th><th>Box above</th><th>Remove</th></tr></thead>
+      <tbody>
+        <%= form.fields_for :parts do |part_form| %>
+          <tr data-part>
+            <td><%= part_form.hidden_field :id if part_form.object.persisted? %>
+              <%= part_form.select :sign, [ [ "Add", 1 ], [ "Less", -1 ] ], {}, class: "tc-input min-w-24", "aria-label": "Add or less" %></td>
+            <td><%= part_form.select :source, TudlaAccounting::TaxReturnBoxPart::SOURCES.map { |key, label| [ label, key ] }, { include_blank: "—" }, class: "tc-input min-w-60", "aria-label": "What" %></td>
+            <td><%= part_form.select :tax_code_id, part_choices[:tax_codes], { include_blank: "—" }, class: "tc-input min-w-52", "aria-label": "Tax code" %></td>
+            <td><%= part_form.select :account_id, part_choices[:accounts], { include_blank: "—" }, class: "tc-input min-w-52", "aria-label": "Account" %></td>
+            <td><%= part_form.select :from_box_id, part_choices[:boxes], { include_blank: "—" }, class: "tc-input min-w-44", "aria-label": "Box above" %></td>
+            <td class="text-center"><%= part_form.check_box :_destroy, "aria-label": "Remove" if part_form.object.persisted? %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+    <p class="tc-hint p-4">Tax codes give the tax summary's figures: the net amount taxed, the tax, or the two together (gross), on the return's basis.
+      An account gives what was posted to it (and its sub-accounts) in the months, on its natural side: wages and amounts withheld come out positive.</p>
+  </fieldset>
+
+  <div class="flex gap-2">
+    <%= form.submit "Save box", class: "tc-btn" %>
+    <%= link_to "Cancel", tax_return_form_path(@form), class: "tc-btn tc-btn-secondary" %>
+  </div>
+<% end %>

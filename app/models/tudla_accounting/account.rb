@@ -156,10 +156,11 @@ module TudlaAccounting
     end
 
     # Only an account with no history, no sub-accounts, nothing offsetting it and no
-    # recurring entry, bank rule or budget using it.
+    # recurring entry, bank rule, budget or tax return using it.
     def deletable?
       structure_editable? && children.none? && contra_for.nil? && RecurringEntryLine.where(account: self).none? &&
-        BankRule.where(counter_account_id: id).or(BankRule.where(account_id: id)).none? && BudgetLine.where(account: self).none?
+        BankRule.where(counter_account_id: id).or(BankRule.where(account_id: id)).none? && BudgetLine.where(account: self).none? &&
+        TaxReturnBoxPart.where(account_id: id).none?
     end
 
     # Stops offering the account, and every account beneath it, for new entries: they keep
@@ -307,7 +308,7 @@ module TudlaAccounting
     def ensure_deletable
       return if deletable?
 
-      errors.add(:base, "Only an account with no postings, sub-accounts, contra accounts, recurring entries, bank rules or budgets can be deleted")
+      errors.add(:base, "Only an account with no postings, sub-accounts, contra accounts, recurring entries, bank rules, budgets or tax returns can be deleted")
       throw :abort
     end
 

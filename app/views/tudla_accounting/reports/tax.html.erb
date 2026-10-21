@@ -47,4 +47,10 @@
     <p class="text-lg font-semibold" data-total="net_tax"><%= tc_money(@report[:net_tax].abs) %></p>
   </div>
   <p class="tc-hint mt-3">Tax on sales less tax on purchases. Credit notes and reversals reduce the side they are on.</p>
+  <p class="text-sm mt-3 print:hidden">
+    <% @tax_return_forms.each do |form| %>
+      <%= link_to "#{form.name} for these months", reports_tax_return_path(form_id: form.id, from_id: @from.id, thru_id: @thru.id, basis: @report[:basis]), class: "tc-btn tc-btn-secondary mr-2" %>
+    <% end %>
+    <% if @tax_return_forms.empty? && tc_can?(:administer) %><%= link_to "Set up a tax return", tax_return_forms_path, class: "underline" %> (a BAS or VAT return) to see these figures in its boxes.<% end %>
+  </p>
 <% end %>
