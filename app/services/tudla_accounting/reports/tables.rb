@@ -1,0 +1,91 @@
+# frozen_string_literal: true
+
+module TudlaAccounting
+  module Reports
+    # Each report as a Table, for exporting, with what the pages show. The callers name
+    # periods and parties (labels: and party_name:), as the pages do.
+    module Tables
+      module_function
+
+      # A balance sheet or profit and loss (a Comparison, of one period or several): a row
+      # per account, with its section, code and level in the account tree, then the
+      # section's total; the figures after the sections. With change, the change from the
+      # second period to the first and as a percentage of the second (blank when it is zero).
+      def statement(comparison, labels:, sections:, figures:, change: false)
+        headings = [ "Section", "Code", "Account", "Level", *labels, *([ "Change", "Change %" ] if change) ]
+        amounts = ->(values) { [ *values, *([ values[0] - values[1], percent(values) ] if change) ] }
+        rows = sections.flat_map do |category, total_label|
+          title = ReportsHelper::SECTION_TITLES.fetch(category)
+          [ *comparison.rows(category).map { |row| [ title, row.account.code, row.account.name, row.depth, *amounts.call(row.amounts) ] },
+            [ title, nil, total_label || "Total #{title.downcase}", nil, *amounts.call(comparison.total(category)) ] ]
+        end
+        rows += figures.map { |figure, label| [ nil, nil, label, nil, *amounts.call(comparison.values(figure)) ] }
+        Table.new([ headings, *rows ])
+      end
+
+      def trial_balance(report)
+        rows = report.rows.map { |row| [ row.account.code, row.account.name, row.debit, row.credit ] }
+        Table.new([ [ "Code", "Account", "Debit", "Credit" ], *rows, [ nil, "Total", report.total_debits, report.total_credits ] ])
+      end
+
+      # A row per open item (credits to apply as negative amounts), its amount in the
+      # column of its bucket, then the totals.
+      def aging(report, party_name:)
+        buckets = AgingReportGenerator::BUCKETS
+        headings = [ "Party", "Entry no.", "Entry", "Due", "Days overdue", *buckets.map { |bucket| ReportsHelper::AGING_BUCKETS.fetch(bucket) }, "Total" ]
+        rows = report[:details].flat_map do |key, lines|
+          party = party_name.call(report[:summary].fetch(key)[:related_party])
+          lines.map do |line|
+            entry = line[:entry]
+            [ party, entry.number_label, entry.particulars, (line[:carrying_amount].due_date unless line[:credit]),
+              (line[:days_outstanding] if line[:days_outstanding].positive?),
+              *buckets.map { |bucket| line[:outstanding] if line[:aging_bucket] == bucket }, line[:outstanding] ]
+          end
+        end
+        Table.new([ headings, *rows, [ "Total", nil, nil, nil, nil, *buckets.map { |bucket| report[:totals][bucket] }, report[:totals][:total] ] ])
+      end
+
+      def tax(report)
+        rows = report[:codes].map do |row|
+          code = row[:tax_code]
+          [ code.code, code.name, code.kind.capitalize, BigDecimal(code.rate_percent), row[:base], row[:tax] ]
+        end
+        Table.new([ [ "Code", "Name", "Kind", "Rate %", "Taxed amount", "Tax" ], *rows,
+                    [ nil, "Total sales", nil, nil, report[:sales][:base], report[:sales][:tax] ],
+                    [ nil, "Total purchases", nil, nil, report[:purchases][:base], report[:purchases][:tax] ],
+                    [ nil, report[:net_tax].negative? ? "Net tax refundable" : "Net tax payable", nil, nil, nil, report[:net_tax] ] ])
+      end
+
+      # A column per dimension value ("Untagged" for lines without one), then the total.
+      def by_dimension(report)
+        columns = report[:columns]
+        headings = [ "Section", "Code", "Account", *columns.map { |value| value ? value.name : "Untagged" }, "Total" ]
+        rows = %i[income expense].flat_map do |section|
+          title = ReportsHelper::SECTION_TITLES.fetch(section.to_s)
+          totals = report[:totals][section]
+          [ *report[section].map { |row| [ title, row[:account].code, row[:account].name, *columns.map { |column| row[:amounts][column] }, row[:total] ] },
+            [ title, nil, "Total #{title.downcase}", *columns.map { |column| totals[column] }, totals[:total] ] ]
+        end
+        net = report[:totals][:net_profit]
+        Table.new([ headings, *rows, [ nil, nil, "Net profit (loss)", *columns.map { |column| net[column] }, net[:total] ] ])
+      end
+
+      def cash_flow(report)
+        rows = Reports::CashFlow::ACTIVITIES.flat_map do |activity|
+          title = "#{activity.capitalize} activities"
+          [ *report.sections.fetch(activity).map { |row| [ title, row.account&.code, row.account ? row.account.name : row.label, row.amount ] },
+            [ title, nil, "Net cash from #{activity} activities", report.total(activity) ] ]
+        end
+        Table.new([ [ "Section", "Code", "Account", "Amount" ], *rows,
+                    [ nil, nil, "Net change in cash", report.net_change ], [ nil, nil, "Cash at the start", report.opening ],
+                    [ nil, nil, "Cash at the end", report.closing ] ])
+      end
+
+      # The change as a percentage of the second amount, to one decimal place; nil when it is zero.
+      def percent(amounts)
+        base = amounts[1]
+        (BigDecimal(amounts[0].cents - base.cents) / base.cents.abs * 100).round(1) unless base.zero?
+      end
+    end
+  end
+end

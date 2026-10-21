@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "csv"
-
 module TudlaAccounting
   module Reports
     # Every posted line, account by account, over a run of months: each account's opening
@@ -56,21 +54,22 @@ module TudlaAccounting
       end
 
       # Date, Entry no., Reference, Account code, Account, Entry, Description (the line's),
-      # Debit, Credit, Balance;
-      # an opening and a closing row per account.
-      def to_csv
-        CSV.generate do |csv|
-          csv << [ "Date", "Entry no.", "Reference", "Account code", "Account", "Entry", "Description", "Debit", "Credit", "Balance" ]
-          accounts.each do |section|
-            account = section.account
-            csv << [ from.from_date.to_date.iso8601, nil, nil, account.code, account.name, "Opening balance", nil, nil, nil, plain(section.opening) ]
-            section.lines.each do |line|
-              csv << [ line.date.to_date.iso8601, line.entry.number_label, line.entry.reference, account.code, account.name, line.entry.particulars,
-                       line.detail.description, plain(line.debit), plain(line.credit), plain(line.balance) ]
-            end
-            csv << [ thru.thru_date.to_date.iso8601, nil, nil, account.code, account.name, "Closing balance", nil, nil, nil, plain(section.closing) ]
-          end
+      # Debit, Credit, Balance; an opening and a closing row per account.
+      def to_table
+        rows = accounts.flat_map do |section|
+          account = section.account
+          [ [ from.from_date, nil, nil, account.code, account.name, "Opening balance", nil, nil, nil, section.opening ],
+            *section.lines.map do |line|
+              [ line.date, line.entry.number_label, line.entry.reference, account.code, account.name, line.entry.particulars,
+                line.detail.description, line.debit, line.credit, line.balance ]
+            end,
+            [ thru.thru_date, nil, nil, account.code, account.name, "Closing balance", nil, nil, nil, section.closing ] ]
         end
+        Table.new([ [ "Date", "Entry no.", "Reference", "Account code", "Account", "Entry", "Description", "Debit", "Credit", "Balance" ], *rows ])
+      end
+
+      def to_csv
+        to_table.to_csv
       end
 
       private
@@ -92,10 +91,6 @@ module TudlaAccounting
           .where(tudla_accounting_entries: { posted_at: from.from_date..thru.thru_date })
           .includes(:entry).order("tudla_accounting_entries.posted_at", "tudla_accounting_entries.id", :id)
           .group_by(&:account_id)
-      end
-
-      def plain(money)
-        money&.format(symbol: false, thousands_separator: "")
       end
 
       def zero

@@ -4,6 +4,7 @@
     <div><%= form.label :as_of, "As at", class: "tc-label" %><%= form.date_field :as_of, value: @as_of, class: "tc-input" %></div>
     <%= form.submit "Show", class: "tc-btn tc-btn-secondary", name: nil %>
   <% end %>
+  <%= render "download" %>
 <% end %>
 
 <% buckets = TudlaAccounting::ReportsHelper::AGING_BUCKETS %>

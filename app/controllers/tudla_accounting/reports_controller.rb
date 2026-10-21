@@ -12,17 +12,26 @@ module TudlaAccounting
       @period = chosen_period(months)
       @report = Reports::BalanceSheet.new(accounting_organization, @period) if @period
       @comparison = comparison(Reports::BalanceSheet) if @period
+      respond_with_table("balance-sheet-#{@period&.thru_date&.to_date}") do
+        statement_table(Reports::BalanceSheet, sections: [ [ "asset" ], [ "liability" ], [ "equity", "Total equity before current-year earnings" ] ],
+                        figures: [ [ :current_year_earnings, "Current-year earnings" ], [ :total_equity, "Total equity" ],
+                                   [ :liabilities_and_equity, "Total liabilities and equity" ] ])
+      end
     end
 
     def profit_and_loss
       @period = chosen_period(years + months, default: current_year)
       @report = Reports::ProfitAndLoss.new(accounting_organization, @period) if @period
       @comparison = comparison(Reports::ProfitAndLoss) if @period
+      respond_with_table("profit-and-loss-#{@period&.from_date&.to_date}-to-#{@period&.thru_date&.to_date}") do
+        statement_table(Reports::ProfitAndLoss, sections: [ [ "income" ], [ "expense" ] ], figures: [ [ :net_profit, "Net profit (loss)" ] ])
+      end
     end
 
     def trial_balance
       @period = chosen_period(months)
       @report = Reports::TrialBalance.new(accounting_organization, @period) if @period
+      respond_with_table("trial-balance-#{@period&.thru_date&.to_date}") { Reports::Tables.trial_balance(@report) }
     end
 
     def receivables
@@ -35,20 +44,22 @@ module TudlaAccounting
 
     # Tax collected and paid over a run of months (the month containing today by default).
     def tax
-      return unless month_range
+      return respond_with_table("tax-summary") unless month_range
 
       @report = TaxReport.call(accounting_organization, from: @from.from_date, thru: @thru.thru_date,
                                basis: params[:basis].presence_in(TaxReport::BASES.map(&:to_s)))
+      respond_with_table("tax-summary-#{@report[:basis]}-#{span_name}") { Reports::Tables.tax(@report) }
     end
 
     # Profit and loss with a column per value of a dimension, over a run of months (the
     # current year to date by default).
     def by_dimension
       @dimensions = organization_scope(Dimension).order(:code).to_a
-      return if @dimensions.empty? || !month_range(year_to_date: true)
+      return respond_with_table("profit-and-loss-by-dimension") if @dimensions.empty? || !month_range(year_to_date: true)
 
       @dimension = params[:dimension_id].present? ? (@dimensions.find { |d| d.id == params[:dimension_id].to_i } || raise(ActiveRecord::RecordNotFound)) : @dimensions.first
       @report = DimensionReport.call(accounting_organization, @dimension, from: @from.from_date, thru: @thru.thru_date)
+      respond_with_table("profit-and-loss-by-#{@dimension.code.parameterize}-#{span_name}") { Reports::Tables.by_dimension(@report) }
     end
 
     # Every posted line, account by account, over a run of months (this month by default).
@@ -68,14 +79,36 @@ module TudlaAccounting
     # the chosen cash accounts or those configured.
     def cash_flow
       @accounts = organization_scope(Account).where(category: [ Account::CATEGORY_ASSET, Account::CATEGORY_LIABILITY ]).order(:code).to_a
-      return unless month_range(year_to_date: true)
+      return respond_with_table("cash-flow") unless month_range(year_to_date: true)
 
       chosen = params[:cash_account_ids].present? ? organization_scope(Account).where(id: Array(params[:cash_account_ids])).to_a : nil
       @report = Reports::CashFlow.new(accounting_organization, from: @from, thru: @thru, cash_accounts: chosen,
                                       method: params[:method].presence_in(Reports::CashFlow::METHODS.map(&:to_s)) || :direct)
+      respond_with_table("cash-flow-#{@report.flow_method}-#{span_name}", available: @report.configured?) { Reports::Tables.cash_flow(@report) }
     end
 
     private
+
+    # The page, or (as CSV) the table the block gives; not found when there is nothing to
+    # export (no periods yet, say).
+    def respond_with_table(name, available: !@report.nil?, &table)
+      respond_to do |format|
+        format.html
+        format.csv { available ? send_data(table.call.to_csv, filename: "#{name}.csv", type: "text/csv") : head(:not_found) }
+      end
+    end
+
+    # The statement on the page as a table: its comparison, or the period alone.
+    def statement_table(report_class, sections:, figures:)
+      comparison = @comparison || Reports::Comparison.new(report_class, accounting_organization, [ @period ])
+      Reports::Tables.statement(comparison, labels: comparison.periods.map { |period| helpers.comparison_label(period, @compare) },
+                                            sections: sections, figures: figures, change: comparison.periods.size == 2 && @compare != "months")
+    end
+
+    # "2026-03-01-to-2026-05-31" for the months picked.
+    def span_name
+      "#{@from.from_date.to_date}-to-#{@thru.thru_date.to_date}"
+    end
 
     # @months, and the run @from..@thru picked with from_id/thru_id (either way round), by
     # default this month or (year_to_date) the start of its year to it. False without months.
@@ -151,7 +184,10 @@ module TudlaAccounting
       @type = type
       @as_of = params[:as_of].presence&.to_date || Date.current
       @report = AgingReportGenerator.call(organization: accounting_organization, report_type: type, as_of_date: @as_of)
-      render :aging
+      respond_to do |format|
+        format.html { render :aging }
+        format.csv { send_data Reports::Tables.aging(@report, party_name: helpers.method(:related_party_name)).to_csv, filename: "#{type}s-aging-#{@as_of}.csv", type: "text/csv" }
+      end
     end
   end
 end

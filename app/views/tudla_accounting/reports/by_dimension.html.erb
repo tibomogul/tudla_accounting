@@ -7,6 +7,7 @@
       <div><%= form.label :thru_id, "To", class: "tc-label" %><%= form.select :thru_id, @months.map { |month| [ tc_period_label(month), month.id ] }, { selected: @thru.id }, class: "tc-input" %></div>
       <%= form.submit "Show", class: "tc-btn tc-btn-secondary", name: nil %>
     <% end %>
+    <%= render "download" %>
   <% end %>
 <% end %>
 

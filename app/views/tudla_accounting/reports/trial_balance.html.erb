@@ -1,5 +1,5 @@
 <%= tc_page_header "Trial balance", subtitle: (@period ? "As at #{tc_date(@period.thru_date)}" : nil) do %>
-  <% if @period %><%= render "period_picker", url: reports_trial_balance_path, period: @period, label: "As at the end of" %><% end %>
+  <% if @period %><%= render "period_picker", url: reports_trial_balance_path, period: @period, label: "As at the end of" %><%= render "download" %><% end %>
 <% end %>
 
 <% if @report.nil? %>

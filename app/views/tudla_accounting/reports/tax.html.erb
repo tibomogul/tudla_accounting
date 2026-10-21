@@ -6,6 +6,7 @@
       <div><%= form.label :basis, "Basis", class: "tc-label" %><%= form.select :basis, [ [ "Accrual", "accrual" ], [ "Cash", "cash" ] ], { selected: @report[:basis] }, class: "tc-input" %></div>
       <%= form.submit "Show", class: "tc-btn tc-btn-secondary", name: nil %>
     <% end %>
+    <%= render "download" %>
   <% end %>
 <% end %>
 

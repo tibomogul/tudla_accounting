@@ -1,0 +1,2 @@
+<%# The page's report as CSV, for what is shown now (its query string kept). %>
+<%= link_to "Download CSV", "#{request.path}.csv#{"?#{request.query_string}" if request.query_string.present?}", class: "tc-btn tc-btn-ghost", data: { turbo: false } %>
