@@ -18,6 +18,7 @@ module TudlaAccounting
         format.html do
           @page = Paginator.new(documents, page: params[:page])
           @documents = @page.records.with_open_cents.includes(:contact).to_a
+          @emailed = Delivery.sent.where(subject_type: Document.name, subject_id: @documents.map(&:id)).distinct.pluck(:subject_id).to_set
           open = Document.where(id: documents.approved.select(:id)).with_open_cents
           @due = Money.new(open.sum { |document| document.credit? ? -document.amount_due.cents : document.amount_due.cents }, accounting_organization.currency)
         end
@@ -27,7 +28,10 @@ module TudlaAccounting
 
     def show
       respond_to do |format|
-        format.html { @applied = applied(@document) }
+        format.html do
+          @applied = applied(@document)
+          @deliveries = Delivery.where(subject: @document).newest_first.to_a
+        end
         format.pdf { send_pdf(@document.number_label || "draft-#{@document.kind.dasherize}-#{@document.id}", fallback: document_path(@document)) { PdfMaker.document(@document) } }
       end
     end

@@ -7,7 +7,7 @@ module TudlaAccounting
                        "dimension" => "Dimensions", "dimension_value" => "Dimension values",
                        "recurring_entry" => "Recurring entries", "bank_rule" => "Bank rules",
                        "budget" => "Budgets", "tax_return_form" => "Tax returns", "tax_return" => "Tax returns filed",
-                       "contact" => "Contacts", "document" => "Invoices and bills", "payment" => "Payments", "api_token" => "API tokens" }.freeze
+                       "contact" => "Contacts", "document" => "Invoices and bills", "payment" => "Payments", "api_token" => "API tokens", "email" => "Emails" }.freeze
 
     # What an audit event did, in words, linking to its subject while it still exists.
     def activity_description(event)
@@ -74,6 +74,8 @@ module TudlaAccounting
       when "document.updated" then safe_join([ "Changed ", subject, ": #{details.fetch('changes', {}).keys.map { |key| key.delete_suffix('_cents').humanize }.join(', ').downcase}" ])
       when "document.deleted" then safe_join([ "Deleted ", subject ])
       when "document.approved" then safe_join([ "Approved ", subject ])
+      when "email.sent" then safe_join([ "Emailed ", subject, " to #{details['to']}" ])
+      when "email.failed" then safe_join([ "Couldn't email ", subject, " to #{details['to']}: #{details['error']}" ])
       when "api_token.created" then safe_join([ "Issued ", subject, " (#{details['permissions'].to_sentence})" ])
       when "api_token.revoked" then safe_join([ "Revoked ", subject ])
       when "payment.recorded"

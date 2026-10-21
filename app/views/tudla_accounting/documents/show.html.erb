@@ -13,9 +13,10 @@
       <%= button_to "Approve", approve_document_path(@document), class: "tc-btn",
                     form: { data: { controller: "confirm", confirm_message_value: "Approve it? It is numbered and posted, and can then only be voided.", action: "submit->confirm#ask" } } %>
     <% end %>
-  <% elsif @document.approved? && !@document.credit? %>
-    <% if tc_can?(:record) %><%= link_to (sales ? "Credit note" : "Supplier credit"), new_document_path(credit: @document.id), class: "tc-btn tc-btn-secondary" %><% end %>
-    <% if tc_can?(:post) && @document.amount_due.positive? %><%= link_to "Record payment", new_payment_path(document_id: @document.id), class: "tc-btn" %><% end %>
+  <% elsif @document.approved? %>
+    <% if tc_can?(:record) && !@document.credit? %><%= link_to (sales ? "Credit note" : "Supplier credit"), new_document_path(credit: @document.id), class: "tc-btn tc-btn-secondary" %><% end %>
+    <% if tc_can?(:post) && sales %><%= link_to "Email", new_email_path(document_id: @document.id), class: "tc-btn tc-btn-secondary" %><% end %>
+    <% if tc_can?(:post) && !@document.credit? && @document.amount_due.positive? %><%= link_to "Record payment", new_payment_path(document_id: @document.id), class: "tc-btn" %><% end %>
   <% end %>
 <% end %>
 
@@ -27,6 +28,8 @@
 </div>
 
 <%= render "document", document: @document %>
+
+<%= render "tudla_accounting/emails/list", deliveries: @deliveries %>
 
 <% if @applied.any? %>
   <section class="tc-card overflow-x-auto mt-6" aria-labelledby="applied">

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_22_003000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_22_004000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -190,7 +190,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_003000) do
     t.index ["counter_account_id"], name: "index_tudla_accounting_bank_rules_on_counter_account"
     t.index ["organization_type", "organization_id"], name: "index_tudla_accounting_bank_rules_on_organization"
     t.index ["tax_code_id"], name: "index_tudla_accounting_bank_rules_on_tax_code"
-    t.check_constraint "direction IS NULL OR (direction::text = ANY (ARRAY['in'::character varying, 'out'::character varying]::text[]))", name: "tudla_accounting_bank_rules_direction_known"
+    t.check_constraint "direction IS NULL OR (direction::text = ANY (ARRAY['in'::character varying::text, 'out'::character varying::text]))", name: "tudla_accounting_bank_rules_direction_known"
   end
 
   create_table "tudla_accounting_bank_statement_lines", force: :cascade do |t|
@@ -278,8 +278,32 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_003000) do
     t.index ["default_account_id"], name: "index_tudla_accounting_contacts_on_default_account"
     t.index ["default_tax_code_id"], name: "index_tudla_accounting_contacts_on_default_tax_code"
     t.index ["organization_type", "organization_id", "name"], name: "index_tudla_accounting_contacts_on_name"
-    t.check_constraint "kind::text = ANY (ARRAY['customer'::character varying, 'supplier'::character varying, 'both'::character varying]::text[])", name: "tudla_accounting_contacts_kind_known"
+    t.check_constraint "kind::text = ANY (ARRAY['customer'::character varying::text, 'supplier'::character varying::text, 'both'::character varying::text])", name: "tudla_accounting_contacts_kind_known"
     t.check_constraint "payment_terms_days IS NULL OR payment_terms_days >= 0", name: "tudla_accounting_contacts_terms_not_negative"
+  end
+
+  create_table "tudla_accounting_deliveries", force: :cascade do |t|
+    t.string "cc"
+    t.datetime "created_at", null: false
+    t.jsonb "details", default: {}, null: false
+    t.text "error"
+    t.string "kind", null: false
+    t.text "message", null: false
+    t.bigint "organization_id", null: false
+    t.string "organization_type", null: false
+    t.string "requested_by"
+    t.datetime "sent_at"
+    t.integer "stage"
+    t.string "status", default: "queued", null: false
+    t.bigint "subject_id", null: false
+    t.string "subject_line", null: false
+    t.string "subject_type", null: false
+    t.string "to", null: false
+    t.datetime "updated_at", null: false
+    t.index ["organization_type", "organization_id", "created_at"], name: "index_tudla_accounting_deliveries_on_organization"
+    t.index ["subject_type", "subject_id"], name: "index_tudla_accounting_deliveries_on_subject"
+    t.check_constraint "kind::text = ANY (ARRAY['document'::character varying, 'reminder'::character varying, 'statement'::character varying, 'receipt'::character varying, 'payment_notice'::character varying]::text[])", name: "tudla_accounting_deliveries_kind_known"
+    t.check_constraint "status::text = ANY (ARRAY['queued'::character varying, 'sent'::character varying, 'failed'::character varying]::text[])", name: "tudla_accounting_deliveries_status_known"
   end
 
   create_table "tudla_accounting_detail_tags", force: :cascade do |t|
@@ -385,8 +409,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_003000) do
     t.index ["organization_type", "organization_id", "issued_on"], name: "index_tudla_accounting_documents_on_issued_on"
     t.index ["organization_type", "organization_id", "kind", "number"], name: "tudla_accounting_documents_number_unique_key", unique: true, where: "(number IS NOT NULL)"
     t.check_constraint "(status::text = 'draft'::text) = (number IS NULL) AND (status::text = 'draft'::text) = (entry_id IS NULL)", name: "tudla_accounting_documents_numbered_when_approved"
-    t.check_constraint "kind::text = ANY (ARRAY['sales_invoice'::character varying, 'sales_credit'::character varying, 'bill'::character varying, 'supplier_credit'::character varying]::text[])", name: "tudla_accounting_documents_kind_known"
-    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying, 'approved'::character varying, 'void'::character varying]::text[])", name: "tudla_accounting_documents_status_known"
+    t.check_constraint "kind::text = ANY (ARRAY['sales_invoice'::character varying::text, 'sales_credit'::character varying::text, 'bill'::character varying::text, 'supplier_credit'::character varying::text])", name: "tudla_accounting_documents_kind_known"
+    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying::text, 'approved'::character varying::text, 'void'::character varying::text])", name: "tudla_accounting_documents_status_known"
   end
 
   create_table "tudla_accounting_entries", force: :cascade do |t|
@@ -480,8 +504,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_003000) do
     t.index ["organization_type", "organization_id", "idempotency_key"], name: "tudla_accounting_payments_idempotency_key", unique: true, where: "(idempotency_key IS NOT NULL)"
     t.index ["organization_type", "organization_id", "paid_on"], name: "index_tudla_accounting_payments_on_paid_on"
     t.check_constraint "amount_cents > 0", name: "tudla_accounting_payments_amount_positive"
-    t.check_constraint "kind::text = ANY (ARRAY['received'::character varying, 'paid'::character varying]::text[])", name: "tudla_accounting_payments_kind_known"
-    t.check_constraint "status::text = ANY (ARRAY['posted'::character varying, 'void'::character varying]::text[])", name: "tudla_accounting_payments_status_known"
+    t.check_constraint "kind::text = ANY (ARRAY['received'::character varying::text, 'paid'::character varying::text])", name: "tudla_accounting_payments_kind_known"
+    t.check_constraint "status::text = ANY (ARRAY['posted'::character varying::text, 'void'::character varying::text])", name: "tudla_accounting_payments_status_known"
   end
 
   create_table "tudla_accounting_periods", force: :cascade do |t|
@@ -523,7 +547,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_003000) do
     t.index ["active", "next_on"], name: "index_tudla_accounting_recurring_entries_on_active_and_next_on"
     t.index ["organization_type", "organization_id"], name: "index_tudla_accounting_recurring_entries_on_organization"
     t.check_constraint "\"interval\" > 0", name: "tudla_accounting_recurring_entries_interval_positive"
-    t.check_constraint "frequency::text = ANY (ARRAY['weekly'::character varying, 'monthly'::character varying, 'yearly'::character varying]::text[])", name: "tudla_accounting_recurring_entries_frequency_known"
+    t.check_constraint "frequency::text = ANY (ARRAY['weekly'::character varying::text, 'monthly'::character varying::text, 'yearly'::character varying::text])", name: "tudla_accounting_recurring_entries_frequency_known"
   end
 
   create_table "tudla_accounting_recurring_entry_lines", force: :cascade do |t|

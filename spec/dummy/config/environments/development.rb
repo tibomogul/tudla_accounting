@@ -34,7 +34,10 @@ Rails.application.configure do
   config.active_storage.service = :local
 
   # Don't care if the mailer can't send.
-  config.action_mailer.raise_delivery_errors = false
+  # Emails (invoices to customers, say) are written to files in tmp/mails, not sent.
+  config.action_mailer.delivery_method = :file
+  config.action_mailer.file_settings = { location: Rails.root.join("tmp/mails") }
+  config.action_mailer.raise_delivery_errors = true
 
   # Make template changes take effect immediately.
   config.action_mailer.perform_caching = false

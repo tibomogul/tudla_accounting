@@ -33,7 +33,8 @@
       <% @documents.each do |document| %>
         <tr data-document-row>
           <td class="whitespace-nowrap"><%= link_to document.number_label || "Draft", document_path(document), class: "underline" %>
-            <% if document.credit? %><span class="tc-muted text-xs"><%= document.kind_label.downcase %></span><% end %></td>
+            <% if document.credit? %><span class="tc-muted text-xs"><%= document.kind_label.downcase %></span><% end %>
+            <% if @emailed.include?(document.id) %><span class="tc-muted text-xs" title="Emailed" data-emailed>emailed</span><% end %></td>
           <td class="whitespace-nowrap"><%= tc_date(document.issued_on) %></td>
           <td><%= link_to document.contact.name, contact_path(document.contact), class: "underline" %></td>
           <td><%= document.reference %></td>

@@ -1,0 +1,30 @@
+<%# locals: (deliveries:) %>
+<%# The emails of a document, statement or payment, newest first, with how each went. %>
+<% if deliveries.any? %>
+  <section class="tc-card overflow-x-auto mt-6" aria-labelledby="emails" data-emails>
+    <h2 id="emails" class="tc-card-body tc-card-title">Emails</h2>
+    <table class="tc-table">
+      <thead><tr><th>Asked for</th><th>To</th><th>Subject</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>
+        <% deliveries.each do |delivery| %>
+          <tr data-delivery="<%= delivery.status %>">
+            <td class="whitespace-nowrap"><%= delivery.created_at.in_time_zone(TudlaAccounting.configuration.time_zone).strftime("%-d %b %Y %H:%M") %><% if delivery.requested_by %> <span class="tc-muted text-xs">by <%= delivery.requested_by %></span><% end %></td>
+            <td><%= delivery.to %><% if delivery.cc %> <span class="tc-muted text-xs">cc <%= delivery.cc %></span><% end %></td>
+            <td><%= delivery.subject_line %></td>
+            <td>
+              <% if delivery.sent? %><%= tc_badge "Sent #{delivery.sent_at.in_time_zone(TudlaAccounting.configuration.time_zone).strftime("%-d %b %H:%M")}", tone: :success %>
+              <% elsif delivery.failed? %><%= tc_badge "Failed", tone: :danger %> <span class="text-xs text-[var(--tc-danger)]"><%= delivery.error %></span>
+              <% else %><%= tc_badge "Sending", tone: :warning %>
+              <% end %>
+            </td>
+            <td class="text-right">
+              <% if tc_can?(:post) && delivery.status != "queued" %>
+                <%= button_to "Send again", resend_email_path(delivery), class: "tc-btn tc-btn-ghost tc-btn-sm" %>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </section>
+<% end %>

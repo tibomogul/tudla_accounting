@@ -39,6 +39,7 @@ module TudlaAccounting
     document.created document.updated document.deleted document.approved document.voided
     payment.recorded payment.voided
     api_token.created api_token.revoked
+    email.sent email.failed
   ].freeze
 
   # Calls the block with each TudlaAccounting::AuditEvent for an action (or for every
@@ -71,8 +72,9 @@ module TudlaAccounting
                   :parent_controller, :current_organization, :current_actor, :authorize,
                   :cash_account_codes, :tax_basis, :organization_label, :entry_number_format,
                   :attachment_content_types, :attachment_max_size, :document_header,
-                  :api_rate_limit, :api_rate_limit_store, :pdf_browser_options, :pdf_paper, :pdf_stylesheet
-    attr_reader :carrying_amount_sources, :entry_sources, :entry_number_series, :document_number_format
+                  :api_rate_limit, :api_rate_limit_store, :pdf_browser_options, :pdf_paper, :pdf_stylesheet,
+                  :document_mailer, :document_mail_from, :document_mail_reply_to
+    attr_reader :carrying_amount_sources, :entry_sources, :entry_number_series, :document_number_format, :document_email_templates
 
     def initialize
       @base_currency = "USD"
@@ -139,6 +141,52 @@ module TudlaAccounting
       @pdf_browser_options = {}
       @pdf_paper = :A4
       @pdf_stylesheet = nil
+      # Emailing invoices, statements and payments to customers and suppliers: the mailer
+      # (its class name; see DocumentMailer for what one takes), the From and Reply-To
+      # addresses (text, or a callable given the organization; From falls back to the host's
+      # ActionMailer default), and each email's subject and message (see
+      # document_email_templates=).
+      @document_mailer = "TudlaAccounting::DocumentMailer"
+      @document_mail_from = nil
+      @document_mail_reply_to = nil
+      @document_email_templates = DOCUMENT_EMAIL_TEMPLATES
+    end
+
+    # The subject and message each kind of email starts with (they can be changed before
+    # sending). Placeholders are filled in from what is sent: %{organization}, %{contact},
+    # and for invoices and credit notes %{number}, %{kind}, %{total}, %{amount_due},
+    # %{issued_on}, %{due_on}; for statements %{from}, %{thru}, %{balance}; for payments
+    # %{amount}, %{paid_on}, %{reference}.
+    DOCUMENT_EMAIL_TEMPLATES = {
+      "invoice" => { subject: "Invoice %{number} from %{organization}",
+                     body: "Hello %{contact},\n\nPlease find attached invoice %{number} for %{total}, due on %{due_on}.\n\nThank you,\n%{organization}" },
+      "credit_note" => { subject: "Credit note %{number} from %{organization}",
+                         body: "Hello %{contact},\n\nPlease find attached credit note %{number} for %{total}.\n\nThank you,\n%{organization}" },
+      "reminder" => { subject: "Reminder: invoice %{number} is overdue",
+                      body: "Hello %{contact},\n\nInvoice %{number}, due on %{due_on}, still has %{amount_due} owing. A copy is attached. " \
+                            "If you have already paid it, thank you, and please ignore this reminder.\n\nThank you,\n%{organization}" },
+      "statement" => { subject: "Your statement from %{organization}",
+                       body: "Hello %{contact},\n\nPlease find attached your statement for %{from} to %{thru}. The balance is %{balance}.\n\nThank you,\n%{organization}" },
+      "receipt" => { subject: "Receipt for your payment to %{organization}",
+                     body: "Hello %{contact},\n\nThank you for your payment of %{amount} on %{paid_on}. A receipt is attached.\n\n%{organization}" },
+      "payment_notice" => { subject: "Payment from %{organization}",
+                            body: "Hello %{contact},\n\nWe have paid you %{amount} on %{paid_on}. The attached notice shows what it is for.\n\n%{organization}" }
+    }.freeze
+
+    # Templates by kind (above), each { subject:, body: }, merged over the defaults; a kind
+    # given only a subject or body keeps the default other.
+    def document_email_templates=(templates)
+      templates = templates.to_h.transform_keys(&:to_s)
+      unknown = templates.keys - DOCUMENT_EMAIL_TEMPLATES.keys
+      raise ArgumentError, "unknown email template #{unknown.first.inspect}; expected one of #{DOCUMENT_EMAIL_TEMPLATES.keys.join(', ')}" if unknown.any?
+
+      @document_email_templates = DOCUMENT_EMAIL_TEMPLATES.merge(templates) { |_kind, default, given| default.merge(given.to_h.symbolize_keys) }.freeze
+    end
+
+    # A from or reply-to setting's address for an organization, or nil.
+    def document_mail_address(setting, organization)
+      value = public_send(setting)
+      (value.respond_to?(:call) ? value.call(organization) : value).presence
     end
 
     DOCUMENT_NUMBER_FORMAT = { "sales_invoice" => "INV-%<number>04d", "sales_credit" => "CN-%<number>04d",

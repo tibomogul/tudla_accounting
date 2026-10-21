@@ -96,6 +96,16 @@ TudlaAccounting::PdfMaker.payment(payment)
 
 The page is rendered with the engine's styles inline (the host's compiled `tailwind.css`, or the `pdf_stylesheet` setting) and the browser is barred from fetching anything, so making a PDF reaches nothing on the network. `pdf_browser_options` passes options to `Ferrum::Browser` (Chrome's path, a timeout; in a container that can't sandbox Chrome, `browser_options: { "no-sandbox" => nil }`), and `pdf_paper` picks A4 or Letter. A PDF that can't be made raises `PdfMaker::Error`; the pages say why.
 
+### Emailing invoices and credit notes
+An approved invoice or credit note has an **Email** button (`:post`): the email starts from its template, to the contact's email address, and can be changed (To, Cc, subject, message) before it goes. It is recorded (`TudlaAccounting::Delivery`) and sent in the background (`DeliveryJob`, so the host's Active Job backend must run jobs), with the PDF attached when the engine can make PDFs. The document's page lists its emails, who asked for each, and whether it was sent or failed (with the error, and **Send again**); the Sales list marks those emailed; and the activity log has `email.sent` and `email.failed`.
+
+```ruby
+draft = TudlaAccounting::EmailDraft.for_document(invoice) # { kind:, to:, subject_line:, message: }
+TudlaAccounting::Delivery.request!(subject: invoice, **draft, cc: "boss@northwind.test")
+```
+
+Emails go through the host's own ActionMailer setup (delivery method, SMTP), from `document_mail_from` (text, or a callable given the organization; the host's ActionMailer default otherwise) and replying to `document_mail_reply_to`. `document_email_templates` changes each kind's subject and message, with placeholders such as `%{number}`, `%{total}`, `%{amount_due}` and `%{due_on}`. To send them another way, point `document_mailer` at a mailer of your own whose `delivery(delivery, pdf:, filename:)` returns the mail. The dummy app writes them to files in `spec/dummy/tmp/mails` in development.
+
 ### Payments
 `TudlaAccounting::Payment` is money received from a customer (`kind: "received"`) or paid to a supplier (`"paid"`), through a bank or cash account in the organization's currency. `Payment.record!` saves it and posts its entry straight away, dated `paid_on`, with the payment as its source: the bank account against the account marked receivable (or payable), opening a credit for the contact that is applied to the invoices or bills given, as much to each as said. What isn't applied stays as a credit, applied later from the entry's page as any credit is. With `bank_line:` it is matched to that bank statement line too. All or nothing; `ArgumentError` says what's wrong.
 
@@ -517,6 +527,12 @@ TudlaAccounting.configure do |config|
   config.pdf_browser_options = { browser_path: "/usr/bin/chromium", timeout: 60 }
   config.pdf_paper = :A4                  # or :Letter
   config.pdf_stylesheet = nil             # found among the host's assets as tailwind.css; or a path, or ->{ css }
+
+  # Emailing documents to customers and suppliers (sent through the host's ActionMailer setup)
+  config.document_mail_from = ->(organization) { "#{organization.name} <accounts@example.com>" } # or text; the ActionMailer default if nil
+  config.document_mail_reply_to = "accounts@example.com"
+  config.document_email_templates = { invoice: { subject: "Invoice %{number} from %{organization}" } } # over the defaults
+  config.document_mailer = "TudlaAccounting::DocumentMailer" # or one of the host's: delivery(delivery, pdf:, filename:)
 
   # The JSON API (see API.md): requests a minute per token (nil for no limit), and where they're counted
   config.api_rate_limit = 300

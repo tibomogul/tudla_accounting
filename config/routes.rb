@@ -113,6 +113,9 @@ TudlaAccounting::Engine.routes.draw do
   resources :payments, only: %i[show new create] do
     member { post :void }
   end
+  resources :emails, only: %i[new create] do
+    member { post :resend }
+  end
   resources :documents, except: :index do
     member do
       post :approve
