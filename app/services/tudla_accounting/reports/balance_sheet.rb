@@ -11,8 +11,8 @@ module TudlaAccounting
 
       delegate :period, :rows, :total, to: :statement
 
-      def initialize(organization, period)
-        @statement = Statement.new(organization, period, :ending_amount)
+      def initialize(organization, period, accounts: nil)
+        @statement = Statement.new(organization, period, :ending_amount, accounts: accounts)
       end
 
       # Income less expenses from the start of the year to the period end (income and

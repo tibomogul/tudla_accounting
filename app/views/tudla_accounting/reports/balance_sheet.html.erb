@@ -1,10 +1,29 @@
 <%= tc_page_header "Balance sheet", subtitle: (@period ? "As at #{tc_date(@period.thru_date)}" : nil) do %>
-  <% if @period %><%= render "period_picker", url: reports_balance_sheet_path, period: @period, label: "As at the end of" %><% end %>
+  <% if @period %><%= render "period_picker", url: reports_balance_sheet_path, period: @period, label: "As at the end of", compare: true %><% end %>
 <% end %>
 
 <% if @report.nil? %>
   <%= render "no_periods" %>
+<% elsif @comparison %>
+  <% unbalanced = @comparison.reports.reject(&:balanced?) %>
+  <div class="mb-4">
+    <% if unbalanced.empty? %>
+      <%= tc_badge "Balanced at each date: assets equal liabilities plus equity", tone: :success %>
+    <% else %>
+      <% unbalanced.each do |report| %><%= tc_badge "#{comparison_label(report.period, @compare)} out of balance by #{report.difference.abs.format(symbol: false)}", tone: :danger %><% end %>
+    <% end %>
+  </div>
+  <div class="space-y-6">
+    <%= render "comparison_section", comparison: @comparison, category: "asset" %>
+    <%= render "comparison_section", comparison: @comparison, category: "liability" %>
+    <%= render "comparison_section", comparison: @comparison, category: "equity", total_label: "Total equity before current-year earnings" %>
+    <%= render "comparison_figures", comparison: @comparison, figures: [
+          [ :current_year_earnings, "Current-year earnings", false ], [ :total_equity, "Total equity", true ],
+          [ :liabilities_and_equity, "Total liabilities and equity", true ]
+        ] %>
+  </div>
 <% else %>
+  <%= render "nothing_to_compare" if @compare %>
   <div class="mb-4">
     <% if @report.balanced? %>
       <%= tc_badge "Balanced: assets equal liabilities plus equity", tone: :success %>

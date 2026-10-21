@@ -4,14 +4,20 @@ module TudlaAccounting
     def index
     end
 
+    # What a statement can be compared with: the period before, the same period a year
+    # earlier, or each month of the year (up to the period chosen).
+    COMPARISONS = { "previous" => "Previous period", "last_year" => "Same period last year", "months" => "Each month of the year" }.freeze
+
     def balance_sheet
       @period = chosen_period(months)
       @report = Reports::BalanceSheet.new(accounting_organization, @period) if @period
+      @comparison = comparison(Reports::BalanceSheet) if @period
     end
 
     def profit_and_loss
       @period = chosen_period(years + months, default: current_year)
       @report = Reports::ProfitAndLoss.new(accounting_organization, @period) if @period
+      @comparison = comparison(Reports::ProfitAndLoss) if @period
     end
 
     def trial_balance
@@ -111,6 +117,34 @@ module TudlaAccounting
       return choices.find { |period| period.id == params[:period_id].to_i } || raise(ActiveRecord::RecordNotFound) if params[:period_id].present?
 
       default || choices.find { |period| period.includes_date?(Time.current) } || choices.find { |period| period.from_date <= Time.current } || choices.last
+    end
+
+    # The statement for @period beside the periods the compare parameter asks for, or nil
+    # when it asks for none or there is nothing to compare with (@compare says what was
+    # asked for, so the page can say so).
+    def comparison(report_class)
+      @compare = params[:compare].presence_in(COMPARISONS.keys)
+      return unless @compare
+
+      periods = compared_periods(@period)
+      periods.size > 1 ? Reports::Comparison.new(report_class, accounting_organization, periods) : nil
+    end
+
+    # The columns, the chosen period's among them. Beside the previous period or the same
+    # one a year earlier (of the same kind: months beside a month, years beside a year),
+    # the chosen period comes first. For each month, the months of its year in order, up
+    # to the chosen month, or all of them and then the year as a whole when a year was
+    # chosen (its total).
+    def compared_periods(period)
+      peers = organization_scope(Period).at_depth(period.depth).to_a
+      case @compare
+      when "previous" then [ period, peers.select { |peer| peer.thru_date < period.from_date }.max_by(&:from_date) ].compact
+      when "last_year" then [ period, peers.find { |peer| peer.from_date.to_date == period.from_date.to_date.prev_year } ].compact
+      when "months"
+        year = period.root
+        in_year = year.children.order(:from_date).to_a
+        period.root? ? [ *in_year, year ] : in_year.select { |month| month.from_date <= period.from_date }
+      end
     end
 
     def aging(type)

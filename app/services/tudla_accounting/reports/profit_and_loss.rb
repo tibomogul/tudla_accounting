@@ -10,8 +10,8 @@ module TudlaAccounting
 
       delegate :period, :rows, :total, :net_profit, to: :statement
 
-      def initialize(organization, period)
-        @statement = Statement.new(organization, period, :current_amount)
+      def initialize(organization, period, accounts: nil)
+        @statement = Statement.new(organization, period, :current_amount, accounts: accounts)
       end
     end
   end

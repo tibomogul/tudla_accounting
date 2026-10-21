@@ -1,10 +1,17 @@
 <%= tc_page_header "Profit and loss", subtitle: (@period ? "#{tc_date(@period.from_date)} to #{tc_date(@period.thru_date)}" : nil) do %>
-  <% if @period %><%= render "period_picker", url: reports_profit_and_loss_path, period: @period %><% end %>
+  <% if @period %><%= render "period_picker", url: reports_profit_and_loss_path, period: @period, compare: true %><% end %>
 <% end %>
 
 <% if @report.nil? %>
   <%= render "no_periods" %>
+<% elsif @comparison %>
+  <div class="space-y-6">
+    <%= render "comparison_section", comparison: @comparison, category: "income" %>
+    <%= render "comparison_section", comparison: @comparison, category: "expense" %>
+    <%= render "comparison_figures", comparison: @comparison, figures: [ [ :net_profit, "Net profit (loss)", true ] ] %>
+  </div>
 <% else %>
+  <%= render "nothing_to_compare" if @compare %>
   <div class="space-y-6">
     <%= render "section", report: @report, category: "income" %>
     <%= render "section", report: @report, category: "expense" %>

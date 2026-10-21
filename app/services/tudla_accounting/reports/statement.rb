@@ -13,11 +13,13 @@ module TudlaAccounting
 
       attr_reader :organization, :period
 
-      def initialize(organization, period, amount = :ending_amount)
+      # accounts: the organization's accounts in code order, when already loaded (a
+      # Comparison shares them between its periods).
+      def initialize(organization, period, amount = :ending_amount, accounts: nil)
         @organization = organization
         @period = period
         @amount = amount
-        @accounts = TudlaAccounting::Account.where(organization: organization).order(:code).to_a
+        @accounts = accounts || TudlaAccounting::Account.where(organization: organization).order(:code).to_a
         @balances = TudlaAccounting::Balance.peek_all(@accounts, period)
       end
 
@@ -26,7 +28,7 @@ module TudlaAccounting
         children = @accounts.group_by(&:parent_id)
         walk = lambda do |account, depth|
           below = children.fetch(account.id, []).flat_map { |child| walk.call(child, depth + 1) }
-          own = Row.new(account: account, depth: depth, amount: natural(account))
+          own = Row.new(account: account, depth: depth, amount: natural_amount(account))
           own.amount.zero? && below.empty? ? [] : [ own, *below ]
         end
         roots(category).flat_map { |account| walk.call(account, 0) }
@@ -34,7 +36,7 @@ module TudlaAccounting
 
       # The category's total: its top-level accounts, which include their sub-accounts.
       def total(category)
-        roots(category).sum(Money.new(0, organization.currency)) { |account| natural(account) }
+        roots(category).sum(Money.new(0, organization.currency)) { |account| natural_amount(account) }
       end
 
       # Income less expenses for the period.
@@ -47,19 +49,19 @@ module TudlaAccounting
         Money.new(@balances.fetch(account.id).public_send("#{@amount}_cents"), organization.currency)
       end
 
+      # The account's balance on its category's natural side, as the rows show it: a contra
+      # account counts against its category.
+      def natural_amount(account)
+        account.contra? ? -amount_of(account) : amount_of(account)
+      end
+
       def accounts
         @accounts
       end
 
-      private
-
+      # The category's top-level accounts.
       def roots(category)
         @accounts.select { |account| account.parent_id.nil? && account.category == category }
-      end
-
-      # On the category's natural side: a contra account counts against its category.
-      def natural(account)
-        account.contra? ? -amount_of(account) : amount_of(account)
       end
     end
   end
