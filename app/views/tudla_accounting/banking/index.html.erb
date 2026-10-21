@@ -8,9 +8,10 @@
       <thead><tr><th>Account</th><th class="tc-num">Statement lines</th><th>Last line</th><th class="tc-num">To match</th></tr></thead>
       <tbody>
         <% with_statements, others = @accounts.partition { |account| @statements.key?(account.id) } %>
+        <% others = others.select(&:active?) # an inactive account is reconciled no further, unless it was already %>
         <% with_statements.each do |account| %>
           <tr>
-            <td><%= link_to account.code_with_name, banking_account_path(account), class: "underline" %></td>
+            <td><%= link_to account_option_label(account), banking_account_path(account), class: "underline" %></td>
             <td class="tc-num"><%= @statements[account.id][:count] %></td>
             <td><%= tc_date(@statements[account.id][:last]) %></td>
             <td class="tc-num"><% if (count = @unmatched.fetch(account.id, 0)).positive? %><%= tc_badge count.to_s, tone: :warning %><% else %><%= tc_badge "All matched", tone: :success %><% end %></td>

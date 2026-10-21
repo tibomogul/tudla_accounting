@@ -77,6 +77,8 @@ module TudlaAccounting
         errors.add(:account, "is needed for a code with a rate")
       elsif account && account.organization != organization
         errors.add(:account, "must belong to the same organization")
+      elsif account && !account.active? && active? && (will_save_change_to_account_id? || will_save_change_to_active?)
+        errors.add(:account, "is inactive")
       end
     end
   end

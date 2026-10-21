@@ -7,7 +7,7 @@
   <div><%= form.label :status, "Status", class: "tc-label" %><%= form.select :status, [ [ "All", "" ], [ "Drafts", "draft" ], [ "Posted", "posted" ] ], { selected: params[:status] }, class: "tc-input" %></div>
   <div><%= form.label :from, "From", class: "tc-label" %><%= form.date_field :from, value: params[:from], class: "tc-input" %></div>
   <div><%= form.label :thru, "To", class: "tc-label" %><%= form.date_field :thru, value: params[:thru], class: "tc-input" %></div>
-  <div><%= form.label :account_id, "Account", class: "tc-label" %><%= form.select :account_id, [ [ "Any", "" ] ] + organization_accounts.map { |account| [ account.code_with_name, account.id ] }, { selected: params[:account_id] }, class: "tc-input" %></div>
+  <div><%= form.label :account_id, "Account", class: "tc-label" %><%= form.select :account_id, [ [ "Any", "" ] ] + account_filter_options(organization_accounts), { selected: params[:account_id] }, class: "tc-input" %></div>
   <div class="flex gap-2 lg:col-span-6">
     <%= form.submit "Filter", class: "tc-btn tc-btn-secondary", name: nil %>
     <%= link_to "Clear", entries_path, class: "tc-btn tc-btn-ghost" %>

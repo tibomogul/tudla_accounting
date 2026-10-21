@@ -94,10 +94,16 @@ module TudlaAccounting
     validate :validate_structure_unchanged_once_used, on: :update
     validate :validate_role_category
     validate :validate_role_assigned
+    validate :validate_active_parent
+    validate :validate_role_active
+    validate :validate_deactivation, if: -> { will_save_change_to_active?(to: false) }
+
+    # Accounts offered for new entries; inactive ones keep their history.
+    scope :active, -> { where(active: true) }
 
     before_destroy :ensure_deletable, prepend: true
     after_create { audit("account.created") }
-    after_update { audit("account.updated", changes: saved_changes.except("created_at", "updated_at")) if saved_changes.except("created_at", "updated_at").any? }
+    after_update { audit("account.updated", changes: saved_changes.except("created_at", "updated_at")) if !@changing_active && saved_changes.except("created_at", "updated_at").any? }
     after_destroy { audit("account.deleted") }
 
     has_many :balances, dependent: :destroy, class_name: "TudlaAccounting::Balance"
@@ -153,6 +159,69 @@ module TudlaAccounting
       structure_editable? && children.none? && contra_for.nil?
     end
 
+    # Stops offering the account, and every account beneath it, for new entries: they keep
+    # their history and balances, and still show in reports and ledgers. Refused while one
+    # of them holds a role, is where an active tax code posts, or has receivables or
+    # payables still open (see deactivation_blocker). reactivate! offers it again.
+    def deactivate!
+      blocker = deactivation_blocker
+      raise ArgumentError, blocker if blocker
+
+      transaction do
+        closing = subtree.where(active: true).order(ancestry_depth: :desc).to_a # sub-accounts first
+        closing.each { |account| account.change_active!(false) }
+        audit("account.deactivated", sub_accounts: (closing - [ self ]).map(&:code).sort)
+      end
+      reload
+    end
+
+    # Offers an inactive account for new entries again. Its sub-accounts stay as they
+    # are; a sub-account needs its parent active first.
+    def reactivate!
+      blocker = reactivation_blocker
+      raise ArgumentError, blocker if blocker
+
+      transaction do
+        change_active!(true)
+        audit("account.reactivated")
+      end
+    end
+
+    # Why deactivate! would be refused, or nil if it can go ahead.
+    def deactivation_blocker
+      return "#{code_with_name} is inactive already" unless active?
+
+      subtree.where(active: true).order(:code).each do |account|
+        problem = account.own_deactivation_problem
+        return "#{account.code_with_name} #{problem}" if problem
+      end
+      nil
+    end
+
+    # Why reactivate! would be refused, or nil if it can go ahead.
+    def reactivation_blocker
+      if active? then "#{code_with_name} is active already"
+      elsif parent && !parent.active? then "Reactivate #{parent.code_with_name} first"
+      end
+    end
+
+    # Why this account alone can't be made inactive (sub-accounts aside), or nil.
+    def own_deactivation_problem
+      tax_code = TaxCode.where(account: self, active: true).order(:code).first
+      if role then "is the #{role_name} account; move the role to another account first"
+      elsif tax_code then "is where the #{tax_code.code} tax code posts; change its account or make it inactive first"
+      elsif open_items? then "has receivables or payables still open"
+      end
+    end
+
+    # Saves active alone, for deactivate! and reactivate!, which record it themselves.
+    def change_active!(value)
+      @changing_active = true
+      update!(active: value)
+    ensure
+      @changing_active = false
+    end
+
     # Lets this account save a change to its role while the block runs. Only for
     # AccountRoleAssigner, which first runs its checks under the posting lock: any other
     # save that changes a role is refused (validate_role_assigned), including other
@@ -173,6 +242,26 @@ module TudlaAccounting
       AuditEvent.record!(action, organization: organization, subject: self, details: details)
     end
 
+    def open_items?
+      CarryingAmount.joins(:detail).where(tudla_accounting_details: { account_id: id }).includes(:detail, :forex).any? do |carrying_amount|
+        carrying_amount.outstanding.values.any?(&:nonzero?)
+      end
+    end
+
+    # Active accounts sit under active parents, so a parent made inactive takes its
+    # sub-accounts with it (deactivate!), and an account can't be added under one.
+    def validate_active_parent
+      return unless active? && parent && !parent.active?
+      return unless new_record? || will_save_change_to_active? || will_save_change_to_ancestry?
+
+      errors.add(:base, "#{parent.code_with_name} is inactive; reactivate it first")
+    end
+
+    def validate_deactivation
+      problem = own_deactivation_problem || ("has active sub-accounts" if children.where(active: true).exists?)
+      errors.add(:base, "#{code_with_name} #{problem}") if problem
+    end
+
     def validate_known_currency
       errors.add(:currency, "is not a known currency code") if currency.present? && Money::Currency.find(currency).nil?
     end
@@ -189,6 +278,10 @@ module TudlaAccounting
       return if ROLES[role][:categories].include?(category)
 
       errors.add(:role, "needs #{ROLES[role][:needs]} for #{role_name}")
+    end
+
+    def validate_role_active
+      errors.add(:role, "can't be given to an inactive account") if will_save_change_to_role? && role.present? && !active?
     end
 
     def validate_role_assigned

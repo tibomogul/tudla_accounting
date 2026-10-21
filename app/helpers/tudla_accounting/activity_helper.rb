@@ -20,6 +20,9 @@ module TudlaAccounting
       when "account.created" then safe_join([ "Added the account ", subject ])
       when "account.updated" then safe_join([ "Changed ", subject, ": #{details.fetch('changes', {}).keys.map(&:humanize).join(', ').downcase}" ])
       when "account.deleted" then safe_join([ "Deleted the account ", subject ])
+      when "account.deactivated"
+        safe_join([ "Made ", subject, " inactive", (" with #{details['sub_accounts'].to_sentence}" if details["sub_accounts"].present?) ].compact)
+      when "account.reactivated" then safe_join([ "Reactivated ", subject ])
       when "period.created" then safe_join([ "Created the financial year ", subject ])
       when "period.deleted" then safe_join([ "Deleted the financial year ", subject ])
       when "period.closed" then safe_join([ "Closed ", subject ])

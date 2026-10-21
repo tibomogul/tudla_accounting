@@ -23,7 +23,7 @@ module TudlaAccounting
   # commits; see subscribe.
   EVENTS = %w[
     entry.posted entry.reversed entry.deleted entry.attachment_added entry.attachment_removed
-    account.created account.updated account.deleted
+    account.created account.updated account.deleted account.deactivated account.reactivated
     period.created period.deleted period.closed period.reopened
     opening_balances.saved balances.rebuilt
     allocation.created allocation.reversed

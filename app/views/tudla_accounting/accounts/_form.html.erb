@@ -21,10 +21,10 @@
 
   <div class="grid gap-4 sm:grid-cols-2">
     <%= tc_field form, :parent_id, as: :select, label: "Parent account", disabled: locked,
-                 choices: [ [ "None (top level)", "" ] ] + account_choices(accounts, except: account, exclude_descendants: true),
+                 choices: [ [ "None (top level)", "" ] ] + account_choices(accounts, except: account, exclude_descendants: true, selected: account.parent_id),
                  hint: "Must have the same category" %>
     <%= tc_field form, :contra_account_id, as: :select, label: "Contra account for", disabled: locked,
-                 choices: [ [ "Not a contra account", "" ] ] + account_choices(accounts, except: account),
+                 choices: [ [ "Not a contra account", "" ] ] + account_choices(accounts, except: account, selected: account.contra_account_id),
                  hint: "The account this one offsets, e.g. accumulated depreciation offsets equipment" %>
   </div>
 

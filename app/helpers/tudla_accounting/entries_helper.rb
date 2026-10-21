@@ -9,6 +9,13 @@ module TudlaAccounting
       [ entry.number_label, entry.particulars ].compact.join(" ")
     end
 
+    # The accounts a line can choose: the active ones, and any already on the entry.
+    def entry_account_options(entry)
+      used = entry.details.filter_map(&:account_id)
+      TudlaAccounting::Account.where(organization: accounting_organization).active.or(TudlaAccounting::Account.where(id: used))
+        .order(:code).map { |account| [ account_option_label(account), account.id ] }
+    end
+
     # The tax codes a line can choose: the active ones, and any already on the entry. Each
     # carries its rate for the line editor's totals.
     def entry_tax_options(entry)

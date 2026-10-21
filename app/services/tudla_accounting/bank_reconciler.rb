@@ -119,6 +119,7 @@ module TudlaAccounting
     # line keeps the statement's description.
     def create_entry!(line, account:, particulars: nil, rate: nil)
       raise ArgumentError, "Choose another account than the bank account" if account == self.account
+      raise ArgumentError, "#{account.code_with_name} is inactive" unless account.active?
       raise ArgumentError, "That statement line is matched already" if line.matched?
 
       foreign_cents = line.amount_cents.abs

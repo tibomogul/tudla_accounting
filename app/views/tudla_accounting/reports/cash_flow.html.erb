@@ -4,7 +4,7 @@
       <div><%= form.label :from_id, "From", class: "tc-label" %><%= form.select :from_id, @months.map { |month| [ tc_period_label(month), month.id ] }, { selected: @from.id }, class: "tc-input" %></div>
       <div><%= form.label :thru_id, "To", class: "tc-label" %><%= form.select :thru_id, @months.map { |month| [ tc_period_label(month), month.id ] }, { selected: @thru.id }, class: "tc-input" %></div>
       <div><%= form.label :cash_account_ids, "Cash accounts", class: "tc-label" %>
-        <%= form.select :cash_account_ids, @accounts.map { |account| [ account.code_with_name, account.id ] }, { selected: @report.cash_accounts.map(&:id) },
+        <%= form.select :cash_account_ids, account_filter_options(@accounts), { selected: @report.cash_accounts.map(&:id) },
                         multiple: true, size: 3, class: "tc-input min-w-64" %></div>
       <div><%= form.label :method, "Method", class: "tc-label" %>
         <%= form.select :method, [ [ "Direct", "direct" ], [ "Indirect", "indirect" ] ], { selected: @report.flow_method }, class: "tc-input" %></div>

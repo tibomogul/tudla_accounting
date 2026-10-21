@@ -13,7 +13,7 @@
                  disabled: tax_code.persisted? && tax_code.used? %>
     <%= tc_field form, :rate_percent, label: "Rate (%)", inputmode: "decimal", required: true, hint: "0 for tax-free" %>
     <%= tc_field form, :account_id, as: :select, label: "Tax account",
-                 choices: [ [ "None (tax-free)", "" ] ] + tax_accounts.map { |account| [ account.code_with_name, account.id ] },
+                 choices: [ [ "None (tax-free)", "" ] ] + account_choices(tax_accounts, selected: form.object.account_id),
                  hint: "Where the tax is posted" %>
   </div>
   <label class="flex items-center gap-2 text-sm"><%= form.check_box :active %> Active (offered for new lines)</label>

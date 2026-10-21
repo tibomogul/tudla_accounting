@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_21_150000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_21_180000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -50,6 +50,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_150000) do
   end
 
   create_table "tudla_accounting_accounts", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
     t.string "ancestry", default: "/", null: false
     t.integer "ancestry_depth", default: 0, null: false
     t.integer "cash_flow_activity"

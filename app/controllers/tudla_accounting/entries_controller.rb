@@ -114,12 +114,16 @@ module TudlaAccounting
       lines = rows.each_with_index.filter_map do |line, index|
         next if line[:id].blank? && line.values_at(:account_id, :debit, :credit, :description).all?(&:blank?) # an unused blank row
 
+        account = organization_scope(Account).find(line[:account_id]) if line[:account_id].present?
+        if account && !account.active? && line[:_destroy] != "1" && saved_account_id(line) != account.id
+          problems << "Line #{index + 1}: #{account.code_with_name} is inactive"
+        end
         debit = amount_cents(line[:debit], currency) { problems << "Line #{index + 1}: #{line[:debit]} isn't an amount" }
         credit = amount_cents(line[:credit], currency) { problems << "Line #{index + 1}: #{line[:credit]} isn't an amount" }
         problems << "Line #{index + 1} has both a debit and a credit; use one line for each" if debit && credit && line[:_destroy] != "1"
 
         { id: line[:id].presence, _destroy: line[:_destroy],
-          account_id: (organization_scope(Account).find(line[:account_id]).id if line[:account_id].present?),
+          account_id: account&.id,
           tally: (credit && !debit ? Detail::TALLY_CREDIT : Detail::TALLY_DEBIT),
           amount_cents: (debit || credit).to_i, currency: currency }.compact.merge(description: line[:description])
           .merge(tax_code_id: line[:tax_code_id].presence, tax_role: nil) # tagged by tax_lines
@@ -130,6 +134,12 @@ module TudlaAccounting
       attributes = { particulars: permitted[:particulars], reference: permitted[:reference], details_attributes: lines,
                      transacted_at: (day_start(permitted[:transacted_at]) if permitted[:transacted_at].present?) }
       [ attributes, problems ]
+    end
+
+    # The account a saved line of the draft is on: a line keeps an account made inactive
+    # since, though no line can be put on one.
+    def saved_account_id(line)
+      @entry&.details&.find { |detail| detail.persisted? && detail.id.to_s == line[:id].to_s }&.account_id if line[:id].present?
     end
 
     # tags_attributes setting a line's dimension values as chosen: added, changed, or taken

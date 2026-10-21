@@ -1,8 +1,8 @@
 module TudlaAccounting
   class AccountsController < ApplicationController
-    permits :record, only: %i[new create edit update destroy]
+    permits :record, only: %i[new create edit update destroy deactivate reactivate]
 
-    before_action :set_account, only: %i[show edit update destroy]
+    before_action :set_account, only: %i[show edit update destroy deactivate reactivate]
     helper_method :organization_accounts
 
     def index
@@ -53,6 +53,22 @@ module TudlaAccounting
       else
         redirect_to account_path(@account), alert: @account.errors.full_messages.to_sentence
       end
+    end
+
+    def deactivate
+      sub_accounts = @account.descendants.where(active: true).count
+      @account.deactivate!
+      redirect_to account_path(@account), notice: "#{@account.code_with_name}#{" and #{helpers.pluralize(sub_accounts, 'sub-account')}" if sub_accounts.positive?} " \
+                                                  "made inactive: no longer offered for new entries."
+    rescue ArgumentError => e
+      redirect_to account_path(@account), alert: "#{e.message}."
+    end
+
+    def reactivate
+      @account.reactivate!
+      redirect_to account_path(@account), notice: "#{@account.code_with_name} is active again."
+    rescue ArgumentError => e
+      redirect_to account_path(@account), alert: "#{e.message}."
     end
 
     private

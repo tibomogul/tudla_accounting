@@ -24,7 +24,7 @@ module TudlaAccounting
       @suggestions = @reconciler.suggestions
       @unmatched_ledger = @reconciler.unmatched_ledger.to_a
       @ledger_page = Paginator.new(@unmatched_ledger, page: params[:ledger_page], per_page: LEDGER_PAGE)
-      @other_accounts = organization_scope(Account).where.not(id: @account.id).order(:code)
+      @other_accounts = organization_scope(Account).active.where.not(id: @account.id).order(:code)
     end
 
     def import

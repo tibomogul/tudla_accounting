@@ -1,6 +1,6 @@
 <%# locals: (entry:) %>
 <% currency = Money::Currency.new(accounting_organization.currency) %>
-<% account_options = organization_accounts.map { |account| [ account.code_with_name, account.id ] } %>
+<% account_options = entry_account_options(entry) %>
 <% tax_options = entry_tax_options(entry) %>
 <% dimensions = entry_dimensions(entry) %>
 <% extra_columns = (tax_options.any? ? 1 : 0) + dimensions.size %>

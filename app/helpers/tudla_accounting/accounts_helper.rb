@@ -38,11 +38,23 @@ module TudlaAccounting
     end
 
     # Accounts that can be the parent or contra target of this one: the organization's
-    # own, excluding the account and (for parents) anything beneath it.
-    def account_choices(accounts, except: nil, exclude_descendants: false)
+    # own active ones (and the one chosen already), excluding the account and (for
+    # parents) anything beneath it.
+    def account_choices(accounts, except: nil, exclude_descendants: false, selected: nil)
       excluded = except ? [ except.id ] : []
       excluded += except.descendant_ids if except&.persisted? && exclude_descendants
-      accounts.reject { |account| excluded.include?(account.id) }.map { |account| [ account.code_with_name, account.id ] }
+      accounts.select { |account| (account.active? || account.id == selected) && excluded.exclude?(account.id) }
+              .map { |account| [ account_option_label(account), account.id ] }
+    end
+
+    # An account as a choice: "6050 - Printing", marked when inactive.
+    def account_option_label(account)
+      account.active? ? account.code_with_name : "#{account.code_with_name} (inactive)"
+    end
+
+    # Choices for filtering what's already recorded: every account, inactive ones marked.
+    def account_filter_options(accounts)
+      accounts.map { |account| [ account_option_label(account), account.id ] }
     end
   end
 end
