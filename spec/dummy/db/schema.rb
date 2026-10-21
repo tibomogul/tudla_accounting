@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_10_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_21_090000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -45,7 +45,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_100000) do
     t.index ["organization_type", "organization_id"], name: "index_tudla_accounting_accounts_on_organization"
     t.check_constraint "cash_flow_activity IS NULL OR (cash_flow_activity = ANY (ARRAY[0, 1, 2]))", name: "tudla_accounting_accounts_cash_flow_activity_known"
     t.check_constraint "category = ANY (ARRAY[0, 1, 2, 3, 4])", name: "tudla_accounting_accounts_category_known"
-    t.check_constraint "role::text = ANY (ARRAY['receivable'::character varying, 'payable'::character varying, 'retained_earnings'::character varying, 'unrealized_fx_gain'::character varying, 'realized_fx_gain'::character varying]::text[])", name: "tudla_accounting_accounts_role_known"
+    t.check_constraint "role::text = ANY (ARRAY['receivable'::character varying::text, 'payable'::character varying::text, 'retained_earnings'::character varying::text, 'unrealized_fx_gain'::character varying::text, 'realized_fx_gain'::character varying::text])", name: "tudla_accounting_accounts_role_known"
   end
 
   create_table "tudla_accounting_allocations", force: :cascade do |t|
@@ -222,10 +222,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_100000) do
   create_table "tudla_accounting_entries", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "idempotency_key"
+    t.bigint "number"
+    t.string "number_series", default: "", null: false
     t.bigint "organization_id", null: false
     t.string "organization_type", null: false
     t.text "particulars"
     t.datetime "posted_at"
+    t.string "reference"
     t.bigint "related_id"
     t.string "related_type"
     t.bigint "source_id"
@@ -233,11 +236,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_100000) do
     t.datetime "transacted_at"
     t.datetime "updated_at", null: false
     t.index ["organization_type", "organization_id", "idempotency_key"], name: "tudla_accounting_entries_idempotency_key", unique: true, where: "(idempotency_key IS NOT NULL)"
+    t.index ["organization_type", "organization_id", "number_series", "number"], name: "tudla_accounting_entries_number_unique_key", unique: true, where: "(number IS NOT NULL)"
     t.index ["organization_type", "organization_id"], name: "index_tudla_accounting_entries_on_organization"
     t.index ["posted_at"], name: "index_tudla_accounting_entries_on_posted_at"
     t.index ["related_type", "related_id"], name: "index_tudla_accounting_entries_on_related"
     t.index ["source_type", "source_id"], name: "index_tudla_accounting_entries_on_source"
     t.index ["transacted_at"], name: "index_tudla_accounting_entries_on_transacted_at"
+    t.check_constraint "(posted_at IS NULL) = (number IS NULL)", name: "tudla_accounting_entries_numbered_when_posted"
   end
 
   create_table "tudla_accounting_foreign_exchanges", force: :cascade do |t|
@@ -275,6 +280,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_10_100000) do
     t.datetime "updated_at", null: false
     t.index ["ancestry"], name: "index_tudla_accounting_periods_on_ancestry"
     t.index ["organization_type", "organization_id"], name: "index_tudla_accounting_periods_on_organization"
+  end
+
+  create_table "tudla_accounting_sequences", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "last_value", null: false
+    t.string "name", null: false
+    t.bigint "organization_id", null: false
+    t.string "organization_type", null: false
+    t.datetime "updated_at", null: false
+    t.index ["organization_type", "organization_id", "name"], name: "tudla_accounting_sequences_unique_key", unique: true
   end
 
   create_table "tudla_accounting_tax_codes", force: :cascade do |t|

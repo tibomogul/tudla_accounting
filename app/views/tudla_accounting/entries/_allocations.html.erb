@@ -23,7 +23,7 @@
             <% allocations.each do |allocation| %>
               <% other = carrying_amount.credit? ? allocation.to.detail.entry : allocation.from.detail.entry %>
               <tr class="<%= 'tc-muted line-through' unless allocation.active? %>">
-                <td><%= link_to other.particulars, entry_path(other), class: "underline" %></td>
+                <td><%= link_to entry_title(other), entry_path(other), class: "underline" %></td>
                 <td><%= tc_date(allocation.allocated_at) %></td>
                 <td class="tc-num"><%= tc_money(allocation.amount) %><% if allocation.other_currency_cents && carrying_amount.forex %> <span class="tc-muted text-xs">(<%= foreign.call(allocation.other_currency_cents) %>)</span><% end %></td>
                 <td class="text-right">
@@ -50,7 +50,7 @@
           <%= form_with url: allocations_path, class: "grid gap-3 sm:grid-cols-6 items-end" do |form| %>
             <%= form.hidden_field :entry_id, value: entry.id %>
             <div class="sm:col-span-3"><%= form.label :to_id, "Apply to", class: "tc-label" %>
-              <%= form.select :to_id, charges.map { |charge| [ "#{charge.detail.entry.particulars} · owes #{tc_money(charge.amount)}#{" (#{Money.new(charge.forex.other_currency_amount_cents, charge.forex.other_currency).format})" if charge.forex}#{" · due #{tc_date(charge.due_date)}" if charge.due_date}", charge.id ] }, {}, class: "tc-input" %></div>
+              <%= form.select :to_id, charges.map { |charge| [ "#{entry_title(charge.detail.entry)} · owes #{tc_money(charge.amount)}#{" (#{Money.new(charge.forex.other_currency_amount_cents, charge.forex.other_currency).format})" if charge.forex}#{" · due #{tc_date(charge.due_date)}" if charge.due_date}", charge.id ] }, {}, class: "tc-input" %></div>
             <div><%= form.label :amount, (carrying_amount.forex ? "Amount (#{carrying_amount.forex.other_currency} for #{carrying_amount.forex.other_currency} invoices)" : "Amount"), class: "tc-label" %>
               <%= form.text_field :amount, class: "tc-input", inputmode: "decimal", placeholder: "All it can" %></div>
             <div><%= form.label :on, "On", class: "tc-label" %><%= form.date_field :on, value: Date.current, class: "tc-input" %></div>

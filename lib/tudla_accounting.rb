@@ -53,12 +53,15 @@ module TudlaAccounting
     # credit_note/supplier_credit (no cash) are credits applied against it; refund (paid
     # back to a customer) and supplier_refund (paid back by a supplier) use up a credit.
     CARRYING_AMOUNT_ROLES = %i[receivable payable receipt disbursement credit_note supplier_credit refund supplier_refund].freeze
+    # The runs posted entries are numbered in: one per organization, or one per financial
+    # year (or a callable; see entry_number_series=).
+    ENTRY_NUMBER_SERIES = %i[organization financial_year].freeze
 
     attr_accessor :base_currency, :rounding, :time_zone, :organization_class,
                   :due_date_method, :related_party_method, :forex_rate_provider,
                   :parent_controller, :current_organization, :current_actor, :authorize,
-                  :cash_account_codes, :tax_basis, :organization_label
-    attr_reader :carrying_amount_sources, :entry_sources
+                  :cash_account_codes, :tax_basis, :organization_label, :entry_number_format
+    attr_reader :carrying_amount_sources, :entry_sources, :entry_number_series
 
     def initialize
       @base_currency = "USD"
@@ -91,7 +94,49 @@ module TudlaAccounting
       # How error messages and warnings name an organization (one with no account marked
       # for a role, say), e.g. ->(organization) { organization.name }
       @organization_label = ->(organization) { "#{organization.class.name} #{organization.id}" }
+      # Which run of numbers a posted entry is numbered in; see entry_number_series=.
+      @entry_number_series = :organization
+      # How a posted entry's number is shown: a format string given number and series
+      # (e.g. "JE-%{series}-%<number>05d"), or a callable given the entry.
+      @entry_number_format = "#%{number}"
       @entry_sources = {}
+    end
+
+    # The run of numbers posted entries are numbered in, each counted from 1:
+    # :organization (one run, the default), :financial_year (restarting each year; the
+    # series is the year it ends in, e.g. "2027" for July 2026 to June 2027), or a
+    # callable given the entry being posted and returning the series, e.g.
+    #   ->(entry) { entry.source_type == "Invoice" ? "INV" : "JE" }
+    # It can change at any time: entries already posted keep their numbers, and each
+    # series counts on its own.
+    def entry_number_series=(series)
+      unless series.respond_to?(:call) || ENTRY_NUMBER_SERIES.include?(series)
+        raise ArgumentError, "unknown entry number series #{series.inspect}; expected one of #{ENTRY_NUMBER_SERIES.map(&:inspect).join(', ')} or a callable"
+      end
+
+      @entry_number_series = series
+    end
+
+    # The series an entry being posted is numbered in (see entry_number_series=).
+    def entry_number_series_for(entry)
+      case entry_number_series
+      when :organization then ""
+      when :financial_year
+        year = Period.periods_for_date(entry.organization, entry.posted_at).roots.first
+        (year ? year.thru_date : entry.posted_at.in_time_zone(time_zone)).to_date.year.to_s
+      else entry_number_series.call(entry).to_s
+      end
+    end
+
+    # A posted entry's number as shown (see entry_number_format), or nil for a draft.
+    def entry_number_label(entry)
+      return unless entry.number
+
+      if entry_number_format.respond_to?(:call)
+        entry_number_format.call(entry).to_s
+      else
+        format(entry_number_format, number: entry.number, series: entry.number_series)
+      end
     end
 
     # The cash flow statement's cash account codes for an organization: the

@@ -114,6 +114,7 @@ class Demo::Seeder
       tax = net / 10
       income = %w[4010 4020].sample(random: random)
       entry.particulars = "Invoice #{@invoice_number += 1} – #{CUSTOMERS.sample(random: random)} (#{accounts[income].name.downcase})"
+      entry.reference = "INV-#{@invoice_number}"
       line(entry, bank, :debit, net + tax)
       sale = line(entry, accounts[income], :credit, net, tax_code: @gst, tax_role: :base)
       sale.tags.build(dimension_value: @teams.sample(random: random))

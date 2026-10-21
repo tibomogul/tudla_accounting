@@ -133,7 +133,7 @@ RSpec.describe "Accounts", type: :request do
       get routes.account_path(account("1010"), from: in_year(3, 1).to_date, thru: in_year(3, 31).to_date)
 
       ledger = css_select("table")[1].css("tbody tr").map { |row| row.css("td").map { |cell| cell.text.squish } }
-      expect(ledger).to eq([ [ in_year(3, 20).strftime("%-d %b %Y"), "4000 from 1010", "", "30.00", "470.00" ] ])
+      expect(ledger).to eq([ [ in_year(3, 20).strftime("%-d %b %Y"), "#3 4000 from 1010", "", "30.00", "470.00" ] ])
     end
 
     it "says when nothing was posted in the dates" do

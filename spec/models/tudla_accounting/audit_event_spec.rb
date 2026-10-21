@@ -28,7 +28,7 @@ RSpec.describe TudlaAccounting::AuditEvent, type: :model do
   it "records posting, reversing and deleting drafts" do
     entry = draft
     entry.post(entry.transacted_at)
-    expect(last_event).to have_attributes(action: "entry.posted", subject: entry, subject_label: "Capital in", details: { "posted_at" => "2026-03-01T00:00:00Z" })
+    expect(last_event).to have_attributes(action: "entry.posted", subject: entry, subject_label: "#1 Capital in", details: { "posted_at" => "2026-03-01T00:00:00Z" })
 
     reversal = entry.reverse!(on: Date.new(2026, 3, 5))
     expect(described_class.where(action: "entry.reversed").sole).to have_attributes(subject: entry, details: { "reversal_id" => reversal.id, "on" => "2026-03-05" })

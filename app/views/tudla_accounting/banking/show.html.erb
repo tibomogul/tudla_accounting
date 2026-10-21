@@ -64,12 +64,12 @@
               <td>
                 <% if line.matched? %>
                   <div class="flex flex-wrap items-center gap-2">
-                    <% line.details.each do |detail| %><%= link_to detail.entry.particulars, entry_path(detail.entry), class: "underline" %><% end %>
+                    <% line.details.each do |detail| %><%= link_to entry_title(detail.entry), entry_path(detail.entry), class: "underline" %><% end %>
                     <% if tc_can?(:post) %><%= button_to "Unmatch", unmatch_bank_statement_line_path(line, show: params[:show]), class: "tc-btn tc-btn-ghost tc-btn-sm" %><% end %>
                   </div>
                 <% elsif (suggested = @suggestions[line]) %>
                   <div class="flex flex-wrap items-center gap-2">
-                    <span class="tc-muted text-sm">Suggested: <%= link_to "#{suggested.entry.particulars} (#{tc_date(suggested.entry.posted_at)})", entry_path(suggested.entry), class: "underline" %></span>
+                    <span class="tc-muted text-sm">Suggested: <%= link_to "#{entry_title(suggested.entry)} (#{tc_date(suggested.entry.posted_at)})", entry_path(suggested.entry), class: "underline" %></span>
                     <% if tc_can?(:post) %><%= button_to "Match", match_bank_statement_line_path(line, show: params[:show]), params: { "detail_ids[]" => suggested.id }, class: "tc-btn tc-btn-secondary tc-btn-sm" %><% end %>
                   </div>
                 <% elsif tc_can?(:post) %>
@@ -80,7 +80,7 @@
                       <% if candidates.any? %>
                         <%= form_with url: match_bank_statement_line_path(line, show: params[:show]), class: "flex flex-wrap items-end gap-2" do |form| %>
                           <div><%= form.label "detail_ids_#{line.id}", "Ledger lines that add up to it", class: "tc-label" %>
-                            <%= select_tag "detail_ids[]", options_for_select(candidates.map { |detail| [ "#{tc_date(detail.entry.posted_at)} #{detail.entry.particulars} #{Money.new(@reconciler.bank_cents(detail), @reconciler.currency).format(symbol: false)}", detail.id ] }),
+                            <%= select_tag "detail_ids[]", options_for_select(candidates.map { |detail| [ "#{tc_date(detail.entry.posted_at)} #{entry_title(detail.entry)} #{Money.new(@reconciler.bank_cents(detail), @reconciler.currency).format(symbol: false)}", detail.id ] }),
                                            multiple: true, id: "detail_ids_#{line.id}", class: "tc-input min-w-72", size: [ candidates.size, 4 ].min %></div>
                           <%= form.submit "Match", class: "tc-btn tc-btn-secondary tc-btn-sm" %>
                         <% end %>
@@ -123,7 +123,7 @@
           <% @ledger_page.records.each do |detail| %>
             <tr>
               <td class="whitespace-nowrap"><%= tc_date(detail.entry.posted_at) %></td>
-              <td><%= link_to detail.entry.particulars, entry_path(detail.entry), class: "underline" %></td>
+              <td><%= link_to entry_title(detail.entry), entry_path(detail.entry), class: "underline" %></td>
               <td class="tc-num"><%= (cents = @reconciler.bank_cents(detail)) ? tc_money(Money.new(cents, @reconciler.currency)) : tag.span("no #{@reconciler.currency} amount", class: "tc-muted") %></td>
             </tr>
           <% end %>

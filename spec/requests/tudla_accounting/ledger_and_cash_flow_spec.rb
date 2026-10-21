@@ -46,8 +46,8 @@ RSpec.describe "General ledger and cash flow pages", type: :request do
         expect(response.body).to include("1 Feb 2026 to 28 Feb 2026")
         bank = css_select("table").find { |table| table.text.include?("1010 - Bank") }
         expect(bank.css("tbody tr").map { |row| row.css("td").map { |cell| cell.text.squish } }).to eq([
-          [ "1 Feb 2026", "Opening balance", "", "", "1,000.00" ], [ "10 Feb 2026", "1010/4000", "250.00", "", "1,250.00" ],
-          [ "10 Feb 2026", "1500/1010", "", "400.00", "850.00" ], [ "28 Feb 2026", "Closing balance", "", "", "850.00" ]
+          [ "1 Feb 2026", "Opening balance", "", "", "1,000.00" ], [ "10 Feb 2026", "#2 1010/4000", "250.00", "", "1,250.00" ],
+          [ "10 Feb 2026", "#3 1500/1010", "", "400.00", "850.00" ], [ "28 Feb 2026", "Closing balance", "", "", "850.00" ]
         ])
         expect([ total("debits"), total("credits") ]).to eq([ "650.00", "650.00" ])
       end
@@ -60,7 +60,7 @@ RSpec.describe "General ledger and cash flow pages", type: :request do
         get routes.reports_general_ledger_path(format: :csv, account_id: account("1500").id, from_id: month(1).id, thru_id: month(2).id)
         expect(response.media_type).to eq("text/csv")
         expect(response.headers["Content-Disposition"]).to include("general-ledger-2026-01-01-to-2026-02-28.csv")
-        expect(CSV.parse(response.body).map { |row| row[3] }).to eq([ "Entry", "Opening balance", "1500/1010", "Closing balance" ])
+        expect(CSV.parse(response.body).map { |row| row[5] }).to eq([ "Entry", "Opening balance", "1500/1010", "Closing balance" ])
       end
 
       it "shows a page of lines at a time, continuing an account across pages" do

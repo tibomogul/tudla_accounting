@@ -32,7 +32,7 @@ module TudlaAccounting
     def self.label_for(object)
       case object
       when nil, String then object
-      when Entry then object.particulars
+      when Entry then [ object.number_label, object.particulars ].compact.join(" ")
       when Account then object.code_with_name
       when Period, Allocation, TaxCode, BankStatementLine, Dimension, DimensionValue then object.label
       else

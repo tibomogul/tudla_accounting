@@ -18,7 +18,13 @@ A `TudlaAccounting::Entry` is made up of `Detail` lines. Each line is a debit or
 
 An entry can point at a `source` record in the host app, such as the invoice it came from, and a `related` entry, such as the invoice a payment settles. A line can carry a `ForeignExchange` record holding the foreign-currency amount and rate.
 
-`Entry.create_from_ruby_hash` builds an entry from plain data. You give account codes and **signed** amounts, and it works out whether each line is a debit or credit from the account's normal side. Positive increases the account; negative decreases it.
+**Numbers and references.** Posting gives an entry the next **journal number** of its series (`number`, shown by `number_label`, e.g. `#42`). Drafts have none, and posted entries are never deleted, so the numbers have no gaps; a post that is rolled back gives its number back. Two settings choose how entries are numbered and shown, and both can change at any time: entries already posted keep their numbers, and each series counts from 1 on its own.
+- `entry_number_series`: `:organization` (one run per organization, the default), `:financial_year` (restarting each year; the series is the year it ends in, e.g. `"2027"` for July 2026 to June 2027), or a callable given the entry being posted, e.g. `->(entry) { entry.source_type == "Invoice" ? "INV" : "JE" }`.
+- `entry_number_format`: a format string given `number` and `series` (default `"#%{number}"`; e.g. `"JE-%{series}-%<number>05d"` for `JE-2027-00042`), or a callable given the entry.
+
+An entry's `reference` is free text from elsewhere, such as a cheque number or the supplier's invoice number. Like the rest of an entry, both are fixed once it is posted; a reversal keeps the reference and takes its own number. The entries page searches particulars, references and numbers (`42`, `#42` or `JE-00042`).
+
+`Entry.create_from_ruby_hash` builds an entry from plain data (with an optional `reference:`). You give account codes and **signed** amounts, and it works out whether each line is a debit or credit from the account's normal side. Positive increases the account; negative decreases it.
 
 ### Posting and balances
 `entry.post(posted_at)` posts every line to the period that contains `posted_at`, then stamps the entry. The whole post is one transaction: if any line fails, nothing is posted. Posting an entry twice raises `ArgumentError`. Posts lock the organization's row while they run, so concurrent posts for the same organization take turns instead of overwriting each other's balance updates; other organizations aren't blocked. Each account has one `TudlaAccounting::Balance` per period, holding starting, current and ending amounts. Posting:
@@ -67,7 +73,7 @@ The entry form has a Tax column once the organization has tax codes: the totals 
 By default tax counts when its lines are posted (accrual basis). With `basis: :cash` (or the `tax_basis` setting, or the page's Basis choice) it counts when money changes hands: entries that open no receivable or payable count when posted, while an invoice's, bill's or taxed credit note's tax counts in proportion as payments and credits are applied to it (by its foreign amount when it has one), back out if one is taken off, and the reversal of an invoice or bill isn't counted.
 
 ### General ledger and cash flow
-`Reports::GeneralLedger.new(organization, from: month, thru: month, account_ids: nil)` lists, for every account lines are posted to (or the ones chosen), the opening balance, each posted line with a running balance on the account's own side, and the closing balance; `to_csv` writes it out. Reports → General ledger shows it and downloads the CSV.
+`Reports::GeneralLedger.new(organization, from: month, thru: month, account_ids: nil)` lists, for every account lines are posted to (or the ones chosen), the opening balance, each posted line with a running balance on the account's own side, and the closing balance; `to_csv` writes it out, with each line's entry number and reference. Reports → General ledger shows it and downloads the CSV.
 
 `Reports::CashFlow.new(organization, from:, thru:, cash_accounts: nil)` is a direct-method cash flow statement: each posted entry that moves cash is attributed to its other lines, grouped by their account's **cash flow activity** — operating, investing or financing, set on the account (inherited from its parent when blank; equity defaults to financing, everything else to operating). Moves between cash accounts cancel out, and `reconciles?` checks that opening cash plus the net change is the closing cash. Cash is the `cash_accounts` given or the `cash_account_codes` setting (each with its sub-accounts); Reports → Cash flow lets you pick them too. With `method: :indirect` (the page's Method choice) it starts instead from the net profit and adds each other balance-sheet account's change over the time, by its activity (receivables growing take cash, payables growing give it); income and expense accounts all count in the net profit, so set accumulated depreciation's activity to operating to show depreciation added back there. Both methods come from the same posted lines and give the same totals.
 
@@ -154,7 +160,7 @@ Mounted at `/accounting` by the install generator (see [Integration](#integratio
 
 - **Dashboard:** profit this year, what is owed each way, draft entries, recent entries, and a getting-started checklist.
 - **Accounts:** the chart of accounts as a tree with closing balances. Each account page shows monthly balances and a ledger with running balances. You can create, edit and delete unused accounts.
-- **Entries:** search and filter entries, write drafts with a line editor that keeps live debit/credit totals, post them, and reverse posted entries. A posted payment or credit note shows what it was applied to and what is left, with forms to apply it to the party's open invoices or bills (or oldest first) and to take an allocation off; an invoice or bill shows what was applied to it. Reversing a payment takes it off what it settled and reverses its realized exchange difference. An invoice or bill can be reversed once nothing is applied to it, which closes its receivable or payable.
+- **Entries:** search entries (by particulars, reference or number) and filter them, write drafts with a line editor that keeps live debit/credit totals, post them, and reverse posted entries. A posted payment or credit note shows what it was applied to and what is left, with forms to apply it to the party's open invoices or bills (or oldest first) and to take an allocation off; an invoice or bill shows what was applied to it. Reversing a payment takes it off what it settled and reverses its realized exchange difference. An invoice or bill can be reversed once nothing is applied to it, which closes its receivable or payable.
 - **Banking:** import bank statements, see where the books and the bank stand on a date, match statement lines to the books (suggested matches in one click), post entries for bank fees and the like, and see what is in the books but not yet on a statement.
 - **Reports:** balance sheet, profit and loss, trial balance, receivables and payables aging, a tax summary for a run of months, profit and loss by dimension, a cash flow statement, and the general ledger (also as CSV).
 - **Periods:** create calendar or fiscal years, see each year's months, and close or reopen them (reopening asks for a reason).
@@ -323,6 +329,10 @@ TudlaAccounting.configure do |config|
   # or a callable given the organization, for books whose charts differ (a bookkeeper's clients):
   # config.cash_account_codes = ->(organization) { organization.cash_account_codes }
   config.organization_label = ->(organization) { organization.name } # names it in errors (default: class and id)
+
+  # Journal numbers, given when entries are posted (see numbers and references)
+  config.entry_number_series = :organization # or :financial_year, or ->(entry) { "series" }
+  config.entry_number_format = "#%{number}"  # or "JE-%{series}-%<number>05d", or ->(entry) { ... }
 
   # Receivables and payables (carrying amounts). Off until the organization has an
   # account marked receivable or payable: entries still post normally, but no

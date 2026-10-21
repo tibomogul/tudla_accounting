@@ -4,6 +4,11 @@ module TudlaAccounting
       entry.posted? ? tc_badge("Posted #{tc_date(entry.posted_at)}", tone: :success) : tc_badge("Draft", tone: :warning)
     end
 
+    # The entry's journal number and particulars, e.g. "#42 Office rent" (a draft has no number).
+    def entry_title(entry)
+      [ entry.number_label, entry.particulars ].compact.join(" ")
+    end
+
     # The tax codes a line can choose: the active ones, and any already on the entry. Each
     # carries its rate for the line editor's totals.
     def entry_tax_options(entry)

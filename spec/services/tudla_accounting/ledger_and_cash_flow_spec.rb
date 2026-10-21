@@ -72,10 +72,11 @@ RSpec.describe "General ledger and cash flow", type: :service do
 
     it "writes a CSV with opening and closing rows" do
       csv = CSV.parse(TudlaAccounting::Reports::GeneralLedger.new(organization, from: month(3), thru: month(3), account_ids: [ account("6000").id ]).to_csv)
-      expect(csv).to eq([ [ "Date", "Account code", "Account", "Entry", "Debit", "Credit", "Balance" ],
-                          [ "2026-03-01", "6000", "Rent", "Opening balance", nil, nil, "0.00" ],
-                          [ "2026-03-10", "6000", "Rent", "Rent", "100.00", nil, "100.00" ],
-                          [ "2026-03-31", "6000", "Rent", "Closing balance", nil, nil, "100.00" ] ])
+      rent = TudlaAccounting::Entry.find_by!(organization: organization, particulars: "Rent")
+      expect(csv).to eq([ [ "Date", "Entry no.", "Reference", "Account code", "Account", "Entry", "Debit", "Credit", "Balance" ],
+                          [ "2026-03-01", nil, nil, "6000", "Rent", "Opening balance", nil, nil, "0.00" ],
+                          [ "2026-03-10", "##{rent.number}", nil, "6000", "Rent", "Rent", "100.00", nil, "100.00" ],
+                          [ "2026-03-31", nil, nil, "6000", "Rent", "Closing balance", nil, nil, "100.00" ] ])
     end
   end
 

@@ -55,18 +55,19 @@ module TudlaAccounting
         accounts.sum(zero) { |section| section.lines.filter_map(&:credit).sum(zero) }
       end
 
-      # Date, Account code, Account, Entry, Debit, Credit, Balance; an opening and a closing
-      # row per account.
+      # Date, Entry no., Reference, Account code, Account, Entry, Debit, Credit, Balance;
+      # an opening and a closing row per account.
       def to_csv
         CSV.generate do |csv|
-          csv << [ "Date", "Account code", "Account", "Entry", "Debit", "Credit", "Balance" ]
+          csv << [ "Date", "Entry no.", "Reference", "Account code", "Account", "Entry", "Debit", "Credit", "Balance" ]
           accounts.each do |section|
             account = section.account
-            csv << [ from.from_date.to_date.iso8601, account.code, account.name, "Opening balance", nil, nil, plain(section.opening) ]
+            csv << [ from.from_date.to_date.iso8601, nil, nil, account.code, account.name, "Opening balance", nil, nil, plain(section.opening) ]
             section.lines.each do |line|
-              csv << [ line.date.to_date.iso8601, account.code, account.name, line.entry.particulars, plain(line.debit), plain(line.credit), plain(line.balance) ]
+              csv << [ line.date.to_date.iso8601, line.entry.number_label, line.entry.reference, account.code, account.name, line.entry.particulars,
+                       plain(line.debit), plain(line.credit), plain(line.balance) ]
             end
-            csv << [ thru.thru_date.to_date.iso8601, account.code, account.name, "Closing balance", nil, nil, plain(section.closing) ]
+            csv << [ thru.thru_date.to_date.iso8601, nil, nil, account.code, account.name, "Closing balance", nil, nil, plain(section.closing) ]
           end
         end
       end

@@ -54,7 +54,7 @@
       <% @recent_entries.each do |entry| %>
         <tr>
           <td class="whitespace-nowrap w-32"><%= tc_date(entry.transacted_at) %></td>
-          <td><%= link_to entry.particulars, entry_path(entry) %></td>
+          <td><%= link_to entry_title(entry), entry_path(entry) %></td>
           <td><%= entry_status_badge(entry) %></td>
           <td class="tc-num"><%= tc_money(entry_total(entry)) %></td>
         </tr>

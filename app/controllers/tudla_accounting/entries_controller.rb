@@ -9,7 +9,7 @@ module TudlaAccounting
 
     def index
       entries = organization_scope(Entry).includes(:details).order(transacted_at: :desc, id: :desc)
-      entries = entries.where("particulars ILIKE ?", "%#{Entry.sanitize_sql_like(params[:q])}%") if params[:q].present?
+      entries = search(entries, params[:q].strip) if params[:q].present?
       entries = entries.where(posted_at: nil) if params[:status] == "draft"
       entries = entries.where.not(posted_at: nil) if params[:status] == "posted"
       entries = entries.where(transacted_at: day_start(params[:from])..) if params[:from].present?
@@ -76,6 +76,15 @@ module TudlaAccounting
 
     private
 
+    # Entries whose particulars or reference contain the text, or numbered as typed: "42",
+    # "#42" or "JE-00042" (any prefix, without spaces, then the number).
+    def search(entries, text)
+      pattern = "%#{Entry.sanitize_sql_like(text)}%"
+      found = entries.where("particulars ILIKE :pattern OR reference ILIKE :pattern", pattern: pattern)
+      number = text[/\A[^\d\s]*(\d+)\z/, 1]
+      number ? found.or(entries.where(number: number.to_i)) : found
+    end
+
     def organization_accounts
       organization_scope(Account).order(:code)
     end
@@ -96,7 +105,7 @@ module TudlaAccounting
     # The form's lines, with separate debit and credit columns, as detail attributes, and
     # anything wrong with them that the model can't tell (e.g. both columns filled in).
     def entry_attributes
-      permitted = params.require(:entry).permit(:particulars, :transacted_at, :tax_inclusive, lines: [ :id, :account_id, :debit, :credit, :tax_code_id, :_destroy, { dimensions: {} } ])
+      permitted = params.require(:entry).permit(:particulars, :reference, :transacted_at, :tax_inclusive, lines: [ :id, :account_id, :debit, :credit, :tax_code_id, :_destroy, { dimensions: {} } ])
       currency = accounting_organization.currency
       problems = []
       rows = permitted.fetch(:lines, {}).to_h.values
@@ -116,7 +125,7 @@ module TudlaAccounting
       end
       lines += tax_lines(lines, permitted[:tax_inclusive] == "1", currency)
 
-      attributes = { particulars: permitted[:particulars], details_attributes: lines,
+      attributes = { particulars: permitted[:particulars], reference: permitted[:reference], details_attributes: lines,
                      transacted_at: (day_start(permitted[:transacted_at]) if permitted[:transacted_at].present?) }
       [ attributes, problems ]
     end

@@ -13,8 +13,9 @@
     </div>
   <% end %>
 
-  <div class="tc-card tc-card-body grid gap-4 sm:grid-cols-4">
+  <div class="tc-card tc-card-body grid gap-4 sm:grid-cols-6">
     <div class="sm:col-span-3"><%= tc_field form, :particulars, required: true, placeholder: "What the entry records" %></div>
+    <div class="sm:col-span-2"><%= tc_field form, :reference, placeholder: "Cheque or invoice number" %></div>
     <div class="space-y-1">
       <%= form.label :transacted_at, "Date", class: "tc-label" %>
       <%= form.date_field :transacted_at, value: entry.transacted_at&.to_date, class: "tc-input", required: true %>

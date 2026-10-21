@@ -1,4 +1,4 @@
-<%= tc_page_header @entry.particulars, subtitle: "Dated #{tc_date(@entry.transacted_at)}" do %>
+<%= tc_page_header @entry.particulars, subtitle: [ @entry.number_label, "Dated #{tc_date(@entry.transacted_at)}" ].compact.join(" · ") do %>
   <% if @entry.draft? %>
     <% if tc_can?(:post) %><%= button_to "Post", post_entry_path(@entry), class: "tc-btn" %><% end %>
     <% if tc_can?(:record) %>
@@ -11,11 +11,14 @@
 
 <div class="flex flex-wrap items-center gap-2 mb-4">
   <%= entry_status_badge(@entry) %>
+  <% if @entry.reference %>
+    <span class="tc-muted text-sm">Reference <%= @entry.reference %></span>
+  <% end %>
   <% if @entry.related.is_a?(TudlaAccounting::Entry) %>
-    <span class="tc-muted text-sm">Related to <%= link_to @entry.related.particulars, entry_path(@entry.related), class: "underline" %></span>
+    <span class="tc-muted text-sm">Related to <%= link_to entry_title(@entry.related), entry_path(@entry.related), class: "underline" %></span>
   <% end %>
   <% if (reversal = @entry.reversal) %>
-    <span class="tc-muted text-sm">Reversed by <%= link_to reversal.particulars, entry_path(reversal), class: "underline" %></span>
+    <span class="tc-muted text-sm">Reversed by <%= link_to entry_title(reversal), entry_path(reversal), class: "underline" %></span>
   <% end %>
   <% if @entry.source_type.present? %>
     <span class="tc-muted text-sm">From <%= @entry.source_type %> #<%= @entry.source_id %></span>

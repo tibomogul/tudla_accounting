@@ -38,6 +38,7 @@ def purge(organization)
     TudlaAccounting::DimensionValue.where(dimension: dimensions).delete_all
     dimensions.delete_all
     scope.call(TudlaAccounting::AuditEvent).delete_all
+    scope.call(TudlaAccounting::Sequence).delete_all
     scope.call(TudlaAccounting::Account).update_all(contra_account_id: nil)
     scope.call(TudlaAccounting::Account).delete_all
     scope.call(TudlaAccounting::Period).delete_all

@@ -12,7 +12,10 @@ module TudlaAccounting
 
     accepts_nested_attributes_for :details, allow_destroy: true
 
+    normalizes :reference, with: ->(reference) { reference.strip.presence }
+
     validates :particulars, presence: true
+    validates :reference, length: { maximum: 255 }
     validate :has_one_currency?
     validate :has_credit_amounts?
     validate :has_debit_amounts?
@@ -20,6 +23,7 @@ module TudlaAccounting
     validate :unchanged_once_posted, on: :update
 
     before_validation :set_detail_organizations
+    before_save :assign_number, if: -> { posted_at.present? && number.nil? }
     before_destroy :ensure_draft, prepend: true
     after_destroy { AuditEvent.record!("entry.deleted", organization: organization, subject: self) }
 
@@ -29,6 +33,12 @@ module TudlaAccounting
 
     def draft?
       !posted?
+    end
+
+    # The journal number as shown (the entry_number_format setting), e.g. "#42"; nil
+    # until posted.
+    def number_label
+      TudlaAccounting.configuration.entry_number_label(self)
     end
 
     # The posted entry that reverses this one, if any.
@@ -76,7 +86,7 @@ module TudlaAccounting
       at = ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].local(on.year, on.month, on.day)
       transaction do
         reversing = self.class.new(organization: organization, related: self, transacted_at: at,
-                                   particulars: "#{REVERSAL_PREFIX}#{particulars}")
+                                   particulars: "#{REVERSAL_PREFIX}#{particulars}", reference: reference)
         details.each do |detail|
           line = reversing.details.build(account: detail.account, amount_cents: detail.amount_cents, currency: detail.currency,
                                          tally: detail.debit? ? Detail::TALLY_CREDIT : Detail::TALLY_DEBIT,
@@ -136,6 +146,7 @@ module TudlaAccounting
       end
 
       raise ArgumentError, "particulars must be a string" unless hash[:particulars].is_a?(String)
+      raise ArgumentError, "reference must be a string" unless hash[:reference].nil? || hash[:reference].is_a?(String)
 
       raise ArgumentError, "details must be an array" unless hash[:details].is_a?(Array)
       raise ArgumentError, "details must have at least 2 elements" unless hash[:details].length >= 2
@@ -197,6 +208,7 @@ module TudlaAccounting
         source_type: hash[:source_type],
         source_id: hash[:source_id],
         particulars: hash[:particulars],
+        reference: hash[:reference],
         transacted_at: transacted_at,
         idempotency_key: key,
         details_attributes: details_attributes
@@ -333,6 +345,13 @@ module TudlaAccounting
       credit_amount_total = credit_amounts.inject(Money.new(0, organization.currency)) { |sum, credit_amount| sum + credit_amount.amount }
       debit_amount_total = debit_amounts.inject(Money.new(0, organization.currency)) { |sum, debit_amount| sum + debit_amount.amount }
       credit_amount_total - debit_amount_total
+    end
+
+    # The next number in the entry's series, when it is posted (or created posted). The
+    # sequence's row lock keeps concurrent posts in turn, whatever else they lock.
+    def assign_number
+      self.number_series = TudlaAccounting.configuration.entry_number_series_for(self)
+      self.number = Sequence.next!(organization, "entry:#{number_series}")
     end
 
     def set_detail_organizations

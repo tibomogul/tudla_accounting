@@ -45,27 +45,38 @@ RSpec.describe "Entries", type: :request do
     it "lists entries newest first with their status and amount" do
       get routes.entries_path
       expect(rows).to eq([
-        [ on(4).strftime("%-d %b %Y"), "Another sale", "Posted #{on(4).strftime('%-d %b %Y')}", "80.00" ],
-        [ on(3).strftime("%-d %b %Y"), "Cash sale", "Draft", "120.00" ],
-        [ on(2).strftime("%-d %b %Y"), "Capital contribution", "Posted #{on(2).strftime('%-d %b %Y')}", "500.00" ]
+        [ on(4).strftime("%-d %b %Y"), "#2", "Another sale", "Posted #{on(4).strftime('%-d %b %Y')}", "80.00" ],
+        [ on(3).strftime("%-d %b %Y"), "", "Cash sale", "Draft", "120.00" ],
+        [ on(2).strftime("%-d %b %Y"), "#1", "Capital contribution", "Posted #{on(2).strftime('%-d %b %Y')}", "500.00" ]
       ])
     end
 
     it "filters by text, status, dates and account (including sub-accounts)" do
       get routes.entries_path(q: "SALE")
-      expect(rows.map(&:second)).to eq([ "Another sale", "Cash sale" ])
+      expect(rows.map(&:third)).to eq([ "Another sale", "Cash sale" ])
 
       get routes.entries_path(status: "draft")
-      expect(rows.map(&:second)).to eq([ "Cash sale" ])
+      expect(rows.map(&:third)).to eq([ "Cash sale" ])
 
       get routes.entries_path(status: "posted", from: on(3, 1).to_date, thru: on(4, 30).to_date)
-      expect(rows.map(&:second)).to eq([ "Another sale" ])
+      expect(rows.map(&:third)).to eq([ "Another sale" ])
 
       get routes.entries_path(account_id: account("3000").id)
-      expect(rows.map(&:second)).to eq([ "Capital contribution" ])
+      expect(rows.map(&:third)).to eq([ "Capital contribution" ])
 
       get routes.entries_path(account_id: account("1000").id)
       expect(rows.size).to eq(3)
+    end
+
+    it "finds entries by reference or number" do
+      TudlaAccounting::Entry.find_by!(particulars: "Cash sale").update!(reference: "CHQ-1001")
+
+      get routes.entries_path(q: "chq-10")
+      expect(rows.map(&:third)).to eq([ "Cash sale CHQ-1001" ])
+      [ "2", "#2", "JE-00002" ].each do |number|
+        get routes.entries_path(q: number)
+        expect(rows.map(&:third)).to eq([ "Another sale" ])
+      end
     end
 
     it "says when nothing matches, and leaves other organizations' entries out" do
@@ -91,12 +102,12 @@ RSpec.describe "Entries", type: :request do
     end
 
     it "saves debit and credit columns as a draft, ignoring blank lines" do
-      post routes.entries_path, params: { entry: { particulars: "Owner's capital", transacted_at: on(2).to_date.iso8601,
+      post routes.entries_path, params: { entry: { particulars: "Owner's capital", reference: "Deed 12", transacted_at: on(2).to_date.iso8601,
                                                    lines: lines([ "1010", "1,500.50", "" ], [ "3000", "", "1500.5" ], [ nil, "", "" ]) } }
 
       created = TudlaAccounting::Entry.last
       expect(response).to redirect_to(routes.entry_path(created))
-      expect(created).to have_attributes(particulars: "Owner's capital", posted_at: nil, transacted_at: on(2).beginning_of_day, organization: organization)
+      expect(created).to have_attributes(particulars: "Owner's capital", reference: "Deed 12", posted_at: nil, transacted_at: on(2).beginning_of_day, organization: organization)
       expect(created.details.map { |line| [ line.account.code, line.tally, line.amount ] }).to contain_exactly([ "1010", "debit", aud("1500.50") ], [ "3000", "credit", aud("1500.50") ])
       expect(TudlaAccounting::Balance.count).to eq(0)
       follow_redirect!
@@ -203,7 +214,7 @@ RSpec.describe "Entries", type: :request do
 
     it "offers reversing instead of editing" do
       get routes.entry_path(posted)
-      expect(response.body).to include("Posted", "Reverse on")
+      expect(response.body).to include("Posted", "Reverse on", "#1 · Dated")
       expect(css_select("form button").map(&:text)).not_to include("Post", "Delete")
     end
 

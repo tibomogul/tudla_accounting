@@ -51,7 +51,7 @@ RSpec.describe "Applying payments", type: :request do
 
     expect(total("left_to_apply")).to eq("Left to apply: 450.00")
     expect(response.body).to include("Nothing applied yet.")
-    expect(css_select("#to_id option").map(&:text)).to eq([ "Invoice 2 · owes 200.00 · due 15 Mar 2026", "Invoice 1 · owes 300.00 · due 31 Mar 2026" ])
+    expect(css_select("#to_id option").map(&:text)).to eq([ "#2 Invoice 2 · owes 200.00 · due 15 Mar 2026", "#1 Invoice 1 · owes 300.00 · due 31 Mar 2026" ])
   end
 
   it "applies part of it to a chosen invoice, then the rest oldest first, and takes one off" do
@@ -64,15 +64,15 @@ RSpec.describe "Applying payments", type: :request do
     expect([ open_item(inv1).amount_cents, open_item(inv2).amount_cents, open_item(pay).amount_cents ]).to eq([ 50_00, 0, 0 ])
 
     get routes.entry_path(pay)
-    expect(rows).to eq([ [ "Invoice 1", "21 Mar 2026", "120.00", "Take off" ], [ "Invoice 2", "22 Mar 2026", "200.00", "Take off" ],
-                         [ "Invoice 1", "22 Mar 2026", "130.00", "Take off" ] ])
+    expect(rows).to eq([ [ "#1 Invoice 1", "21 Mar 2026", "120.00", "Take off" ], [ "#2 Invoice 2", "22 Mar 2026", "200.00", "Take off" ],
+                         [ "#1 Invoice 1", "22 Mar 2026", "130.00", "Take off" ] ])
     expect(css_select("#to_id")).to be_empty # nothing left to apply
 
     first = TudlaAccounting::Allocation.order(:id).first
     post routes.reverse_allocation_path(first), params: { on: "2026-03-23" }
     expect(flash[:notice]).to eq("Took 120.00 off Invoice 1.")
     get routes.entry_path(pay)
-    expect(rows.first).to eq([ "Invoice 1", "21 Mar 2026", "120.00", "Taken off 23 Mar 2026" ])
+    expect(rows.first).to eq([ "#1 Invoice 1", "21 Mar 2026", "120.00", "Taken off 23 Mar 2026" ])
     expect(total("left_to_apply")).to eq("Left to apply: 120.00")
 
     post routes.reverse_allocation_path(first)
@@ -80,7 +80,7 @@ RSpec.describe "Applying payments", type: :request do
 
     get routes.entry_path(inv1)
     expect(total("still_owed")).to eq("Still owed: 170.00")
-    expect(rows.map(&:first)).to eq([ "Payment 1", "Payment 1" ])
+    expect(rows.map(&:first)).to eq([ "#3 Payment 1", "#3 Payment 1" ])
 
     get routes.activity_path(kind: "allocation")
     expect(css_select("tbody tr td:last-child").map { |cell| cell.text.squish }.first(2))
@@ -129,7 +129,7 @@ RSpec.describe "Applying payments", type: :request do
     post routes.allocations_path, params: { entry_id: eur_pay.id, to_id: open_item(eur_inv).id, amount: "60", on: "2026-03-12" }
     expect(TudlaAccounting::Allocation.last).to have_attributes(amount_cents: 96_00, other_currency_cents: 60_00)
     get routes.entry_path(eur_pay)
-    expect(rows).to eq([ [ "Invoice EUR", "12 Mar 2026", "96.00 (€60,00)", "Take off" ] ])
+    expect(rows).to eq([ [ "#4 Invoice EUR", "12 Mar 2026", "96.00 (€60,00)", "Take off" ] ])
   end
 
   it "shows what a refund paid back" do
@@ -139,7 +139,7 @@ RSpec.describe "Applying payments", type: :request do
     get routes.entry_path(back)
     expect(css_select("#allocations-heading").text).to eq("Credits paid back")
     expect(total("still_owed")).to eq("Not matched to a credit: 0.00")
-    expect(rows.map(&:first)).to eq([ "Payment 1" ])
+    expect(rows.map(&:first)).to eq([ "#3 Payment 1" ])
   end
 
   it "refuses another organization's allocation" do

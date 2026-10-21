@@ -46,12 +46,12 @@ RSpec.describe "Activity", type: :request do
       expect(descriptions).to eq([
         "Deleted the financial year 2030", "Created the financial year 2030", "Rebuilt the balances: 0 balances corrected",
         "Saved the opening balances at 1 Jan 2026", "Reopened Jan 2026: “Late receipt”", "Closed Jan 2026",
-        "Changed 1000 - Cash at bank: name", "Reversed Capital in on 5 Mar 2026", "Posted Reversal of: Capital in",
-        "Posted Capital in", "Added the account 3100 - Capital", "Added the account 1000 - Cash", "Created the financial year 2026"
+        "Changed 1000 - Cash at bank: name", "Reversed #1 Capital in on 5 Mar 2026", "Posted #2 Reversal of: Capital in",
+        "Posted #1 Capital in", "Added the account 3100 - Capital", "Added the account 1000 - Cash", "Created the financial year 2026"
       ])
-      expect(rows.find { |row| row.last == "Posted Capital in" }[1]).to eq("Demo user")
+      expect(rows.find { |row| row.last == "Posted #1 Capital in" }[1]).to eq("Demo user")
       expect(rows.first[1]).to eq("System")
-      expect(css_select("a[href='#{routes.entry_path(entry)}']").map(&:text)).to include("Capital in")
+      expect(css_select("a[href='#{routes.entry_path(entry)}']").map(&:text)).to include("#1 Capital in")
       expect(css_select("a[href='#{routes.period_path(year)}']").map(&:text)).to include("Jan 2026", "2026")
       expect(css_select("a[href='#{routes.account_path(account('1000'))}']").map(&:text)).to include("1000 - Cash at bank")
       expect(css_select("a").map(&:text)).not_to include("2030")

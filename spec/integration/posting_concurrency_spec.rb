@@ -27,6 +27,7 @@ RSpec.describe "Concurrent posting" do
     scope.call(TudlaAccounting::Account).delete_all
     scope.call(TudlaAccounting::Period).delete_all
     scope.call(TudlaAccounting::AuditEvent).delete_all
+    scope.call(TudlaAccounting::Sequence).delete_all
     Organization.where(id: org_ids).delete_all
   end
 
@@ -67,6 +68,8 @@ RSpec.describe "Concurrent posting" do
     end
     4.times { gate << :go }
     workers.each { |worker| expect(worker.join(30)).to be_truthy }
+
+    expect(entries.map { |entry| entry.reload.number }.sort).to eq((1..12).to_a) # each its own, no gaps
 
     total = entries.sum { |entry| entry.details.first.amount_cents }
     year = TudlaAccounting::Period.roots.find_by(organization: org)

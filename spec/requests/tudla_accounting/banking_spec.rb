@@ -125,7 +125,7 @@ RSpec.describe "Banking", type: :request do
       get routes.banking_account_path(bank)
       fee_row = css_select("##{ActionView::RecordIdentifier.dom_id(line('Account fee'))}").first
       expect(fee_row.text).to include("Match or record it", "Record it as spent on")
-      expect(fee_row.css("select[name='detail_ids[]'] option").map(&:text)).to eq([ "20 Mar 2026 Cheque 7 -30.00" ])
+      expect(fee_row.css("select[name='detail_ids[]'] option").map(&:text)).to eq([ "20 Mar 2026 #2 Cheque 7 -30.00" ])
     end
 
     it "reports what is wrong with an import" do
