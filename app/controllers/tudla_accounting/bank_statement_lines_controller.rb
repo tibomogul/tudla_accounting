@@ -2,7 +2,7 @@ module TudlaAccounting
   # Matching one statement line on the banking page, taking a match off, or posting an
   # entry for it. See BankReconciler.
   class BankStatementLinesController < ApplicationController
-    permits :post, only: %i[match unmatch create_entry]
+    permits :post, only: %i[match unmatch create_entry record_by_rule]
 
     before_action :set_line
 
@@ -27,6 +27,17 @@ module TudlaAccounting
       done "Posted #{entry.particulars} and matched it."
     rescue ArgumentError, ActiveRecord::RecordInvalid, ActionController::ParameterMissing => e
       done alert: "No entry was posted: #{e.message.downcase_first}."
+    end
+
+    # Records the line by the bank rule that suggests it.
+    def record_by_rule
+      rule = @reconciler.rule_suggestions[@line]
+      return done alert: "No rule suggests how to record #{@line.description}." unless rule
+
+      entry = @reconciler.record_by_rule!(@line, rule)
+      done "Posted #{entry.particulars} and matched it."
+    rescue ArgumentError, ActiveRecord::RecordInvalid => e
+      done alert: "It was not recorded: #{e.message.downcase_first}."
     end
 
     private

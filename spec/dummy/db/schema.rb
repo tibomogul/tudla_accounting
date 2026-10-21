@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_21_200000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_21_210000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -148,6 +148,30 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_200000) do
     t.datetime "updated_at", null: false
     t.index ["bank_statement_line_id"], name: "index_tudla_accounting_bank_matches_on_bank_statement_line_id"
     t.index ["detail_id"], name: "index_tudla_accounting_bank_matches_on_detail_id", unique: true
+  end
+
+  create_table "tudla_accounting_bank_rules", force: :cascade do |t|
+    t.bigint "account_id"
+    t.boolean "active", default: true, null: false
+    t.bigint "amount_max_cents"
+    t.bigint "amount_min_cents"
+    t.bigint "counter_account_id", null: false
+    t.datetime "created_at", null: false
+    t.string "description_contains", null: false
+    t.bigint "dimension_value_ids", default: [], null: false, array: true
+    t.string "direction"
+    t.string "name", null: false
+    t.bigint "organization_id", null: false
+    t.string "organization_type", null: false
+    t.string "particulars"
+    t.integer "position", default: 0, null: false
+    t.bigint "tax_code_id"
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_tudla_accounting_bank_rules_on_account"
+    t.index ["counter_account_id"], name: "index_tudla_accounting_bank_rules_on_counter_account"
+    t.index ["organization_type", "organization_id"], name: "index_tudla_accounting_bank_rules_on_organization"
+    t.index ["tax_code_id"], name: "index_tudla_accounting_bank_rules_on_tax_code"
+    t.check_constraint "direction IS NULL OR (direction::text = ANY (ARRAY['in'::character varying, 'out'::character varying]::text[]))", name: "tudla_accounting_bank_rules_direction_known"
   end
 
   create_table "tudla_accounting_bank_statement_lines", force: :cascade do |t|
@@ -394,6 +418,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_200000) do
   add_foreign_key "tudla_accounting_bank_account_balances", "tudla_accounting_accounts", column: "account_id"
   add_foreign_key "tudla_accounting_bank_matches", "tudla_accounting_bank_statement_lines", column: "bank_statement_line_id"
   add_foreign_key "tudla_accounting_bank_matches", "tudla_accounting_details", column: "detail_id"
+  add_foreign_key "tudla_accounting_bank_rules", "tudla_accounting_accounts", column: "account_id"
+  add_foreign_key "tudla_accounting_bank_rules", "tudla_accounting_accounts", column: "counter_account_id"
+  add_foreign_key "tudla_accounting_bank_rules", "tudla_accounting_tax_codes", column: "tax_code_id"
   add_foreign_key "tudla_accounting_bank_statement_lines", "tudla_accounting_accounts", column: "account_id"
   add_foreign_key "tudla_accounting_carrying_amount_forexes", "tudla_accounting_carrying_amounts", column: "carrying_amount_id"
   add_foreign_key "tudla_accounting_carrying_amounts", "tudla_accounting_details", column: "detail_id"

@@ -64,10 +64,15 @@ module TudlaAccounting
       errors.add(:kind, "can't change once lines are taxed under it; add a new code instead") if kind_changed? && used?
     end
 
+    # Taxed lines keep their code; recurring entries and bank rules refer to it.
     def ensure_unused
-      return unless used?
+      problem = if used? then "Lines are taxed under #{code}; make it inactive instead"
+      elsif RecurringEntryLine.where(tax_code_id: id).exists? || BankRule.where(tax_code_id: id).exists?
+        "Recurring entries or bank rules use #{code}; change them first"
+      end
+      return unless problem
 
-      errors.add(:base, "Lines are taxed under #{code}; make it inactive instead")
+      errors.add(:base, problem)
       throw :abort
     end
 

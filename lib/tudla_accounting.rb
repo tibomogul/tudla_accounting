@@ -31,6 +31,7 @@ module TudlaAccounting
     bank_statement.imported bank_line.matched bank_line.unmatched
     dimension.created dimension.updated dimension_value.created dimension_value.updated
     recurring_entry.created recurring_entry.updated recurring_entry.deleted recurring_entry.generated
+    bank_rule.created bank_rule.updated bank_rule.deleted
   ].freeze
 
   # Calls the block with each TudlaAccounting::AuditEvent for an action (or for every

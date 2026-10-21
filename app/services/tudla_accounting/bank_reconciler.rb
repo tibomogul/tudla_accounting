@@ -117,10 +117,15 @@ module TudlaAccounting
     # bank line carries the statement amount as its foreign amount, as does the other line
     # when its account is held in the same currency. Given other particulars, the bank
     # line keeps the statement's description.
-    def create_entry!(line, account:, particulars: nil, rate: nil)
+    #
+    # With a tax_code the statement's amount includes the tax, which is split out onto the
+    # code's account (not for a foreign-currency account); the other line is tagged with
+    # dimension_values.
+    def create_entry!(line, account:, particulars: nil, rate: nil, tax_code: nil, dimension_values: [])
       raise ArgumentError, "Choose another account than the bank account" if account == self.account
       raise ArgumentError, "#{account.code_with_name} is inactive" unless account.active?
       raise ArgumentError, "That statement line is matched already" if line.matched?
+      raise ArgumentError, "Tax can't be split from a #{currency} statement line; record it without a tax code" if tax_code && foreign?
 
       foreign_cents = line.amount_cents.abs
       rate = foreign? ? rate_for(line, rate) : nil
@@ -130,19 +135,52 @@ module TudlaAccounting
         at = ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].local(line.occurred_on.year, line.occurred_on.month, line.occurred_on.day)
         money_in = line.amount_cents.positive?
         entry = Entry.new(organization: @organization, transacted_at: at, particulars: particulars.presence || line.description)
-        [ [ self.account, money_in ], [ account, !money_in ] ].each do |each_account, debit|
-          detail = entry.details.build(account: each_account, tally: debit ? Detail::TALLY_DEBIT : Detail::TALLY_CREDIT, amount_cents: cents,
-                                       currency: @organization.currency)
-          detail.description = line.description if each_account == self.account && entry.particulars != line.description
-          if rate && each_account.currency == self.account.currency
-            detail.build_foreign_exchange(other_currency: currency, other_currency_cents: foreign_cents, rate: rate)
-          end
+        bank = entry_line(entry, self.account, money_in, cents, rate, foreign_cents)
+        bank.description = line.description if entry.particulars != line.description
+        tax_cents = tax_code ? tax_code.tax_cents(cents, inclusive: true) : 0
+        counter = entry_line(entry, account, !money_in, cents - tax_cents, rate, foreign_cents)
+        counter.assign_attributes(tax_code: tax_code, tax_role: :base) if tax_code
+        dimension_values.each { |value| counter.tags.build(dimension_value: value) }
+        if tax_cents.positive?
+          entry.details.build(account: tax_code.account, tally: counter.tally, amount_cents: tax_cents, currency: @organization.currency, tax_code: tax_code, tax_role: :tax)
         end
         entry.save!
         entry.post(at)
         match!(line, [ entry.details.find { |detail| detail.account_id == self.account.id } ])
         entry
       end
+    end
+
+    # { statement line => BankRule } for the unmatched lines with no suggested ledger line
+    # (see suggestions) that one of the organization's active rules for this account
+    # matches: the first in order.
+    def rule_suggestions(ledger_suggested: suggestions.keys)
+      rules = BankRule.active.in_order.where(organization: @organization).where(account_id: [ nil, account.id ]).includes(:counter_account, :tax_code).to_a
+      return {} if rules.empty?
+
+      skip = ledger_suggested.to_set
+      statement_lines.unmatched.order(:occurred_on, :id).each_with_object({}) do |line, found|
+        next if skip.include?(line)
+
+        rule = rules.find { |candidate| candidate.matches?(line) }
+        found[line] = rule if rule
+      end
+    end
+
+    # Records every line rule_suggestions has by its rule. { recorded: [entry, ...],
+    # problems: ["line: why", ...] }: a line that can't be (no rate for a foreign one, say)
+    # is left, and the rest go ahead.
+    def record_by_rules!
+      rule_suggestions.each_with_object({ recorded: [], problems: [] }) do |(line, rule), result|
+        result[:recorded] << record_by_rule!(line, rule)
+      rescue ArgumentError, ActiveRecord::RecordInvalid => e
+        result[:problems] << "#{line.description}: #{e.message.downcase_first}"
+      end
+    end
+
+    # Posts the entry a rule says for a statement line, and matches it (create_entry!).
+    def record_by_rule!(line, rule)
+      create_entry!(line, account: rule.counter_account, particulars: rule.particulars, tax_code: rule.tax_code, dimension_values: rule.dimension_values.to_a)
     end
 
     # Whether the books agree with the bank as at a date. The book balance (opening
@@ -166,6 +204,14 @@ module TudlaAccounting
     end
 
     private
+
+    # A line of an entry for a statement line: on the bank account (or, held in the same
+    # currency, another) with the statement's amount as its foreign amount.
+    def entry_line(entry, account, debit, cents, rate, foreign_cents)
+      detail = entry.details.build(account: account, tally: debit ? Detail::TALLY_DEBIT : Detail::TALLY_CREDIT, amount_cents: cents, currency: @organization.currency)
+      detail.build_foreign_exchange(other_currency: currency, other_currency_cents: foreign_cents, rate: rate) if rate && account.currency == self.account.currency
+      detail
+    end
 
     def book_balance_cents(as_of)
       first_year = Period.roots.where(organization: @organization).order(:from_date).first

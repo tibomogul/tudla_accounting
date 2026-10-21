@@ -4,9 +4,9 @@ module TudlaAccounting
   class BankingController < ApplicationController
     LEDGER_PAGE = 100 # ledger lines not yet on a statement, per page
     FORMAT_NAMES = { csv: "CSV", ofx: "OFX", camt053: "CAMT.053" }.freeze
-    permits :post, only: %i[import match_suggestions]
+    permits :post, only: %i[import match_suggestions record_by_rules]
 
-    before_action :set_account, only: %i[show import match_suggestions]
+    before_action :set_account, only: %i[show import match_suggestions record_by_rules]
 
     def index
       @accounts = organization_scope(Account).where(category: [ Account::CATEGORY_ASSET, Account::CATEGORY_LIABILITY ]).order(:code)
@@ -23,6 +23,7 @@ module TudlaAccounting
       lines = @reconciler.statement_lines.includes(bank_matches: { detail: :entry }).order(occurred_on: :desc, id: :desc)
       @page = Paginator.new(@show_all ? lines : lines.unmatched, page: params[:page])
       @suggestions = @reconciler.suggestions
+      @rule_suggestions = @reconciler.rule_suggestions(ledger_suggested: @suggestions.keys)
       @unmatched_ledger = @reconciler.unmatched_ledger.to_a
       @ledger_page = Paginator.new(@unmatched_ledger, page: params[:ledger_page], per_page: LEDGER_PAGE)
       @other_accounts = organization_scope(Account).active.where.not(id: @account.id).order(:code)
@@ -35,6 +36,14 @@ module TudlaAccounting
                                                           "#{"; #{result[:skipped]} already imported" if result[:skipped].positive?}."
     rescue ArgumentError, CSV::MalformedCSVError, ActionController::ParameterMissing => e
       redirect_to banking_account_path(@account), alert: "The statement was not imported: #{e.message.downcase_first}."
+    end
+
+    # Records every line a bank rule suggests, by its rule.
+    def record_by_rules
+      result = BankReconciler.new(@account).record_by_rules!
+      flash[:notice] = "Recorded #{helpers.pluralize(result[:recorded].size, 'statement line')} by their rules." if result[:recorded].any?
+      flash[:alert] = "Some weren't recorded: #{result[:problems].to_sentence}." if result[:problems].any?
+      redirect_to banking_account_path(@account)
     end
 
     def match_suggestions

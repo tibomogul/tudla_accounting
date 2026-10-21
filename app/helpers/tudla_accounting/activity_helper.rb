@@ -5,7 +5,7 @@ module TudlaAccounting
                        "allocation" => "Payments applied", "tax_code" => "Tax codes",
                        "bank_statement" => "Statement imports", "bank_line" => "Bank matches",
                        "dimension" => "Dimensions", "dimension_value" => "Dimension values",
-                       "recurring_entry" => "Recurring entries" }.freeze
+                       "recurring_entry" => "Recurring entries", "bank_rule" => "Bank rules" }.freeze
 
     # What an audit event did, in words, linking to its subject while it still exists.
     def activity_description(event)
@@ -45,6 +45,9 @@ module TudlaAccounting
       when "recurring_entry.updated" then safe_join([ "Changed the recurring entry ", subject, ": #{details.fetch('changes', {}).keys.map(&:humanize).join(', ').downcase}" ])
       when "recurring_entry.deleted" then safe_join([ "Deleted the recurring entry ", subject ])
       when "recurring_entry.generated" then safe_join([ "Made the entry for #{tc_date(details['on'])} from ", subject ])
+      when "bank_rule.created" then safe_join([ "Added the bank rule ", subject ])
+      when "bank_rule.updated" then safe_join([ "Changed the bank rule ", subject, ": #{details.fetch('changes', {}).keys.map(&:humanize).join(', ').downcase}" ])
+      when "bank_rule.deleted" then safe_join([ "Deleted the bank rule ", subject ])
       when "balances.rebuilt" then rebuilt_description(details)
       end
     end
@@ -96,6 +99,7 @@ module TudlaAccounting
       when TaxCode then edit_tax_code_path(subject)
       when Allocation then entry_path(subject.from.detail.entry_id)
       when RecurringEntry then recurring_entry_path(subject)
+      when BankRule then edit_bank_rule_path(subject)
       end
       path ? link_to(event.subject_label, path, class: "underline") : event.subject_label.to_s
     end

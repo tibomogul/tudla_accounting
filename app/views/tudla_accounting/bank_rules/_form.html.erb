@@ -1,0 +1,58 @@
+<%# locals: (bank_rule:) %>
+<% currency = accounting_organization.currency %>
+<% plain = ->(cents) { cents && Money.new(cents, currency).format(symbol: false, thousands_separator: "") } %>
+<%= form_with model: bank_rule, scope: :bank_rule, url: (bank_rule.persisted? ? bank_rule_path(bank_rule) : bank_rules_path), class: "space-y-4 max-w-3xl" do |form| %>
+  <% if bank_rule.errors.any? %>
+    <div class="tc-alert tc-alert-danger" role="alert">
+      <ul class="list-disc pl-4"><% bank_rule.errors.full_messages.uniq.each do |message| %><li><%= message %></li><% end %></ul>
+    </div>
+  <% end %>
+
+  <div class="tc-card tc-card-body grid gap-4 sm:grid-cols-4">
+    <div class="sm:col-span-3"><%= tc_field form, :name, required: true, placeholder: "Software subscriptions" %></div>
+    <div><%= tc_field form, :position, as: :number_field, label: "Order", hint: "Lower first" %></div>
+  </div>
+
+  <fieldset class="tc-card tc-card-body grid gap-4 sm:grid-cols-4">
+    <legend class="tc-card-title px-1">A statement line</legend>
+    <div class="sm:col-span-2"><%= tc_field form, :description_contains, label: "Whose description contains", required: true, placeholder: "ADOBE", hint: "Upper or lower case alike" %></div>
+    <div class="sm:col-span-2"><%= tc_field form, :account_id, as: :select, label: "On the bank account",
+                                            choices: [ [ "Any", "" ] ] + account_choices(bank_accounts, selected: bank_rule.account_id) %></div>
+    <div class="sm:col-span-2"><%= tc_field form, :direction, as: :select, label: "That is", choices: [ [ "Money in or out", "" ], [ "Money in", "in" ], [ "Money out", "out" ] ] %></div>
+    <div class="space-y-1">
+      <%= form.label :amount_min, "Of at least (#{currency})", class: "tc-label" %>
+      <%= form.text_field :amount_min, value: plain.call(bank_rule.amount_min_cents), inputmode: "decimal", class: "tc-input" %>
+    </div>
+    <div class="space-y-1">
+      <%= form.label :amount_max, "And at most", class: "tc-label" %>
+      <%= form.text_field :amount_max, value: plain.call(bank_rule.amount_max_cents), inputmode: "decimal", class: "tc-input" %>
+    </div>
+  </fieldset>
+
+  <fieldset class="tc-card tc-card-body grid gap-4 sm:grid-cols-4">
+    <legend class="tc-card-title px-1">Is recorded</legend>
+    <div class="sm:col-span-2"><%= tc_field form, :counter_account_id, as: :select, label: "Against the account", required: true,
+                                            choices: [ [ "Choose an account", "" ] ] + account_choices(rule_accounts, selected: bank_rule.counter_account_id) %></div>
+    <% if (tax_options = entry_tax_options([ bank_rule ])).any? %>
+      <div class="sm:col-span-2">
+        <%= form.label :tax_code_id, "Taxed under", class: "tc-label" %>
+        <%= form.select :tax_code_id, options_for_select(tax_options, bank_rule.tax_code_id), { include_blank: "No tax" }, class: "tc-input" %>
+        <p class="tc-hint">The line's amount includes the tax, which is split out.</p>
+      </div>
+    <% end %>
+    <% entry_dimensions([ bank_rule ]).each do |dimension, values| %>
+      <div class="sm:col-span-2">
+        <%= label_tag "bank_rule_dimensions_#{dimension.id}", dimension.name, class: "tc-label" %>
+        <%= select_tag "bank_rule[dimensions][#{dimension.id}]", options_for_select(values, bank_rule.dimension_value_ids.find { |id| values.any? { |_name, value_id| value_id == id } }),
+                       include_blank: "—", id: "bank_rule_dimensions_#{dimension.id}", class: "tc-input" %>
+      </div>
+    <% end %>
+    <div class="sm:col-span-4"><%= tc_field form, :particulars, placeholder: "The line's own description", hint: "What the entry says; blank keeps the bank's description" %></div>
+    <% if bank_rule.persisted? %><label class="sm:col-span-4 flex items-center gap-2 text-sm"><%= form.check_box :active %> Active</label><% end %>
+  </fieldset>
+
+  <div class="flex gap-2">
+    <%= form.submit "Save rule", class: "tc-btn" %>
+    <%= link_to "Cancel", bank_rules_path, class: "tc-btn tc-btn-secondary" %>
+  </div>
+<% end %>

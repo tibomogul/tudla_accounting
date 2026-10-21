@@ -1,0 +1,5 @@
+<%= tc_page_header "Edit #{@bank_rule.name}" do %>
+  <%= button_to "Delete", bank_rule_path(@bank_rule), method: :delete, class: "tc-btn tc-btn-danger",
+                form: { data: { controller: "confirm", confirm_message_value: "Delete the rule #{@bank_rule.name}?", action: "submit->confirm#ask" } } %>
+<% end %>
+<%= render "form", bank_rule: @bank_rule %>

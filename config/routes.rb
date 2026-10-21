@@ -48,14 +48,17 @@ TudlaAccounting::Engine.routes.draw do
     get "", action: :show, as: :account
     post :import
     post :match_suggestions
+    post :record_by_rules
   end
   resources :bank_statement_lines, only: [] do
     member do
       post :match
       post :unmatch
       post :create_entry
+      post :record_by_rule
     end
   end
+  resources :bank_rules, except: :show
 
   resources :allocations, only: :create do
     collection { post :oldest_first }

@@ -47,7 +47,14 @@
 <section class="tc-card mb-6" aria-labelledby="lines-heading">
   <div class="tc-card-body pb-0 flex flex-wrap items-baseline justify-between gap-2">
     <h2 id="lines-heading" class="tc-card-title"><%= @show_all ? "Statement lines" : "Statement lines to match" %></h2>
-    <%= link_to (@show_all ? "Show only those to match" : "Show all"), banking_account_path(@account, show: (@show_all ? nil : "all")), class: "underline text-sm" %>
+    <div class="flex flex-wrap items-center gap-3">
+      <% if @rule_suggestions.any? && tc_can?(:post) %>
+        <%= button_to "Record #{pluralize(@rule_suggestions.size, 'line')} by their rules", banking_record_by_rules_path(@account), class: "tc-btn tc-btn-secondary tc-btn-sm",
+                      form: { data: { controller: "confirm", confirm_message_value: "Post an entry for each of these lines, as its rule says?", action: "submit->confirm#ask" } } %>
+      <% end %>
+      <%= link_to "Bank rules", bank_rules_path, class: "underline text-sm" %>
+      <%= link_to (@show_all ? "Show only those to match" : "Show all"), banking_account_path(@account, show: (@show_all ? nil : "all")), class: "underline text-sm" %>
+    </div>
   </div>
   <% if @page.total_count.zero? %>
     <p class="tc-card-body tc-muted text-sm"><%= @reconciler.statement_lines.none? ? "No statement imported yet." : "Every statement line is matched." %></p>
@@ -73,6 +80,12 @@
                     <% if tc_can?(:post) %><%= button_to "Match", match_bank_statement_line_path(line, show: params[:show]), params: { "detail_ids[]" => suggested.id }, class: "tc-btn tc-btn-secondary tc-btn-sm" %><% end %>
                   </div>
                 <% elsif tc_can?(:post) %>
+                  <% if (rule = @rule_suggestions[line]) %>
+                    <div class="flex flex-wrap items-center gap-2 mb-1" data-rule-suggestion>
+                      <span class="tc-muted text-sm">Rule <%= rule.name %>: <%= rule.outcome_label %></span>
+                      <%= button_to "Record", record_by_rule_bank_statement_line_path(line, show: params[:show]), class: "tc-btn tc-btn-secondary tc-btn-sm" %>
+                    </div>
+                  <% end %>
                   <details>
                     <summary class="cursor-pointer text-sm underline">Match or record it</summary>
                     <div class="mt-2 space-y-3">
@@ -96,6 +109,7 @@
                         <% end %>
                         <%= form.submit "Post entry", class: "tc-btn tc-btn-secondary tc-btn-sm" %>
                       <% end %>
+                      <%= link_to "Create a rule from it", new_bank_rule_path(line_id: line.id), class: "underline text-sm" %>
                     </div>
                   </details>
                 <% else %>

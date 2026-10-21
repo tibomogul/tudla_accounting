@@ -1,0 +1,26 @@
+<%= tc_page_header "Bank rules", subtitle: "Suggest how to record statement lines the books don't have yet, in this order" do %>
+  <%= link_to "Banking", banking_path, class: "tc-btn tc-btn-ghost" %>
+  <% if tc_can?(:post) %><%= link_to "New rule", new_bank_rule_path, class: "tc-btn" %><% end %>
+<% end %>
+
+<div class="tc-card overflow-x-auto">
+  <table class="tc-table">
+    <thead><tr><th class="tc-num">Order</th><th>Name</th><th>A line</th><th>Is recorded against</th></tr></thead>
+    <tbody>
+      <% if @bank_rules.empty? %>
+        <tr><td colspan="4" class="tc-muted text-center">None yet. Add one here, or with "Create a rule from it" on a statement line.</td></tr>
+      <% end %>
+      <% @bank_rules.each do |rule| %>
+        <tr class="<%= "tc-muted" unless rule.active? %>" data-bank-rule>
+          <td class="tc-num"><%= rule.position %></td>
+          <td><%= tc_can?(:post) ? link_to(rule.name, edit_bank_rule_path(rule), class: "underline") : rule.name %><% unless rule.active? %> <%= tc_badge "Inactive" %><% end %></td>
+          <td>
+            containing “<%= rule.description_contains %>”<%= { "in" => ", money in", "out" => ", money out" }[rule.direction] %><%= ", from #{tc_money(Money.new(rule.amount_min_cents, accounting_organization.currency))}" if rule.amount_min_cents %><%= ", to #{tc_money(Money.new(rule.amount_max_cents, accounting_organization.currency))}" if rule.amount_max_cents %>
+            <div class="tc-muted text-xs"><%= rule.account ? "On #{rule.account.code_with_name}" : "On any bank account" %></div>
+          </td>
+          <td><%= rule.outcome_label %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
