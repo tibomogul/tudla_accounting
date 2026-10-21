@@ -3,8 +3,13 @@ module TudlaAccounting
     module V1
       # Payments received and made, with what each was applied to: by kind, status
       # (posted, void), contact, paid from and to, or changed since a time.
+      #
+      # Recording one (create) and voiding it need :post. An Idempotency-Key makes a
+      # retried create return the payment the first recorded.
       class PaymentsController < BaseController
         include Representation
+
+        permits :post, only: %i[create void]
 
         def index
           payments = organization_scope(Payment).includes(:organization, :contact, :account, entry: { details: :carrying_amount }).order(:paid_on, :id)
@@ -18,6 +23,30 @@ module TudlaAccounting
 
         def show
           render json: { data: payment_json(organization_scope(Payment).find(params[:id])) }
+        end
+
+        def create
+          existing = replay(organization_scope(Payment))
+          return render_made(payment_json(existing)) if existing
+
+          applications = Array.wrap(body[:applications]).each_with_index.map do |application, index|
+            raise ArgumentError, "Application #{index + 1} must be an object with document_id and amount" unless application.is_a?(Hash)
+
+            { document: organization_scope(Document).find(application[:document_id]), amount_cents: cents(application[:amount], "Application #{index + 1}'s amount") }
+          end
+          payment = Payment.record!(organization: accounting_organization, kind: body[:kind].to_s, contact: contact_by_id(body[:contact_id]),
+                                    account: account_by_code(body[:account_code], "account_code"), paid_on: date_param(:paid_on) || raise(ArgumentError, "paid_on is missing"),
+                                    amount_cents: cents(body[:amount], "amount"), reference: body[:reference], notes: body[:notes],
+                                    idempotency_key: idempotency_key, applications: applications)
+          render_made(payment_json(payment))
+        rescue ActiveRecord::RecordNotUnique
+          render_made(payment_json(replay(organization_scope(Payment)) || raise))
+        end
+
+        def void
+          payment = organization_scope(Payment).find(params[:id])
+          payment.void!(on: date_param(:on) || raise(ArgumentError, "on is missing"), reason: body[:reason])
+          render json: { data: payment_json(payment.reload) }
         end
       end
     end

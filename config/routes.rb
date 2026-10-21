@@ -6,10 +6,22 @@ TudlaAccounting::Engine.routes.draw do
     namespace :v1 do
       get "organization", to: "organizations#show"
       resources :accounts, only: %i[index show]
-      resources :entries, only: %i[index show]
-      resources :contacts, only: %i[index show]
-      resources :documents, only: %i[index show]
-      resources :payments, only: %i[index show]
+      resources :entries, only: %i[index show create destroy] do
+        member do
+          post :post
+          post :reverse
+        end
+      end
+      resources :contacts, only: %i[index show create update]
+      resources :documents, only: %i[index show create update destroy] do
+        member do
+          post :approve
+          post :void
+        end
+      end
+      resources :payments, only: %i[index show create] do
+        member { post :void }
+      end
       resources :tax_codes, only: :index
       resources :periods, only: :index
       get "reports/:report", to: "reports#show", as: :report

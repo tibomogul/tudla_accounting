@@ -1,6 +1,6 @@
 # JSON API
 
-Other systems (a shop, a payroll app, a reporting tool) can read an organization's books over HTTP. The API is part of the engine, mounted under the engine's path: with the engine at `/tudla_accounting`, it is at `/tudla_accounting/api/v1`.
+Other systems (a shop, a payroll app, a reporting tool) can read an organization's books, and record in them, over HTTP. The API is part of the engine, mounted under the engine's path: with the engine at `/tudla_accounting`, it is at `/tudla_accounting/api/v1`.
 
 ## Authentication
 
@@ -18,8 +18,10 @@ Each token has permissions, the same ones the pages check:
 
 | Permission | Allows |
 |---|---|
-| `read` | Everything on this page |
-| `record`, `post`, `administer` | Writing (coming in the next version of this document) |
+| `read` | Every `GET` |
+| `record` | Drafting: entries, contacts, invoices and bills (and deleting drafts) |
+| `post` | Posting and reversing entries, approving and voiding invoices and bills, recording and voiding payments |
+| `administer` | Nothing in the API yet |
 
 A token without the permission an endpoint needs gets `403`. A missing, unknown, revoked or expired token gets `401` with `WWW-Authenticate: Bearer realm="TudlaAccounting", error="invalid_token"`.
 
@@ -41,9 +43,10 @@ end
 - **Accounts, tax codes and dimensions** are named by their codes.
 - **Lists** are paged: `page` (from 1) and `per_page` (50 by default, at most 200). The response is `{ "data": [...], "meta": { "page", "per_page", "total_count", "total_pages" } }`. A single record is `{ "data": {...} }`.
 - **Syncing**: lists of accounts, entries, contacts, documents and payments take `updated_since` (an ISO 8601 time) for records changed after it.
-- **Errors** are `{ "error": { "code", "message" } }`: `invalid_token` (401), `forbidden` (403), `not_found` (404), `no_periods` (404: a report needs periods the books don't have yet), `invalid_request` (422: a parameter that can't be read), `rate_limited` (429).
+- **Errors** are `{ "error": { "code", "message" } }`: `invalid_token` (401), `forbidden` (403), `not_found` (404), `no_periods` (404: a report needs periods the books don't have yet), `invalid_request` (422: something sent that can't be read or done, the message says what), `invalid` (422: a record that fails its checks, with `"details": { "field": ["message"] }`), `rate_limited` (429).
+- **Writing**: send JSON (`Content-Type: application/json`). A create answers `201` with the record as a `GET` shows it. Whatever a request does happens entirely or not at all, and is on the audit trail under the token's name ("API token Online shop").
 
-## Endpoints
+## Reading
 
 ### Organization
 
@@ -139,7 +142,68 @@ end
 
 `GET /periods`: financial years and their months, latest first: `{ "id", "label" ("Mar 2026"), "kind" (year or month), "year_id", "from_date", "thru_date", "closed" }`. Their ids pick the periods reports cover.
 
-### Reports
+## Recording
+
+### Idempotency
+
+`POST /entries`, `POST /documents` and `POST /payments` take an `Idempotency-Key` header (up to 200 characters; an order number, a UUID): a request with a key an earlier one used gets what that one made, `200` with `Idempotent-Replayed: true`, instead of making it again, so a request can be retried safely after a timeout. The key is kept with what was made, for good, and it is the key that counts, not the body: use a new key for a new thing.
+
+```
+POST /tudla_accounting/api/v1/entries
+Authorization: Bearer tudla_6qN3...
+Content-Type: application/json
+Idempotency-Key: shop-order-1042
+```
+
+### Entries
+
+`POST /entries` (`record`; with `"post": true`, `post` too) records a draft, or posts it at once:
+
+```json
+{ "date": "2026-04-10", "particulars": "Shop order 1042", "reference": "1042", "post": true,
+  "lines": [
+    { "account_code": "1000", "debit": "110.00" },
+    { "account_code": "4000", "credit": "100.00", "tax_code": "GST", "description": "Widgets", "dimensions": { "DEPT": "SALES" } }
+  ] }
+```
+
+- `date` is a day (the start of it in the books' time zone) or an ISO 8601 time. Posting puts the entry in the month of its date.
+- Each line has a `debit` or a `credit` (a positive decimal string), an `account_code`, and optionally a `description`, `dimensions` (dimension code to value code), and a `tax_code`: the tax is worked out and added on a line of its own, on the same side, to the code's account (above, 10.00 to GST). With `"tax_inclusive": true` (on the entry, or a line) the amount includes the tax, which is split out of it.
+- A line in an account held in another currency gives that amount too: `"foreign": { "currency": "EUR", "amount": "100.00", "rate": "1.65" }`, the debit or credit being its value in the organization's currency.
+- `reverse_on` (a date) posts its reversal that day too: an accrual.
+- The debits and credits must balance (after tax).
+
+`POST /entries/:id/post` (`post`) posts a draft, dated as it is. `POST /entries/:id/reverse` (`post`) reverses a posted entry on `on` (a date; today by default) and answers with the reversal. `DELETE /entries/:id` (`record`) deletes a draft (`204`); a posted entry is reversed instead.
+
+### Contacts
+
+`POST /contacts` and `PATCH /contacts/:id` (`record`) take `name`, `kind` (customer, supplier, both), `email`, `phone`, `address`, `tax_number`, `payment_terms_days`, `notes`, `active`, `default_account_code` and `default_tax_code`. A `PATCH` changes only the fields sent; `null` clears one.
+
+### Invoices, bills and credit notes
+
+`POST /documents` (`record`; with `"approve": true`, `post` too) drafts one, or approves it at once (numbered and posted):
+
+```json
+{ "kind": "sales_invoice", "contact_id": 3, "issued_on": "2026-04-01", "reference": "PO 9", "approve": true,
+  "lines": [ { "description": "Consulting", "quantity": "2.5", "unit_price": "100.00", "account_code": "4010", "tax_code": "GST" } ] }
+```
+
+`kind` is `sales_invoice`, `sales_credit`, `bill` or `supplier_credit`. `due_on` defaults to the contact's payment terms after `issued_on`. Lines need a `description`, `unit_price` and `account_code` (not the receivables or payables account); `quantity` is 1 if not given; `tax_code` must be of the document's side. `tax_inclusive` says the prices include the tax. A credit note can name the approved invoice (or bill) it credits, `credited_document_id`, and is applied to it when approved.
+
+`PATCH /documents/:id` (`record`) changes a draft: the fields sent, and with `lines`, all its lines. `DELETE /documents/:id` (`record`) deletes a draft. `POST /documents/:id/approve` (`post`) approves a draft. `POST /documents/:id/void` (`post`) voids an approved one, reversing its entry on `on` (a date) with a `reason`; it is refused while payments or credit notes are applied to it.
+
+### Payments
+
+`POST /payments` (`post`) records a payment, posted at once, and applies it:
+
+```json
+{ "kind": "received", "contact_id": 3, "account_code": "1000", "paid_on": "2026-04-10", "amount": "300.00", "reference": "EFT 88213",
+  "applications": [ { "document_id": 7, "amount": "275.00" } ] }
+```
+
+`kind` is `received` (from a customer, applied to their invoices) or `paid` (to a supplier, applied to their bills). `account_code` is the bank or cash account it went through, in the organization's currency. Each application can't be more than is still owed on its document, nor all of them more than the payment; what isn't applied stays as a credit for the contact. `POST /payments/:id/void` (`post`) voids it, reversing its entry on `on` with a `reason` and taking it off what it paid; refused while it is matched to a bank statement line.
+
+## Reports
 
 `GET /reports/:report` lays a report out as its page's download does:
 

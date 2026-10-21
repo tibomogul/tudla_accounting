@@ -33,6 +33,10 @@ module TudlaAccounting
         rescue_from ActionController::ParameterMissing, ArgumentError do |exception|
           error(:invalid_request, exception.message.upcase_first, :unprocessable_content)
         end
+        rescue_from ActiveRecord::RecordInvalid do |exception|
+          errors = exception.record.errors
+          error(:invalid, errors.full_messages.to_sentence, :unprocessable_content, details: errors.to_hash)
+        end
 
         private
 
@@ -63,6 +67,14 @@ module TudlaAccounting
           error(:forbidden, "This token can't #{permission}; issue one that can", :forbidden) unless api_token.can?(permission)
         end
 
+        # For what an action does only on request (posting what it records, say).
+        class Forbidden < StandardError; end
+        rescue_from(Forbidden) { |exception| error(:forbidden, exception.message, :forbidden) }
+
+        def require_permission!(permission)
+          raise Forbidden, "This token can't #{permission}; issue one that can" unless api_token.can?(permission)
+        end
+
         # A fixed window a minute long per token; a store that can't count (a null store)
         # limits nothing.
         def limit_rate
@@ -83,6 +95,65 @@ module TudlaAccounting
 
         def rate_limit_store
           TudlaAccounting.configuration.api_rate_limit_store || Rails.cache
+        end
+
+        # The request's JSON body (or form fields), as a hash with indifferent access; each
+        # action reads and checks what it needs.
+        def body
+          @body ||= params.except(:controller, :action, :format, :id).to_unsafe_h
+        end
+
+        def boolean(value) = ActiveModel::Type::Boolean.new.cast(value) || false
+
+        # The request's Idempotency-Key, as stored ("api:<key>"), or nil.
+        def idempotency_key
+          key = request.headers["Idempotency-Key"].to_s.strip
+          return if key.empty?
+          raise ArgumentError, "Idempotency-Key must be at most 200 characters" if key.length > 200
+
+          "api:#{key}"
+        end
+
+        # The record an earlier request with this Idempotency-Key made, marked as a replay;
+        # nil when there was none.
+        def replay(scope)
+          key = idempotency_key or return
+          record = scope.find_by(idempotency_key: key) or return
+          response.headers["Idempotent-Replayed"] = "true"
+          record
+        end
+
+        # A made (201) or replayed (200) record.
+        def render_made(json)
+          render json: { data: json }, status: response.headers["Idempotent-Replayed"] ? :ok : :created
+        end
+
+        # Cents for an amount given as a decimal string (or number) in the organization's
+        # currency (or another); ArgumentError naming what it was for otherwise.
+        def cents(value, label, currency: accounting_organization.currency)
+          raise ArgumentError, "#{label} is missing" if value.blank?
+
+          Money.from_amount(decimal(value, label), currency).cents
+        end
+
+        def decimal(value, label)
+          BigDecimal(value.to_s)
+        rescue ArgumentError, TypeError
+          raise ArgumentError, "#{label} must be a decimal number, such as \"1234.50\""
+        end
+
+        def account_by_code(code, label)
+          organization_scope(Account).find_by(code: code.to_s) or raise ArgumentError, "#{label}: there is no account #{code}"
+        end
+
+        def tax_code_by_code(code, label)
+          organization_scope(TaxCode).find_by(code: code.to_s) or raise ArgumentError, "#{label}: there is no tax code #{code}"
+        end
+
+        def contact_by_id(id)
+          raise ArgumentError, "contact_id is missing" if id.blank?
+
+          organization_scope(Contact).find(id)
         end
 
         def error(code, message, status, details: nil)

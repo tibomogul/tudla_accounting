@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_22_002000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_22_003000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -361,6 +361,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_002000) do
     t.bigint "credited_document_id"
     t.date "due_on"
     t.bigint "entry_id"
+    t.string "idempotency_key"
     t.date "issued_on", null: false
     t.string "kind", null: false
     t.text "notes"
@@ -380,6 +381,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_002000) do
     t.index ["contact_id"], name: "index_tudla_accounting_documents_on_contact"
     t.index ["credited_document_id"], name: "index_tudla_accounting_documents_on_credited"
     t.index ["entry_id"], name: "index_tudla_accounting_documents_on_entry", unique: true
+    t.index ["organization_type", "organization_id", "idempotency_key"], name: "tudla_accounting_documents_idempotency_key", unique: true, where: "(idempotency_key IS NOT NULL)"
     t.index ["organization_type", "organization_id", "issued_on"], name: "index_tudla_accounting_documents_on_issued_on"
     t.index ["organization_type", "organization_id", "kind", "number"], name: "tudla_accounting_documents_number_unique_key", unique: true, where: "(number IS NOT NULL)"
     t.check_constraint "(status::text = 'draft'::text) = (number IS NULL) AND (status::text = 'draft'::text) = (entry_id IS NULL)", name: "tudla_accounting_documents_numbered_when_approved"
@@ -461,6 +463,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_002000) do
     t.bigint "contact_id", null: false
     t.datetime "created_at", null: false
     t.bigint "entry_id"
+    t.string "idempotency_key"
     t.string "kind", null: false
     t.text "notes"
     t.bigint "organization_id", null: false
@@ -474,6 +477,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_002000) do
     t.index ["account_id"], name: "index_tudla_accounting_payments_on_account"
     t.index ["contact_id"], name: "index_tudla_accounting_payments_on_contact"
     t.index ["entry_id"], name: "index_tudla_accounting_payments_on_entry", unique: true
+    t.index ["organization_type", "organization_id", "idempotency_key"], name: "tudla_accounting_payments_idempotency_key", unique: true, where: "(idempotency_key IS NOT NULL)"
     t.index ["organization_type", "organization_id", "paid_on"], name: "index_tudla_accounting_payments_on_paid_on"
     t.check_constraint "amount_cents > 0", name: "tudla_accounting_payments_amount_positive"
     t.check_constraint "kind::text = ANY (ARRAY['received'::character varying, 'paid'::character varying]::text[])", name: "tudla_accounting_payments_kind_known"
