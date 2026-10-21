@@ -11,7 +11,7 @@ RSpec.describe Demo::Seeder do
     expect(Organization.where(name: "Demo Co").count).to eq(1)
 
     entries = TudlaAccounting::Entry.where(organization: organization)
-    expect(entries.where.not(posted_at: nil).count).to eq(31)
+    expect(entries.where.not(posted_at: nil).count).to eq(52) # 30, the owner's capital, and 12 invoices on account with 9 payments
     expect(entries.where(posted_at: nil).count).to eq(3)
     expect(entries.maximum(:transacted_at)).to be <= Time.current
     expect(entries.pluck(:particulars)).to include(a_string_starting_with("Invoice "))
@@ -75,6 +75,18 @@ RSpec.describe Demo::Seeder do
     expect(budget).to have_attributes(name: "Plan", main: true, period: TudlaAccounting::Period.periods_for_date(organization, Date.new(2026, 1, 1)).roots.first)
     expect(budget.lines).not_to be_empty
     expect(budget.lines.map(&:amount_cents)).to all(satisfy { |cents| (cents % 100).zero? })
+  end
+
+  it "has customers owing for invoices on account, Globex paying half and Umbrella nothing" do
+    organization = described_class.call(entries: 30)
+
+    aging = TudlaAccounting::AgingReportGenerator.call(organization: organization, report_type: :receivable, as_of_date: Date.current)
+    expect(aging[:summary].values.map { |party| party[:related_party].name }).to contain_exactly("Globex", "Umbrella")
+    expect(TudlaAccounting::PartyStatement.parties(organization, :receivable).map(&:name)).to eq(%w[Globex Initech Northwind Umbrella])
+    northwind = Demo::Customer.find_by!(name: "Northwind")
+    statement = TudlaAccounting::PartyStatement.call(organization: organization, type: :receivable, party: northwind, from: Date.new(2026, 3, 1), thru: Date.current)
+    expect(statement.lines.map(&:kind)).to eq(%w[Invoice Payment Invoice Payment Invoice Payment])
+    expect(statement).to have_attributes(opening: Money.new(0, "USD"), closing: Money.new(0, "USD"))
   end
 
   it "attaches the landlord's receipt to the latest rent payments" do

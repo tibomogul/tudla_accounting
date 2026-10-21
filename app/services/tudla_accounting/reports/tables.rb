@@ -85,11 +85,31 @@ module TudlaAccounting
       # A customer's or supplier's statement (a PartyStatement): the opening balance, a row
       # per line with the running balance, and the closing balance; or (open_items) what
       # was still open at the end, then the closing balance by how overdue it is. With
-      # foreign amounts, their currency and amount.
-      def party_statement(statement, open_items: false)
-        foreign = statement.foreign?
-        foreign_cells = ->(money) { foreign ? [ money&.currency&.iso_code, money ] : [] }
+      # foreign amounts (foreign: whether to have their columns), their currency and amount.
+      def party_statement(statement, open_items: false, foreign: statement.foreign?)
+        Table.new([ party_statement_headings(statement.type, open_items: open_items, foreign: foreign),
+                    *party_statement_rows(statement, open_items: open_items, foreign: foreign) ])
+      end
+
+      # Several statements (of one type) in one table, each row headed by its party's name.
+      def party_statements(statements, type:, open_items: false)
+        foreign = statements.any?(&:foreign?)
+        rows = statements.flat_map do |statement|
+          name = PartyStatement.party_name(statement.party)
+          party_statement_rows(statement, open_items: open_items, foreign: foreign).map { |row| row.is_a?(Table::TotalRow) ? Table.total([ name, *row ]) : [ name, *row ] }
+        end
+        Table.new([ [ PartyStatement::PARTY_NAMES.fetch(type), *party_statement_headings(type, open_items: open_items, foreign: foreign) ], *rows ])
+      end
+
+      def party_statement_headings(type, open_items:, foreign:)
         foreign_headings = foreign ? [ "Currency", open_items ? "Foreign outstanding" : "Foreign amount" ] : []
+        return [ "Date", "Reference", "Details", "Due", "Days overdue", *foreign_headings, "Amount", "Outstanding" ] if open_items
+
+        [ "Date", "Type", "Reference", "Details", "Due", *foreign_headings, PartyStatement::CHARGE_HEADINGS.fetch(type), PartyStatement::CREDIT_HEADING, "Balance" ]
+      end
+
+      def party_statement_rows(statement, open_items:, foreign:)
+        foreign_cells = ->(money) { foreign ? [ money&.currency&.iso_code, money ] : [] }
         if open_items
           rows = statement.open_items.map do |line|
             entry = line[:entry]
@@ -100,8 +120,7 @@ module TudlaAccounting
               amount, line[:outstanding] ]
           end
           buckets = AgingReportGenerator::BUCKETS.map { |bucket| Table.total([ nil, nil, ReportsHelper::AGING_BUCKETS.fetch(bucket), nil, nil, *foreign_cells.call(nil), nil, statement.aging[bucket] ]) }
-          return Table.new([ [ "Date", "Reference", "Details", "Due", "Days overdue", *foreign_headings, "Amount", "Outstanding" ], *rows, *buckets,
-                             Table.total([ nil, nil, "Closing balance", nil, nil, *foreign_cells.call(nil), nil, statement.closing ]) ])
+          return [ *rows, *buckets, Table.total([ nil, nil, "Closing balance", nil, nil, *foreign_cells.call(nil), nil, statement.closing ]) ]
         end
 
         rows = statement.lines.map do |line|
@@ -109,9 +128,8 @@ module TudlaAccounting
           [ line.date, line.kind, entry && (entry.reference || entry.number_label), entry&.particulars, line.due_date&.to_date, *foreign_cells.call(line.foreign),
             line.charge, line.credit, line.balance ]
         end
-        Table.new([ [ "Date", "Type", "Reference", "Details", "Due", *foreign_headings, PartyStatement::CHARGE_HEADINGS.fetch(statement.type), PartyStatement::CREDIT_HEADING, "Balance" ],
-                    [ statement.from, nil, nil, "Opening balance", nil, *foreign_cells.call(nil), nil, nil, statement.opening ], *rows,
-                    Table.total([ statement.thru, nil, nil, "Closing balance", nil, *foreign_cells.call(nil), statement.charges_total, statement.credits_total, statement.closing ]) ])
+        [ [ statement.from, nil, nil, "Opening balance", nil, *foreign_cells.call(nil), nil, nil, statement.opening ], *rows,
+          Table.total([ statement.thru, nil, nil, "Closing balance", nil, *foreign_cells.call(nil), statement.charges_total, statement.credits_total, statement.closing ]) ]
       end
 
       # The change as a percentage of the second amount, to one decimal place; nil when it is zero.

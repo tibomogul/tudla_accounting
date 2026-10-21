@@ -1,0 +1,16 @@
+<%# locals: (url:, chosen: false) %>
+<%# The statement pages' choices: the type, the party (unless chosen is false: every
+    party), the dates and what to show. %>
+<%= form_with url: url, method: :get, class: "tc-card tc-card-body mb-6 flex flex-wrap items-end gap-3 print:hidden" do |form| %>
+  <div><%= form.label :type, "For", class: "tc-label" %>
+    <%= form.select :type, [ [ "Customers", "receivable" ], [ "Suppliers", "payable" ] ], { selected: @type }, class: "tc-input" %></div>
+  <% unless chosen == false %>
+    <div><%= form.label :party, TudlaAccounting::PartyStatement::PARTY_NAMES.fetch(@type), class: "tc-label" %>
+      <%= form.select :party, @parties.map { |party| [ related_party_name(party), TudlaAccounting::PartyStatement.key(party) ] }, { selected: chosen, include_blank: "Choose one" }, class: "tc-input" %></div>
+  <% end %>
+  <div><%= form.label :from, "From", class: "tc-label" %><%= form.date_field :from, value: @from, class: "tc-input" %></div>
+  <div><%= form.label :thru, "To", class: "tc-label" %><%= form.date_field :thru, value: @thru, class: "tc-input" %></div>
+  <div><%= form.label :show, "Show", class: "tc-label" %>
+    <%= form.select :show, [ [ "Activity", "activity" ], [ "Open items at the end", "open_items" ] ], { selected: (@open_items ? "open_items" : "activity") }, class: "tc-input" %></div>
+  <%= form.submit "Show", class: "tc-btn tc-btn-secondary", name: nil %>
+<% end %>

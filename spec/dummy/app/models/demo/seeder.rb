@@ -2,10 +2,10 @@ require "csv"
 
 # Seeds Demo Co: last year and this year, a small chart of accounts, GST, a department
 # dimension, a couple of hundred posted entries up to today, a few drafts, the first half
-# of last year closed, a bank statement for the operating account, recurring entries
-# and this year's budget. Returns the organization; running it again returns the
-# existing one, only adding the years' periods up to this one if the year has turned
-# since it was seeded.
+# of last year closed, a bank statement for the operating account, recurring entries,
+# this year's budget, and customers with invoices on account. Returns the organization;
+# running it again returns the existing one, only adding the years' periods up to this
+# one if the year has turned since it was seeded.
 #
 # The name is the demo's identity: an organization someone else names "Demo Co" is
 # taken for the demo. That's fine in the dummy app.
@@ -77,6 +77,7 @@ class Demo::Seeder
     attach_receipts
     add_recurring_entries
     add_budget
+    add_customer_accounts
   end
 
   def create_accounts
@@ -142,7 +143,7 @@ class Demo::Seeder
 
   def post(date, &)
     at = noon(date)
-    draft(date, &).post(at)
+    draft(date, &).tap { |entry| entry.post(at) }
   end
 
   def draft(date)
@@ -177,6 +178,41 @@ class Demo::Seeder
   def add_budget
     last_year, this_year = years.map { |year| TudlaAccounting::Period.periods_for_date(organization, Date.new(year, 1, 1)).roots.first }
     TudlaAccounting::Budget.create!(organization: organization, period: this_year, name: "Plan", main: true).fill_from_actuals!(last_year, percent: 10)
+  end
+
+  # Invoices on account to four customers over the last three months, due in 30 days,
+  # each paid 25 days later, except that Globex pays half and Umbrella nothing, so the
+  # aging report and statements have something to show. Their own random numbers, so the
+  # rest of the demo stays as it was.
+  def add_customer_accounts
+    amounts = Random.new(7)
+    customers = CUSTOMERS.first(4).map { |name| Demo::Customer.create!(name: name) }
+    start = today.prev_month(3).beginning_of_month
+    number = 100
+    customers.each_with_index do |customer, index|
+      (0..2).map { |month| start.next_month(month) + (index * 6).days }.select { |date| date <= today }.each do |date|
+        net = amounts.rand(500_00..3_000_00)
+        invoice = post(date) { |entry| invoice_on_account(entry, customer, "A-#{number += 1}", net, due: date + 30) }
+        paid_on = date + 25
+        next if customer.name == "Umbrella" || paid_on > today
+
+        paid = customer.name == "Globex" ? (net + net / 10) / 2 : net + net / 10
+        post(paid_on) do |entry|
+          entry.assign_attributes(particulars: "Payment – #{customer.name} (#{invoice.reference})", source: Demo::Payment.create!(customer: customer), related: invoice)
+          line(entry, accounts["1011"], :debit, paid)
+          line(entry, accounts["1100"], :credit, paid)
+        end
+      end
+    end
+  end
+
+  def invoice_on_account(entry, customer, reference, net, due:)
+    tax = net / 10
+    entry.assign_attributes(particulars: "Invoice #{reference} – #{customer.name} (consulting, on account)", reference: reference,
+                            source: Demo::Invoice.create!(customer: customer, due_date: due.in_time_zone(zone).end_of_day))
+    line(entry, accounts["1100"], :debit, net + tax)
+    line(entry, accounts["4010"], :credit, net, tax_code: @gst, tax_role: :base).tags.build(dimension_value: @teams.first)
+    line(entry, accounts["2200"], :credit, tax, tax_code: @gst, tax_role: :tax)
   end
 
   # The landlord's receipt on the three latest rent payments, when the app has Active Storage.

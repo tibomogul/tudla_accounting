@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_21_220000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_21_230000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -40,6 +40,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_220000) do
     t.bigint "blob_id", null: false
     t.string "variation_digest", null: false
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
+  end
+
+  create_table "demo_customers", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+  end
+
+  create_table "demo_invoices", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "customer_id", null: false
+    t.datetime "due_date"
+    t.datetime "updated_at", null: false
+    t.index ["customer_id"], name: "index_demo_invoices_on_customer_id"
+  end
+
+  create_table "demo_payments", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "customer_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["customer_id"], name: "index_demo_payments_on_customer_id"
   end
 
   create_table "organizations", force: :cascade do |t|
@@ -432,6 +453,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_220000) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "demo_invoices", "demo_customers", column: "customer_id"
+  add_foreign_key "demo_payments", "demo_customers", column: "customer_id"
   add_foreign_key "tudla_accounting_accounts", "tudla_accounting_accounts", column: "contra_account_id"
   add_foreign_key "tudla_accounting_allocations", "tudla_accounting_carrying_amounts", column: "from_id"
   add_foreign_key "tudla_accounting_allocations", "tudla_accounting_carrying_amounts", column: "to_id"

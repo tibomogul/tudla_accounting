@@ -118,6 +118,43 @@ RSpec.describe "Customer and supplier statements", type: :request do
     expect(response).to have_http_status(:not_found)
   end
 
+  it "shows every customer's statement with something to send, one to a page, and downloads them together" do
+    initech = create(:organization, name: "Initech")
+    umbrella = create(:organization, name: "Umbrella")
+    paid = post_entry([ [ "1100", :debit, 40 ], [ "4000", :credit, 40 ] ], at: Time.zone.local(2026, 1, 5), particulars: "Initech invoice", source: Invoice.create!(customer: initech))
+    post_entry([ [ "1000", :debit, 40 ], [ "1100", :credit, 40 ] ], at: Time.zone.local(2026, 1, 9), particulars: "Initech pays", source: Payment.create!(customer: initech), related: paid)
+    post_entry([ [ "1100", :debit, 70 ], [ "4000", :credit, 70 ] ], at: Time.zone.local(2026, 3, 9), particulars: "Umbrella invoice", source: Invoice.create!(customer: umbrella))
+
+    get routes.reports_statement_path
+    expect(css_select("a").map { |link| link["href"] }).to include(routes.reports_statements_path(type: :receivable, from: "2026-03-01", thru: "2026-03-31"))
+    get routes.reports_statements_path
+    expect(css_select("[data-statement] [data-party]").map(&:text)).to eq(%w[Globex Umbrella]) # Initech had nothing in March
+    expect(response.body).to include("2 to send")
+    expect(css_select("select[name=party]")).to be_empty
+
+    get routes.reports_statements_path(format: :csv)
+    expect(response.headers["Content-Disposition"]).to include("statements-customers-2026-03-01-to-2026-03-31.csv")
+    csv = CSV.parse(response.body)
+    expect(csv.first).to eq([ "Customer", "Date", "Type", "Reference", "Details", "Due", "Invoiced", "Paid or credited", "Balance" ])
+    expect(csv.drop(1).map { |row| [ row[0], row[4], row[-1] ] }).to eq([
+      [ "Globex", "Opening balance", "300.00" ], [ "Globex", "Payment 1", "50.00" ], [ "Globex", "Closing balance", "50.00" ],
+      [ "Umbrella", "Opening balance", "0.00" ], [ "Umbrella", "Umbrella invoice", "70.00" ], [ "Umbrella", "Closing balance", "70.00" ]
+    ])
+
+    get routes.reports_statements_path(show: "open_items", from: "2026-02-01", thru: "2026-02-28")
+    expect(css_select("[data-statement] [data-party]").map(&:text)).to eq(%w[Globex]) # Initech had paid
+    get routes.reports_statements_path(show: "open_items", format: :csv)
+    expect(CSV.parse(response.body).first.first(3)).to eq([ "Customer", "Date", "Reference" ])
+  end
+
+  it "says when no supplier has a statement to send" do
+    get routes.reports_statements_path(type: "payable")
+    expect(response.body).to include("No supplier has a balance or activity in these dates.")
+    get routes.reports_statements_path(type: "payable", show: "open_items")
+    expect(response.body).to include("No supplier has anything open at the end.")
+    expect(css_select("a").map { |link| link["href"] }).to include(routes.reports_statement_path(type: :payable, from: "2026-03-01", thru: "2026-03-31", show: "open_items"))
+  end
+
   it "is linked from the aging report" do
     get routes.reports_receivables_path(as_of: "2026-03-31")
     expect(css_select("a").map { |link| link["href"] }).to include(routes.reports_statement_path(type: :receivable, party: key, from: "2026-03-01", thru: "2026-03-31"))

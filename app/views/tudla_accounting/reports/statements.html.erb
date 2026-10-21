@@ -1,0 +1,15 @@
+<% party_name = TudlaAccounting::PartyStatement::PARTY_NAMES.fetch(@type).downcase %>
+<%= tc_page_header "All #{party_name}s' statements",
+                   subtitle: "#{@statements.size} to send: #{@open_items ? "every #{party_name} with anything open at the end" : "every #{party_name} with a balance or activity"}, one to a printed page" do %>
+  <%= link_to "One #{party_name}", reports_statement_path(type: @type, from: @from, thru: @thru, show: (@open_items ? "open_items" : nil)), class: "tc-btn tc-btn-ghost print:hidden" %>
+  <%= render "download" %>
+<% end %>
+
+<%= render "statement_form", url: reports_statements_path, chosen: false %>
+
+<% if @statements.empty? %>
+  <div class="tc-card tc-card-body tc-muted">No <%= party_name %> has <%= @open_items ? "anything open at the end" : "a balance or activity in these dates" %>.</div>
+<% end %>
+<% @statements.each do |statement| %>
+  <%= render "party_statement", statement: statement, open_items: @open_items %>
+<% end %>

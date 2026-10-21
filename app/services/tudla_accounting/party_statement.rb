@@ -85,6 +85,11 @@ module TudlaAccounting
       self
     end
 
+    # Whether there is nothing to send: no balance at either end and nothing in between.
+    def empty?
+      opening.zero? && closing.zero? && lines.empty?
+    end
+
     def charges_total = lines.sum(money(0)) { |line| line.charge || money(0) }
     def credits_total = lines.sum(money(0)) { |line| line.credit || money(0) }
 

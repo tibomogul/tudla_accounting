@@ -93,10 +93,7 @@ module TudlaAccounting
     # still open at the end. See PartyStatement. Without a party (or one of the other
     # type), the page asks for one.
     def statement
-      @type = params[:type].presence_in(%w[receivable payable])&.to_sym || :receivable
-      @parties = PartyStatement.parties(accounting_organization, @type)
-      @from, @thru = statement_dates
-      @open_items = params[:show] == "open_items"
+      statement_options
       party = @parties.find { |each| PartyStatement.key(each) == params[:party] } # none when the type changed
       if party
         @statement = PartyStatement.call(organization: accounting_organization, type: @type, party: party, from: @from, thru: @thru)
@@ -105,7 +102,26 @@ module TudlaAccounting
       respond_with_table(name, available: !@statement.nil?) { Reports::Tables.party_statement(@statement, open_items: @open_items) }
     end
 
+    # Every customer's (or supplier's) statement with something to send, one to a printed
+    # page: those with a balance at either end or activity in between, or (open_items) with
+    # anything open at the end.
+    def statements
+      statement_options
+      @statements = @parties.map { |party| PartyStatement.call(organization: accounting_organization, type: @type, party: party, from: @from, thru: @thru) }
+                            .reject { |statement| @open_items ? statement.open_items.empty? : statement.empty? }
+      name = "statements-#{PartyStatement::PARTY_NAMES.fetch(@type).downcase.pluralize}-#{@open_items ? "open-items-#{@thru}" : "#{@from}-to-#{@thru}"}"
+      respond_with_table(name, available: true) { Reports::Tables.party_statements(@statements, type: @type, open_items: @open_items) }
+    end
+
     private
+
+    # What the statement pages share: the type, its parties, the dates and what to show.
+    def statement_options
+      @type = params[:type].presence_in(%w[receivable payable])&.to_sym || :receivable
+      @parties = PartyStatement.parties(accounting_organization, @type)
+      @from, @thru = statement_dates
+      @open_items = params[:show] == "open_items"
+    end
 
     # The statement's first and last days, either way round; last month by default, and
     # for a date that can't be read.

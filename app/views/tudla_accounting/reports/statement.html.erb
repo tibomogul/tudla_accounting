@@ -1,108 +1,17 @@
 <% party_name = TudlaAccounting::PartyStatement::PARTY_NAMES.fetch(@type) %>
 <% chosen = @statement && TudlaAccounting::PartyStatement.key(@statement.party) %>
 <%= tc_page_header "Statements", subtitle: "A customer's or supplier's account with #{accounting_organization.name}, to send them" do %>
+  <%= link_to "All #{party_name.downcase.pluralize}", reports_statements_path(type: @type, from: @from, thru: @thru, show: (@open_items ? "open_items" : nil)),
+              class: "tc-btn tc-btn-ghost print:hidden" %>
   <% if @statement %><%= render "download" %><% end %>
 <% end %>
 
-<%= form_with url: reports_statement_path, method: :get, class: "tc-card tc-card-body mb-6 flex flex-wrap items-end gap-3 print:hidden" do |form| %>
-  <div><%= form.label :type, "For", class: "tc-label" %>
-    <%= form.select :type, [ [ "Customers", "receivable" ], [ "Suppliers", "payable" ] ], { selected: @type }, class: "tc-input" %></div>
-  <div><%= form.label :party, party_name, class: "tc-label" %>
-    <%= form.select :party, @parties.map { |party| [ related_party_name(party), TudlaAccounting::PartyStatement.key(party) ] }, { selected: chosen, include_blank: "Choose one" }, class: "tc-input" %></div>
-  <div><%= form.label :from, "From", class: "tc-label" %><%= form.date_field :from, value: @from, class: "tc-input" %></div>
-  <div><%= form.label :thru, "To", class: "tc-label" %><%= form.date_field :thru, value: @thru, class: "tc-input" %></div>
-  <div><%= form.label :show, "Show", class: "tc-label" %>
-    <%= form.select :show, [ [ "Activity", "activity" ], [ "Open items at the end", "open_items" ] ], { selected: (@open_items ? "open_items" : "activity") }, class: "tc-input" %></div>
-  <%= form.submit "Show", class: "tc-btn tc-btn-secondary", name: nil %>
-<% end %>
+<%= render "statement_form", url: reports_statement_path, chosen: chosen %>
 
 <% if @statement.nil? %>
   <div class="tc-card tc-card-body tc-muted">
     <%= @parties.empty? ? "No #{party_name.downcase}s have #{@type == :receivable ? "invoices" : "bills"} yet." : "Choose a #{party_name.downcase} to see their statement." %>
   </div>
 <% else %>
-  <% statement = @statement %>
-  <% foreign = statement.foreign? %>
-  <% currency = accounting_organization.currency %>
-  <article class="tc-card tc-card-body space-y-6" data-statement>
-    <header class="flex flex-wrap justify-between gap-4">
-      <div>
-        <p class="tc-muted text-sm"><%= accounting_organization.name %></p>
-        <h2 class="text-xl font-semibold">Statement of account</h2>
-        <p class="font-semibold mt-2" data-party><%= related_party_name(statement.party) %></p>
-      </div>
-      <div class="text-sm sm:text-right">
-        <p><%= @open_items ? "Open items at #{tc_date(statement.thru)}" : "#{tc_date(statement.from)} to #{tc_date(statement.thru)}" %></p>
-        <p class="tc-muted">Amounts in <%= currency %></p>
-      </div>
-    </header>
-
-    <div class="overflow-x-auto">
-      <% if @open_items %>
-        <table class="tc-table" data-open-items>
-          <thead><tr><th>Date</th><th>Reference</th><th>Details</th><th>Due</th><th class="tc-num">Days overdue</th>
-            <% if foreign %><th class="tc-num">Foreign outstanding</th><% end %><th class="tc-num">Amount</th><th class="tc-num">Outstanding</th></tr></thead>
-          <tbody>
-            <% if statement.open_items.empty? %><tr><td colspan="<%= foreign ? 8 : 7 %>" class="tc-muted text-center">Nothing open.</td></tr><% end %>
-            <% statement.open_items.each do |line| %>
-              <% item = line[:carrying_amount] %>
-              <tr>
-                <td class="whitespace-nowrap"><%= tc_date(line[:entry].transacted_at) %></td>
-                <td><%= line[:entry].reference || line[:entry].number_label %></td>
-                <td><%= link_to line[:entry].particulars, entry_path(line[:entry]) %></td>
-                <td class="whitespace-nowrap"><%= line[:credit] ? tc_badge("Credit to apply") : (tc_date(item.due_date) || "—") %></td>
-                <td class="tc-num"><%= line[:days_outstanding] if line[:days_outstanding].positive? %></td>
-                <% if foreign %><td class="tc-num whitespace-nowrap"><%= Money.new(item.forex.other_currency_amount_cents, item.forex.other_currency).format if item.forex %></td><% end %>
-                <td class="tc-num"><%= tc_money(item.credit? ? -item.detail.amount : item.detail.amount) %></td>
-                <td class="tc-num"><%= tc_money(line[:outstanding]) %></td>
-              </tr>
-            <% end %>
-          </tbody>
-        </table>
-      <% else %>
-        <table class="tc-table" data-activity>
-          <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Details</th><th>Due</th><% if foreign %><th class="tc-num">Foreign amount</th><% end %>
-            <th class="tc-num"><%= TudlaAccounting::PartyStatement::CHARGE_HEADINGS.fetch(@type) %></th><th class="tc-num"><%= TudlaAccounting::PartyStatement::CREDIT_HEADING %></th><th class="tc-num">Balance</th></tr></thead>
-          <tbody>
-            <tr data-opening>
-              <td class="whitespace-nowrap"><%= tc_date(statement.from) %></td><td colspan="<%= foreign ? 6 : 5 %>">Opening balance</td>
-              <td class="tc-num"></td><td class="tc-num font-semibold"><%= tc_money(statement.opening) %></td>
-            </tr>
-            <% statement.lines.each do |line| %>
-              <tr data-line>
-                <td class="whitespace-nowrap"><%= tc_date(line.date) %></td>
-                <td><%= line.entry ? line.kind : tag.span(line.kind, class: "tc-muted") %></td>
-                <td><%= line.entry && (line.entry.reference || line.entry.number_label) %></td>
-                <td><%= link_to line.entry.particulars, entry_path(line.entry) if line.entry %></td>
-                <td class="whitespace-nowrap"><%= tc_date(line.due_date) %></td>
-                <% if foreign %><td class="tc-num whitespace-nowrap"><%= line.foreign.abs.format if line.foreign %></td><% end %>
-                <td class="tc-num"><%= tc_money(line.charge) %></td>
-                <td class="tc-num"><%= tc_money(line.credit) %></td>
-                <td class="tc-num"><%= tc_money(line.balance) %></td>
-              </tr>
-            <% end %>
-            <% if statement.lines.empty? %><tr><td colspan="<%= foreign ? 9 : 8 %>" class="tc-muted text-center">Nothing in these dates.</td></tr><% end %>
-            <tr class="font-semibold" data-closing>
-              <td class="whitespace-nowrap"><%= tc_date(statement.thru) %></td><td colspan="<%= foreign ? 5 : 4 %>">Closing balance</td>
-              <td class="tc-num"><%= tc_money(statement.charges_total) %></td><td class="tc-num"><%= tc_money(statement.credits_total) %></td>
-              <td class="tc-num"><%= tc_money(statement.closing) %></td>
-            </tr>
-          </tbody>
-        </table>
-      <% end %>
-    </div>
-
-    <footer class="grid gap-4 sm:grid-cols-[1fr_auto] items-end">
-      <div class="overflow-x-auto">
-        <table class="tc-table" data-aging>
-          <thead><tr><% TudlaAccounting::ReportsHelper::AGING_BUCKETS.each_value do |label| %><th class="tc-num"><%= label %></th><% end %></tr></thead>
-          <tbody><tr><% TudlaAccounting::ReportsHelper::AGING_BUCKETS.each_key do |bucket| %><td class="tc-num"><%= tc_money(statement.aging[bucket]) %></td><% end %></tr></tbody>
-        </table>
-      </div>
-      <div class="rounded-lg border border-[var(--tc-border)] px-4 py-3 sm:text-right" data-amount-due>
-        <p class="tc-muted text-sm"><%= statement.closing.negative? ? "In credit" : (@type == :receivable ? "Amount due" : "Balance owing") %> at <span class="whitespace-nowrap"><%= tc_date(statement.thru) %></span></p>
-        <p class="text-2xl font-semibold tc-num"><%= currency %> <%= statement.closing.abs.format(symbol: false) %></p>
-      </div>
-    </footer>
-  </article>
+  <%= render "party_statement", statement: @statement, open_items: @open_items %>
 <% end %>

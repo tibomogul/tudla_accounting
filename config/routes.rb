@@ -37,6 +37,7 @@ TudlaAccounting::Engine.routes.draw do
     get :general_ledger
     get :cash_flow
     get :statement
+    get :statements
   end
 
   resources :budgets do
