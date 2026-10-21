@@ -16,6 +16,9 @@
   <% elsif @document.approved? %>
     <% if tc_can?(:record) && !@document.credit? %><%= link_to (sales ? "Credit note" : "Supplier credit"), new_document_path(credit: @document.id), class: "tc-btn tc-btn-secondary" %><% end %>
     <% if tc_can?(:post) && sales %><%= link_to "Email", new_email_path(document_id: @document.id), class: "tc-btn tc-btn-secondary" %><% end %>
+    <% if tc_can?(:post) && @document.overdue?(ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].today) %>
+      <%= link_to "Send reminder", new_email_path(document_id: @document.id, reminder: 1), class: "tc-btn tc-btn-secondary" %>
+    <% end %>
     <% if tc_can?(:post) && !@document.credit? && @document.amount_due.positive? %><%= link_to "Record payment", new_payment_path(document_id: @document.id), class: "tc-btn" %><% end %>
   <% end %>
 <% end %>

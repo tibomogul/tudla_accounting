@@ -1,0 +1,39 @@
+<% days = TudlaAccounting.configuration.reminder_days %>
+<%= tc_page_header "Reminders due", subtitle: (days.any? ? "Overdue invoices reaching #{days.to_sentence} days past their due date" : "Reminders aren't set up") do %>
+  <%= link_to "Sales", sales_documents_path, class: "tc-btn tc-btn-ghost" %>
+  <% if tc_can?(:post) && @reminders.any? %>
+    <%= button_to "Send #{pluralize(@reminders.size, 'reminder')}", reminders_path, class: "tc-btn",
+                  form: { data: { controller: "confirm", confirm_message_value: "Email #{pluralize(@reminders.size, 'reminder')}, each as the reminder template says?", action: "submit->confirm#ask" } } %>
+  <% end %>
+<% end %>
+
+<% if days.empty? %>
+  <div class="tc-card tc-card-body text-sm space-y-2">
+    <p>Set <code>reminder_days</code> (for example <code>[7, 14, 30]</code>) to remind customers of overdue invoices on those days after the due date.</p>
+    <p class="tc-muted">Until then, an overdue invoice's page can send a reminder by hand.</p>
+  </div>
+<% else %>
+  <div class="tc-card overflow-x-auto">
+    <table class="tc-table">
+      <thead><tr><th>Invoice</th><th>Customer</th><th>Due</th><th class="tc-num">Days overdue</th><th class="tc-num">Still owing (<%= accounting_organization.currency %>)</th><th>Reminder</th></tr></thead>
+      <tbody>
+        <% if @reminders.empty? %>
+          <tr><td colspan="6" class="tc-muted text-center">No reminders are due.</td></tr>
+        <% end %>
+        <% @reminders.each do |reminder| %>
+          <% invoice = reminder.invoice %>
+          <tr data-reminder>
+            <td><%= link_to invoice.number_label, document_path(invoice), class: "underline" %></td>
+            <td><%= link_to invoice.contact.name, contact_path(invoice.contact), class: "underline" %>
+              <% if invoice.contact.email.blank? %><%= tc_badge "No email address", tone: :warning %><% end %></td>
+            <td class="whitespace-nowrap"><%= tc_date(invoice.due_on) %></td>
+            <td class="tc-num"><%= reminder.days_overdue %></td>
+            <td class="tc-num"><%= tc_money(invoice.amount_due) %></td>
+            <td><%= reminder.label %> <span class="tc-muted text-xs">(<%= reminder.days %> days)</span></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+  <p class="tc-hint mt-4">Each reminder goes once. Schedule <code>TudlaAccounting::SendRemindersJob</code> (daily, say) to send them without coming here.</p>
+<% end %>

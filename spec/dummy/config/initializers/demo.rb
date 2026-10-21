@@ -9,5 +9,8 @@ Rails.configuration.x.sign_in_organizations = ->(organizations) { organizations.
 # Who the demo's invoices are from, when printed and emailed (to files in tmp/mails).
 TudlaAccounting.configure do |config|
   config.document_mail_from = "Demo Co <accounts@demo-co.example>"
+  # Overdue customers are reminded a week, a fortnight and a month after the due date
+  # (by SendRemindersJob, in config/recurring.yml, or from Sales > Reminders due).
+  config.reminder_days = [ 7, 14, 30 ]
   config.document_header = ->(organization) { "#{organization.name}\n1 Demo Street, Sydney NSW 2000\nABN 12 345 678 901" }
 end

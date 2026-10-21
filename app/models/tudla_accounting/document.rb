@@ -124,6 +124,11 @@ module TudlaAccounting
       end
     end
 
+    # An approved invoice past its due date with something still owing.
+    def overdue?(today)
+      kind == "sales_invoice" && approved? && due_on.present? && due_on < today && amount_due.positive?
+    end
+
     # Numbers it and posts its entry, or (ArgumentError) does neither when it can't be
     # posted: nothing to charge, no receivable or payable account, a closed period...
     def approve!(at: Time.current)

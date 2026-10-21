@@ -74,7 +74,7 @@ module TudlaAccounting
                   :attachment_content_types, :attachment_max_size, :document_header,
                   :api_rate_limit, :api_rate_limit_store, :pdf_browser_options, :pdf_paper, :pdf_stylesheet,
                   :document_mailer, :document_mail_from, :document_mail_reply_to
-    attr_reader :carrying_amount_sources, :entry_sources, :entry_number_series, :document_number_format, :document_email_templates
+    attr_reader :carrying_amount_sources, :entry_sources, :entry_number_series, :document_number_format, :document_email_templates, :reminder_days
 
     def initialize
       @base_currency = "USD"
@@ -150,6 +150,19 @@ module TudlaAccounting
       @document_mail_from = nil
       @document_mail_reply_to = nil
       @document_email_templates = DOCUMENT_EMAIL_TEMPLATES
+      # When overdue invoices' customers are reminded: days after the due date (see
+      # reminder_days=). None by default.
+      @reminder_days = []
+    end
+
+    # The days after an invoice's due date at which its customer is emailed a reminder,
+    # e.g. [7, 14, 30]: whole days, kept in order. ReminderRunner (and SendRemindersJob,
+    # which the host schedules) sends each reminder that is due, once.
+    def reminder_days=(days)
+      days = Array(days).map { |day| Integer(day, exception: false) }
+      raise ArgumentError, "reminder_days must be whole numbers of days, more than zero" unless days.all? { |day| day&.positive? }
+
+      @reminder_days = days.uniq.sort.freeze
     end
 
     # The subject and message each kind of email starts with (they can be changed before

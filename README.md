@@ -108,6 +108,14 @@ TudlaAccounting::EmailDraft.for_payment(payment)                        # a rece
 
 Emails go through the host's own ActionMailer setup (delivery method, SMTP), from `document_mail_from` (text, or a callable given the organization; the host's ActionMailer default otherwise) and replying to `document_mail_reply_to`. `document_email_templates` changes each kind's subject and message, with placeholders such as `%{number}`, `%{total}`, `%{amount_due}` and `%{due_on}`. To send them another way, point `document_mailer` at a mailer of your own whose `delivery(delivery, pdf:, filename:)` returns the mail. The dummy app writes them to files in `spec/dummy/tmp/mails` in development.
 
+### Overdue reminders
+With `reminder_days` set (say `[7, 14, 30]`), customers of overdue invoices are emailed a reminder on those days after the due date, from the `reminder` template, with the invoice attached: **Sales → Reminders due** lists them (the latest day each invoice has reached; no catching up on earlier ones) and sends them all (`:post`), and `TudlaAccounting::SendRemindersJob`, which the host schedules (daily, in Solid Queue's `config/recurring.yml`, say), sends them for every organization. Each goes once: one already sent or on its way isn't sent again (a failed one is), nor is one for an invoice paid or void, and customers without an email address are named instead. An overdue invoice's page can also **Send reminder** by hand, any time.
+
+```ruby
+TudlaAccounting::ReminderRunner.due(organization: organization)  # => [#<Reminder invoice=... days=14 days_overdue=16>, ...]
+TudlaAccounting::ReminderRunner.call(organization: organization) # => #<Result sent=[...] no_address=[...]>
+```
+
 ### Payments
 `TudlaAccounting::Payment` is money received from a customer (`kind: "received"`) or paid to a supplier (`"paid"`), through a bank or cash account in the organization's currency. `Payment.record!` saves it and posts its entry straight away, dated `paid_on`, with the payment as its source: the bank account against the account marked receivable (or payable), opening a credit for the contact that is applied to the invoices or bills given, as much to each as said. What isn't applied stays as a credit, applied later from the entry's page as any credit is. With `bank_line:` it is matched to that bank statement line too. All or nothing; `ArgumentError` says what's wrong.
 
@@ -535,6 +543,7 @@ TudlaAccounting.configure do |config|
   config.document_mail_reply_to = "accounts@example.com"
   config.document_email_templates = { invoice: { subject: "Invoice %{number} from %{organization}" } } # over the defaults
   config.document_mailer = "TudlaAccounting::DocumentMailer" # or one of the host's: delivery(delivery, pdf:, filename:)
+  config.reminder_days = [ 7, 14, 30 ]   # days after the due date to remind customers of overdue invoices (none by default)
 
   # The JSON API (see API.md): requests a minute per token (nil for no limit), and where they're counted
   config.api_rate_limit = 300

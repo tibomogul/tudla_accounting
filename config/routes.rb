@@ -107,6 +107,8 @@ TudlaAccounting::Engine.routes.draw do
     collection { post :import }
   end
   get "sales", to: "documents#index", defaults: { side: "sales" }, as: :sales_documents
+  get "sales/reminders", to: "reminders#index", as: :reminders
+  post "sales/reminders", to: "reminders#create"
   get "purchases", to: "documents#index", defaults: { side: "purchases" }, as: :purchase_documents
   get "sales/payments", to: "payments#index", defaults: { kind: "received" }, as: :received_payments
   get "purchases/payments", to: "payments#index", defaults: { kind: "paid" }, as: :paid_payments

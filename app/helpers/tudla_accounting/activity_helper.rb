@@ -96,6 +96,7 @@ module TudlaAccounting
       when "statement" then [ subject, "'s statement" ]
       when "receipt" then [ "the receipt for ", subject ]
       when "payment_notice" then [ "the payment notice for ", subject ]
+      when "reminder" then [ "a reminder of ", subject ]
       else [ subject ]
       end
     end

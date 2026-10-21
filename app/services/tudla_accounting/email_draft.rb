@@ -12,10 +12,18 @@ module TudlaAccounting
     module_function
 
     def for_document(document)
-      template = document.kind == "sales_credit" ? "credit_note" : "invoice"
-      values = { number: document.number_label, kind: document.kind_label, total: document.total.format, amount_due: document.amount_due.format,
-                 issued_on: day(document.issued_on), due_on: day(document.due_on) }
-      draft("document", template, document.organization, document.contact, values)
+      draft("document", document.kind == "sales_credit" ? "credit_note" : "invoice", document.organization, document.contact, document_values(document))
+    end
+
+    # A reminder of an overdue invoice, for the reminder day it is (days after the due
+    # date; nil for one sent by hand before any of them).
+    def for_reminder(invoice, days:)
+      draft("reminder", "reminder", invoice.organization, invoice.contact, document_values(invoice)).merge(stage: days)
+    end
+
+    def document_values(document)
+      { number: document.number_label, kind: document.kind_label, total: document.total.format, amount_due: document.amount_due.format,
+        issued_on: day(document.issued_on), due_on: day(document.due_on) }
     end
 
     # A statement's (a PartyStatement), to its customer or supplier: their contact, or a host

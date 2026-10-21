@@ -17,8 +17,15 @@ production:
   tudla_accounting_recurring_entries:
     class: TudlaAccounting::RecurringEntriesJob
     schedule: every day at 1am
+  # Emails the overdue-invoice reminders due each day (see TudlaAccounting::SendRemindersJob).
+  tudla_accounting_reminders:
+    class: TudlaAccounting::SendRemindersJob
+    schedule: every day at 9am
 
 development:
   tudla_accounting_recurring_entries:
     class: TudlaAccounting::RecurringEntriesJob
     schedule: every day at 1am
+  tudla_accounting_reminders:
+    class: TudlaAccounting::SendRemindersJob
+    schedule: every day at 9am

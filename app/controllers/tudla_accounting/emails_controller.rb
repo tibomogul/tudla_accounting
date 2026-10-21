@@ -1,6 +1,6 @@
 module TudlaAccounting
   # Emailing to customers and suppliers (see Delivery): an invoice or credit note
-  # (document_id), a payment's receipt or payment notice (payment_id), or a statement of
+  # (document_id; with reminder, a reminder of an overdue invoice), a payment's receipt or payment notice (payment_id), or a statement of
   # account (type, party, from, thru and show, as the statement page has them). The email
   # is shown to check and change, then queued. Also every statement with something to
   # send at once, and sending one again. Needs :post.
@@ -16,7 +16,7 @@ module TudlaAccounting
     def create
       permitted = params.require(:delivery).permit(:to, :cc, :subject_line, :message)
       @delivery = Delivery.request!(subject: @subject, organization: accounting_organization, kind: @draft[:kind], details: @draft.fetch(:details, {}),
-                                    **permitted.to_h.symbolize_keys)
+                                    stage: @draft[:stage], **permitted.to_h.symbolize_keys)
       redirect_to @back, notice: "Emailing #{@title} to #{@delivery.to}."
     rescue ActiveRecord::RecordInvalid => e
       @delivery = e.record
@@ -61,15 +61,30 @@ module TudlaAccounting
       end
     end
 
-    # An approved invoice or credit note: what goes to customers.
+    # An approved invoice or credit note: what goes to customers. Or a reminder of an
+    # invoice past its due date with something still owing, for the reminder day it has
+    # reached (if any).
     def document_target
       @subject = organization_scope(Document).approved.where(kind: %w[sales_invoice sales_credit]).find(params[:document_id])
-      @draft = EmailDraft.for_document(@subject)
-      @title = @subject.title.downcase_first
       @recipient = @subject.contact.name
       @back = document_path(@subject)
       @attachment = "#{@subject.number_label}.pdf"
-      @target = { document_id: @subject.id }
+      if params[:reminder].present?
+        raise ActiveRecord::RecordNotFound unless @subject.overdue?(today)
+
+        days = TudlaAccounting.configuration.reminder_days.select { |day| day <= (today - @subject.due_on).to_i }.max
+        @draft = EmailDraft.for_reminder(@subject, days: days)
+        @title = "a reminder of #{@subject.title.downcase_first}"
+        @target = { document_id: @subject.id, reminder: 1 }
+      else
+        @draft = EmailDraft.for_document(@subject)
+        @title = @subject.title.downcase_first
+        @target = { document_id: @subject.id }
+      end
+    end
+
+    def today
+      ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].today
     end
 
     def payment_target
