@@ -214,7 +214,7 @@
   .tc-app [data-statement] { border: 0; padding: 0; }
   .tc-app [data-statement] + [data-statement] { break-before: page; }
   /* So does an invoice, bill or credit note. */
-  .tc-app main:has([data-document]) > :not([data-document]) { display: none; }
+  .tc-app main:has([data-document]) > :not([data-document], :has([data-document])) { display: none; }
   .tc-app [data-document] { border: 0; padding: 0; }
   .tc-print-wide { font-size: 0.75rem; }
   .tc-print-wide td, .tc-print-wide th { padding: 0.25rem 0.375rem; }

@@ -23,6 +23,13 @@ module TudlaAccounting
     end
 
     def show
+      respond_to do |format|
+        format.html
+        format.pdf do
+          name = "#{@payment.received? ? 'receipt' : 'payment-notice'}-#{@payment.contact.name}-#{@payment.paid_on}"
+          send_pdf(name, fallback: payment_path(@payment)) { PdfMaker.payment(@payment) }
+        end
+      end
     end
 
     # A payment from (or to) a contact, with their open invoices (or bills) to apply it to;

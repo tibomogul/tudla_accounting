@@ -1,6 +1,10 @@
 <% received = @payment.received? %>
 <%= tc_page_header "#{@payment.title} of #{@payment.amount.format}", subtitle: tc_date(@payment.paid_on) do %>
   <%= link_to (received ? "Payments received" : "Payments made"), (received ? received_payments_path : paid_payments_path), class: "tc-btn tc-btn-ghost" %>
+  <% if TudlaAccounting.pdf? %>
+    <%= link_to (received ? "Download receipt" : "Download payment notice"), payment_path(@payment, format: :pdf), class: "tc-btn tc-btn-ghost", data: { turbo: false } %>
+  <% end %>
+  <button type="button" class="tc-btn tc-btn-ghost" data-controller="print" data-action="print#print"><%= received ? "Print receipt" : "Print payment notice" %></button>
 <% end %>
 
 <div class="mb-4 flex flex-wrap items-center gap-3 text-sm">
@@ -54,3 +58,8 @@
     <% end %>
   </details>
 <% end %>
+
+<section class="mt-6 space-y-2" aria-labelledby="notice-heading">
+  <h2 id="notice-heading" class="tc-card-title print:hidden"><%= received ? "The receipt, as it prints" : "The payment notice, as it prints" %></h2>
+  <%= render "notice", payment: @payment %>
+</section>

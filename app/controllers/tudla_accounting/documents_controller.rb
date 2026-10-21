@@ -26,7 +26,10 @@ module TudlaAccounting
     end
 
     def show
-      @applied = applied(@document)
+      respond_to do |format|
+        format.html { @applied = applied(@document) }
+        format.pdf { send_pdf(@document.number_label || "draft-#{@document.kind.dasherize}-#{@document.id}", fallback: document_path(@document)) { PdfMaker.document(@document) } }
+      end
     end
 
     # A new draft of a kind (an invoice by default), for a contact when one is given; or

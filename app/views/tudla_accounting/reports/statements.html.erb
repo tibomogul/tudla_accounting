@@ -2,7 +2,7 @@
 <%= tc_page_header "All #{party_name}s' statements",
                    subtitle: "#{@statements.size} to send: #{@open_items ? "every #{party_name} with anything open at the end" : "every #{party_name} with a balance or activity"}, one to a printed page" do %>
   <%= link_to "One #{party_name}", reports_statement_path(type: @type, from: @from, thru: @thru, show: (@open_items ? "open_items" : nil)), class: "tc-btn tc-btn-ghost print:hidden" %>
-  <%= render "download" %>
+  <%= render "download", pdf: true %>
 <% end %>
 
 <%= render "statement_form", url: reports_statements_path, chosen: false %>

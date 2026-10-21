@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <title><%= @title %></title>
+  <%# Everything inline: the browser making the PDF loads nothing from anywhere. %>
+  <style><%= raw TudlaAccounting::PdfMaker.stylesheet %></style>
+</head>
+<body class="tc-app">
+  <main><%= yield %></main>
+</body>
+</html>

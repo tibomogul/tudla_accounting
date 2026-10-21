@@ -85,6 +85,17 @@ invoice.void!(on: Date.current, reason: "Issued twice") # reverses its entry
 
 The **Sales** and **Purchases** pages list them, searched by number, reference or contact, by kind and status (draft, awaiting payment, part paid, overdue, paid, void), with what is still owed, and download as CSV. The form fills in the contact's payment terms, default account and tax code, and adds up the lines as they're typed. Each document's page prints (or saves as a PDF) as the document itself, headed by the `document_header` setting, and shows the payments and credits applied to it; an approved invoice or bill offers a credit note copying its lines. Drafting needs `:record`; approving and voiding need `:post`.
 
+### PDFs
+With the `ferrum` gem in the host's bundle (the engine doesn't depend on it) and Chrome or Chromium on the server, the engine makes PDFs of what goes to customers and suppliers, from the same layouts the pages print: an invoice, bill or credit note, a statement of account (or every statement at once, one to a page), and a payment, as a receipt (money received) or a payment notice (money paid, with the bills it paid). Their pages get a **Download PDF** button; without `ferrum` they offer printing only (`TudlaAccounting.pdf?` says which).
+
+```ruby
+TudlaAccounting::PdfMaker.document(invoice)                          # => the PDF's bytes
+TudlaAccounting::PdfMaker.statements([ statement ], open_items: false)
+TudlaAccounting::PdfMaker.payment(payment)
+```
+
+The page is rendered with the engine's styles inline (the host's compiled `tailwind.css`, or the `pdf_stylesheet` setting) and the browser is barred from fetching anything, so making a PDF reaches nothing on the network. `pdf_browser_options` passes options to `Ferrum::Browser` (Chrome's path, a timeout; in a container that can't sandbox Chrome, `browser_options: { "no-sandbox" => nil }`), and `pdf_paper` picks A4 or Letter. A PDF that can't be made raises `PdfMaker::Error`; the pages say why.
+
 ### Payments
 `TudlaAccounting::Payment` is money received from a customer (`kind: "received"`) or paid to a supplier (`"paid"`), through a bank or cash account in the organization's currency. `Payment.record!` saves it and posts its entry straight away, dated `paid_on`, with the payment as its source: the bank account against the account marked receivable (or payable), opening a credit for the contact that is applied to the invoices or bills given, as much to each as said. What isn't applied stays as a credit, applied later from the entry's page as any credit is. With `bank_line:` it is matched to that bank statement line too. All or nothing; `ArgumentError` says what's wrong.
 
@@ -501,6 +512,11 @@ TudlaAccounting.configure do |config|
   # Invoices, bills and credit notes (the engine's own documents)
   config.document_number_format = { "sales_invoice" => "%<number>05d" } # over INV-0001, CN-0001, BILL-0001, SC-0001; or ->(document) { ... }
   config.document_header = ->(organization) { "#{organization.name}\n#{organization.address}" } # who a printed document is from
+
+  # PDFs (with the ferrum gem): Ferrum::Browser options, the paper, and the compiled stylesheet
+  config.pdf_browser_options = { browser_path: "/usr/bin/chromium", timeout: 60 }
+  config.pdf_paper = :A4                  # or :Letter
+  config.pdf_stylesheet = nil             # found among the host's assets as tailwind.css; or a path, or ->{ css }
 
   # The JSON API (see API.md): requests a minute per token (nil for no limit), and where they're counted
   config.api_rate_limit = 300

@@ -1,0 +1,48 @@
+<%# locals: (payment:) %>
+<%# A payment as it goes to the contact: a receipt for money received, a payment notice
+    (remittance advice) for money paid, with what it paid. It prints on its own. %>
+<% received = payment.received? %>
+<article class="tc-card tc-card-body space-y-6" data-document aria-label="<%= received ? "Receipt" : "Payment notice" %>">
+  <header class="flex flex-wrap justify-between gap-6">
+    <div class="whitespace-pre-line text-sm"><%= TudlaAccounting.configuration.document_header_for(payment.organization) %></div>
+    <div class="text-right">
+      <h2 class="text-2xl font-bold tracking-tight"><%= received ? "Receipt" : "Payment notice" %><%= " (void)" if payment.void? %></h2>
+      <dl class="mt-2 grid grid-cols-[auto_auto] justify-end gap-x-4 gap-y-1 text-sm">
+        <dt class="tc-muted">Date</dt><dd><%= tc_date(payment.paid_on) %></dd>
+        <% if payment.reference %><dt class="tc-muted">Reference</dt><dd><%= payment.reference %></dd><% end %>
+      </dl>
+    </div>
+  </header>
+
+  <section class="text-sm" aria-label="<%= received ? "From" : "To" %>">
+    <p class="tc-muted"><%= received ? "Received from" : "Paid to" %></p>
+    <p class="font-semibold"><%= payment.contact.name %></p>
+    <% if payment.contact.address %><p class="whitespace-pre-line"><%= payment.contact.address %></p><% end %>
+  </section>
+
+  <% applications = payment.applications.select { |_target, _amount, allocation| allocation.active? } %>
+  <table class="tc-table">
+    <thead><tr><th><%= received ? "For invoice" : "For bill" %></th><th>Dated</th><th class="tc-num">Amount (<%= payment.organization.currency %>)</th></tr></thead>
+    <tbody>
+      <% applications.each do |target, amount, _allocation| %>
+        <tr>
+          <% if target.is_a?(TudlaAccounting::Document) %>
+            <td><%= target.number_label %><%= " (your #{target.reference})" if target.purchases? && target.reference %></td>
+            <td><%= tc_date(target.issued_on) %></td>
+          <% else %>
+            <td><%= target.reference || target.particulars %></td>
+            <td><%= tc_date(target.transacted_at) %></td>
+          <% end %>
+          <td class="tc-num"><%= tc_money(amount) %></td>
+        </tr>
+      <% end %>
+      <% if payment.unapplied.positive? %>
+        <tr><td colspan="2"><%= received ? "Held as a credit to your account" : "Paid in advance, held as a credit" %></td><td class="tc-num"><%= tc_money(payment.unapplied) %></td></tr>
+      <% end %>
+    </tbody>
+    <tfoot>
+      <tr class="font-semibold"><td colspan="2" class="text-right"><%= received ? "Total received" : "Total paid" %></td><td class="tc-num"><%= tc_money(payment.amount) %></td></tr>
+    </tfoot>
+  </table>
+
+</article>

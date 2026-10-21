@@ -1,7 +1,8 @@
 <% sales = @document.sales? %>
 <%= tc_page_header @document.title, subtitle: @document.contact.name do %>
   <%= link_to (sales ? "Sales" : "Purchases"), (sales ? sales_documents_path : purchase_documents_path), class: "tc-btn tc-btn-ghost" %>
-  <button type="button" class="tc-btn tc-btn-ghost" data-controller="print" data-action="print#print">Print or save as PDF</button>
+  <% if TudlaAccounting.pdf? %><%= link_to "Download PDF", document_path(@document, format: :pdf), class: "tc-btn tc-btn-ghost", data: { turbo: false } %><% end %>
+  <button type="button" class="tc-btn tc-btn-ghost" data-controller="print" data-action="print#print"><%= TudlaAccounting.pdf? ? "Print" : "Print or save as PDF" %></button>
   <% if @document.draft? %>
     <% if tc_can?(:record) %>
       <%= link_to "Edit", edit_document_path(@document), class: "tc-btn tc-btn-secondary" %>

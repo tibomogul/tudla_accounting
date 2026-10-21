@@ -110,7 +110,9 @@ module TudlaAccounting
         @statement = PartyStatement.call(organization: accounting_organization, type: @type, party: party, from: @from, thru: @thru)
       end
       name = "statement-#{PartyStatement.party_name(party).parameterize if party}-#{@open_items ? "open-items-#{@thru}" : "#{@from}-to-#{@thru}"}"
-      respond_with_table(name, available: !@statement.nil?) { Reports::Tables.party_statement(@statement, open_items: @open_items) }
+      respond_with_table(name, available: !@statement.nil?, pdf: -> { PdfMaker.statements([ @statement ], open_items: @open_items) }) do
+        Reports::Tables.party_statement(@statement, open_items: @open_items)
+      end
     end
 
     # Every customer's (or supplier's) statement with something to send, one to a printed
@@ -121,7 +123,9 @@ module TudlaAccounting
       @statements = @parties.map { |party| PartyStatement.call(organization: accounting_organization, type: @type, party: party, from: @from, thru: @thru) }
                             .reject { |statement| @open_items ? statement.open_items.empty? : statement.empty? }
       name = "statements-#{PartyStatement::PARTY_NAMES.fetch(@type).downcase.pluralize}-#{@open_items ? "open-items-#{@thru}" : "#{@from}-to-#{@thru}"}"
-      respond_with_table(name, available: true) { Reports::Tables.party_statements(@statements, type: @type, open_items: @open_items) }
+      respond_with_table(name, available: true, pdf: -> { PdfMaker.statements(@statements, open_items: @open_items) }) do
+        Reports::Tables.party_statements(@statements, type: @type, open_items: @open_items)
+      end
     end
 
     private
@@ -147,11 +151,13 @@ module TudlaAccounting
     end
 
     # The page (html, when given, prepares it), or the table the block gives as CSV, or as
-    # an Excel workbook when the host has caxlsx. Not found when there is nothing to export
-    # (no periods yet, say) or no Excel. The workbook's sheet is named after the file.
-    def respond_with_table(name, available: !@report.nil?, html: nil, &table)
+    # an Excel workbook when the host has caxlsx, or (pdf, when given) the PDF it makes.
+    # Not found when there is nothing to export (no periods yet, say), or no Excel or PDFs.
+    # The workbook's sheet is named after the file.
+    def respond_with_table(name, available: !@report.nil?, html: nil, pdf: nil, &table)
       respond_to do |format|
         format.html { html&.call }
+        format.pdf { pdf && available ? send_pdf(name, fallback: request.path) { pdf.call } : head(:not_found) }
         format.csv { available ? send_data(table.call.to_csv, filename: "#{name}.csv", type: "text/csv") : head(:not_found) }
         format.xlsx do
           next head(:not_found) unless available && TudlaAccounting.xlsx?

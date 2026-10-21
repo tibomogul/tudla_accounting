@@ -1,0 +1,7 @@
+<%# locals: (partial:, locals:, collection: nil, as: nil) %>
+<%# What PdfMaker makes a PDF of: a partial the pages print, once or for each of a collection. %>
+<% if collection %>
+  <%= render partial: partial, collection: collection, as: as, locals: locals %>
+<% else %>
+  <%= render partial: partial, locals: locals %>
+<% end %>

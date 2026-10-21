@@ -66,6 +66,16 @@ module TudlaAccounting
       render "tudla_accounting/shared/not_allowed", status: :forbidden, locals: { permission: permission } unless tc_can?(permission)
     end
 
+    # The PDF the block makes, as a download named filename (.pdf), or not found when the
+    # engine can't make PDFs; back to fallback, saying why, when this one couldn't be made.
+    def send_pdf(filename, fallback:)
+      return head(:not_found) unless TudlaAccounting.pdf?
+
+      send_data yield, filename: "#{filename.parameterize(preserve_case: true)}.pdf", type: "application/pdf", disposition: "attachment"
+    rescue PdfMaker::Error => e
+      redirect_to fallback, alert: "#{e.message}."
+    end
+
     # Cents for a typed amount ("1,234.50"), nil when blank; yields when it isn't a number.
     def amount_cents(text, currency)
       text = text.to_s.strip.delete(",")

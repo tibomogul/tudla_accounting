@@ -71,7 +71,7 @@ module TudlaAccounting
                   :parent_controller, :current_organization, :current_actor, :authorize,
                   :cash_account_codes, :tax_basis, :organization_label, :entry_number_format,
                   :attachment_content_types, :attachment_max_size, :document_header,
-                  :api_rate_limit, :api_rate_limit_store
+                  :api_rate_limit, :api_rate_limit_store, :pdf_browser_options, :pdf_paper, :pdf_stylesheet
     attr_reader :carrying_amount_sources, :entry_sources, :entry_number_series, :document_number_format
 
     def initialize
@@ -131,6 +131,14 @@ module TudlaAccounting
       # must count across processes, as Solid Cache and Redis do, to limit them all).
       @api_rate_limit = 300
       @api_rate_limit_store = nil
+      # PDFs (with the ferrum gem; see TudlaAccounting.pdf?): options for Ferrum::Browser,
+      # e.g. { browser_path: "/usr/bin/chromium", timeout: 60 } (and, in a container that
+      # can't sandbox Chrome, browser_options: { "no-sandbox" => nil }); the paper size
+      # (:A4 or :Letter); and the compiled stylesheet with the engine's styles, a path or
+      # a callable returning the CSS, found among the host's assets as "tailwind.css" when nil.
+      @pdf_browser_options = {}
+      @pdf_paper = :A4
+      @pdf_stylesheet = nil
     end
 
     DOCUMENT_NUMBER_FORMAT = { "sales_invoice" => "INV-%<number>04d", "sales_credit" => "CN-%<number>04d",
@@ -261,6 +269,20 @@ module TudlaAccounting
 
     @xlsx = begin
       require "caxlsx"
+      true
+    rescue LoadError
+      false
+    end
+  end
+
+  # Whether the engine can make PDFs: the host app bundles the ferrum gem (the engine
+  # doesn't depend on it) and the server has Chrome or Chromium for it to drive. The pages
+  # offer printing only otherwise.
+  def self.pdf?
+    return @pdf if defined?(@pdf)
+
+    @pdf = begin
+      require "ferrum"
       true
     rescue LoadError
       false

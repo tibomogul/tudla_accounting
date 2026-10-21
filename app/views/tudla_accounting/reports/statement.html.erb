@@ -3,7 +3,7 @@
 <%= tc_page_header "Statements", subtitle: "A customer's or supplier's account with #{accounting_organization.name}, to send them" do %>
   <%= link_to "All #{party_name.downcase.pluralize}", reports_statements_path(type: @type, from: @from, thru: @thru, show: (@open_items ? "open_items" : nil)),
               class: "tc-btn tc-btn-ghost print:hidden" %>
-  <% if @statement %><%= render "download" %><% end %>
+  <% if @statement %><%= render "download", pdf: true %><% end %>
 <% end %>
 
 <%= render "statement_form", url: reports_statement_path, chosen: chosen %>

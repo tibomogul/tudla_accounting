@@ -2,11 +2,11 @@
 <%# A statement of account (a PartyStatement) as it is sent: its activity, or (open_items)
     what was open at the end, then the aging and the amount due. It prints on its own. %>
 <% foreign = statement.foreign? %>
-<% currency = accounting_organization.currency %>
+<% currency = statement.organization.currency %>
 <article class="tc-card tc-card-body space-y-6 mb-6" data-statement>
   <header class="flex flex-wrap justify-between gap-4">
     <div>
-      <p class="tc-muted text-sm"><%= accounting_organization.name %></p>
+      <p class="tc-muted text-sm whitespace-pre-line" data-from><%= TudlaAccounting.configuration.document_header_for(statement.organization) %></p>
       <h2 class="text-xl font-semibold">Statement of account</h2>
       <p class="font-semibold mt-2" data-party><%= related_party_name(statement.party) %></p>
     </div>
@@ -27,8 +27,8 @@
             <% item = line[:carrying_amount] %>
             <tr>
               <td class="whitespace-nowrap"><%= tc_date(line[:entry].transacted_at) %></td>
-              <td><%= line[:entry].reference || line[:entry].number_label %></td>
-              <td><%= link_to line[:entry].particulars, entry_path(line[:entry]) %></td>
+              <td class="whitespace-nowrap"><%= line[:entry].reference || line[:entry].number_label %></td>
+              <td class="min-w-48"><%= link_to line[:entry].particulars, entry_path(line[:entry]) %></td>
               <td class="whitespace-nowrap"><%= line[:credit] ? tc_badge("Credit to apply") : (tc_date(item.due_date) || "—") %></td>
               <td class="tc-num"><%= line[:days_outstanding] if line[:days_outstanding].positive? %></td>
               <% if foreign %><td class="tc-num whitespace-nowrap"><%= Money.new(item.forex.other_currency_amount_cents, item.forex.other_currency).format if item.forex %></td><% end %>
@@ -51,8 +51,8 @@
             <tr data-line>
               <td class="whitespace-nowrap"><%= tc_date(line.date) %></td>
               <td><%= line.entry ? line.kind : tag.span(line.kind, class: "tc-muted") %></td>
-              <td><%= line.entry && (line.entry.reference || line.entry.number_label) %></td>
-              <td><%= link_to line.entry.particulars, entry_path(line.entry) if line.entry %></td>
+              <td class="whitespace-nowrap"><%= line.entry && (line.entry.reference || line.entry.number_label) %></td>
+              <td class="min-w-48"><%= link_to line.entry.particulars, entry_path(line.entry) if line.entry %></td>
               <td class="whitespace-nowrap"><%= tc_date(line.due_date) %></td>
               <% if foreign %><td class="tc-num whitespace-nowrap"><%= line.foreign.abs.format if line.foreign %></td><% end %>
               <td class="tc-num"><%= tc_money(line.charge) %></td>

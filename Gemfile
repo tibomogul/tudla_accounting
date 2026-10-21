@@ -21,6 +21,8 @@ group :development, :test do
   gem "debug", ">= 1.0.0"
   gem "spreadsheet" # for the optional RbaForexRateProvider (host apps add it to use it)
   gem "caxlsx", "~> 4.1" # for the optional Excel downloads of reports (host apps add it to use them)
+  gem "ferrum", "~> 0.17" # for the optional PDFs, through headless Chrome (host apps add it to use them)
+  gem "pdf-reader", "~> 2.14" # to read the text of the PDFs in specs
 end
 
 # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
