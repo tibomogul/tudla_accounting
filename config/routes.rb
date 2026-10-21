@@ -1,6 +1,21 @@
 TudlaAccounting::Engine.routes.draw do
   root to: "dashboard#index"
 
+  # The JSON API; see API.md.
+  namespace :api, defaults: { format: :json } do
+    namespace :v1 do
+      get "organization", to: "organizations#show"
+      resources :accounts, only: %i[index show]
+      resources :entries, only: %i[index show]
+      resources :contacts, only: %i[index show]
+      resources :documents, only: %i[index show]
+      resources :payments, only: %i[index show]
+      resources :tax_codes, only: :index
+      resources :periods, only: :index
+      get "reports/:report", to: "reports#show", as: :report
+    end
+  end
+
   resources :accounts do
     member do
       post :deactivate

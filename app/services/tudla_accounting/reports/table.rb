@@ -49,6 +49,17 @@ module TudlaAccounting
         package.to_stream.read
       end
 
+      # For the JSON API: the headings, and each row's cells (amounts as plain decimal
+      # strings, "-1234.50"; dates as ISO 8601), total rows marked.
+      def as_api
+        headings, *body = rows
+        { headings: headings, rows: body.map { |row| { cells: row.map { |cell| self.class.api_cell(cell) }, total: row.is_a?(TotalRow) } } }
+      end
+
+      def self.api_cell(cell)
+        cell.is_a?(String) ? cell : csv_cell(cell)
+      end
+
       def self.csv_cell(cell)
         case cell
         when Money then cell.format(symbol: false, thousands_separator: "", decimal_mark: ".")

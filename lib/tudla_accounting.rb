@@ -70,7 +70,8 @@ module TudlaAccounting
                   :due_date_method, :related_party_method, :forex_rate_provider,
                   :parent_controller, :current_organization, :current_actor, :authorize,
                   :cash_account_codes, :tax_basis, :organization_label, :entry_number_format,
-                  :attachment_content_types, :attachment_max_size, :document_header
+                  :attachment_content_types, :attachment_max_size, :document_header,
+                  :api_rate_limit, :api_rate_limit_store
     attr_reader :carrying_amount_sources, :entry_sources, :entry_number_series, :document_number_format
 
     def initialize
@@ -125,6 +126,11 @@ module TudlaAccounting
       #   ->(organization) { [ organization.name, organization.address, "ABN #{organization.abn}" ].join("\n") }
       # Without one, the organization's name (or organization_label).
       @document_header = nil
+      # How many requests an API token may make a minute (nil for no limit), counted in
+      # api_rate_limit_store (an ActiveSupport::Cache store; Rails.cache when nil, which
+      # must count across processes, as Solid Cache and Redis do, to limit them all).
+      @api_rate_limit = 300
+      @api_rate_limit_store = nil
     end
 
     DOCUMENT_NUMBER_FORMAT = { "sales_invoice" => "INV-%<number>04d", "sales_credit" => "CN-%<number>04d",

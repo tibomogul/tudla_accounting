@@ -112,6 +112,9 @@ token.revoke!
 
 A token acts as itself: what it does is on the audit trail under its name ("API token Online shop"), and `last_used_at` says when it was last used (to the minute). Tokens can't be changed or deleted, only revoked, which stops them at once. **Setup → API tokens** (`:administer`) issues them (showing the secret once, on a page that isn't cached), lists them with what each can do and when it was last used, and revokes them. On the audit trail as `api_token.created` and `api_token.revoked`.
 
+### JSON API
+Other systems can read the books over HTTP at `<engine path>/api/v1` (`/tudla_accounting/api/v1` in the dummy app) with an API token sent as `Authorization: Bearer tudla_...`: the organization, accounts, entries with their lines, contacts, invoices and bills with what is owed, payments with what they paid, tax codes, periods, and the reports. The token picks the organization and needs the `read` permission; the host's sign-in doesn't apply. Each token may make `api_rate_limit` requests a minute (300 by default). Amounts are decimal strings, lists are paged, and `updated_since` returns what changed, for syncing. See [API.md](API.md) for every endpoint.
+
 ### Customer and supplier statements
 `TudlaAccounting::PartyStatement` is a statement of account for one customer (`type: :receivable`) or supplier (`:payable`) over a run of days, as it would be sent to them:
 
@@ -498,6 +501,10 @@ TudlaAccounting.configure do |config|
   # Invoices, bills and credit notes (the engine's own documents)
   config.document_number_format = { "sales_invoice" => "%<number>05d" } # over INV-0001, CN-0001, BILL-0001, SC-0001; or ->(document) { ... }
   config.document_header = ->(organization) { "#{organization.name}\n#{organization.address}" } # who a printed document is from
+
+  # The JSON API (see API.md): requests a minute per token (nil for no limit), and where they're counted
+  config.api_rate_limit = 300
+  config.api_rate_limit_store = nil # Rails.cache
 
   # Foreign exchange: where missing rates come from (gains and losses go to the accounts
   # marked unrealized_fx_gain and realized_fx_gain)
