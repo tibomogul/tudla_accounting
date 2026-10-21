@@ -35,7 +35,10 @@
             <% lines.each do |line| %>
               <tr>
                 <td class="whitespace-nowrap"><%= tc_date(line.date) %></td>
-                <td><%= link_to entry_title(line.entry), entry_path(line.entry), class: "underline" %></td>
+                <td>
+                  <%= link_to entry_title(line.entry), entry_path(line.entry), class: "underline" %>
+                  <% if line.detail.description %><div class="tc-muted text-xs"><%= line.detail.description %></div><% end %>
+                </td>
                 <td class="tc-num"><%= tc_money(line.debit) %></td>
                 <td class="tc-num"><%= tc_money(line.credit) %></td>
                 <td class="tc-num"><%= tc_money(line.balance) %></td>

@@ -156,11 +156,13 @@ RSpec.describe "Bank reconciliation", type: :service do
       expect(entry).to have_attributes(particulars: "Interest March", transacted_at: on(3, 4), posted_at: on(3, 4))
       expect(entry.details.map { |d| [ d.account.code, d.tally, d.amount_cents ] }).to contain_exactly([ "1000", "debit", 80 ], [ "3000", "credit", 80 ])
       expect(line("Interest").details.map(&:entry)).to eq([ entry ])
+      expect(entry.details.map { |d| [ d.account.code, d.description ] }).to contain_exactly([ "1000", "Interest" ], [ "3000", nil ]) # the statement's words kept
 
       fee = reconciler.create_entry!(TudlaAccounting::BankStatementLine.create!(organization: organization, account: bank, occurred_on: Date.new(2026, 3, 9),
                                                                                 description: "Card fee", amount_cents: -2_00, currency: "AUD", external_id: "x"),
                                      account: account("6100"))
       expect(fee.particulars).to eq("Card fee")
+      expect(fee.details.map(&:description)).to eq([ nil, nil ]) # nothing more to say
       expect(fee.details.find { |d| d.account == bank }).to be_credit
 
       expect { reconciler.create_entry!(line("Interest"), account: account("3000")) }.to raise_error(ArgumentError, "That statement line is matched already")

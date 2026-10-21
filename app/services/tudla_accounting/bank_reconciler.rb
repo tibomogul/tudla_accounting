@@ -115,7 +115,8 @@ module TudlaAccounting
     # currency, converted at rate (units of the organization's currency per unit of the
     # account's; by default the forex rate provider's rate for the line's date), and the
     # bank line carries the statement amount as its foreign amount, as does the other line
-    # when its account is held in the same currency.
+    # when its account is held in the same currency. Given other particulars, the bank
+    # line keeps the statement's description.
     def create_entry!(line, account:, particulars: nil, rate: nil)
       raise ArgumentError, "Choose another account than the bank account" if account == self.account
       raise ArgumentError, "That statement line is matched already" if line.matched?
@@ -131,6 +132,7 @@ module TudlaAccounting
         [ [ self.account, money_in ], [ account, !money_in ] ].each do |each_account, debit|
           detail = entry.details.build(account: each_account, tally: debit ? Detail::TALLY_DEBIT : Detail::TALLY_CREDIT, amount_cents: cents,
                                        currency: @organization.currency)
+          detail.description = line.description if each_account == self.account && entry.particulars != line.description
           if rate && each_account.currency == self.account.currency
             detail.build_foreign_exchange(other_currency: currency, other_currency_cents: foreign_cents, rate: rate)
           end

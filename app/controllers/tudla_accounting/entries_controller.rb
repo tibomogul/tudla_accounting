@@ -76,11 +76,12 @@ module TudlaAccounting
 
     private
 
-    # Entries whose particulars or reference contain the text, or numbered as typed: "42",
+    # Entries whose particulars, reference or a line's description contain the text, or numbered as typed: "42",
     # "#42" or "JE-00042" (any prefix, without spaces, then the number).
     def search(entries, text)
       pattern = "%#{Entry.sanitize_sql_like(text)}%"
       found = entries.where("particulars ILIKE :pattern OR reference ILIKE :pattern", pattern: pattern)
+        .or(entries.where(id: Detail.where("description ILIKE ?", pattern).select(:entry_id)))
       number = text[/\A[^\d\s]*(\d+)\z/, 1]
       number ? found.or(entries.where(number: number.to_i)) : found
     end
@@ -105,12 +106,12 @@ module TudlaAccounting
     # The form's lines, with separate debit and credit columns, as detail attributes, and
     # anything wrong with them that the model can't tell (e.g. both columns filled in).
     def entry_attributes
-      permitted = params.require(:entry).permit(:particulars, :reference, :transacted_at, :tax_inclusive, lines: [ :id, :account_id, :debit, :credit, :tax_code_id, :_destroy, { dimensions: {} } ])
+      permitted = params.require(:entry).permit(:particulars, :reference, :transacted_at, :tax_inclusive, lines: [ :id, :account_id, :debit, :credit, :description, :tax_code_id, :_destroy, { dimensions: {} } ])
       currency = accounting_organization.currency
       problems = []
       rows = permitted.fetch(:lines, {}).to_h.values
       lines = rows.each_with_index.filter_map do |line, index|
-        next if line[:id].blank? && line.values_at(:account_id, :debit, :credit).all?(&:blank?) # an unused blank row
+        next if line[:id].blank? && line.values_at(:account_id, :debit, :credit, :description).all?(&:blank?) # an unused blank row
 
         debit = amount_cents(line[:debit], currency) { problems << "Line #{index + 1}: #{line[:debit]} isn't an amount" }
         credit = amount_cents(line[:credit], currency) { problems << "Line #{index + 1}: #{line[:credit]} isn't an amount" }
@@ -119,7 +120,7 @@ module TudlaAccounting
         { id: line[:id].presence, _destroy: line[:_destroy],
           account_id: (organization_scope(Account).find(line[:account_id]).id if line[:account_id].present?),
           tally: (credit && !debit ? Detail::TALLY_CREDIT : Detail::TALLY_DEBIT),
-          amount_cents: (debit || credit).to_i, currency: currency }.compact
+          amount_cents: (debit || credit).to_i, currency: currency }.compact.merge(description: line[:description])
           .merge(tax_code_id: line[:tax_code_id].presence, tax_role: nil) # tagged by tax_lines
           .merge(dimension_tags(line))
       end

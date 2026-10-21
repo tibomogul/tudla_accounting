@@ -33,7 +33,7 @@ RSpec.describe "Entering a journal entry", type: :system do
     expect_status("Not balanced: debits are 250.50 more.")
 
     click_button "Add line"
-    within(line(2)) { select "4000 - Sales", from: "Account"; fill_in "Credit", with: "250.50" }
+    within(line(2)) { select "4000 - Sales", from: "Account"; fill_in "Credit", with: "250.50"; fill_in "Description", with: "Stock sold to the owner" }
     expect_status("Balanced: debits equal credits (1,250.50).")
 
     click_button "Save draft"
@@ -45,6 +45,7 @@ RSpec.describe "Entering a journal entry", type: :system do
     entry = TudlaAccounting::Entry.find_by(particulars: "Opening capital")
     expect(entry).to be_posted
     expect(entry.details.sum(:amount_cents)).to eq(2 * 1250_50)
+    expect(entry.details.filter_map(&:description)).to eq([ "Stock sold to the owner" ])
   end
 
   it "removes new lines, and saved ones on save" do

@@ -30,7 +30,10 @@ module TudlaAccounting
 
     monetize :amount_cents, with_model_currency: :currency
 
+    normalizes :description, with: ->(description) { description.strip.presence }
+
     validates :amount_cents, numericality: { greater_than: 0, message: "must be more than zero" }
+    validates :description, length: { maximum: 255 }
     validates :tax_role, presence: true, if: :tax_code
     validate :tax_code_fits
     validate :one_value_per_dimension

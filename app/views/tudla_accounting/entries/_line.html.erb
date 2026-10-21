@@ -6,6 +6,8 @@
     <input type="hidden" name="<%= name.call(:_destroy) %>" value="<%= detail.marked_for_destruction? ? 1 : 0 %>" data-entry-lines-target="destroy">
     <%= select_tag name.call(:account_id), options_for_select(account_options, detail.account_id), include_blank: "Choose an account",
                    class: "tc-input", aria: { label: "Account" } %>
+    <%= text_field_tag name.call(:description), detail.description, placeholder: "Description (optional)", maxlength: 255,
+                       class: "tc-input mt-1 text-sm", aria: { label: "Description" } %>
   </td>
   <td><%= text_field_tag name.call(:debit), entry_line_amount(detail, "debit"), inputmode: "decimal", class: "tc-input tc-num",
                          aria: { label: "Debit" }, data: { entry_lines_target: "debit", action: "input->entry-lines#recalculate" } %></td>

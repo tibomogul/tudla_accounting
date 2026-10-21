@@ -68,6 +68,13 @@ RSpec.describe "Entries", type: :request do
       expect(rows.size).to eq(3)
     end
 
+    it "finds entries by a line's description" do
+      TudlaAccounting::Entry.find_by!(particulars: "Cash sale").details.first.update!(description: "Market stall takings")
+
+      get routes.entries_path(q: "stall")
+      expect(rows.map(&:third)).to eq([ "Cash sale" ])
+    end
+
     it "finds entries by reference or number" do
       TudlaAccounting::Entry.find_by!(particulars: "Cash sale").update!(reference: "CHQ-1001")
 
@@ -149,6 +156,21 @@ RSpec.describe "Entries", type: :request do
       expect(rows).to eq([ [ "1010 - Cash", "500.00", "" ], [ "3000 - Capital", "", "500.00" ], [ "Total", "500.00", "500.00" ] ])
       expect(css_select("form button").map(&:text)).to include("Post", "Delete")
       expect(response.body).not_to include("Reverse on")
+    end
+
+    it "saves, changes and shows each line's description" do
+      cash, capital = draft.details.sort_by { |line| line.debit? ? 0 : 1 }
+      patch routes.entry_path(draft), params: { entry: { particulars: "Capital contribution", transacted_at: on(2).to_date.iso8601, lines: {
+        "0" => { id: cash.id, account_id: account("1010").id, debit: "500", credit: "", description: " Into the cheque account " },
+        "1" => { id: capital.id, account_id: account("3000").id, debit: "", credit: "500", description: "" },
+        "2" => { account_id: "", debit: "", credit: "", description: "" }
+      } } }
+      expect(draft.reload.details.map { |line| [ line.account.code, line.description ] }).to contain_exactly([ "1010", "Into the cheque account" ], [ "3000", nil ])
+
+      get routes.entry_path(draft)
+      expect(css_select("[data-description]").map(&:text)).to eq([ "Into the cheque account" ])
+      get routes.edit_entry_path(draft)
+      expect(css_select("input[name$='[description]']").map { |input| input["value"] }).to include("Into the cheque account")
     end
 
     it "can be edited: lines changed, added and removed" do

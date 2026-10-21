@@ -33,6 +33,7 @@
         <tr>
           <td>
             <%= link_to line.account.code_with_name, account_path(line.account) %>
+            <% if line.description %><div class="text-sm" data-description><%= line.description %></div><% end %>
             <% line.tags.each do |tag| %>
               <span class="tc-muted text-xs ml-2" data-tag><%= tag.dimension_value.label %></span>
             <% end %>

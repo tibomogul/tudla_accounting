@@ -90,7 +90,7 @@ module TudlaAccounting
         details.each do |detail|
           line = reversing.details.build(account: detail.account, amount_cents: detail.amount_cents, currency: detail.currency,
                                          tally: detail.debit? ? Detail::TALLY_CREDIT : Detail::TALLY_DEBIT,
-                                         tax_code: detail.tax_code, tax_role: detail.tax_role)
+                                         tax_code: detail.tax_code, tax_role: detail.tax_role, description: detail.description)
           detail.tags.each { |tag| line.tags.build(dimension_value: tag.dimension_value) }
           fx = detail.foreign_exchange
           line.build_foreign_exchange(other_currency: fx.other_currency, other_currency_cents: fx.other_currency_cents, rate: fx.rate) if fx
@@ -156,6 +156,7 @@ module TudlaAccounting
         raise ArgumentError, "each detail must have an account_code" unless detail[:account_code].present?
         raise ArgumentError, "each detail must have an amount" unless detail[:amount].present?
         raise ArgumentError, "amount must be a string" unless detail[:amount].is_a?(String)
+        raise ArgumentError, "description must be a string" unless detail[:description].nil? || detail[:description].is_a?(String)
 
         account = Account.find_by(code: detail[:account_code], organization_type: hash[:organization_type], organization_id: hash[:organization_id])
         raise ArgumentError, "invalid account_code: #{detail[:account_code]}" unless account
@@ -176,6 +177,7 @@ module TudlaAccounting
           tally: tally,
           amount_cents: amount_cents,
           currency: money.currency.iso_code,
+          description: detail[:description],
           organization_type: hash[:organization_type],
           organization_id: hash[:organization_id]
         }
