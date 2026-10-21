@@ -38,6 +38,10 @@ TudlaAccounting::Engine.routes.draw do
     get :cash_flow
   end
 
+  resources :budgets do
+    member { post :upload }
+  end
+
   resources :tax_codes, except: :show
   resources :dimensions, except: %i[show destroy] do
     resources :dimension_values, path: "values", only: %i[new create edit update]

@@ -1,0 +1,20 @@
+<%= tc_page_header "Edit #{@budget.name}", subtitle: "Budget for #{tc_period_label(@budget.period)}, in #{accounting_organization.currency}" do %>
+  <%= button_to "Delete", budget_path(@budget), method: :delete, class: "tc-btn tc-btn-danger",
+                form: { data: { controller: "confirm", confirm_message_value: "Delete the budget #{@budget.label}?", action: "submit->confirm#ask" } } %>
+<% end %>
+<%= form_with model: @budget, scope: :budget, url: budget_path(@budget), method: :patch, class: "space-y-4" do |form| %>
+  <% if @budget.errors.any? %>
+    <div class="tc-alert tc-alert-danger" role="alert"><ul class="list-disc pl-4"><% @budget.errors.full_messages.uniq.each do |message| %><li><%= message %></li><% end %></ul></div>
+  <% end %>
+
+  <div class="tc-card tc-card-body grid gap-4 sm:grid-cols-3 max-w-3xl"><%= render "settings", form: form, budget: @budget %></div>
+
+  <p class="tc-muted text-sm">Enter income and spending as positive amounts; accounts marked “deducted” (returns, discounts) count against their section.
+    Accounts with sub-accounts add theirs up. Type an amount in the Year column to spread it over the months.</p>
+  <%= render "grid", grid: @grid, editable: true, typed: @typed %>
+
+  <div class="flex gap-2">
+    <%= form.submit "Save budget", class: "tc-btn" %>
+    <%= link_to "Cancel", budget_path(@budget), class: "tc-btn tc-btn-secondary" %>
+  </div>
+<% end %>

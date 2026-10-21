@@ -1,0 +1,16 @@
+<%= tc_page_header @budget.name, subtitle: "Budget for #{tc_period_label(@budget.period)}, in #{accounting_organization.currency}#{" · the year's main budget" if @budget.main?}" do %>
+  <%= link_to "Budgets", budgets_path, class: "tc-btn tc-btn-ghost print:hidden" %>
+  <%= render "tudla_accounting/reports/download" %>
+  <% if tc_can?(:record) %><%= link_to "Edit amounts", edit_budget_path(@budget), class: "tc-btn print:hidden" %><% end %>
+<% end %>
+
+<%= render "grid", grid: @grid %>
+
+<% if tc_can?(:record) %>
+  <%= form_with url: upload_budget_path(@budget), multipart: true, class: "tc-card tc-card-body mt-6 grid gap-3 sm:grid-cols-4 items-end print:hidden" do |form| %>
+    <div class="sm:col-span-3"><%= form.label :file, "Amounts from a spreadsheet (CSV or Excel)", class: "tc-label" %><%= form.file_field :file, accept: ".csv,.xlsx", class: "tc-input", required: true %></div>
+    <div><%= form.submit "Upload amounts", class: "tc-btn tc-btn-secondary" %></div>
+    <p class="tc-hint sm:col-span-4">Download the budget, change it, and upload it again. Rows are matched to accounts by their Code and columns to months by headings such as “Mar 2026”;
+      blank amounts are zero, and accounts the file has no row for keep their amounts.</p>
+  <% end %>
+<% end %>

@@ -37,9 +37,11 @@ module TudlaAccounting
     # Periods containing a moment in time. A plain Date means that day in the
     # configured time zone (the zone PeriodCreator builds periods in), not Rails'
     # Time.zone, which may differ.
-    # A year (or any period) can be removed while nothing has been posted in it.
+    # A year (or any period) can be removed while nothing has been posted in it and no
+    # budget is for it.
     def deletable?
-      TudlaAccounting::Balance.where(period_id: subtree_ids).none?
+      ids = subtree_ids
+      TudlaAccounting::Balance.where(period_id: ids).none? && TudlaAccounting::Budget.where(period_id: ids).none?
     end
 
     # Removes the period and everything inside it, deepest first.

@@ -1,0 +1,3 @@
+<%# locals: (form:, budget:) %>
+<div class="sm:col-span-2"><%= tc_field form, :name, required: true, placeholder: "Original", hint: "Several budgets for a year need different names" %></div>
+<label class="flex items-center gap-2 text-sm sm:self-center"><%= form.check_box :main %> The year's main budget</label>

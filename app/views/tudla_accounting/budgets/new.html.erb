@@ -1,0 +1,36 @@
+<%= tc_page_header "New budget", subtitle: "A plan for a year's income and expenses, month by month" %>
+<%= form_with model: @budget, scope: :budget, url: budgets_path, class: "space-y-4 max-w-3xl" do |form| %>
+  <% if @budget.errors.any? %>
+    <div class="tc-alert tc-alert-danger" role="alert"><ul class="list-disc pl-4"><% @budget.errors.full_messages.uniq.each do |message| %><li><%= message %></li><% end %></ul></div>
+  <% end %>
+
+  <div class="tc-card tc-card-body grid gap-4 sm:grid-cols-3">
+    <div><%= tc_field form, :period_id, as: :select, label: "For the year", choices: years.map { |year| [ tc_period_label(year), year.id ] } %></div>
+    <%= render "settings", form: form, budget: @budget %>
+  </div>
+
+  <fieldset class="tc-card tc-card-body space-y-3">
+    <legend class="tc-card-title px-1">Start from</legend>
+    <label class="flex items-center gap-2 text-sm"><%= radio_button_tag :start, "blank", @start == "blank" %> Nothing: enter the amounts, or upload them</label>
+    <div class="flex flex-wrap items-center gap-2 text-sm">
+      <label class="flex items-center gap-2"><%= radio_button_tag :start, "actuals", @start == "actuals" %> The actual results of</label>
+      <%= select_tag :actuals_period_id, options_for_select(years.map { |year| [ tc_period_label(year), year.id ] }, params[:actuals_period_id] || years.second&.id),
+                     class: "tc-input w-auto", "aria-label": "The year whose actual results to start from" %>
+      <span>changed by</span>
+      <%= text_field_tag :percent, params[:percent], placeholder: "0", inputmode: "decimal", class: "tc-input w-20", "aria-label": "Percentage change" %>
+      <span>%, month for month</span>
+    </div>
+    <% if other_budgets.any? %>
+      <div class="flex flex-wrap items-center gap-2 text-sm">
+        <label class="flex items-center gap-2"><%= radio_button_tag :start, "budget", @start == "budget" %> A copy of</label>
+        <%= select_tag :budget_id, options_for_select(other_budgets.map { |other| [ other.label, other.id ] }, params[:budget_id]), class: "tc-input w-auto", "aria-label": "The budget to copy" %>
+      </div>
+    <% end %>
+    <p class="tc-hint">Actual results are rounded to whole amounts. Inactive accounts are left out.</p>
+  </fieldset>
+
+  <div class="flex gap-2">
+    <%= form.submit "Add budget", class: "tc-btn" %>
+    <%= link_to "Cancel", budgets_path, class: "tc-btn tc-btn-secondary" %>
+  </div>
+<% end %>

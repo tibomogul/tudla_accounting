@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_21_210000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_21_220000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -190,6 +190,29 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_210000) do
     t.index ["account_id", "external_id"], name: "tudla_accounting_bank_statement_lines_unique_key", unique: true
     t.index ["account_id", "occurred_on"], name: "idx_on_account_id_occurred_on_9c70487287"
     t.check_constraint "amount_cents <> 0", name: "tudla_accounting_bank_statement_lines_amount_not_zero"
+  end
+
+  create_table "tudla_accounting_budget_lines", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "amount_cents", null: false
+    t.bigint "budget_id", null: false
+    t.bigint "period_id", null: false
+    t.index ["account_id"], name: "index_tudla_accounting_budget_lines_on_account"
+    t.index ["budget_id", "account_id", "period_id"], name: "index_tudla_accounting_budget_lines_unique", unique: true
+    t.index ["period_id"], name: "index_tudla_accounting_budget_lines_on_period"
+  end
+
+  create_table "tudla_accounting_budgets", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.boolean "main", default: false, null: false
+    t.string "name", null: false
+    t.bigint "organization_id", null: false
+    t.string "organization_type", null: false
+    t.bigint "period_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["organization_type", "organization_id", "period_id", "name"], name: "index_tudla_accounting_budgets_on_name", unique: true
+    t.index ["organization_type", "organization_id", "period_id"], name: "index_tudla_accounting_budgets_one_main", unique: true, where: "main"
+    t.index ["period_id"], name: "index_tudla_accounting_budgets_on_period"
   end
 
   create_table "tudla_accounting_carrying_amount_forexes", force: :cascade do |t|
@@ -422,6 +445,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_210000) do
   add_foreign_key "tudla_accounting_bank_rules", "tudla_accounting_accounts", column: "counter_account_id"
   add_foreign_key "tudla_accounting_bank_rules", "tudla_accounting_tax_codes", column: "tax_code_id"
   add_foreign_key "tudla_accounting_bank_statement_lines", "tudla_accounting_accounts", column: "account_id"
+  add_foreign_key "tudla_accounting_budget_lines", "tudla_accounting_accounts", column: "account_id"
+  add_foreign_key "tudla_accounting_budget_lines", "tudla_accounting_budgets", column: "budget_id", on_delete: :cascade
+  add_foreign_key "tudla_accounting_budget_lines", "tudla_accounting_periods", column: "period_id"
+  add_foreign_key "tudla_accounting_budgets", "tudla_accounting_periods", column: "period_id"
   add_foreign_key "tudla_accounting_carrying_amount_forexes", "tudla_accounting_carrying_amounts", column: "carrying_amount_id"
   add_foreign_key "tudla_accounting_carrying_amounts", "tudla_accounting_details", column: "detail_id"
   add_foreign_key "tudla_accounting_detail_tags", "tudla_accounting_details", column: "detail_id"

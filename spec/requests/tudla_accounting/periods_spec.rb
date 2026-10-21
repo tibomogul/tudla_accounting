@@ -78,7 +78,7 @@ RSpec.describe "Financial years", type: :request do
 
       expect { delete routes.period_path(year) }.not_to change(TudlaAccounting::Period, :count)
       expect(response).to redirect_to(routes.period_path(year))
-      expect(flash[:alert]).to eq("A year with postings can't be deleted.")
+      expect(flash[:alert]).to eq("A year with postings or budgets can't be deleted.")
     end
   end
 

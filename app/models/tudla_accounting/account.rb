@@ -92,6 +92,7 @@ module TudlaAccounting
     validate :validate_parent
     validate :validate_known_currency
     validate :validate_structure_unchanged_once_used, on: :update
+    validate :validate_category_unchanged_in_budgets, on: :update
     validate :validate_role_category
     validate :validate_role_assigned
     validate :validate_active_parent
@@ -155,10 +156,10 @@ module TudlaAccounting
     end
 
     # Only an account with no history, no sub-accounts, nothing offsetting it and no
-    # recurring entry or bank rule using it.
+    # recurring entry, bank rule or budget using it.
     def deletable?
       structure_editable? && children.none? && contra_for.nil? && RecurringEntryLine.where(account: self).none? &&
-        BankRule.where(counter_account_id: id).or(BankRule.where(account_id: id)).none?
+        BankRule.where(counter_account_id: id).or(BankRule.where(account_id: id)).none? && BudgetLine.where(account: self).none?
     end
 
     # Stops offering the account, and every account beneath it, for new entries: they keep
@@ -279,6 +280,13 @@ module TudlaAccounting
       errors.add(:base, "Category, parent and contra account can't change once the account has postings")
     end
 
+    # A budget's amounts are for income and expense accounts.
+    def validate_category_unchanged_in_budgets
+      return unless will_save_change_to_category? && BudgetLine.where(account_id: id).exists?
+
+      errors.add(:category, "can't change while a budget has amounts for the account")
+    end
+
     def validate_role_category
       return if role.blank? || !ROLES.key?(role) || category.blank?
       return if ROLES[role][:categories].include?(category)
@@ -299,7 +307,7 @@ module TudlaAccounting
     def ensure_deletable
       return if deletable?
 
-      errors.add(:base, "Only an account with no postings, sub-accounts, contra accounts, recurring entries or bank rules can be deleted")
+      errors.add(:base, "Only an account with no postings, sub-accounts, contra accounts, recurring entries, bank rules or budgets can be deleted")
       throw :abort
     end
 

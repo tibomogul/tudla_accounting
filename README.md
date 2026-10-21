@@ -44,6 +44,21 @@ production:
 
 The **Recurring entries** page (from Entries) lists them with their schedule and next date, makes the due ones now, and adds, edits, deactivates and deletes them with the entry form's line editor; an entry's **Make recurring** starts one from its lines, and a template's **Make a draft for today** makes a one-off entry from it. They are on the audit trail, as is each entry made.
 
+### Budgets
+`TudlaAccounting::Budget` is a plan for a financial year: an amount for each income and expense account in each month (`BudgetLine`), on the account's own side, as balances are (income and spending as positive amounts; a contra account's count against its section). A year can have several budgets by name, one of them its `main` budget. Accounts with sub-accounts add theirs up, so amounts go on the accounts beneath them.
+
+```ruby
+budget = TudlaAccounting::Budget.create!(organization: organization, period: year, name: "Original", main: true)
+budget.fill_from_actuals!(last_year, percent: 5) # last year's results, month for month, plus 5%, rounded to whole units
+budget.fill_from_budget!(other_budget)           # or a copy of another budget
+budget.set_amounts!(sales.id => { march.id => 12_000_00 }) # these accounts' amounts; the others keep theirs
+budget.amounts # => { account_id => { month_id => cents } }
+```
+
+`set_amounts!` refuses accounts other than the organization's income and expense accounts, an inactive account not already in the budget, and months of other years. An account a budget has amounts for can't be deleted or change category, and a year with a budget can't be deleted. Budgets are on the audit trail (`budget.created`, `budget.updated` with the accounts whose amounts changed, `budget.deleted`).
+
+The **Budgets** page (from Reports) lists them with their income, expenses and net profit. A new one starts blank, from a year's actual results changed by a percentage, or as a copy of another; its page shows the accounts down the side and the months across, with year totals, section totals and net profit, typed into a grid that keeps the totals up to date and spreads an amount typed in the Year column over the months. A budget downloads as CSV or Excel (`BudgetGrid#to_table`) and uploads again (`BudgetGrid#read`): rows are matched by the Code column and columns by month headings such as "Mar 2026", "2026-03" or a date, and accounts without a row keep their amounts. Viewing needs `:read`; adding and changing budgets needs `:record`.
+
 ### Attachments
 With Active Storage set up in the host app (`bin/rails active_storage:install`), entries can carry receipts and other source documents; `TudlaAccounting.attachments?` says whether they can, and the pages leave attachments out until then. The engine ships no Active Storage migration of its own.
 

@@ -1,0 +1,75 @@
+<%# locals: (grid:, editable: false, typed: nil) %>
+<%# The budget's accounts down the side and its months across, with each account's year
+    total, each section's totals and the net profit. Editable, the amounts are inputs
+    (amounts[account_id][month_id]), the totals kept up to date as they are typed, and a
+    year total typed in is spread over the months. typed: what was typed, shown again. %>
+<% currency = accounting_organization.currency %>
+<% money = ->(cents) { Money.new(cents, currency) } %>
+<% plain = ->(cents) { cents.zero? ? "" : money.call(cents).format(symbol: false, thousands_separator: "") } %>
+<% label_cell = "sticky left-0 z-10 bg-[var(--tc-surface)] whitespace-nowrap" %>
+<% width = grid.months.size + 2 %>
+<div class="tc-card overflow-x-auto tc-print-wide"
+     <% if editable %>data-controller="budget-grid" data-budget-grid-exponent-value="<%= Money::Currency.new(currency).exponent %>"<% end %>>
+  <table class="tc-table" data-budget-grid>
+    <thead>
+      <tr>
+        <th class="<%= label_cell %>">Account</th>
+        <% grid.months.each do |month| %><th class="tc-num whitespace-nowrap"><%= month.label %></th><% end %>
+        <th class="tc-num">Year</th>
+      </tr>
+    </thead>
+    <% grid.categories.each do |category| %>
+      <% title = TudlaAccounting::AccountsHelper::CATEGORY_LABELS.fetch(category) %>
+      <% rows = grid.rows(category) %>
+      <tbody data-section="<%= category %>" aria-label="<%= title %>">
+        <tr><th class="<%= label_cell %> text-left pt-4"><%= title %></th><th colspan="<%= width - 1 %>"></th></tr>
+        <% if rows.empty? %>
+          <tr><td class="<%= label_cell %> tc-muted">No <%= title.downcase %> accounts.</td><td colspan="<%= width - 1 %>"></td></tr>
+        <% end %>
+        <% rows.each do |row| %>
+          <% account = row.account %>
+          <tr data-account-row="<%= account.code %>">
+            <td class="<%= label_cell %>"><div style="padding-left: <%= row.depth * 1.25 %>rem" class="<%= "font-semibold" if row.kind == :parent %>">
+              <span class="font-mono tc-muted mr-2"><%= account.code %></span><%= row.kind == :own ? "#{account.name} (own)" : account.name %>
+              <% if account.contra? %> <%= tc_badge "deducted", tone: :warning %><% end %>
+              <% unless account.active? %> <%= tc_badge "Inactive" %><% end %>
+            </div></td>
+            <% if !row.input? %>
+              <% grid.months.each do |month| %>
+                <td class="tc-num tc-muted" data-budget-grid-target="sum" data-account="<%= account.id %>" data-month="<%= month.id %>"><%= tc_money(money.call(grid.total(account, month))) %></td>
+              <% end %>
+              <td class="tc-num tc-muted font-semibold" data-budget-grid-target="sum" data-account="<%= account.id %>" data-month="year"><%= tc_money(money.call(grid.total(account))) %></td>
+            <% elsif editable %>
+              <% grid.months.each do |month| %>
+                <td class="tc-num"><%= text_field_tag "amounts[#{account.id}][#{month.id}]", typed ? typed.dig(account.id.to_s, month.id.to_s) : plain.call(grid.amount(account, month)),
+                                                      inputmode: "decimal", class: "tc-input tc-num w-28", "aria-label": "#{account.code_with_name}, #{month.label}",
+                                                      data: { budget_grid_target: "amount", action: "input->budget-grid#recalculate", account: account.id, month: month.id,
+                                                              category: category, ancestors: account.ancestor_ids.join(" "), sign: (account.contra? ? -1 : 1) } %></td>
+              <% end %>
+              <td class="tc-num"><%= text_field_tag nil, plain.call(grid.months.sum { |month| grid.amount(account, month) }), inputmode: "decimal", class: "tc-input tc-num w-32 font-semibold",
+                                                    "aria-label": "#{account.code_with_name}, the year (spread over the months)", title: "Type a year total to spread it over the months",
+                                                    data: { budget_grid_target: "rowTotal", action: "change->budget-grid#spread", account: account.id } %></td>
+            <% else %>
+              <% grid.months.each do |month| %><td class="tc-num"><%= tc_money(money.call(grid.amount(account, month))) unless grid.amount(account, month).zero? %></td><% end %>
+              <td class="tc-num font-semibold"><%= tc_money(money.call(grid.months.sum { |month| grid.amount(account, month) })) %></td>
+            <% end %>
+          </tr>
+        <% end %>
+        <tr class="font-semibold" data-total="<%= category %>">
+          <td class="<%= label_cell %>">Total <%= title.downcase %></td>
+          <% [ *grid.months, nil ].each do |month| %>
+            <td class="tc-num" data-budget-grid-target="sectionTotal" data-category="<%= category %>" data-month="<%= month&.id || "year" %>"><%= tc_money(money.call(grid.section_total(category, month))) %></td>
+          <% end %>
+        </tr>
+      </tbody>
+    <% end %>
+    <tbody data-section="figures">
+      <tr class="font-semibold" data-total="net_profit">
+        <td class="<%= label_cell %>">Net profit (loss)</td>
+        <% [ *grid.months, nil ].each do |month| %>
+          <td class="tc-num" data-budget-grid-target="net" data-month="<%= month&.id || "year" %>"><%= tc_money(money.call(grid.net_profit(month))) %></td>
+        <% end %>
+      </tr>
+    </tbody>
+  </table>
+</div>

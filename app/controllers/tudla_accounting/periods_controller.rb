@@ -40,7 +40,7 @@ module TudlaAccounting
         year.destroy_with_subtree!
         redirect_to periods_path, notice: "Financial year #{year_label(year)} was deleted."
       else
-        redirect_to period_path(year), alert: "A year with postings can't be deleted."
+        redirect_to period_path(year), alert: "A year with postings or budgets can't be deleted."
       end
     end
 

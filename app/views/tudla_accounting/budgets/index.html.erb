@@ -1,0 +1,31 @@
+<%= tc_page_header "Budgets", subtitle: "What each year's income and expenses are planned to be, month by month" do %>
+  <%= link_to "Reports", reports_path, class: "tc-btn tc-btn-ghost" %>
+  <% if tc_can?(:record) && years.any? %><%= link_to "New budget", new_budget_path, class: "tc-btn" %><% end %>
+<% end %>
+
+<% if years.empty? %>
+  <div class="tc-alert tc-alert-warning"><span><%= link_to "Create a financial year", new_period_path, class: "underline" %> first: a budget is for a year.</span></div>
+<% end %>
+
+<div class="tc-card overflow-x-auto">
+  <table class="tc-table">
+    <thead><tr><th>Year</th><th>Budget</th><th class="tc-num">Income</th><th class="tc-num">Expenses</th><th class="tc-num">Net profit (loss)</th><th>Updated</th></tr></thead>
+    <tbody>
+      <% if @budgets.empty? %>
+        <tr><td colspan="6" class="tc-muted text-center">None yet. Start one blank, from a year's actual results, or from a spreadsheet.</td></tr>
+      <% end %>
+      <% @budgets.each do |budget| %>
+        <% grid = @grids.fetch(budget.id) %>
+        <% money = ->(cents) { tc_money(Money.new(cents, accounting_organization.currency)) } %>
+        <tr data-budget>
+          <td><%= tc_period_label(budget.period) %></td>
+          <td><%= link_to budget.name, budget_path(budget), class: "underline" %><% if budget.main? %> <%= tc_badge "Main", tone: :success %><% end %></td>
+          <td class="tc-num"><%= money.call(grid.section_total("income")) %></td>
+          <td class="tc-num"><%= money.call(grid.section_total("expense")) %></td>
+          <td class="tc-num font-semibold"><%= money.call(grid.net_profit) %></td>
+          <td class="tc-muted whitespace-nowrap"><%= tc_date(budget.updated_at) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
