@@ -88,7 +88,36 @@ module TudlaAccounting
       respond_with_table("cash-flow-#{@report.flow_method}-#{span_name}", available: @report.configured?) { Reports::Tables.cash_flow(@report) }
     end
 
+    # A customer's or supplier's statement of account (type, party) over a run of days
+    # (from, thru; last month by default): their activity, or (show=open_items) what was
+    # still open at the end. See PartyStatement. Without a party (or one of the other
+    # type), the page asks for one.
+    def statement
+      @type = params[:type].presence_in(%w[receivable payable])&.to_sym || :receivable
+      @parties = PartyStatement.parties(accounting_organization, @type)
+      @from, @thru = statement_dates
+      @open_items = params[:show] == "open_items"
+      party = @parties.find { |each| PartyStatement.key(each) == params[:party] } # none when the type changed
+      if party
+        @statement = PartyStatement.call(organization: accounting_organization, type: @type, party: party, from: @from, thru: @thru)
+      end
+      name = "statement-#{PartyStatement.party_name(party).parameterize if party}-#{@open_items ? "open-items-#{@thru}" : "#{@from}-to-#{@thru}"}"
+      respond_with_table(name, available: !@statement.nil?) { Reports::Tables.party_statement(@statement, open_items: @open_items) }
+    end
+
     private
+
+    # The statement's first and last days, either way round; last month by default, and
+    # for a date that can't be read.
+    def statement_dates
+      last_month = Date.current.prev_month
+      dates = %i[from thru].map { |param| params[param].presence&.to_date }
+      from = dates[0] || last_month.beginning_of_month
+      thru = dates[1] || last_month.end_of_month
+      [ from, thru ].minmax
+    rescue Date::Error
+      [ last_month.beginning_of_month, last_month.end_of_month ]
+    end
 
     # The page (html, when given, prepares it), or the table the block gives as CSV, or as
     # an Excel workbook when the host has caxlsx. Not found when there is nothing to export

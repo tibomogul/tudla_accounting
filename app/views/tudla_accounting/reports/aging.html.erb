@@ -19,7 +19,10 @@
       <% end %>
       <% @report[:summary].each do |key, party| %>
         <tr>
-          <td><a href="#<%= key %>"><%= related_party_name(party[:related_party]) %></a></td>
+          <td>
+            <a href="#<%= key %>"><%= related_party_name(party[:related_party]) %></a>
+            <%= link_to "Statement", reports_statement_path(type: @type, party: key, from: @as_of.beginning_of_month, thru: @as_of), class: "tc-muted text-xs underline ml-2 print:hidden" %>
+          </td>
           <% buckets.each_key do |bucket| %><td class="tc-num"><%= tc_money(party[:aging_buckets][bucket]) unless party[:aging_buckets][bucket].zero? %></td><% end %>
           <td class="tc-num font-semibold"><%= tc_money(party[:total]) %></td>
         </tr>

@@ -44,6 +44,23 @@ production:
 
 The **Recurring entries** page (from Entries) lists them with their schedule and next date, makes the due ones now, and adds, edits, deactivates and deletes them with the entry form's line editor; an entry's **Make recurring** starts one from its lines, and a template's **Make a draft for today** makes a one-off entry from it. They are on the audit trail, as is each entry made.
 
+### Customer and supplier statements
+`TudlaAccounting::PartyStatement` is a statement of account for one customer (`type: :receivable`) or supplier (`:payable`) over a run of days, as it would be sent to them:
+
+```ruby
+statement = TudlaAccounting::PartyStatement.call(organization: organization, type: :receivable, party: customer,
+                                                 from: Date.new(2026, 3, 1), thru: Date.new(2026, 3, 31))
+statement.opening    # what they owed at the end of 28 February
+statement.lines      # each invoice, bill, refund, payment, credit note and reversal: date, entry, kind, due_date, charge, credit, balance, foreign
+statement.closing    # what they owed at the end of 31 March: the aging report's figure for them
+statement.aging      # the closing balance by how overdue it is
+statement.open_items # what was still open then, as the aging report's lines
+```
+
+Balances count each charge and credit as far as it was still open, as the aging report does, so a positive balance is owed by the customer (or to the supplier) and the two reports always agree. When a foreign-currency amount was settled at another rate than it was booked at, a last line, "Exchange differences on settlement and other adjustments", brings the running balance to the closing one. Amounts are in the organization's currency, with each foreign amount on its line. Parties are the records the `related_party_method` setting gives; `PartyStatement.parties(organization, type)` lists those with receivables or payables. Use it to send statements from the host app's own mailer.
+
+The **Statements** page (from Reports, or a party's Statement link on the aging reports) shows one: last month by default, its activity with the running balance or the open items at the end, then the aging and the amount due. It prints on its own (Print or save as PDF), for sending, and downloads as CSV or Excel.
+
 ### Budgets
 `TudlaAccounting::Budget` is a plan for a financial year: an amount for each income and expense account in each month (`BudgetLine`), on the account's own side, as balances are (income and spending as positive amounts; a contra account's count against its section). A year can have several budgets by name, one of them its `main` budget. Accounts with sub-accounts add theirs up, so amounts go on the accounts beneath them.
 

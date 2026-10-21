@@ -82,6 +82,38 @@ module TudlaAccounting
                     Table.total([ nil, nil, "Cash at the end", report.closing ]) ])
       end
 
+      # A customer's or supplier's statement (a PartyStatement): the opening balance, a row
+      # per line with the running balance, and the closing balance; or (open_items) what
+      # was still open at the end, then the closing balance by how overdue it is. With
+      # foreign amounts, their currency and amount.
+      def party_statement(statement, open_items: false)
+        foreign = statement.foreign?
+        foreign_cells = ->(money) { foreign ? [ money&.currency&.iso_code, money ] : [] }
+        foreign_headings = foreign ? [ "Currency", open_items ? "Foreign outstanding" : "Foreign amount" ] : []
+        if open_items
+          rows = statement.open_items.map do |line|
+            entry = line[:entry]
+            item = line[:carrying_amount]
+            amount = item.credit? ? -item.detail.amount : item.detail.amount
+            [ entry.transacted_at.to_date, entry.reference || entry.number_label, entry.particulars, (item.due_date&.to_date unless line[:credit]),
+              (line[:days_outstanding] if line[:days_outstanding].positive?), *foreign_cells.call(item.forex && Money.new(item.forex.other_currency_amount_cents, item.forex.other_currency)),
+              amount, line[:outstanding] ]
+          end
+          buckets = AgingReportGenerator::BUCKETS.map { |bucket| Table.total([ nil, nil, ReportsHelper::AGING_BUCKETS.fetch(bucket), nil, nil, *foreign_cells.call(nil), nil, statement.aging[bucket] ]) }
+          return Table.new([ [ "Date", "Reference", "Details", "Due", "Days overdue", *foreign_headings, "Amount", "Outstanding" ], *rows, *buckets,
+                             Table.total([ nil, nil, "Closing balance", nil, nil, *foreign_cells.call(nil), nil, statement.closing ]) ])
+        end
+
+        rows = statement.lines.map do |line|
+          entry = line.entry
+          [ line.date, line.kind, entry && (entry.reference || entry.number_label), entry&.particulars, line.due_date&.to_date, *foreign_cells.call(line.foreign),
+            line.charge, line.credit, line.balance ]
+        end
+        Table.new([ [ "Date", "Type", "Reference", "Details", "Due", *foreign_headings, PartyStatement::CHARGE_HEADINGS.fetch(statement.type), PartyStatement::CREDIT_HEADING, "Balance" ],
+                    [ statement.from, nil, nil, "Opening balance", nil, *foreign_cells.call(nil), nil, nil, statement.opening ], *rows,
+                    Table.total([ statement.thru, nil, nil, "Closing balance", nil, *foreign_cells.call(nil), statement.charges_total, statement.credits_total, statement.closing ]) ])
+      end
+
       # The change as a percentage of the second amount, to one decimal place; nil when it is zero.
       def percent(amounts)
         base = amounts[1]

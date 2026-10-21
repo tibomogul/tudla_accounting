@@ -23,8 +23,10 @@ module TudlaAccounting
       new(...).call
     end
 
-    def initialize(organization:, report_type:, as_of_date: Date.current)
+    # party: only that customer's or supplier's (see PartyStatement).
+    def initialize(organization:, report_type:, as_of_date: Date.current, party: nil)
       @organization = organization
+      @party = party
       @report_type = report_type.to_sym
       @as_of_date = as_of_date
       raise ArgumentError, "Invalid report_type: #{@report_type}. Must be :receivable or :payable" unless %i[receivable payable].include?(@report_type)
@@ -62,8 +64,9 @@ module TudlaAccounting
         .where(carrying_amount_type: @report_type,
                tudla_accounting_details: { organization_type: @organization.class.name, organization_id: @organization.id })
         .where(tudla_accounting_entries: { transacted_at: ..as_of_end })
-        .includes(:related_party, detail: { entry: :source })
+        .includes(:related_party, :forex, detail: { entry: :source })
         .order("tudla_accounting_entries.transacted_at")
+        .then { |scope| @party ? scope.where(related_party: @party) : scope }
     end
 
     # What was owed at the end of the as-of date; see CarryingAmount#outstanding.
