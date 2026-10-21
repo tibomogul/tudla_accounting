@@ -4,10 +4,15 @@ require "csv"
 require "digest"
 
 module TudlaAccounting
-  # Imports a bank statement CSV for a bank account:
+  # Imports a bank statement for a bank account: a CSV, an OFX or QFX file (Ofx), or an ISO
+  # 20022 CAMT.053 statement (Camt053), told apart by what the file holds:
   #
   #   BankStatementImporter.call(account, "statement.csv", date_order: :dmy)
-  #   # => { imported: 42, skipped: 3 }
+  #   # => { imported: 42, skipped: 3, format: :csv }
+  #
+  # An OFX or CAMT file must be in the account's currency and for one account; its closing
+  # balance goes on its last line (dated by then) when the lines carry none. The rest of
+  # this is about CSV files.
   #
   # Columns are found by their headers (any case): a date ("Date", "Transaction date"); a
   # description ("Description", "Details", "Narrative", "Payee", "Memo"); either one
@@ -45,15 +50,58 @@ module TudlaAccounting
     end
 
     def call
+      text = File.binread(@path)
+      format = format_of(text)
+      lines = case format
+      when :ofx then with_closing(Ofx.new(ofx_text(text), @currency).call)
+      when :camt053 then with_closing(Camt053.new(text, @currency).call)
+      else csv_lines
+      end
+      raise ArgumentError, "The statement has no transactions" if lines.empty?
+
+      save(lines).merge(format: format)
+    end
+
+    private
+
+    # :ofx, :camt053 or :csv, by what the start of the file says.
+    def format_of(text)
+      head = text[0, 4096].to_s.force_encoding(Encoding::BINARY)
+      if head.match?(/OFXHEADER|<OFX>/i) then :ofx
+      elsif head.match?(/camt\.053|<BkToCstmrStmt/) then :camt053
+      else :csv
+      end
+    end
+
+    # OFX 1.x files may say they are in Windows-1252 (CHARSET:1252); the rest is UTF-8.
+    def ofx_text(text)
+      charset = text[/CHARSET:\s*(\d+)/, 1]
+      charset == "1252" ? text.force_encoding(Encoding::Windows_1252).encode(Encoding::UTF_8) : text.force_encoding(Encoding::UTF_8).scrub
+    end
+
+    # The lines, the closing balance on the last one by its date when none has a balance.
+    def with_closing(statement)
+      lines = statement[:lines]
+      closing = statement[:closing]
+      if closing && lines.none? { |line| line[:balance_cents] }
+        last = lines.each_with_index.select { |line, _index| line[:occurred_on] <= closing[:on] }.max_by { |line, index| [ line[:occurred_on], index ] }&.first
+        last[:balance_cents] = closing[:cents] if last
+      end
+      lines
+    end
+
+    def csv_lines
       rows = CSV.read(@path, headers: true, skip_blanks: true)
       columns = find_columns(rows.headers)
       seen = Hash.new(0)
-      lines = rows.each_with_index.filter_map do |row, index|
+      rows.each_with_index.filter_map do |row, index|
         next if row.fields.all?(&:blank?)
 
         line_from(row, columns, index + 2, seen)
       end
+    end
 
+    def save(lines)
       ActiveRecord::Base.transaction do
         existing = BankStatementLine.where(account: @account, external_id: lines.map { |line| line[:external_id] }).pluck(:external_id).to_set
         fresh = lines.reject { |line| existing.include?(line[:external_id]) }
@@ -63,8 +111,6 @@ module TudlaAccounting
         result
       end
     end
-
-    private
 
     def find_columns(headers)
       names = headers.compact.index_by { |header| header.to_s.strip.downcase }

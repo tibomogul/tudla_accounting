@@ -46,8 +46,8 @@ RSpec.describe "Bank reconciliation", type: :service do
 
         2026-03-05,Card purchase,-20.50,,"1,069.50"
       CSV
-      expect(import(text)).to eq(imported: 4, skipped: 0)
-      expect(import(text)).to eq(imported: 0, skipped: 4)
+      expect(import(text)).to eq(imported: 4, skipped: 0, format: :csv)
+      expect(import(text)).to eq(imported: 0, skipped: 4, format: :csv)
 
       lines = TudlaAccounting::BankStatementLine.order(:id)
       expect(lines.map { |l| [ l.occurred_on, l.description, l.amount_cents, l.reference, l.balance_cents, l.currency ] }).to eq([
@@ -65,7 +65,7 @@ RSpec.describe "Bank reconciliation", type: :service do
         T1,03/02/2026,Client,250.00,
         T2,03/04/2026,,,€12.00
       CSV
-      expect(import(text, into: account("1001"), date_order: :mdy)).to eq(imported: 2, skipped: 0)
+      expect(import(text, into: account("1001"), date_order: :mdy)).to eq(imported: 2, skipped: 0, format: :csv)
       expect(TudlaAccounting::BankStatementLine.order(:id).map { |l| [ l.occurred_on, l.description, l.amount_cents, l.currency, l.external_id ] })
         .to eq([ [ Date.new(2026, 3, 2), "Client", 250_00, "EUR", "id:T1" ], [ Date.new(2026, 3, 4), "(no description)", -12_00, "EUR", "id:T2" ] ])
     end

@@ -50,11 +50,18 @@ RSpec.describe "Banking", type: :request do
       CSV
     end
 
+    it "imports an OFX file too, saying so" do
+      post routes.banking_import_path(bank), params: { file: fixture_file_upload("statement_ofx1.ofx", "application/x-ofx") }
+      expect(flash[:notice]).to eq("Imported 3 statement lines from the OFX file.")
+      get routes.banking_account_path(bank)
+      expect(css_select("input[type=file]").first["accept"]).to eq(".csv,.ofx,.qfx,.xml")
+    end
+
     it "imports it, says so, and lists the account with what is left to match" do
       expect(response).to redirect_to(routes.banking_account_path(bank))
-      expect(flash[:notice]).to eq("Imported 2 statement lines.")
+      expect(flash[:notice]).to eq("Imported 2 statement lines from the CSV file.")
       post routes.banking_import_path(bank), params: { file: statement("Date,Description,Amount,Balance\n02/03/2026,Deposit,1000.00,1000.00\n") }
-      expect(flash[:notice]).to eq("Imported 0 statement lines; 1 already imported.")
+      expect(flash[:notice]).to eq("Imported 0 statement lines from the CSV file; 1 already imported.")
 
       get routes.banking_path
       expect(css_select("tbody tr").first.css("td").map { |cell| cell.text.squish }).to eq([ "1000 - Bank", "2", "5 Mar 2026", "2" ])

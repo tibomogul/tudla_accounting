@@ -3,6 +3,7 @@ module TudlaAccounting
   # books. See BankStatementImporter and BankReconciler.
   class BankingController < ApplicationController
     LEDGER_PAGE = 100 # ledger lines not yet on a statement, per page
+    FORMAT_NAMES = { csv: "CSV", ofx: "OFX", camt053: "CAMT.053" }.freeze
     permits :post, only: %i[import match_suggestions]
 
     before_action :set_account, only: %i[show import match_suggestions]
@@ -30,7 +31,7 @@ module TudlaAccounting
     def import
       file = params.require(:file)
       result = BankStatementImporter.call(@account, file.path, date_order: params[:date_order].presence || :dmy)
-      redirect_to banking_account_path(@account), notice: "Imported #{helpers.pluralize(result[:imported], 'statement line')}" \
+      redirect_to banking_account_path(@account), notice: "Imported #{helpers.pluralize(result[:imported], 'statement line')} from the #{FORMAT_NAMES.fetch(result[:format])} file" \
                                                           "#{"; #{result[:skipped]} already imported" if result[:skipped].positive?}."
     rescue ArgumentError, CSV::MalformedCSVError, ActionController::ParameterMissing => e
       redirect_to banking_account_path(@account), alert: "The statement was not imported: #{e.message.downcase_first}."

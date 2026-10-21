@@ -36,11 +36,11 @@
 
 <% if tc_can?(:post) %>
   <%= form_with url: banking_import_path(@account), multipart: true, class: "tc-card tc-card-body mb-6 grid gap-3 sm:grid-cols-4 items-end" do |form| %>
-    <div class="sm:col-span-2"><%= form.label :file, "Statement (CSV)", class: "tc-label" %><%= form.file_field :file, accept: ".csv", class: "tc-input", required: true %></div>
-    <div><%= form.label :date_order, "Dates are", class: "tc-label" %>
+    <div class="sm:col-span-2"><%= form.label :file, "Statement (CSV, OFX, QFX or CAMT.053)", class: "tc-label" %><%= form.file_field :file, accept: ".csv,.ofx,.qfx,.xml", class: "tc-input", required: true %></div>
+    <div><%= form.label :date_order, "CSV dates are", class: "tc-label" %>
       <%= form.select :date_order, [ [ "Day/month/year", "dmy" ], [ "Month/day/year", "mdy" ] ], {}, class: "tc-input" %></div>
     <div><%= form.submit "Import statement", class: "tc-btn" %></div>
-    <p class="tc-hint sm:col-span-4">Columns: Date, Description, and Amount (or money in and money out); optionally Reference, Balance and the bank's Id. Lines already imported are skipped.</p>
+    <p class="tc-hint sm:col-span-4">OFX, QFX and CAMT.053 files are read as the bank wrote them, with its closing balance. A CSV needs the columns Date, Description, and Amount (or money in and money out); optionally Reference, Balance and the bank's Id. Lines already imported are skipped.</p>
   <% end %>
 <% end %>
 

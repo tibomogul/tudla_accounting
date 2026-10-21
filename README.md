@@ -116,7 +116,12 @@ Every report downloads as CSV, as shown on its page (period, comparison, months,
 `DimensionReport.call(organization, dimension, from:, thru:)` (Reports → Profit and loss by dimension) breaks income and expenses posted in that time down by the dimension's values, with an "Untagged" column for lines without one and a total, and the net profit of each.
 
 ### Bank reconciliation
-`BankStatementImporter.call(account, path, date_order: :dmy)` imports a bank's CSV statement for an account as `BankStatementLine`s (money in positive, money out negative, in the account's currency). It finds columns by their usual headers: a date, a description, one signed amount or money in and out columns, and optionally a reference, the running balance and the bank's transaction id. Lines already imported are skipped, so overlapping statements can be imported safely.
+`BankStatementImporter.call(account, path, date_order: :dmy)` imports a bank statement for an account as `BankStatementLine`s (money in positive, money out negative, in the account's currency), and says how many it imported and skipped and the format it read. It tells the formats apart by what the file holds:
+- **CSV:** it finds columns by their usual headers: a date, a description, one signed amount or money in and out columns, and optionally a reference, the running balance and the bank's transaction id.
+- **OFX and QFX** (the SGML of OFX 1.x, in Windows-1252 or UTF-8, or the XML of 2.x; bank or credit card): each transaction by its `FITID`, described by its name and memo, with its cheque or reference number.
+- **ISO 20022 CAMT.053:** each booked entry (pending ones are left out) by the bank's reference, described by the remittance information or the other party's name, with the end-to-end id as its reference.
+
+An OFX or CAMT file must be for one account and in the account's currency, and its closing balance goes on its last line, for the reconciliation summary. Lines already imported are skipped, so overlapping statements can be imported safely.
 
 `BankReconciler.new(account)` matches statement lines to the posted ledger lines on the account (`BankMatch`; posted lines themselves are never changed):
 - `suggestions` pairs each unmatched statement line with an unmatched ledger line for the same amount within a week (the closest), and `match_suggestions!` matches them all.
