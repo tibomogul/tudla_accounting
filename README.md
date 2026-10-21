@@ -28,6 +28,8 @@ An entry's `reference` is free text from elsewhere, such as a cheque number or t
 
 `Entry.create_from_ruby_hash` builds an entry from plain data (with an optional `reference:`, and a `description:` on any line). You give account codes and **signed** amounts, and it works out whether each line is a debit or credit from the account's normal side. Positive increases the account; negative decreases it.
 
+**Auto-reversing entries.** An accrual or prepayment can undo itself: give a draft a `reverse_on` date (the entry form's "Reverse automatically on", or `reverse_on: "2026-04-01"` in `create_from_ruby_hash`) and posting it posts its reversal too, dated that day, in the same transaction: both or neither. The date must come after the entry's own and have a financial year; an invoice, bill, payment or credit can't have one, since its reversal would close what is owed or take the payment off.
+
 ### Attachments
 With Active Storage set up in the host app (`bin/rails active_storage:install`), entries can carry receipts and other source documents; `TudlaAccounting.attachments?` says whether they can, and the pages leave attachments out until then. The engine ships no Active Storage migration of its own.
 

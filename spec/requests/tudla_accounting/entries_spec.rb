@@ -173,6 +173,26 @@ RSpec.describe "Entries", type: :request do
       expect(css_select("input[name$='[description]']").map { |input| input["value"] }).to include("Into the cheque account")
     end
 
+    it "reverses itself automatically when posted, as the form set it to" do
+      cash, capital = draft.details.sort_by { |line| line.debit? ? 0 : 1 }
+      patch routes.entry_path(draft), params: { entry: { particulars: "Capital contribution", transacted_at: on(2).to_date.iso8601, reverse_on: on(3, 1).to_date.iso8601, lines: {
+        "0" => { id: cash.id, account_id: account("1010").id, debit: "500", credit: "" },
+        "1" => { id: capital.id, account_id: account("3000").id, debit: "", credit: "500" }
+      } } }
+      expect(draft.reload.reverse_on).to eq(on(3, 1).to_date)
+      get routes.entry_path(draft)
+      expect(css_select("[data-reverse-on]").map { |tag| tag.text.squish }).to eq([ "Reverses automatically on #{on(3, 1).strftime('%-d %b %Y')}" ])
+
+      post routes.post_entry_path(draft)
+      expect(draft.reload.reversal).to have_attributes(posted_at: on(3, 1).beginning_of_day)
+    end
+
+    it "explains when its reversal date has no financial year" do
+      draft.update!(reverse_on: Date.new(this_year + 1, 1, 1))
+      post routes.post_entry_path(draft)
+      expect(flash[:alert]).to eq("The entry could not be posted: no financial year covers the date it reverses on.")
+    end
+
     it "can be edited: lines changed, added and removed" do
       get routes.edit_entry_path(draft)
       expect(css_select("tbody[data-entry-lines-target=lines] input[name$='[debit]']").map { |input| input["value"] }).to eq([ "500.00", "" ])

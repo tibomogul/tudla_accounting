@@ -20,6 +20,7 @@ module TudlaAccounting
 
     validates :particulars, presence: true
     validates :reference, length: { maximum: 255 }
+    validate :reverse_on_after_date
     validate :has_one_currency?
     validate :has_credit_amounts?
     validate :has_debit_amounts?
@@ -154,6 +155,9 @@ module TudlaAccounting
       { io: file, filename: file.original_filename, content_type: file.content_type }
     end
 
+    # Posts every line into the period containing posted_at. An entry with reverse_on (an
+    # accrual, say) posts its reversal too, dated that day, in the same transaction: both
+    # or neither.
     def post(posted_at)
       raise ArgumentError, "posted_at must be a datetime" unless posted_at.is_a?(Time) || posted_at.is_a?(ActiveSupport::TimeWithZone)
       raise ArgumentError, "entry must be valid" unless valid?
@@ -162,11 +166,13 @@ module TudlaAccounting
         lock_organization!
         raise ArgumentError, "entry is already posted" if self.class.where(id: id).where.not(posted_at: nil).exists?
 
+        check_reversal_date if reverse_on
         poster = BalancePoster.new(organization)
         details.each { |detail| detail.post(posted_at, poster: poster) }
         update!(posted_at: posted_at)
         CarryingAmountProcessor.call(entry: self)
         AuditEvent.record!("entry.posted", organization: organization, subject: self, details: { posted_at: posted_at.iso8601 })
+        reverse!(on: reverse_on) if reverse_on
         true
       end
     end
@@ -198,6 +204,11 @@ module TudlaAccounting
 
       raise ArgumentError, "particulars must be a string" unless hash[:particulars].is_a?(String)
       raise ArgumentError, "reference must be a string" unless hash[:reference].nil? || hash[:reference].is_a?(String)
+      begin
+        reverse_on = Date.iso8601(hash[:reverse_on]) if hash[:reverse_on].present?
+      rescue ArgumentError, TypeError
+        raise ArgumentError, "reverse_on must be a valid ISO 8601 date string"
+      end
 
       raise ArgumentError, "details must be an array" unless hash[:details].is_a?(Array)
       raise ArgumentError, "details must have at least 2 elements" unless hash[:details].length >= 2
@@ -263,6 +274,7 @@ module TudlaAccounting
         source_id: hash[:source_id],
         particulars: hash[:particulars],
         reference: hash[:reference],
+        reverse_on: reverse_on,
         transacted_at: transacted_at,
         idempotency_key: key,
         details_attributes: details_attributes
@@ -359,6 +371,25 @@ module TudlaAccounting
 
     def attachment_details(blob)
       { filename: blob.filename.to_s, content_type: blob.content_type, byte_size: blob.byte_size, checksum: blob.checksum }
+    end
+
+    # An entry reverses itself only after its own date, and not if it opens or settles what
+    # is owed (its reversal would close the receivable or payable, or take the payment off).
+    def reverse_on_after_date
+      return unless reverse_on
+
+      if transacted_at && reverse_on <= transacted_at.in_time_zone(TudlaAccounting.configuration.time_zone).to_date
+        errors.add(:reverse_on, "must be after the entry's date")
+      elsif CarryingAmountRole.call(entry: self)
+        errors.add(:reverse_on, "can't be set on an invoice, bill, payment or credit")
+      end
+    end
+
+    # The reversal needs a month to post into, or posting would fail half way (the
+    # transaction undoes it, but this says why). It can't be closed: months close in
+    # order, so the entry's own, earlier month would be closed too.
+    def check_reversal_date
+      raise ArgumentError, "no financial year covers the reversal date" unless Period.leaf_periods_for_date(organization, reverse_on).exists?
     end
 
     # Lines that will remain once saved (not those being removed while editing).

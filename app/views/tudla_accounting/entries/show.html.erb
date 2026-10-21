@@ -11,6 +11,9 @@
 
 <div class="flex flex-wrap items-center gap-2 mb-4">
   <%= entry_status_badge(@entry) %>
+  <% if @entry.draft? && @entry.reverse_on %>
+    <span class="tc-muted text-sm" data-reverse-on>Reverses automatically on <%= tc_date(@entry.reverse_on) %></span>
+  <% end %>
   <% if @entry.reference %>
     <span class="tc-muted text-sm">Reference <%= @entry.reference %></span>
   <% end %>

@@ -107,7 +107,7 @@ module TudlaAccounting
     # The form's lines, with separate debit and credit columns, as detail attributes, and
     # anything wrong with them that the model can't tell (e.g. both columns filled in).
     def entry_attributes
-      permitted = params.require(:entry).permit(:particulars, :reference, :transacted_at, :tax_inclusive, lines: [ :id, :account_id, :debit, :credit, :description, :tax_code_id, :_destroy, { dimensions: {} } ])
+      permitted = params.require(:entry).permit(:particulars, :reference, :transacted_at, :reverse_on, :tax_inclusive, lines: [ :id, :account_id, :debit, :credit, :description, :tax_code_id, :_destroy, { dimensions: {} } ])
       currency = accounting_organization.currency
       problems = []
       rows = permitted.fetch(:lines, {}).to_h.values
@@ -131,7 +131,7 @@ module TudlaAccounting
       end
       lines += tax_lines(lines, permitted[:tax_inclusive] == "1", currency)
 
-      attributes = { particulars: permitted[:particulars], reference: permitted[:reference], details_attributes: lines,
+      attributes = { particulars: permitted[:particulars], reference: permitted[:reference], reverse_on: permitted[:reverse_on].presence, details_attributes: lines,
                      transacted_at: (day_start(permitted[:transacted_at]) if permitted[:transacted_at].present?) }
       [ attributes, problems ]
     end
@@ -202,7 +202,8 @@ module TudlaAccounting
 
     def posting_problem(error)
       { "no valid period found for the posted date" => "no financial year covers its date",
-        "the period for the posted date is closed" => "its month is closed" }.fetch(error.message, error.message.downcase_first)
+        "the period for the posted date is closed" => "its month is closed",
+        "no financial year covers the reversal date" => "no financial year covers the date it reverses on" }.fetch(error.message, error.message.downcase_first)
     end
   end
 end
