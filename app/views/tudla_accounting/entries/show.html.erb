@@ -57,6 +57,10 @@
   </table>
 </div>
 
+<% if TudlaAccounting.attachments? %>
+  <%= render "attachments", entry: @entry %>
+<% end %>
+
 <% if @entry.posted? %>
   <%= render "allocations", entry: @entry %>
   <% if !tc_can?(:post) %>

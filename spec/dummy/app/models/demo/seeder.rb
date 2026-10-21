@@ -73,6 +73,7 @@ class Demo::Seeder
 
     close_first_half_of_last_year
     import_bank_statement
+    attach_receipts
   end
 
   def create_accounts
@@ -153,6 +154,38 @@ class Demo::Seeder
 
   def line(entry, account, tally, cents, **extra)
     entry.details.build(account: account, tally: tally, amount_cents: cents, currency: CURRENCY, organization: organization, **extra)
+  end
+
+  # The landlord's receipt on the three latest rent payments, when the app has Active Storage.
+  def attach_receipts
+    return unless TudlaAccounting.attachments?
+
+    rent = TudlaAccounting::Detail.where(account: accounts["6010"]).select(:entry_id)
+    TudlaAccounting::Entry.where(id: rent).where.not(posted_at: nil).order(transacted_at: :desc).first(3).each do |entry|
+      date = entry.transacted_at.in_time_zone(zone).to_date
+      pdf = receipt_pdf("Receipt: #{entry.particulars}, #{date.iso8601}, #{entry.details.find(&:debit?).amount.format}")
+      entry.add_attachments!(io: StringIO.new(pdf), filename: "rent-receipt-#{date.iso8601}.pdf", content_type: "application/pdf")
+    end
+  end
+
+  # A one-page PDF saying text (in ASCII: the built-in font has no en dash).
+  def receipt_pdf(text)
+    text = ActiveSupport::Inflector.transliterate(text.tr("–", "-"))
+    stream = "BT /F1 14 Tf 72 720 Td (#{text.gsub(/[()\\]/) { |c| "\\#{c}" }}) Tj ET"
+    objects = [
+      "<< /Type /Catalog /Pages 2 0 R >>",
+      "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+      "<< /Length #{stream.bytesize} >>\nstream\n#{stream}\nendstream",
+      "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
+    ]
+    pdf = +"%PDF-1.4\n"
+    offsets = objects.each_with_index.map do |object, index|
+      pdf.bytesize.tap { pdf << "#{index + 1} 0 obj\n#{object}\nendobj\n" }
+    end
+    xref = pdf.bytesize
+    pdf << "xref\n0 #{objects.size + 1}\n0000000000 65535 f \n" << offsets.map { |offset| format("%010d 00000 n \n", offset) }.join
+    pdf << "trailer\n<< /Size #{objects.size + 1} /Root 1 0 R >>\nstartxref\n#{xref}\n%%EOF\n"
   end
 
   # Months close in order, after everything has been posted into them.

@@ -62,5 +62,6 @@ TudlaAccounting::Engine.routes.draw do
       post :post
       post :reverse
     end
+    resources :attachments, only: %i[show create destroy]
   end
 end

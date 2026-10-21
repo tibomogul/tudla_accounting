@@ -50,6 +50,9 @@ module TudlaAccounting
             1. Fill in config/initializers/tudla_accounting.rb (at least current_organization).
             2. bin/rails db:migrate
             3. Open #{options[:mount_path]} once signed in, create a financial year and load a chart of accounts.
+
+          To attach receipts to entries, the app needs Active Storage (bin/rails active_storage:install
+          if it isn't set up); the pages leave attachments out until it is.
         TEXT
       end
     end

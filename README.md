@@ -26,6 +26,15 @@ An entry's `reference` is free text from elsewhere, such as a cheque number or t
 
 `Entry.create_from_ruby_hash` builds an entry from plain data (with an optional `reference:`, and a `description:` on any line). You give account codes and **signed** amounts, and it works out whether each line is a debit or credit from the account's normal side. Positive increases the account; negative decreases it.
 
+### Attachments
+With Active Storage set up in the host app (`bin/rails active_storage:install`), entries can carry receipts and other source documents; `TudlaAccounting.attachments?` says whether they can, and the pages leave attachments out until then. The engine ships no Active Storage migration of its own.
+
+- `entry.add_attachments!(files)` attaches uploaded files, or hashes of `io:`, `filename:` and `content_type:`, to a draft or a posted entry (a receipt often arrives after the entry is posted). Each must be of a type in the `attachment_content_types` setting, as Active Storage identifies it from the file's contents (by default PDF, PNG, JPEG, HEIC, WebP, CSV, Excel and email), and no bigger than `attachment_max_size` (10 MB by default); otherwise nothing is attached.
+- `entry.remove_attachment!(attachment, reason: nil)` removes one: freely from a draft, but from a posted entry only with a reason, since its files are part of its record.
+- Both are on the audit trail (`entry.attachment_added`, `entry.attachment_removed`) with the file's name, size and checksum, and the reason. Attach and remove files with these methods rather than `entry.attachments.attach`, which skips the checks and the trail. A draft deleted takes its files with it.
+
+The entry page lists an entry's files, uploads more (`:record` permission) and removes them: a draft's with `:record`, a posted entry's with `:administer` and a reason. Files are served through the engine (`/entries/:id/attachments/:id`), which checks the permissions and the organization. Active Storage's own routes serve a file to anyone with its signed URL, so the engine's pages never link to them; keep that in mind if the host app does.
+
 ### Posting and balances
 `entry.post(posted_at)` posts every line to the period that contains `posted_at`, then stamps the entry. The whole post is one transaction: if any line fails, nothing is posted. Posting an entry twice raises `ArgumentError`. Posts lock the organization's row while they run, so concurrent posts for the same organization take turns instead of overwriting each other's balance updates; other organizations aren't blocked. Each account has one `TudlaAccounting::Balance` per period, holding starting, current and ending amounts. Posting:
 - adds the amount to the balance of the deepest period containing `posted_at`, e.g. the month
@@ -160,7 +169,7 @@ Mounted at `/accounting` by the install generator (see [Integration](#integratio
 
 - **Dashboard:** profit this year, what is owed each way, draft entries, recent entries, and a getting-started checklist.
 - **Accounts:** the chart of accounts as a tree with closing balances. Each account page shows monthly balances and a ledger with running balances. You can create, edit and delete unused accounts.
-- **Entries:** search entries (by particulars, reference or number) and filter them, write drafts with a line editor that keeps live debit/credit totals, post them, and reverse posted entries. A posted payment or credit note shows what it was applied to and what is left, with forms to apply it to the party's open invoices or bills (or oldest first) and to take an allocation off; an invoice or bill shows what was applied to it. Reversing a payment takes it off what it settled and reverses its realized exchange difference. An invoice or bill can be reversed once nothing is applied to it, which closes its receivable or payable.
+- **Entries:** search entries (by particulars, reference or number) and filter them, attach receipts, write drafts with a line editor that keeps live debit/credit totals, post them, and reverse posted entries. A posted payment or credit note shows what it was applied to and what is left, with forms to apply it to the party's open invoices or bills (or oldest first) and to take an allocation off; an invoice or bill shows what was applied to it. Reversing a payment takes it off what it settled and reverses its realized exchange difference. An invoice or bill can be reversed once nothing is applied to it, which closes its receivable or payable.
 - **Banking:** import bank statements, see where the books and the bank stand on a date, match statement lines to the books (suggested matches in one click), post entries for bank fees and the like, and see what is in the books but not yet on a statement.
 - **Reports:** balance sheet, profit and loss, trial balance, receivables and payables aging, a tax summary for a run of months, profit and loss by dimension, a cash flow statement, and the general ledger (also as CSV).
 - **Periods:** create calendar or fiscal years, see each year's months, and close or reopen them (reopening asks for a reason).
@@ -333,6 +342,10 @@ TudlaAccounting.configure do |config|
   # Journal numbers, given when entries are posted (see numbers and references)
   config.entry_number_series = :organization # or :financial_year, or ->(entry) { "series" }
   config.entry_number_format = "#%{number}"  # or "JE-%{series}-%<number>05d", or ->(entry) { ... }
+
+  # Attachments (with Active Storage): what may be attached, by identified type, and how big
+  config.attachment_content_types += %w[application/zip]
+  config.attachment_max_size = 20.megabytes
 
   # Receivables and payables (carrying amounts). Off until the organization has an
   # account marked receivable or payable: entries still post normally, but no

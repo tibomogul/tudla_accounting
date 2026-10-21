@@ -28,6 +28,9 @@
           <td>
             <%= link_to entry.particulars, entry_path(entry) %>
             <% if entry.reference %><span class="tc-muted text-xs ml-2"><%= entry.reference %></span><% end %>
+            <% if TudlaAccounting.attachments? && (count = entry.attachments_attachments.size).positive? %>
+              <span class="tc-muted text-xs ml-2" title="<%= pluralize(count, "attachment") %>" data-attachments><span aria-hidden="true">📎</span><span class="sr-only"><%= pluralize(count, "attachment") %></span><%= count if count > 1 %></span>
+            <% end %>
           </td>
           <td><%= entry_status_badge(entry) %></td>
           <td class="tc-num"><%= tc_money(entry_total(entry)) %></td>

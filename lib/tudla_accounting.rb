@@ -22,7 +22,7 @@ module TudlaAccounting
   # What can happen to the books, each recorded as an AuditEvent and published once it
   # commits; see subscribe.
   EVENTS = %w[
-    entry.posted entry.reversed entry.deleted
+    entry.posted entry.reversed entry.deleted entry.attachment_added entry.attachment_removed
     account.created account.updated account.deleted
     period.created period.deleted period.closed period.reopened
     opening_balances.saved balances.rebuilt
@@ -60,7 +60,8 @@ module TudlaAccounting
     attr_accessor :base_currency, :rounding, :time_zone, :organization_class,
                   :due_date_method, :related_party_method, :forex_rate_provider,
                   :parent_controller, :current_organization, :current_actor, :authorize,
-                  :cash_account_codes, :tax_basis, :organization_label, :entry_number_format
+                  :cash_account_codes, :tax_basis, :organization_label, :entry_number_format,
+                  :attachment_content_types, :attachment_max_size
     attr_reader :carrying_amount_sources, :entry_sources, :entry_number_series
 
     def initialize
@@ -99,6 +100,13 @@ module TudlaAccounting
       # How a posted entry's number is shown: a format string given number and series
       # (e.g. "JE-%{series}-%<number>05d"), or a callable given the entry.
       @entry_number_format = "#%{number}"
+      # What can be attached to entries (receipts, invoices, statements), by the type
+      # Active Storage identifies from the file's contents, and how big each may be.
+      @attachment_content_types = %w[
+        application/pdf image/png image/jpeg image/heic image/webp text/csv message/rfc822
+        application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+      ]
+      @attachment_max_size = 10 * 1024 * 1024
       @entry_sources = {}
     end
 
@@ -181,6 +189,14 @@ module TudlaAccounting
         [ source_type.to_s, role ]
       end.freeze
     end
+  end
+
+  # Whether entries can have attachments: the host app loads Active Storage and has its
+  # tables (bin/rails active_storage:install). The pages leave attachments out otherwise.
+  def self.attachments?
+    defined?(ActiveStorage::Blob) && TudlaAccounting::Entry.respond_to?(:reflect_on_attachment) &&
+      TudlaAccounting::Entry.reflect_on_attachment(:attachments).present? &&
+      ActiveStorage::Blob.table_exists? && ActiveStorage::Attachment.table_exists? ? true : false
   end
 
   def self.init_config

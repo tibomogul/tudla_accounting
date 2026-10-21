@@ -9,6 +9,7 @@ module TudlaAccounting
 
     def index
       entries = organization_scope(Entry).includes(:details).order(transacted_at: :desc, id: :desc)
+      entries = entries.includes(:attachments_attachments) if TudlaAccounting.attachments?
       entries = search(entries, params[:q].strip) if params[:q].present?
       entries = entries.where(posted_at: nil) if params[:status] == "draft"
       entries = entries.where.not(posted_at: nil) if params[:status] == "posted"

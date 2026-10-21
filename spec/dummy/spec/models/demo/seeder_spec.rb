@@ -58,6 +58,18 @@ RSpec.describe Demo::Seeder do
     expect(lines.pluck(:occurred_on)).to all(be_between(Date.new(2026, 5, 1), Date.new(2026, 5, 31)))
   end
 
+  it "attaches the landlord's receipt to the latest rent payments" do
+    organization = described_class.call(entries: 60)
+
+    rent = TudlaAccounting::Detail.where(account: TudlaAccounting::Account.find_by(organization: organization, code: "6010")).select(:entry_id)
+    attached = TudlaAccounting::Entry.where(id: rent).joins(:attachments_attachments).distinct.to_a
+    expect(attached.size).to be_between(1, 3)
+    receipt = attached.first.attachments.first
+    expect(receipt).to have_attributes(content_type: "application/pdf")
+    expect(receipt.filename.to_s).to match(/\Arent-receipt-\d{4}-\d{2}-\d{2}\.pdf\z/)
+    expect(receipt.download).to include("(Receipt: Rent - ")
+  end
+
   context "when the engine keeps its books in another time zone than the app's" do
     around do |example|
       zone = TudlaAccounting.configuration.time_zone

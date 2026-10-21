@@ -26,6 +26,9 @@ TudlaAccounting.configure do |config|
   # or :financial_year (restarting each year), or ->(entry) { "series" }. Shown as "#42".
   # config.entry_number_series = :financial_year
   # config.entry_number_format = "JE-%{series}-%<number>05d" # or ->(entry) { ... }
+  # Attachments on entries (with Active Storage): what may be attached, and how big.
+  # config.attachment_content_types += %w[application/zip]
+  # config.attachment_max_size = 20.megabytes
 
   # --- Receivables and payables (off until an account is marked receivable or payable) ---
   # config.carrying_amount_sources = {

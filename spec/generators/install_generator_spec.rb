@@ -39,7 +39,7 @@ RSpec.describe TudlaAccounting::Generators::InstallGenerator do
     expect { RubyVM::InstructionSequence.compile(initializer) }.not_to raise_error
     expect(read("config/routes.rb")).to include(%(mount TudlaAccounting::Engine => "/accounting"))
     expect(File.read(css)).to include(%(@import "../builds/tailwind/tudla_accounting";))
-    expect(output).to include("TudlaAccounting is installed", "Open /accounting once signed in")
+    expect(output).to include("TudlaAccounting is installed", "Open /accounting once signed in", "bin/rails active_storage:install")
     expect(rakes).to eq([ "tudla_accounting:install:migrations" ])
   end
 

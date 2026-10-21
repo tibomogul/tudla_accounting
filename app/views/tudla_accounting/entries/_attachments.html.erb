@@ -1,0 +1,52 @@
+<%# locals: (entry:) %>
+<% attachments = entry.attachments.includes(:blob).sort_by(&:created_at) %>
+<% removable = entry.posted? ? tc_can?(:administer) : tc_can?(:record) %>
+<section class="tc-card mb-6" aria-labelledby="attachments-heading">
+  <div class="tc-card-body pb-0">
+    <h2 id="attachments-heading" class="tc-card-title">Attachments</h2>
+  </div>
+  <% if attachments.empty? %>
+    <p class="tc-card-body tc-muted text-sm">No receipts or documents attached.</p>
+  <% else %>
+    <table class="tc-table">
+      <thead><tr><th>File</th><th class="tc-num">Size</th><th>Added</th><th><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>
+        <% attachments.each do |attachment| %>
+          <tr data-attachment>
+            <td><%= link_to attachment.filename, entry_attachment_path(entry, attachment), class: "underline", target: "_blank", rel: "noopener" %></td>
+            <td class="tc-num whitespace-nowrap"><%= number_to_human_size(attachment.byte_size) %></td>
+            <td class="whitespace-nowrap"><%= tc_date(attachment.created_at) %></td>
+            <td class="text-right">
+              <div class="flex flex-wrap justify-end items-center gap-2">
+                <%= link_to "Download", entry_attachment_path(entry, attachment, download: 1), class: "tc-btn tc-btn-ghost tc-btn-sm" %>
+                <% if removable && entry.draft? %>
+                  <%= button_to "Remove", entry_attachment_path(entry, attachment), method: :delete, class: "tc-btn tc-btn-ghost tc-btn-sm",
+                                form: { data: { controller: "confirm", confirm_message_value: "Remove #{attachment.filename}?", action: "submit->confirm#ask" } } %>
+                <% elsif removable %>
+                  <%= form_with url: entry_attachment_path(entry, attachment), method: :delete, class: "flex items-center gap-2",
+                                data: { controller: "confirm", confirm_message_value: "Remove #{attachment.filename} from this posted entry?", action: "submit->confirm#ask" } do |form| %>
+                    <%= form.text_field :reason, id: dom_id(attachment, :reason), required: true, placeholder: "Why remove it?", class: "tc-input tc-btn-sm w-40",
+                                        aria: { label: "Reason for removing #{attachment.filename}" } %>
+                    <%= form.submit "Remove", class: "tc-btn tc-btn-ghost tc-btn-sm" %>
+                  <% end %>
+                <% end %>
+              </div>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+  <% if tc_can?(:record) %>
+    <div class="tc-card-body border-t border-[var(--tc-border)]">
+      <%= form_with url: entry_attachments_path(entry), multipart: true, class: "flex flex-wrap items-end gap-3" do |form| %>
+        <div>
+          <%= form.label :files, "Attach receipts or documents", class: "tc-label" %>
+          <%= form.file_field :files, multiple: true, accept: TudlaAccounting.configuration.attachment_content_types.join(","), class: "tc-input" %>
+        </div>
+        <%= form.submit "Attach", class: "tc-btn tc-btn-secondary" %>
+        <p class="tc-hint w-full">PDF, images, CSV, Excel or email, up to <%= number_to_human_size(TudlaAccounting.configuration.attachment_max_size) %> each.<%= " Files on a posted entry stay with it; only an administrator can remove one, giving a reason." if entry.posted? %></p>
+      <% end %>
+    </div>
+  <% end %>
+</section>
