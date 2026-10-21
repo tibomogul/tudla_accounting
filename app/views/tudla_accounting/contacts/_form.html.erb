@@ -1,0 +1,30 @@
+<%# locals: (contact:) %>
+<%= form_with model: contact, scope: :contact, url: (contact.persisted? ? contact_path(contact) : contacts_path), class: "space-y-4 max-w-3xl" do |form| %>
+  <% if contact.errors.any? %>
+    <div class="tc-alert tc-alert-danger" role="alert"><ul class="list-disc pl-4"><% contact.errors.full_messages.uniq.each do |message| %><li><%= message %></li><% end %></ul></div>
+  <% end %>
+  <div class="tc-card tc-card-body grid gap-4 sm:grid-cols-4">
+    <div class="sm:col-span-2"><%= tc_field form, :name, required: true, placeholder: "Northwind Traders" %></div>
+    <div class="sm:col-span-2"><%= tc_field form, :kind, as: :select, choices: TudlaAccounting::Contact::KINDS.map { |key, label| [ label, key ] } %></div>
+    <div class="sm:col-span-2"><%= tc_field form, :email, as: :email_field %></div>
+    <div class="sm:col-span-2"><%= tc_field form, :phone, as: :telephone_field %></div>
+    <div class="sm:col-span-4"><%= tc_field form, :address, as: :text_area, rows: 3 %></div>
+    <div class="sm:col-span-2"><%= tc_field form, :tax_number, label: "Tax number", hint: "ABN, VAT number or the like" %></div>
+  </div>
+  <fieldset class="tc-card tc-card-body grid gap-4 sm:grid-cols-4">
+    <legend class="tc-card-title px-1">Their documents</legend>
+    <div><%= tc_field form, :payment_terms_days, as: :number_field, label: "Payment terms (days)", min: 0, hint: "Due this long after the date" %></div>
+    <div class="sm:col-span-2"><%= tc_field form, :default_account_id, as: :select, label: "Default account",
+                                            choices: [ [ "None", "" ] ] + account_choices(contact_accounts, selected: contact.default_account_id) %></div>
+    <div><%= tc_field form, :default_tax_code_id, as: :select, label: "Default tax code",
+                      choices: [ [ "None", "" ] ] + contact_tax_codes.select { |code| code.active? || code.id == contact.default_tax_code_id }.map { |code| [ code.label, code.id ] } %></div>
+  </fieldset>
+  <div class="tc-card tc-card-body grid gap-4">
+    <%= tc_field form, :notes, as: :text_area, rows: 3 %>
+    <% if contact.persisted? %><label class="flex items-center gap-2 text-sm"><%= form.check_box :active %> Active (offered for new documents)</label><% end %>
+  </div>
+  <div class="flex gap-2">
+    <%= form.submit "Save contact", class: "tc-btn" %>
+    <%= link_to "Cancel", (contact.persisted? ? contact_path(contact) : contacts_path), class: "tc-btn tc-btn-secondary" %>
+  </div>
+<% end %>

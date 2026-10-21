@@ -1,0 +1,56 @@
+<%= tc_page_header @contact.name, subtitle: "#{@contact.kind_label}#{" · inactive" unless @contact.active?}" do %>
+  <%= link_to "Contacts", contacts_path, class: "tc-btn tc-btn-ghost" %>
+  <% if tc_can?(:record) %>
+    <%= link_to "Edit", edit_contact_path(@contact), class: "tc-btn tc-btn-secondary" %>
+    <% if @contact.deletable? %>
+      <%= button_to "Delete", contact_path(@contact), method: :delete, class: "tc-btn tc-btn-danger",
+                    form: { data: { controller: "confirm", confirm_message_value: "Delete the contact #{@contact.name}?", action: "submit->confirm#ask" } } %>
+    <% end %>
+  <% end %>
+<% end %>
+
+<div class="grid gap-6 lg:grid-cols-3">
+  <section class="tc-card tc-card-body space-y-2 text-sm" aria-label="Details" data-details>
+    <% { "Email" => (@contact.email && mail_to(@contact.email, class: "underline")), "Phone" => @contact.phone, "Tax number" => @contact.tax_number,
+         "Payment terms" => (@contact.payment_terms_days && "#{@contact.payment_terms_days} days"), "Default account" => @contact.default_account&.code_with_name,
+         "Default tax code" => @contact.default_tax_code&.label }.each do |label, value| %>
+      <div class="flex justify-between gap-4"><span class="tc-muted"><%= label %></span><span class="text-right"><%= value || "—" %></span></div>
+    <% end %>
+    <% if @contact.address %><div><p class="tc-muted">Address</p><p class="whitespace-pre-line"><%= @contact.address %></p></div><% end %>
+    <% if @contact.notes %><div><p class="tc-muted">Notes</p><p class="whitespace-pre-line"><%= @contact.notes %></p></div><% end %>
+  </section>
+
+  <div class="lg:col-span-2 space-y-6">
+    <% @open.each do |type, report| %>
+      <% key = TudlaAccounting::PartyStatement.key(@contact) %>
+      <section class="tc-card overflow-x-auto" aria-labelledby="open-<%= type %>" data-open="<%= type %>">
+        <div class="tc-card-body flex flex-wrap items-center justify-between gap-2">
+          <h2 id="open-<%= type %>" class="tc-card-title"><%= type == :receivable ? "They owe" : "Owed to them" %>: <span class="tc-num"><%= tc_money(report[:totals][:total]) %></span></h2>
+          <%= link_to "Statement", reports_statement_path(type: type, party: key), class: "tc-btn tc-btn-ghost" %>
+        </div>
+        <table class="tc-table">
+          <thead><tr><% TudlaAccounting::ReportsHelper::AGING_BUCKETS.each_value do |label| %><th class="tc-num"><%= label %></th><% end %></tr></thead>
+          <tbody><tr><% TudlaAccounting::ReportsHelper::AGING_BUCKETS.each_key do |bucket| %><td class="tc-num"><%= tc_money(report[:totals][bucket]) %></td><% end %></tr></tbody>
+        </table>
+        <% lines = report[:details].values.first || [] %>
+        <% if lines.any? %>
+          <table class="tc-table">
+            <thead><tr><th>Date</th><th>Entry</th><th>Due</th><th class="tc-num">Outstanding</th></tr></thead>
+            <tbody>
+              <% lines.each do |line| %>
+                <tr>
+                  <td class="whitespace-nowrap"><%= tc_date(line[:entry].transacted_at) %></td>
+                  <td><%= link_to entry_title(line[:entry]), entry_path(line[:entry]), class: "underline" %></td>
+                  <td class="whitespace-nowrap"><%= line[:credit] ? tc_badge("Credit to apply") : (tc_date(line[:carrying_amount].due_date) || "—") %></td>
+                  <td class="tc-num"><%= tc_money(line[:outstanding]) %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        <% else %>
+          <p class="tc-card-body tc-muted text-sm">Nothing open.</p>
+        <% end %>
+      </section>
+    <% end %>
+  </div>
+</div>

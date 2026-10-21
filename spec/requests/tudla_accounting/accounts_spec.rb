@@ -342,7 +342,7 @@ RSpec.describe "Accounts", type: :request do
       [ "1010", "1000", "1500" ].each do |code|
         delete routes.account_path(account(code))
         expect(response).to redirect_to(routes.account_path(account(code)))
-        expect(flash[:alert]).to eq("Only an account with no postings, sub-accounts, contra accounts, recurring entries, bank rules, budgets or tax returns can be deleted")
+        expect(flash[:alert]).to eq("Only an account with no postings, sub-accounts, contra accounts, recurring entries, bank rules, budgets, tax returns or contacts using it can be deleted")
       end
     end
   end

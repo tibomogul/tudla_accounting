@@ -35,6 +35,7 @@ module TudlaAccounting
     budget.created budget.updated budget.deleted
     tax_return_form.created tax_return_form.updated tax_return_form.deleted
     tax_return.filed tax_return.withdrawn
+    contact.created contact.updated contact.deleted
   ].freeze
 
   # Calls the block with each TudlaAccounting::AuditEvent for an action (or for every

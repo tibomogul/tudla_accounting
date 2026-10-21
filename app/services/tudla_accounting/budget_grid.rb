@@ -1,8 +1,5 @@
 # frozen_string_literal: true
 
-require "csv"
-require "roo"
-
 module TudlaAccounting
   # A budget laid out as its page and spreadsheet show it: income, then expenses, each
   # account under its parent, a column per month. Accounts without sub-accounts take
@@ -92,7 +89,7 @@ module TudlaAccounting
     # Rows without a code (totals) and other columns are left out; a blank amount is
     # zero. Raises ArgumentError saying what can't be read.
     def read(path, extension)
-      sheet = read_rows(path, extension)
+      sheet = SpreadsheetRows.read(path, extension)
       headings = sheet.first.to_a
       code_column = headings.index { |heading| heading.to_s.strip.casecmp?("code") } || raise(ArgumentError, "The file has no Code column")
       month_columns = headings.each_with_index.filter_map { |heading, index| [ index, month_for(heading) ] if month_for(heading) }
@@ -132,21 +129,6 @@ module TudlaAccounting
 
     def shown?(account)
       account.active? || @amounts[account.id].present? || @children.fetch(account.id, []).any? { |child| shown?(child) }
-    end
-
-    def read_rows(path, extension)
-      case extension
-      when ".csv" then CSV.read(path, encoding: "bom|utf-8", liberal_parsing: true)
-      when ".xlsx"
-        workbook = Roo::Spreadsheet.open(path.to_s, extension: :xlsx)
-        sheet = workbook.sheet(workbook.sheets.first)
-        (1..sheet.last_row.to_i).map { |index| sheet.row(index) }
-      else raise ArgumentError, "Upload a .csv or .xlsx file"
-      end
-    rescue CSV::MalformedCSVError, Zip::Error, ArgumentError => e
-      raise if e.message.start_with?("Upload a")
-
-      raise ArgumentError, "The file can't be read: #{e.message}"
     end
 
     # The year's month a heading names, if any.

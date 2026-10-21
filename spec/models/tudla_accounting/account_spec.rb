@@ -189,7 +189,7 @@ RSpec.describe TudlaAccounting::Account, type: :model do
 
       expect([ equipment, child, contra ].map(&:deletable?)).to eq([ false, true, true ])
       expect(equipment.destroy).to be(false)
-      expect(equipment.errors[:base]).to eq([ "Only an account with no postings, sub-accounts, contra accounts, recurring entries, bank rules, budgets or tax returns can be deleted" ])
+      expect(equipment.errors[:base]).to eq([ "Only an account with no postings, sub-accounts, contra accounts, recurring entries, bank rules, budgets, tax returns or contacts using it can be deleted" ])
 
       post_to(child)
       expect(child.reload.deletable?).to be(false)

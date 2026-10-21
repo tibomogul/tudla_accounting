@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_21_240000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_21_233000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -259,6 +259,29 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_240000) do
     t.index ["detail_id"], name: "tudla_accounting_carrying_amounts_unique_key", unique: true
     t.index ["related_party_type", "related_party_id"], name: "index_tudla_accounting_carrying_amounts_on_related_party"
     t.check_constraint "carrying_amount_type = ANY (ARRAY[0, 1])", name: "tudla_accounting_carrying_amounts_type_known"
+  end
+
+  create_table "tudla_accounting_contacts", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.text "address"
+    t.datetime "created_at", null: false
+    t.bigint "default_account_id"
+    t.bigint "default_tax_code_id"
+    t.string "email"
+    t.string "kind", default: "customer", null: false
+    t.string "name", null: false
+    t.text "notes"
+    t.bigint "organization_id", null: false
+    t.string "organization_type", null: false
+    t.integer "payment_terms_days"
+    t.string "phone"
+    t.string "tax_number"
+    t.datetime "updated_at", null: false
+    t.index ["default_account_id"], name: "index_tudla_accounting_contacts_on_default_account"
+    t.index ["default_tax_code_id"], name: "index_tudla_accounting_contacts_on_default_tax_code"
+    t.index ["organization_type", "organization_id", "name"], name: "index_tudla_accounting_contacts_on_name"
+    t.check_constraint "kind::text = ANY (ARRAY['customer'::character varying, 'supplier'::character varying, 'both'::character varying]::text[])", name: "tudla_accounting_contacts_kind_known"
+    t.check_constraint "payment_terms_days IS NULL OR payment_terms_days >= 0", name: "tudla_accounting_contacts_terms_not_negative"
   end
 
   create_table "tudla_accounting_detail_tags", force: :cascade do |t|
@@ -528,6 +551,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_240000) do
   add_foreign_key "tudla_accounting_budgets", "tudla_accounting_periods", column: "period_id"
   add_foreign_key "tudla_accounting_carrying_amount_forexes", "tudla_accounting_carrying_amounts", column: "carrying_amount_id"
   add_foreign_key "tudla_accounting_carrying_amounts", "tudla_accounting_details", column: "detail_id"
+  add_foreign_key "tudla_accounting_contacts", "tudla_accounting_accounts", column: "default_account_id"
+  add_foreign_key "tudla_accounting_contacts", "tudla_accounting_tax_codes", column: "default_tax_code_id"
   add_foreign_key "tudla_accounting_detail_tags", "tudla_accounting_details", column: "detail_id"
   add_foreign_key "tudla_accounting_detail_tags", "tudla_accounting_dimension_values", column: "dimension_value_id"
   add_foreign_key "tudla_accounting_detail_tags", "tudla_accounting_dimensions", column: "dimension_id"

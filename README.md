@@ -63,6 +63,11 @@ A box uses only boxes above it, which then stay above it and can't be deleted wh
 
 Once a return is lodged, **Mark as filed** on that report (or `FiledTaxReturn.file!(form, from:, thru:, basis:)`) keeps its figures, who filed it and when (`tax_return.filed` on the audit trail, with the figures). **Tax returns filed** lists them; each shows its figures as filed beside what the books give now (`FiledTaxReturn#comparison`, `#changes`), so a posting into its months since (or a change to the boxes) stands out, and suggests closing months still open. Returns of a form can't overlap; `withdraw!(reason:)` takes one back (`tax_return.withdrawn`) so a corrected return can be filed for the same months. A form with returns filed can't be deleted. Filing and withdrawing need `:administer`. The demo has a BAS mapped to its GST code and wages account, with last quarter's filed.
 
+### Contacts
+`TudlaAccounting::Contact` is a customer or supplier (`kind`: `customer`, `supplier` or `both`) with an email, phone, address, tax number, payment terms (`payment_terms_days`; `due_on(date)` gives a document's due date) and a default account and tax code for its documents' lines. Contacts are the party documents are to or from, so the aging reports and statements work for them without host models; host apps whose own models are the related party (`related_party_method`) keep working as before. An inactive contact keeps its history; one that is owed or owes anything, or ever was, can't be deleted, and an account or tax code a contact defaults to can't be deleted either. Contacts are on the audit trail (`contact.created`, `contact.updated`, `contact.deleted`).
+
+The **Contacts** page searches them by name, email or tax number, by side, with inactive ones on request, and downloads them as CSV; each contact's page shows their details and what they owe or are owed, by how overdue, with links to their statements. `ContactImporter.call(organization, path, ".csv")` (the page's Import, CSV or Excel) adds contacts from a file with the download's columns, updating those already there by name, all or nothing. Adding and changing contacts needs `:record`.
+
 ### Customer and supplier statements
 `TudlaAccounting::PartyStatement` is a statement of account for one customer (`type: :receivable`) or supplier (`:payable`) over a run of days, as it would be sent to them:
 

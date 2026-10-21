@@ -72,6 +72,9 @@ TudlaAccounting::Engine.routes.draw do
     end
   end
   resources :bank_rules, except: :show
+  resources :contacts do
+    collection { post :import }
+  end
 
   resources :allocations, only: :create do
     collection { post :oldest_first }

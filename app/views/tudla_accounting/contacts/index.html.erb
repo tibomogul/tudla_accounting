@@ -1,0 +1,43 @@
+<%= tc_page_header "Contacts", subtitle: "Customers and suppliers" do %>
+  <% query = request.query_string.presence %>
+  <%= link_to "Download CSV", "#{contacts_path}.csv#{"?#{query}" if query}", class: "tc-btn tc-btn-ghost", data: { turbo: false } %>
+  <% if tc_can?(:record) %><%= link_to "New contact", new_contact_path, class: "tc-btn" %><% end %>
+<% end %>
+
+<%= form_with url: contacts_path, method: :get, class: "tc-card tc-card-body mb-6 flex flex-wrap items-end gap-3" do |form| %>
+  <div class="grow"><%= form.label :q, "Search", class: "tc-label" %><%= form.search_field :q, value: params[:q], placeholder: "Name, email or tax number", class: "tc-input" %></div>
+  <div><%= form.label :kind, "Show", class: "tc-label" %>
+    <%= form.select :kind, [ [ "Everyone", "" ], [ "Customers", "customer" ], [ "Suppliers", "supplier" ] ], { selected: params[:kind] }, class: "tc-input" %></div>
+  <label class="flex items-center gap-2 text-sm pb-2"><%= form.check_box :inactive, { checked: params[:inactive] == "1" }, "1", nil %> Inactive too</label>
+  <%= form.submit "Search", class: "tc-btn tc-btn-secondary", name: nil %>
+<% end %>
+
+<div class="tc-card overflow-x-auto mb-4">
+  <table class="tc-table">
+    <thead><tr><th>Name</th><th>Kind</th><th>Email</th><th>Phone</th><th class="tc-num">Terms</th></tr></thead>
+    <tbody>
+      <% if @page.records.empty? %>
+        <tr><td colspan="5" class="tc-muted text-center"><%= params[:q].present? || params[:kind].present? ? "No contacts match." : "No contacts yet. Add your customers and suppliers, or import them from a spreadsheet." %></td></tr>
+      <% end %>
+      <% @page.records.each do |contact| %>
+        <tr data-contact class="<%= "tc-muted" unless contact.active? %>">
+          <td><%= link_to contact.name, contact_path(contact), class: "underline" %><% unless contact.active? %> <%= tc_badge "Inactive" %><% end %></td>
+          <td><%= contact.kind_label %></td>
+          <td><%= contact.email %></td>
+          <td class="whitespace-nowrap"><%= contact.phone %></td>
+          <td class="tc-num"><%= "#{contact.payment_terms_days} days" if contact.payment_terms_days %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+<%= render "tudla_accounting/shared/pagination", paginator: @page %>
+
+<% if tc_can?(:record) %>
+  <%= form_with url: import_contacts_path, multipart: true, class: "tc-card tc-card-body mt-6 grid gap-3 sm:grid-cols-4 items-end" do |form| %>
+    <div class="sm:col-span-3"><%= form.label :file, "Import contacts (CSV or Excel)", class: "tc-label" %><%= form.file_field :file, accept: ".csv,.xlsx", class: "tc-input", required: true %></div>
+    <div><%= form.submit "Import", class: "tc-btn tc-btn-secondary" %></div>
+    <p class="tc-hint sm:col-span-4">Columns: Name, and optionally Kind (customer, supplier or both), Email, Phone, Address, Tax number, Payment terms (days), Default account (code),
+      Default tax code (code) and Notes, as the download has them. A contact whose name is already here is updated; all rows go in, or none.</p>
+  <% end %>
+<% end %>
