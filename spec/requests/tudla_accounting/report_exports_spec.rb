@@ -125,9 +125,34 @@ RSpec.describe "Report exports", type: :request do
                            [ nil, nil, "Cash at the start", "0.00" ], [ nil, nil, "Cash at the end", "800.00" ])
   end
 
+  it "downloads a report as an Excel workbook when the host has caxlsx, and offers printing" do
+    get routes.reports_trial_balance_path(period_id: month(4).id)
+    expect(css_select("a").map { |link| link["href"] }).to include("#{routes.reports_trial_balance_path}.xlsx?period_id=#{month(4).id}")
+    expect(css_select("button[data-action='print#print']").map(&:text)).to eq([ "Print or save as PDF" ])
+
+    get routes.reports_trial_balance_path(format: :xlsx, period_id: month(4).id)
+    expect(response.media_type).to eq("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    expect(response.headers["Content-Disposition"]).to include("trial-balance-2026-04-30.xlsx")
+    expect(response.body).to start_with("PK") # a zip, as workbooks are
+
+    get routes.reports_general_ledger_path(format: :xlsx, from_id: month(1).id, thru_id: month(4).id)
+    expect(response.headers["Content-Disposition"]).to include("general-ledger-2026-01-01-to-2026-04-30.xlsx")
+  end
+
+  it "offers only CSV without caxlsx" do
+    allow(TudlaAccounting).to receive(:xlsx?).and_return(false)
+    get routes.reports_trial_balance_path(period_id: month(4).id)
+    expect(css_select("a").map(&:text)).to include("Download CSV")
+    expect(css_select("a").map(&:text)).not_to include("Excel")
+    get routes.reports_trial_balance_path(format: :xlsx, period_id: month(4).id)
+    expect(response).to have_http_status(:not_found)
+  end
+
   it "has nothing to download without periods" do
     sign_in_as(create(:organization, name: "New Co", currency: "AUD"))
     get routes.reports_balance_sheet_path(format: :csv)
+    expect(response).to have_http_status(:not_found)
+    get routes.reports_general_ledger_path(format: :csv)
     expect(response).to have_http_status(:not_found)
   end
 end

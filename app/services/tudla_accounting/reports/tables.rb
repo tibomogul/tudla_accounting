@@ -17,15 +17,15 @@ module TudlaAccounting
         rows = sections.flat_map do |category, total_label|
           title = ReportsHelper::SECTION_TITLES.fetch(category)
           [ *comparison.rows(category).map { |row| [ title, row.account.code, row.account.name, row.depth, *amounts.call(row.amounts) ] },
-            [ title, nil, total_label || "Total #{title.downcase}", nil, *amounts.call(comparison.total(category)) ] ]
+            Table.total([ title, nil, total_label || "Total #{title.downcase}", nil, *amounts.call(comparison.total(category)) ]) ]
         end
-        rows += figures.map { |figure, label| [ nil, nil, label, nil, *amounts.call(comparison.values(figure)) ] }
+        rows += figures.map { |figure, label| Table.total([ nil, nil, label, nil, *amounts.call(comparison.values(figure)) ]) }
         Table.new([ headings, *rows ])
       end
 
       def trial_balance(report)
         rows = report.rows.map { |row| [ row.account.code, row.account.name, row.debit, row.credit ] }
-        Table.new([ [ "Code", "Account", "Debit", "Credit" ], *rows, [ nil, "Total", report.total_debits, report.total_credits ] ])
+        Table.new([ [ "Code", "Account", "Debit", "Credit" ], *rows, Table.total([ nil, "Total", report.total_debits, report.total_credits ]) ])
       end
 
       # A row per open item (credits to apply as negative amounts), its amount in the
@@ -42,7 +42,7 @@ module TudlaAccounting
               *buckets.map { |bucket| line[:outstanding] if line[:aging_bucket] == bucket }, line[:outstanding] ]
           end
         end
-        Table.new([ headings, *rows, [ "Total", nil, nil, nil, nil, *buckets.map { |bucket| report[:totals][bucket] }, report[:totals][:total] ] ])
+        Table.new([ headings, *rows, Table.total([ "Total", nil, nil, nil, nil, *buckets.map { |bucket| report[:totals][bucket] }, report[:totals][:total] ]) ])
       end
 
       def tax(report)
@@ -51,9 +51,9 @@ module TudlaAccounting
           [ code.code, code.name, code.kind.capitalize, BigDecimal(code.rate_percent), row[:base], row[:tax] ]
         end
         Table.new([ [ "Code", "Name", "Kind", "Rate %", "Taxed amount", "Tax" ], *rows,
-                    [ nil, "Total sales", nil, nil, report[:sales][:base], report[:sales][:tax] ],
-                    [ nil, "Total purchases", nil, nil, report[:purchases][:base], report[:purchases][:tax] ],
-                    [ nil, report[:net_tax].negative? ? "Net tax refundable" : "Net tax payable", nil, nil, nil, report[:net_tax] ] ])
+                    Table.total([ nil, "Total sales", nil, nil, report[:sales][:base], report[:sales][:tax] ]),
+                    Table.total([ nil, "Total purchases", nil, nil, report[:purchases][:base], report[:purchases][:tax] ]),
+                    Table.total([ nil, report[:net_tax].negative? ? "Net tax refundable" : "Net tax payable", nil, nil, nil, report[:net_tax] ]) ])
       end
 
       # A column per dimension value ("Untagged" for lines without one), then the total.
@@ -64,21 +64,21 @@ module TudlaAccounting
           title = ReportsHelper::SECTION_TITLES.fetch(section.to_s)
           totals = report[:totals][section]
           [ *report[section].map { |row| [ title, row[:account].code, row[:account].name, *columns.map { |column| row[:amounts][column] }, row[:total] ] },
-            [ title, nil, "Total #{title.downcase}", *columns.map { |column| totals[column] }, totals[:total] ] ]
+            Table.total([ title, nil, "Total #{title.downcase}", *columns.map { |column| totals[column] }, totals[:total] ]) ]
         end
         net = report[:totals][:net_profit]
-        Table.new([ headings, *rows, [ nil, nil, "Net profit (loss)", *columns.map { |column| net[column] }, net[:total] ] ])
+        Table.new([ headings, *rows, Table.total([ nil, nil, "Net profit (loss)", *columns.map { |column| net[column] }, net[:total] ]) ])
       end
 
       def cash_flow(report)
         rows = Reports::CashFlow::ACTIVITIES.flat_map do |activity|
           title = "#{activity.capitalize} activities"
           [ *report.sections.fetch(activity).map { |row| [ title, row.account&.code, row.account ? row.account.name : row.label, row.amount ] },
-            [ title, nil, "Net cash from #{activity} activities", report.total(activity) ] ]
+            Table.total([ title, nil, "Net cash from #{activity} activities", report.total(activity) ]) ]
         end
         Table.new([ [ "Section", "Code", "Account", "Amount" ], *rows,
-                    [ nil, nil, "Net change in cash", report.net_change ], [ nil, nil, "Cash at the start", report.opening ],
-                    [ nil, nil, "Cash at the end", report.closing ] ])
+                    Table.total([ nil, nil, "Net change in cash", report.net_change ]), Table.total([ nil, nil, "Cash at the start", report.opening ]),
+                    Table.total([ nil, nil, "Cash at the end", report.closing ]) ])
       end
 
       # The change as a percentage of the second amount, to one decimal place; nil when it is zero.

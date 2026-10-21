@@ -20,6 +20,7 @@ group :development, :test do
   gem "selenium-webdriver"
   gem "debug", ">= 1.0.0"
   gem "spreadsheet" # for the optional RbaForexRateProvider (host apps add it to use it)
+  gem "caxlsx", "~> 4.1" # for the optional Excel downloads of reports (host apps add it to use them)
 end
 
 # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]

@@ -23,6 +23,11 @@ module TudlaAccounting
     end
 
     # Triggers aren't in schema.rb, so they go back in after every schema load.
+    # Reports download as .xlsx when the host bundles caxlsx (TudlaAccounting.xlsx?).
+    initializer "tudla_accounting.mime_types" do
+      Mime::Type.register "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", :xlsx unless Mime::Type.lookup_by_extension(:xlsx)
+    end
+
     initializer "tudla_accounting.schema_loading" do
       ActiveSupport.on_load(:active_record) do
         require "active_record/tasks/database_tasks"

@@ -199,6 +199,19 @@ module TudlaAccounting
       ActiveStorage::Blob.table_exists? && ActiveStorage::Attachment.table_exists? ? true : false
   end
 
+  # Whether reports can download as Excel workbooks: the host app bundles the caxlsx gem
+  # (the engine doesn't depend on it). The pages offer only CSV otherwise.
+  def self.xlsx?
+    return @xlsx if defined?(@xlsx)
+
+    @xlsx = begin
+      require "caxlsx"
+      true
+    rescue LoadError
+      false
+    end
+  end
+
   def self.init_config
     self.configuration ||= Configuration.new
   end

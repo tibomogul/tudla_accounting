@@ -1,2 +1,10 @@
-<%# The page's report as CSV, for what is shown now (its query string kept). %>
-<%= link_to "Download CSV", "#{request.path}.csv#{"?#{request.query_string}" if request.query_string.present?}", class: "tc-btn tc-btn-ghost", data: { turbo: false } %>
+<%# The page's report as CSV (and Excel, when the host has caxlsx), for what is shown now
+    (its query string kept), and printing it. %>
+<% query = request.query_string.presence %>
+<div class="flex flex-wrap items-center gap-1 print:hidden">
+  <%= link_to "Download CSV", "#{request.path}.csv#{"?#{query}" if query}", class: "tc-btn tc-btn-ghost", data: { turbo: false } %>
+  <% if TudlaAccounting.xlsx? %>
+    <%= link_to "Excel", "#{request.path}.xlsx#{"?#{query}" if query}", class: "tc-btn tc-btn-ghost", data: { turbo: false } %>
+  <% end %>
+  <button type="button" class="tc-btn tc-btn-ghost" data-controller="print" data-action="print#print">Print or save as PDF</button>
+</div>

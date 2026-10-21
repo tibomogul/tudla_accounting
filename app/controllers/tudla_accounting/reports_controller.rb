@@ -65,13 +65,12 @@ module TudlaAccounting
     # Every posted line, account by account, over a run of months (this month by default).
     def general_ledger
       @accounts = organization_scope(Account).order(:code).to_a
-      return unless month_range
+      return respond_with_table("general-ledger") unless month_range
 
       @account = params[:account_id].present? ? organization_scope(Account).find(params[:account_id]) : nil
       @report = Reports::GeneralLedger.new(accounting_organization, from: @from, thru: @thru, account_ids: @account && [ @account.id ])
-      respond_to do |format|
-        format.html { @page = Paginator.new(@report.rows, page: params[:page], per_page: GENERAL_LEDGER_PAGE) }
-        format.csv { send_data @report.to_csv, filename: "general-ledger-#{@from.from_date.to_date}-to-#{@thru.thru_date.to_date}.csv", type: "text/csv" }
+      respond_with_table("general-ledger-#{span_name}", html: -> { @page = Paginator.new(@report.rows, page: params[:page], per_page: GENERAL_LEDGER_PAGE) }) do
+        @report.to_table
       end
     end
 
@@ -89,12 +88,18 @@ module TudlaAccounting
 
     private
 
-    # The page, or (as CSV) the table the block gives; not found when there is nothing to
-    # export (no periods yet, say).
-    def respond_with_table(name, available: !@report.nil?, &table)
+    # The page (html, when given, prepares it), or the table the block gives as CSV, or as
+    # an Excel workbook when the host has caxlsx. Not found when there is nothing to export
+    # (no periods yet, say) or no Excel. The workbook's sheet is named after the file.
+    def respond_with_table(name, available: !@report.nil?, html: nil, &table)
       respond_to do |format|
-        format.html
+        format.html { html&.call }
         format.csv { available ? send_data(table.call.to_csv, filename: "#{name}.csv", type: "text/csv") : head(:not_found) }
+        format.xlsx do
+          next head(:not_found) unless available && TudlaAccounting.xlsx?
+
+          send_data table.call.to_xlsx(name.titleize), filename: "#{name}.xlsx", type: Mime[:xlsx].to_s
+        end
       end
     end
 
@@ -184,9 +189,8 @@ module TudlaAccounting
       @type = type
       @as_of = params[:as_of].presence&.to_date || Date.current
       @report = AgingReportGenerator.call(organization: accounting_organization, report_type: type, as_of_date: @as_of)
-      respond_to do |format|
-        format.html { render :aging }
-        format.csv { send_data Reports::Tables.aging(@report, party_name: helpers.method(:related_party_name)).to_csv, filename: "#{type}s-aging-#{@as_of}.csv", type: "text/csv" }
+      respond_with_table("#{type}s-aging-#{@as_of}", html: -> { render :aging }) do
+        Reports::Tables.aging(@report, party_name: helpers.method(:related_party_name))
       end
     end
   end

@@ -63,7 +63,7 @@ module TudlaAccounting
               [ line.date, line.entry.number_label, line.entry.reference, account.code, account.name, line.entry.particulars,
                 line.detail.description, line.debit, line.credit, line.balance ]
             end,
-            [ thru.thru_date, nil, nil, account.code, account.name, "Closing balance", nil, nil, nil, section.closing ] ]
+            Table.total([ thru.thru_date, nil, nil, account.code, account.name, "Closing balance", nil, nil, nil, section.closing ]) ]
         end
         Table.new([ [ "Date", "Entry no.", "Reference", "Account code", "Account", "Entry", "Description", "Debit", "Credit", "Balance" ], *rows ])
       end

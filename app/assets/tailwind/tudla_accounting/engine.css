@@ -173,3 +173,42 @@
   .tc-muted { color: var(--tc-text-muted); }
   .tc-negative { color: var(--tc-danger); }
 }
+
+/*
+  Printing (and the browser's Save as PDF): paper is light whatever the screen theme;
+  the navigation, forms and buttons are left out; wide tables print every column instead
+  of scrolling, with their headings on each page and rows kept whole. Outside the layers,
+  so these win over the utilities they undo (overflow-x-auto, sticky).
+*/
+@media print {
+  :root, :root[data-theme] {
+    --tc-bg:         oklch(1.00 0 0);
+    --tc-bg-subtle:  oklch(0.96 0 0);
+    --tc-surface:    oklch(1.00 0 0);
+    --tc-border:     oklch(0.80 0 0);
+    --tc-text:       oklch(0.10 0 0);
+    --tc-text-muted: oklch(0.40 0 0);
+    --tc-success:    oklch(0.45 0.14 155);
+    --tc-success-bg: oklch(1.00 0 0);
+    --tc-danger:     oklch(0.50 0.20 25);
+    --tc-danger-bg:  oklch(1.00 0 0);
+    --tc-warning:    oklch(0.45 0.13 75);
+    --tc-warning-bg: oklch(1.00 0 0);
+  }
+  @page { margin: 12mm; }
+  @page wide { size: landscape; }
+
+  .tc-app { min-height: 0; }
+  .tc-app main { max-width: none; padding: 0; }
+  .tc-app main form, .tc-app .tc-btn, .tc-app .tc-pagination { display: none; }
+  .tc-app .overflow-x-auto { overflow: visible; }
+  .tc-app .sticky { position: static; }
+  .tc-app .tc-card { border-radius: 0; break-inside: auto; }
+  .tc-table thead { display: table-header-group; }
+  .tc-table tr { break-inside: avoid; }
+  .tc-table tbody tr:hover { background: none; }
+  /* The whole page turns landscape, not just the table (a page of its own would split the title off). */
+  .tc-app main:has(.tc-print-wide) { page: wide; }
+  .tc-print-wide { font-size: 0.75rem; }
+  .tc-print-wide td, .tc-print-wide th { padding: 0.25rem 0.375rem; }
+}

@@ -47,5 +47,7 @@ end
 # Entries from your own records (Entry hashes; one entry per record by default):
 # TudlaAccounting.register_entry_source("Invoice", ->(invoice) { { organization_type: ..., details: [...] } })
 
+# Reports download as CSV; add gem "caxlsx" to the Gemfile to offer Excel workbooks too.
+
 # React to changes to the books once they commit:
 # TudlaAccounting.subscribe("entry.posted") { |event| LedgerSyncJob.perform_later(event.subject_id) }

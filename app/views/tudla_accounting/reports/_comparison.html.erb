@@ -9,7 +9,7 @@
   <% amounts.each do |amount| %><td class="tc-num"><%= tc_money(amount) %></td><% end %>
   <% if change %><td class="tc-num"><%= tc_money(amounts[0] - amounts[1]) %></td><td class="tc-num tc-muted"><%= comparison_percent(amounts) %></td><% end %>
 <% end %>
-<div class="tc-card overflow-x-auto">
+<div class="tc-card overflow-x-auto <%= "tc-print-wide" if comparison.periods.size > 3 %>">
   <table class="tc-table" data-comparison>
     <thead>
       <tr>
