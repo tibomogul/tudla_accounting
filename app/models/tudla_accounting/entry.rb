@@ -186,6 +186,18 @@ module TudlaAccounting
       existing = key && find_by(**scope, idempotency_key: key)
       return existing if existing
 
+      entry = build_from_ruby_hash(hash)
+      transaction(requires_new: true) { entry.save! }
+      entry
+    rescue ActiveRecord::RecordNotUnique
+      raise unless key
+
+      find_by!(**scope, idempotency_key: key) # created by someone else at the same time
+    end
+
+    # The entry create_from_ruby_hash would create, unsaved (valid? says whether it can be),
+    # e.g. to check a recurring entry's lines. ArgumentError for what isn't understood.
+    def self.build_from_ruby_hash(hash)
       raise ArgumentError, "transacted_at must be a valid ISO 8601 datetime string" unless hash[:transacted_at].is_a?(String)
       begin
         transacted_at = Time.iso8601(hash[:transacted_at])
@@ -276,15 +288,11 @@ module TudlaAccounting
         reference: hash[:reference],
         reverse_on: reverse_on,
         transacted_at: transacted_at,
-        idempotency_key: key,
+        idempotency_key: hash[:idempotency_key].presence,
         details_attributes: details_attributes
       }
       attributes[:posted_at] = posted_at if hash[:posted_at].present?
-      transaction(requires_new: true) { create!(attributes) }
-    rescue ActiveRecord::RecordNotUnique
-      raise unless key
-
-      find_by!(**scope, idempotency_key: key) # created by someone else at the same time
+      new(attributes)
     end
 
     # Tags for a line's dimensions, given as dimension code => value code, e.g.

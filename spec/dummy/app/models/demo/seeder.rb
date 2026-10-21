@@ -74,6 +74,7 @@ class Demo::Seeder
     close_first_half_of_last_year
     import_bank_statement
     attach_receipts
+    add_recurring_entries
   end
 
   def create_accounts
@@ -154,6 +155,20 @@ class Demo::Seeder
 
   def line(entry, account, tally, cents, **extra)
     entry.details.build(account: account, tally: tally, amount_cents: cents, currency: CURRENCY, organization: organization, **extra)
+  end
+
+  # From next month: software, posted automatically, and an accrual for the month's rent
+  # before the landlord's invoice comes, at each month's end, as drafts to check.
+  def add_recurring_entries
+    first = today.next_month.beginning_of_month
+    [ [ "Software subscriptions", "Design and accounting software", 1, true, false, [ [ "6020", :debit, 249_00 ], [ "1011", :credit, 249_00 ] ] ],
+      [ "Rent accrual", "Rent for the month, not yet invoiced", nil, false, true, [ [ "6010", :debit, 1_800_00 ], [ "2100", :credit, 1_800_00 ] ] ] ]
+      .each do |name, particulars, day, post, reverse, lines|
+        template = TudlaAccounting::RecurringEntry.new(organization: organization, name: name, particulars: particulars, frequency: "monthly",
+                                                       day_of_month: day, starts_on: first, post_automatically: post, reverse_next_month: reverse)
+        lines.each { |code, tally, cents| template.lines.build(account: accounts[code], tally: tally, amount_cents: cents) }
+        template.save!
+      end
   end
 
   # The landlord's receipt on the three latest rent payments, when the app has Active Storage.

@@ -1,8 +1,8 @@
 <%# locals: (entry:) %>
 <% currency = Money::Currency.new(accounting_organization.currency) %>
-<% account_options = entry_account_options(entry) %>
-<% tax_options = entry_tax_options(entry) %>
-<% dimensions = entry_dimensions(entry) %>
+<% account_options = entry_account_options(entry.details) %>
+<% tax_options = entry_tax_options(entry.details) %>
+<% dimensions = entry_dimensions(entry.details) %>
 <% extra_columns = (tax_options.any? ? 1 : 0) + dimensions.size %>
 <% lines = entry.details.reject(&:tax_tax?) # tax lines are worked out from the taxed lines on save %>
 <%= form_with model: entry, scope: :entry, url: (entry.persisted? ? entry_path(entry) : entries_path),

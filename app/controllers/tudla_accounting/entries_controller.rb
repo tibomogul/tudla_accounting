@@ -184,16 +184,6 @@ module TudlaAccounting
       end
     end
 
-    # Cents for a typed amount ("1,234.50"), nil when blank; yields when it isn't a number.
-    def amount_cents(text, currency)
-      text = text.to_s.strip.delete(",")
-      return nil if text.empty?
-
-      Money.from_amount(BigDecimal(text), currency).cents
-    rescue ArgumentError
-      yield
-      nil
-    end
 
     def show_problems(problems)
       @entry.valid?

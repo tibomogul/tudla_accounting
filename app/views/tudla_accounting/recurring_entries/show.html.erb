@@ -1,0 +1,58 @@
+<%= tc_page_header @recurring_entry.name, subtitle: "#{@recurring_entry.schedule_label} from #{tc_date(@recurring_entry.starts_on)}#{" to #{tc_date(@recurring_entry.ends_on)}" if @recurring_entry.ends_on}" do %>
+  <% if tc_can?(:record) %>
+    <%= button_to "Make a draft for today", make_recurring_entry_path(@recurring_entry), class: "tc-btn tc-btn-secondary" %>
+    <%= link_to "Edit", edit_recurring_entry_path(@recurring_entry), class: "tc-btn tc-btn-secondary" %>
+    <%= button_to "Delete", recurring_entry_path(@recurring_entry), method: :delete, class: "tc-btn tc-btn-danger",
+                  form: { data: { controller: "confirm", confirm_message_value: "Delete #{@recurring_entry.name}? The entries made from it stay.", action: "submit->confirm#ask" } } %>
+  <% end %>
+<% end %>
+
+<% if @recurring_entry.last_problem %>
+  <div class="tc-alert tc-alert-danger mb-4" role="alert">Last run: <%= @recurring_entry.last_problem %></div>
+<% end %>
+
+<div class="grid gap-4 sm:grid-cols-4 mb-6">
+  <div class="tc-card tc-card-body"><p class="tc-stat-label">Next</p><p class="mt-1" data-next-on><%= @recurring_entry.finished? ? "Finished" : tc_date(@recurring_entry.next_on) %><%= " (inactive)" unless @recurring_entry.active? %></p></div>
+  <div class="tc-card tc-card-body"><p class="tc-stat-label">Makes</p><p class="mt-1"><%= @recurring_entry.post_automatically? ? "Posted entries" : "Drafts to post" %><%= ", reversed on the first of the next month" if @recurring_entry.reverse_next_month? %></p></div>
+  <div class="tc-card tc-card-body"><p class="tc-stat-label">Made so far</p><p class="mt-1"><%= @recurring_entry.occurrences_count %><%= " of #{@recurring_entry.occurrences_limit}" if @recurring_entry.occurrences_limit %></p></div>
+  <div class="tc-card tc-card-body"><p class="tc-stat-label">Particulars</p><p class="mt-1"><%= @recurring_entry.particulars %><%= " · #{@recurring_entry.reference}" if @recurring_entry.reference %></p></div>
+</div>
+
+<div class="tc-card overflow-x-auto mb-6">
+  <table class="tc-table">
+    <thead><tr><th>Account</th><th class="tc-num">Debit</th><th class="tc-num">Credit</th></tr></thead>
+    <tbody>
+      <% @recurring_entry.lines.each do |line| %>
+        <tr>
+          <td>
+            <%= link_to account_option_label(line.account), account_path(line.account) %>
+            <% if line.description %><div class="text-sm"><%= line.description %></div><% end %>
+            <% if line.tax_code %><span class="tc-muted text-xs">taxed <%= line.tax_code.label %><%= ", included" if @recurring_entry.tax_inclusive? %></span><% end %>
+            <% line.dimension_values.each do |value| %><span class="tc-muted text-xs ml-2"><%= value.label %></span><% end %>
+          </td>
+          <td class="tc-num"><%= tc_money(line.amount) if line.debit? %></td>
+          <td class="tc-num"><%= tc_money(line.amount) if line.credit? %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+
+<section class="tc-card overflow-x-auto" aria-labelledby="made-heading">
+  <div class="tc-card-body pb-0"><h2 id="made-heading" class="tc-card-title">Entries made from it</h2></div>
+  <table class="tc-table">
+    <tbody>
+      <% if @entries.empty? %><tr><td class="tc-muted">None yet.</td></tr><% end %>
+      <% @entries.each do |entry| %>
+        <tr data-made-entry>
+          <td class="whitespace-nowrap w-32"><%= tc_date(entry.transacted_at) %></td>
+          <td><%= link_to entry_title(entry), entry_path(entry) %></td>
+          <td><%= entry_status_badge(entry) %></td>
+          <td class="tc-num"><%= tc_money(entry_total(entry)) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</section>
+
+<p class="mt-6"><%= link_to "← All recurring entries", recurring_entries_path, class: "tc-btn tc-btn-ghost" %></p>

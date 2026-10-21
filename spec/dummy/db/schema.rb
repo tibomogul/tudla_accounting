@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_21_190000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_21_200000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -313,6 +313,49 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_190000) do
     t.index ["organization_type", "organization_id"], name: "index_tudla_accounting_periods_on_organization"
   end
 
+  create_table "tudla_accounting_recurring_entries", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.integer "day_of_month"
+    t.date "ends_on"
+    t.string "frequency", null: false
+    t.integer "interval", default: 1, null: false
+    t.string "last_problem"
+    t.string "name", null: false
+    t.date "next_on"
+    t.integer "occurrences_count", default: 0, null: false
+    t.integer "occurrences_limit"
+    t.bigint "organization_id", null: false
+    t.string "organization_type", null: false
+    t.text "particulars", null: false
+    t.boolean "post_automatically", default: false, null: false
+    t.string "reference"
+    t.boolean "reverse_next_month", default: false, null: false
+    t.date "starts_on", null: false
+    t.boolean "tax_inclusive", default: false, null: false
+    t.datetime "updated_at", null: false
+    t.index ["active", "next_on"], name: "index_tudla_accounting_recurring_entries_on_active_and_next_on"
+    t.index ["organization_type", "organization_id"], name: "index_tudla_accounting_recurring_entries_on_organization"
+    t.check_constraint "\"interval\" > 0", name: "tudla_accounting_recurring_entries_interval_positive"
+    t.check_constraint "frequency::text = ANY (ARRAY['weekly'::character varying, 'monthly'::character varying, 'yearly'::character varying]::text[])", name: "tudla_accounting_recurring_entries_frequency_known"
+  end
+
+  create_table "tudla_accounting_recurring_entry_lines", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "amount_cents", null: false
+    t.datetime "created_at", null: false
+    t.string "description"
+    t.bigint "dimension_value_ids", default: [], null: false, array: true
+    t.bigint "recurring_entry_id", null: false
+    t.integer "tally", null: false
+    t.bigint "tax_code_id"
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_tudla_accounting_recurring_entry_lines_on_account"
+    t.index ["recurring_entry_id"], name: "index_tudla_accounting_recurring_entry_lines_on_recurring_entry"
+    t.index ["tax_code_id"], name: "index_tudla_accounting_recurring_entry_lines_on_tax_code"
+    t.check_constraint "amount_cents > 0", name: "tudla_accounting_recurring_entry_lines_amount_positive"
+  end
+
   create_table "tudla_accounting_sequences", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.bigint "last_value", null: false
@@ -363,5 +406,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_190000) do
   add_foreign_key "tudla_accounting_details", "tudla_accounting_tax_codes", column: "tax_code_id"
   add_foreign_key "tudla_accounting_dimension_values", "tudla_accounting_dimensions", column: "dimension_id"
   add_foreign_key "tudla_accounting_foreign_exchanges", "tudla_accounting_details", column: "detail_id"
+  add_foreign_key "tudla_accounting_recurring_entry_lines", "tudla_accounting_accounts", column: "account_id"
+  add_foreign_key "tudla_accounting_recurring_entry_lines", "tudla_accounting_recurring_entries", column: "recurring_entry_id"
+  add_foreign_key "tudla_accounting_recurring_entry_lines", "tudla_accounting_tax_codes", column: "tax_code_id"
   add_foreign_key "tudla_accounting_tax_codes", "tudla_accounting_accounts", column: "account_id"
 end

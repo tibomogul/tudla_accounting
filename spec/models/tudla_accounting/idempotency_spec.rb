@@ -44,7 +44,7 @@ RSpec.describe "Idempotent entry creation" do
   end
 
   it "still raises for other uniqueness problems" do
-    allow(TudlaAccounting::Entry).to receive(:create!).and_raise(ActiveRecord::RecordNotUnique)
+    allow_any_instance_of(TudlaAccounting::Entry).to receive(:save!).and_raise(ActiveRecord::RecordNotUnique)
     expect { TudlaAccounting::Entry.create_from_ruby_hash(entry_hash) }.to raise_error(ActiveRecord::RecordNotUnique)
   end
 

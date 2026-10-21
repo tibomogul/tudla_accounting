@@ -1,0 +1,88 @@
+<%# locals: (recurring_entry:) %>
+<% currency = Money::Currency.new(accounting_organization.currency) %>
+<% lines = recurring_entry.lines.to_a %>
+<% account_options = entry_account_options(lines) %>
+<% tax_options = entry_tax_options(lines) %>
+<% dimensions = entry_dimensions(lines) %>
+<% extra_columns = (tax_options.any? ? 1 : 0) + dimensions.size %>
+<%= form_with model: recurring_entry, scope: :recurring_entry, url: (recurring_entry.persisted? ? recurring_entry_path(recurring_entry) : recurring_entries_path),
+              class: "space-y-4", data: { controller: "entry-lines", entry_lines_exponent_value: currency.exponent } do |form| %>
+  <% if recurring_entry.errors.any? %>
+    <div class="tc-alert tc-alert-danger" role="alert">
+      <ul class="list-disc pl-4"><% recurring_entry.errors.full_messages.uniq.each do |message| %><li><%= message %></li><% end %></ul>
+    </div>
+  <% end %>
+
+  <div class="tc-card tc-card-body grid gap-4 sm:grid-cols-6">
+    <div class="sm:col-span-2"><%= tc_field form, :name, required: true, placeholder: "Office rent" %></div>
+    <div class="sm:col-span-4"><%= tc_field form, :particulars, required: true, placeholder: "What each entry records" %></div>
+    <div class="sm:col-span-2"><%= tc_field form, :reference, placeholder: "Lease number" %></div>
+  </div>
+
+  <fieldset class="tc-card tc-card-body grid gap-4 sm:grid-cols-6">
+    <legend class="tc-card-title px-1">Schedule</legend>
+    <div class="sm:col-span-2 flex items-start gap-2">
+      <div class="w-20"><%= tc_field form, :interval, as: :number_field, label: "Every", min: 1, max: 120, required: true %></div>
+      <div class="flex-1"><%= tc_field form, :frequency, as: :select, label: "Period", choices: [ [ "week(s)", "weekly" ], [ "month(s)", "monthly" ], [ "year(s)", "yearly" ] ] %></div>
+    </div>
+    <div class="sm:col-span-2 space-y-1">
+      <%= form.label :day_of_month, "On the", class: "tc-label" %>
+      <%= form.select :day_of_month, (1..31).map { |day| [ day.ordinalize, day ] } + [ [ "Last day", "last" ] ],
+                      { selected: recurring_entry.day_of_month || "last" }, class: "tc-input" %>
+      <p class="tc-hint">Monthly and yearly; a short month uses its last day. Weekly runs on the start date's weekday.</p>
+    </div>
+    <div class="sm:col-span-2"><%= tc_field form, :starts_on, as: :date_field, label: "Starting", required: true %></div>
+    <div class="sm:col-span-2"><%= tc_field form, :ends_on, as: :date_field, label: "Ending (optional)" %></div>
+    <div class="sm:col-span-2"><%= tc_field form, :occurrences_limit, as: :number_field, label: "Or after this many entries", min: 1 %></div>
+    <div class="sm:col-span-6 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+      <label class="flex items-center gap-2"><%= form.check_box :post_automatically %> Post each entry automatically (otherwise each is a draft to post)</label>
+      <label class="flex items-center gap-2"><%= form.check_box :reverse_next_month %> Reverse each on the first of the next month (an accrual)</label>
+      <% if recurring_entry.persisted? %><label class="flex items-center gap-2"><%= form.check_box :active %> Active</label><% end %>
+    </div>
+  </fieldset>
+
+  <div class="tc-card overflow-x-auto">
+    <table class="tc-table">
+      <thead>
+        <tr><th>Account</th><th class="tc-num">Debit (<%= currency.iso_code %>)</th><th class="tc-num">Credit (<%= currency.iso_code %>)</th><% if tax_options.any? %><th>Tax</th><% end %><% dimensions.each do |dimension, _values| %><th><%= dimension.name %></th><% end %><th><span class="sr-only">Remove</span></th></tr>
+      </thead>
+      <tbody data-entry-lines-target="lines">
+        <% lines.each_with_index do |line, index| %>
+          <%= render "tudla_accounting/entries/line", detail: line, index: index, account_options: account_options, tax_options: tax_options, dimensions: dimensions, scope: "recurring_entry" %>
+        <% end %>
+      </tbody>
+      <tfoot>
+        <% if tax_options.any? %>
+          <tr class="tc-muted" data-entry-lines-target="taxRow">
+            <td>Tax, added to each entry</td>
+            <td class="tc-num" data-entry-lines-target="debitTax"></td>
+            <td class="tc-num" data-entry-lines-target="creditTax"></td>
+            <td colspan="<%= extra_columns + 1 %>"></td>
+          </tr>
+        <% end %>
+        <tr class="font-semibold">
+          <td><button type="button" class="tc-btn tc-btn-secondary tc-btn-sm" data-action="entry-lines#add">Add line</button></td>
+          <td class="tc-num" data-entry-lines-target="debitTotal"></td>
+          <td class="tc-num" data-entry-lines-target="creditTotal"></td>
+          <td colspan="<%= extra_columns + 1 %>"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  <p data-entry-lines-target="status" aria-live="polite" class="text-sm"></p>
+  <% if tax_options.any? %>
+    <label class="flex items-center gap-2 text-sm">
+      <%= form.check_box :tax_inclusive, data: { entry_lines_target: "inclusive", action: "change->entry-lines#recalculate" } %>
+      Amounts on taxed lines include the tax (it is split out of each entry)
+    </label>
+  <% end %>
+
+  <template data-entry-lines-target="template">
+    <%= render "tudla_accounting/entries/line", detail: TudlaAccounting::RecurringEntryLine.new, index: "NEW_LINE", account_options: account_options, tax_options: tax_options, dimensions: dimensions, scope: "recurring_entry" %>
+  </template>
+
+  <div class="flex gap-2">
+    <%= form.submit "Save recurring entry", class: "tc-btn" %>
+    <%= link_to "Cancel", (recurring_entry.persisted? ? recurring_entry_path(recurring_entry) : recurring_entries_path), class: "tc-btn tc-btn-secondary" %>
+  </div>
+<% end %>

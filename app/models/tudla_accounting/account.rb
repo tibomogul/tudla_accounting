@@ -154,9 +154,10 @@ module TudlaAccounting
                              .where.not(tudla_accounting_entries: { posted_at: nil }).exists?
     end
 
-    # Only an account with no history, no sub-accounts and nothing offsetting it.
+    # Only an account with no history, no sub-accounts, nothing offsetting it and no
+    # recurring entry using it.
     def deletable?
-      structure_editable? && children.none? && contra_for.nil?
+      structure_editable? && children.none? && contra_for.nil? && RecurringEntryLine.where(account: self).none?
     end
 
     # Stops offering the account, and every account beneath it, for new entries: they keep
@@ -208,8 +209,10 @@ module TudlaAccounting
     # Why this account alone can't be made inactive (sub-accounts aside), or nil.
     def own_deactivation_problem
       tax_code = TaxCode.where(account: self, active: true).order(:code).first
+      recurring = RecurringEntry.active.joins(:lines).where(tudla_accounting_recurring_entry_lines: { account_id: id }).order(:name).first
       if role then "is the #{role_name} account; move the role to another account first"
       elsif tax_code then "is where the #{tax_code.code} tax code posts; change its account or make it inactive first"
+      elsif recurring then "is used by the recurring entry #{recurring.name}; change it or make it inactive first"
       elsif open_items? then "has receivables or payables still open"
       end
     end
@@ -293,7 +296,7 @@ module TudlaAccounting
     def ensure_deletable
       return if deletable?
 
-      errors.add(:base, "Only an account with no postings, sub-accounts or contra accounts can be deleted")
+      errors.add(:base, "Only an account with no postings, sub-accounts, contra accounts or recurring entries can be deleted")
       throw :abort
     end
 

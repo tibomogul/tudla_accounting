@@ -9,25 +9,26 @@ module TudlaAccounting
       [ entry.number_label, entry.particulars ].compact.join(" ")
     end
 
-    # The accounts a line can choose: the active ones, and any already on the entry.
-    def entry_account_options(entry)
-      used = entry.details.filter_map(&:account_id)
+    # The accounts a line can choose: the active ones, and any the lines have already.
+    # lines: an entry's details, or a recurring entry's lines.
+    def entry_account_options(lines)
+      used = lines.filter_map(&:account_id)
       TudlaAccounting::Account.where(organization: accounting_organization).active.or(TudlaAccounting::Account.where(id: used))
         .order(:code).map { |account| [ account_option_label(account), account.id ] }
     end
 
-    # The tax codes a line can choose: the active ones, and any already on the entry. Each
+    # The tax codes a line can choose: the active ones, and any the lines have already. Each
     # carries its rate for the line editor's totals.
-    def entry_tax_options(entry)
-      used = entry.details.filter_map(&:tax_code_id)
+    def entry_tax_options(lines)
+      used = lines.filter_map(&:tax_code_id)
       TudlaAccounting::TaxCode.where(organization: accounting_organization).where(active: true).or(TudlaAccounting::TaxCode.where(id: used))
         .order(:kind, :code).map { |code| [ code.label, code.id, { data: { rate: code.rate.to_s } } ] }
     end
 
     # [dimension, value choices] for the line editor: the active dimensions and values,
-    # and any already on the entry.
-    def entry_dimensions(entry)
-      used = entry.details.flat_map { |detail| detail.tags.map(&:dimension_value_id) }
+    # and any the lines have already.
+    def entry_dimensions(lines)
+      used = lines.flat_map { |line| line.respond_to?(:tags) ? line.tags.map(&:dimension_value_id) : line.dimension_value_ids }
       TudlaAccounting::Dimension.where(organization: accounting_organization).includes(:dimension_values).order(:code).filter_map do |dimension|
         values = dimension.dimension_values.select { |value| value.active? || used.include?(value.id) }
         [ dimension, values.map { |value| [ value.name, value.id ] } ] if (dimension.active? && values.any?) || values.any? { |value| used.include?(value.id) }

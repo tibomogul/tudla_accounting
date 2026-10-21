@@ -1,5 +1,6 @@
-<%# locals: (detail:, index:, account_options:, tax_options:, dimensions:) %>
-<% name = ->(field) { "entry[lines][#{index}][#{field}]" } %>
+<%# locals: (detail:, index:, account_options:, tax_options:, dimensions:, scope: "entry") %>
+<%# detail: an entry's line, or a recurring entry's (the same fields). %>
+<% name = ->(field) { "#{scope}[lines][#{index}][#{field}]" } %>
 <tr data-entry-lines-target="line" <%= "hidden" if detail.marked_for_destruction? %>>
   <td class="min-w-64">
     <% if detail.persisted? %><input type="hidden" name="<%= name.call(:id) %>" value="<%= detail.id %>"><% end %>

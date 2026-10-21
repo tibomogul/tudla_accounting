@@ -1,4 +1,5 @@
 <%= tc_page_header "Entries", subtitle: "Journal entries, newest first" do %>
+  <%= link_to "Recurring entries", recurring_entries_path, class: "tc-btn tc-btn-ghost" %>
   <% if tc_can?(:record) %><%= link_to "New entry", new_entry_path, class: "tc-btn" %><% end %>
 <% end %>
 

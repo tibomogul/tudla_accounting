@@ -62,6 +62,11 @@ TudlaAccounting::Engine.routes.draw do
     member { post :reverse }
   end
 
+  resources :recurring_entries do
+    collection { post :run }
+    member { post :make }
+  end
+
   resources :entries do
     member do
       post :post

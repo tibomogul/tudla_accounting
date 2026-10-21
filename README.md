@@ -30,6 +30,20 @@ An entry's `reference` is free text from elsewhere, such as a cheque number or t
 
 **Auto-reversing entries.** An accrual or prepayment can undo itself: give a draft a `reverse_on` date (the entry form's "Reverse automatically on", or `reverse_on: "2026-04-01"` in `create_from_ruby_hash`) and posting it posts its reversal too, dated that day, in the same transaction: both or neither. The date must come after the entry's own and have a financial year; an invoice, bill, payment or credit can't have one, since its reversal would close what is owed or take the payment off.
 
+### Recurring entries
+`TudlaAccounting::RecurringEntry` is an entry made again and again (rent, a subscription, depreciation, a month-end accrual): its particulars, reference and lines (account, debit or credit, amount, description, tax code, dimension values) and a schedule: every N weeks, months or years from `starts_on`, a monthly or yearly one on `day_of_month` (cut to a short month) or the last day when that is blank, until `ends_on` or `occurrences_limit` entries. Each makes drafts to post, or (`post_automatically`) posts them; with `reverse_next_month` each reverses itself on the first of the next month. Lines refer to accounts, not codes, so renumbering is safe; an account an active one uses can't be made inactive, nor one any uses deleted.
+
+`RecurringEntryRunner.call(organization:, as_of:)` makes every entry due by then (today by default), catching up any missed, each through `Entry.create_from_ruby_hash` with the template as its source and `recurring:<id>:<date>` as its idempotency key, so runs that overlap or repeat make each once. One that can't be made (an account made inactive since) stops its template, to try again next run; one that can't be posted (no year for it yet) is left a draft. Either way the reason is kept in `last_problem`, shown on its page and the dashboard. `TudlaAccounting::RecurringEntriesJob` runs it for every organization; schedule it in the host app, e.g. with Solid Queue's `config/recurring.yml`:
+
+```yaml
+production:
+  tudla_accounting_recurring_entries:
+    class: TudlaAccounting::RecurringEntriesJob
+    schedule: every day at 1am
+```
+
+The **Recurring entries** page (from Entries) lists them with their schedule and next date, makes the due ones now, and adds, edits, deactivates and deletes them with the entry form's line editor; an entry's **Make recurring** starts one from its lines, and a template's **Make a draft for today** makes a one-off entry from it. They are on the audit trail, as is each entry made.
+
 ### Attachments
 With Active Storage set up in the host app (`bin/rails active_storage:install`), entries can carry receipts and other source documents; `TudlaAccounting.attachments?` says whether they can, and the pages leave attachments out until then. The engine ships no Active Storage migration of its own.
 

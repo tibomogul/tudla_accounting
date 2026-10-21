@@ -7,6 +7,7 @@
                     form: { data: { controller: "confirm", confirm_message_value: "Delete this draft?", action: "submit->confirm#ask" } } %>
     <% end %>
   <% end %>
+  <% if tc_can?(:record) %><%= link_to "Make recurring", new_recurring_entry_path(entry_id: @entry.id), class: "tc-btn tc-btn-ghost" %><% end %>
 <% end %>
 
 <div class="flex flex-wrap items-center gap-2 mb-4">
@@ -23,7 +24,9 @@
   <% if (reversal = @entry.reversal) %>
     <span class="tc-muted text-sm">Reversed by <%= link_to entry_title(reversal), entry_path(reversal), class: "underline" %></span>
   <% end %>
-  <% if @entry.source_type.present? %>
+  <% if @entry.source.is_a?(TudlaAccounting::RecurringEntry) %>
+    <span class="tc-muted text-sm">Made from the recurring entry <%= link_to @entry.source.name, recurring_entry_path(@entry.source), class: "underline" %></span>
+  <% elsif @entry.source_type.present? %>
     <span class="tc-muted text-sm">From <%= @entry.source_type %> #<%= @entry.source_id %></span>
   <% end %>
 </div>

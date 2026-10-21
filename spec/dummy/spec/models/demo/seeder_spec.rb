@@ -58,6 +58,16 @@ RSpec.describe Demo::Seeder do
     expect(lines.pluck(:occurred_on)).to all(be_between(Date.new(2026, 5, 1), Date.new(2026, 5, 31)))
   end
 
+  it "sets up recurring entries starting next month" do
+    organization = described_class.call(entries: 30)
+
+    templates = TudlaAccounting::RecurringEntry.where(organization: organization).order(:name)
+    expect(templates.map { |template| [ template.name, template.schedule_label, template.next_on ] }).to eq([
+      [ "Rent accrual", "Every month on the last day", Date.new(2026, 7, 31) ],
+      [ "Software subscriptions", "Every month on the 1st", Date.new(2026, 7, 1) ]
+    ])
+  end
+
   it "attaches the landlord's receipt to the latest rent payments" do
     organization = described_class.call(entries: 60)
 

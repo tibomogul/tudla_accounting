@@ -1,0 +1,33 @@
+<%= tc_page_header "Recurring entries", subtitle: "Entries made again on a schedule" do %>
+  <% if @due.any? && tc_can?(:post) %>
+    <%= button_to "Make the #{pluralize(@due.size, 'due entry')} now", run_recurring_entries_path, class: "tc-btn" %>
+  <% end %>
+  <% if tc_can?(:record) %><%= link_to "New recurring entry", new_recurring_entry_path, class: "tc-btn tc-btn-secondary" %><% end %>
+<% end %>
+
+<div class="tc-card overflow-x-auto">
+  <table class="tc-table">
+    <thead><tr><th>Name</th><th>Schedule</th><th>Next</th><th>Makes</th><th class="tc-num">Amount</th></tr></thead>
+    <tbody>
+      <% if @recurring_entries.empty? %>
+        <tr><td colspan="5" class="tc-muted text-center">None yet. Add one for rent, subscriptions or depreciation, or save an entry as one from its page.</td></tr>
+      <% end %>
+      <% @recurring_entries.each do |template| %>
+        <tr class="<%= "tc-muted" unless template.active? %>" data-recurring-entry>
+          <td>
+            <%= link_to template.name, recurring_entry_path(template), class: "underline" %>
+            <% unless template.active? %><%= tc_badge "Inactive" %><% end %>
+            <% if template.last_problem %><div class="text-xs tc-negative"><%= template.last_problem %></div><% end %>
+          </td>
+          <td><%= template.schedule_label %></td>
+          <td class="whitespace-nowrap">
+            <% if template.finished? %><span class="tc-muted">Finished</span><% else %><%= tc_date(template.next_on) %><% if template.due?(@today) %> <%= tc_badge "Due", tone: :warning %><% end %><% end %>
+          </td>
+          <td><%= template.post_automatically? ? "Posted entries" : "Drafts" %><%= " · reversed next month" if template.reverse_next_month? %></td>
+          <td class="tc-num"><%= tc_money(template.lines.select(&:debit?).sum(Money.new(0, accounting_organization.currency), &:amount)) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+<p class="tc-hint mt-4">Due entries are made by the host app's scheduled <code>TudlaAccounting::RecurringEntriesJob</code> (daily, say), or with the button above.</p>
