@@ -100,6 +100,18 @@ The engine maps its payments to the receipt and disbursement roles itself (see `
 
 **Record payment** on an approved invoice or bill (or on a contact's page) opens a form listing the contact's open invoices or bills, oldest due first, to apply it to. **Payments received** and **Payments made** (from the Sales and Purchases pages) list them, searched and downloadable as CSV, and each payment's page shows what it was applied to. On the banking page, an unmatched statement line can be recorded as a payment of an open invoice (money in) or bill (money out), those owing exactly its amount first: it applies as much as is owed, keeps the rest as a credit, and matches the line. Recording and voiding payments need `:post`.
 
+### API tokens
+`TudlaAccounting::ApiToken` lets another system (a shop, a payroll app) reach an organization's books through the JSON API, with the permissions it is given: `read`, `record`, `post` and `administer`, as the `authorize` setting checks them on the pages. Only a SHA-256 digest of the token is kept, so its secret is seen once, when it is issued:
+
+```ruby
+token, secret = TudlaAccounting::ApiToken.issue!(organization: organization, name: "Online shop",
+                                                 permissions: %w[read record], expires_on: Date.new(2027, 6, 30))
+TudlaAccounting::ApiToken.authenticate(secret) # => token, while it isn't revoked or expired
+token.revoke!
+```
+
+A token acts as itself: what it does is on the audit trail under its name ("API token Online shop"), and `last_used_at` says when it was last used (to the minute). Tokens can't be changed or deleted, only revoked, which stops them at once. **Setup → API tokens** (`:administer`) issues them (showing the secret once, on a page that isn't cached), lists them with what each can do and when it was last used, and revokes them. On the audit trail as `api_token.created` and `api_token.revoked`.
+
 ### Customer and supplier statements
 `TudlaAccounting::PartyStatement` is a statement of account for one customer (`type: :receivable`) or supplier (`:payable`) over a run of days, as it would be sent to them:
 

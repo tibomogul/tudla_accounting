@@ -7,7 +7,7 @@ module TudlaAccounting
                        "dimension" => "Dimensions", "dimension_value" => "Dimension values",
                        "recurring_entry" => "Recurring entries", "bank_rule" => "Bank rules",
                        "budget" => "Budgets", "tax_return_form" => "Tax returns", "tax_return" => "Tax returns filed",
-                       "contact" => "Contacts", "document" => "Invoices and bills", "payment" => "Payments" }.freeze
+                       "contact" => "Contacts", "document" => "Invoices and bills", "payment" => "Payments", "api_token" => "API tokens" }.freeze
 
     # What an audit event did, in words, linking to its subject while it still exists.
     def activity_description(event)
@@ -74,6 +74,8 @@ module TudlaAccounting
       when "document.updated" then safe_join([ "Changed ", subject, ": #{details.fetch('changes', {}).keys.map { |key| key.delete_suffix('_cents').humanize }.join(', ').downcase}" ])
       when "document.deleted" then safe_join([ "Deleted ", subject ])
       when "document.approved" then safe_join([ "Approved ", subject ])
+      when "api_token.created" then safe_join([ "Issued ", subject, " (#{details['permissions'].to_sentence})" ])
+      when "api_token.revoked" then safe_join([ "Revoked ", subject ])
       when "payment.recorded"
         applied = details["documents"].presence
         safe_join([ "Recorded ", subject, (" for #{applied.to_sentence}" if applied) ].compact)
@@ -139,6 +141,7 @@ module TudlaAccounting
       when Contact then contact_path(subject)
       when Document then document_path(subject)
       when Payment then payment_path(subject)
+      when ApiToken then api_tokens_path
       end
       path ? link_to(event.subject_label, path, class: "underline") : event.subject_label.to_s
     end

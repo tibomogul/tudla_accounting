@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_22_001000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_22_002000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -94,6 +94,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_001000) do
     t.index ["realized_entry_id"], name: "index_tudla_accounting_allocations_on_realized_entry_id"
     t.index ["to_id"], name: "index_tudla_accounting_allocations_on_to_id"
     t.check_constraint "amount_cents > 0", name: "tudla_accounting_allocations_amount_positive"
+  end
+
+  create_table "tudla_accounting_api_tokens", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "created_by"
+    t.date "expires_on"
+    t.string "hint", null: false
+    t.datetime "last_used_at"
+    t.string "name", null: false
+    t.bigint "organization_id", null: false
+    t.string "organization_type", null: false
+    t.string "permissions", default: [], null: false, array: true
+    t.datetime "revoked_at"
+    t.string "revoked_by"
+    t.string "token_digest", null: false
+    t.datetime "updated_at", null: false
+    t.index ["organization_type", "organization_id"], name: "index_tudla_accounting_api_tokens_on_organization"
+    t.index ["token_digest"], name: "tudla_accounting_api_tokens_digest_unique_key", unique: true
+    t.check_constraint "permissions <@ ARRAY['read'::character varying, 'record'::character varying, 'post'::character varying, 'administer'::character varying] AND cardinality(permissions) > 0", name: "tudla_accounting_api_tokens_permissions_known"
   end
 
   create_table "tudla_accounting_audit_events", force: :cascade do |t|

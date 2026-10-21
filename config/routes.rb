@@ -45,6 +45,9 @@ TudlaAccounting::Engine.routes.draw do
     member { post :upload }
   end
 
+  resources :api_tokens, only: %i[index new create] do
+    member { post :revoke }
+  end
   resources :tax_codes, except: :show
   resources :filed_tax_returns, only: %i[index show create] do
     member { post :withdraw }

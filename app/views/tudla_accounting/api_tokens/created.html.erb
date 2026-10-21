@@ -1,0 +1,8 @@
+<%= tc_page_header "Token issued", subtitle: @token.name %>
+<div class="tc-card tc-card-body space-y-4 max-w-3xl">
+  <div class="tc-alert tc-alert-warning" role="alert"><span>Copy it now: it isn't kept, and won't be shown again. If it's lost, revoke it and issue another.</span></div>
+  <label for="secret" class="tc-label">Token</label>
+  <input id="secret" type="text" readonly value="<%= @secret %>" class="tc-input font-mono text-sm" data-secret autofocus>
+  <p class="text-sm">It can <%= @token.permissions.to_sentence %><%= ", until #{tc_date(@token.expires_on)}" if @token.expires_on %>. Send it as <code>Authorization: Bearer &lt;token&gt;</code>.</p>
+  <%= link_to "Done", api_tokens_path, class: "tc-btn" %>
+</div>

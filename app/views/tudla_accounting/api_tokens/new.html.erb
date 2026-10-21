@@ -1,0 +1,25 @@
+<%= tc_page_header "New API token" %>
+<%= form_with model: @token, scope: :api_token, url: api_tokens_path, class: "space-y-4 max-w-2xl" do |form| %>
+  <% if @token.errors.any? %>
+    <div class="tc-alert tc-alert-danger" role="alert"><ul class="list-disc pl-4"><% @token.errors.full_messages.uniq.each do |message| %><li><%= message %></li><% end %></ul></div>
+  <% end %>
+  <div class="tc-card tc-card-body grid gap-4 sm:grid-cols-3">
+    <div class="sm:col-span-2"><%= tc_field form, :name, required: true, placeholder: "Online shop", hint: "What uses it, so you know what stops if you revoke it" %></div>
+    <div><%= tc_field form, :expires_on, as: :date_field, label: "Expires (optional)" %></div>
+  </div>
+  <fieldset class="tc-card tc-card-body space-y-2 text-sm">
+    <legend class="tc-card-title px-1">It can</legend>
+    <% { "read" => "Read the books: accounts, entries, contacts, invoices and bills, reports",
+         "record" => "Record drafts: entries, contacts, invoices and bills",
+         "post" => "Post: entries, approving invoices and bills, recording payments",
+         "administer" => "Administer: periods and setup" }.each do |permission, label| %>
+      <label class="flex items-center gap-2">
+        <%= check_box_tag "api_token[permissions][]", permission, @token.permissions.include?(permission), id: "api_token_permissions_#{permission}" %> <%= label %>
+      </label>
+    <% end %>
+  </fieldset>
+  <div class="flex gap-2">
+    <%= form.submit "Issue token", class: "tc-btn" %>
+    <%= link_to "Cancel", api_tokens_path, class: "tc-btn tc-btn-ghost" %>
+  </div>
+<% end %>

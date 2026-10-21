@@ -38,6 +38,7 @@ module TudlaAccounting
     contact.created contact.updated contact.deleted
     document.created document.updated document.deleted document.approved document.voided
     payment.recorded payment.voided
+    api_token.created api_token.revoked
   ].freeze
 
   # Calls the block with each TudlaAccounting::AuditEvent for an action (or for every
