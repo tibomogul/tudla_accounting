@@ -1,0 +1,54 @@
+<%# locals: (document:) %>
+<%# The document as it prints: on paper (or a PDF) it is all that shows. %>
+<% currency = document.organization.currency %>
+<article class="tc-card tc-card-body space-y-6" data-document aria-label="<%= document.title %>">
+  <header class="flex flex-wrap justify-between gap-6">
+    <div class="whitespace-pre-line text-sm"><%= TudlaAccounting.configuration.document_header_for(document.organization) %></div>
+    <div class="text-right">
+      <h2 class="text-2xl font-bold tracking-tight"><%= document.draft? ? "Draft #{document.kind_label.downcase}" : document.kind_label %><%= " (void)" if document.void? %></h2>
+      <dl class="mt-2 grid grid-cols-[auto_auto] justify-end gap-x-4 gap-y-1 text-sm">
+        <% if document.number_label %><dt class="tc-muted">Number</dt><dd><%= document.number_label %></dd><% end %>
+        <dt class="tc-muted">Date</dt><dd><%= tc_date(document.issued_on) %></dd>
+        <% if document.due_on && !document.credit? %><dt class="tc-muted">Due</dt><dd><%= tc_date(document.due_on) %></dd><% end %>
+        <% if document.reference %><dt class="tc-muted"><%= document.sales? ? "Your reference" : "Their number" %></dt><dd><%= document.reference %></dd><% end %>
+        <% if document.credited_document %><dt class="tc-muted">Credits</dt><dd><%= document.credited_document.number_label %></dd><% end %>
+      </dl>
+    </div>
+  </header>
+
+  <section class="text-sm" aria-label="<%= document.sales? ? "To" : "From" %>">
+    <p class="tc-muted"><%= document.sales? ? "To" : "From" %></p>
+    <p class="font-semibold"><%= document.contact.name %></p>
+    <% if document.contact.address %><p class="whitespace-pre-line"><%= document.contact.address %></p><% end %>
+    <% if document.contact.tax_number %><p>Tax number <%= document.contact.tax_number %></p><% end %>
+  </section>
+
+  <table class="tc-table">
+    <thead>
+      <tr><th>Description</th><th class="tc-num">Quantity</th><th class="tc-num">Unit price</th><th>Tax</th><th class="tc-num">Amount (<%= currency %>)</th></tr>
+    </thead>
+    <tbody>
+      <% document.lines.each do |line| %>
+        <tr>
+          <td><%= line.description %></td>
+          <td class="tc-num"><%= document_quantity(line.quantity) %></td>
+          <td class="tc-num"><%= tc_money(line.unit_price) %></td>
+          <td><%= line.tax_code&.label %></td>
+          <td class="tc-num"><%= tc_money(line.amount) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+    <tfoot>
+      <tr><td colspan="4" class="text-right"><%= document.tax_inclusive? ? "Total excluding tax" : "Subtotal" %></td><td class="tc-num"><%= tc_money(document.subtotal) %></td></tr>
+      <tr><td colspan="4" class="text-right">Tax<%= " included" if document.tax_inclusive? %></td><td class="tc-num"><%= tc_money(document.tax) %></td></tr>
+      <tr class="font-semibold"><td colspan="4" class="text-right">Total</td><td class="tc-num"><%= tc_money(document.total) %></td></tr>
+      <% if document.approved? && !document.credit? && document.amount_due != document.total %>
+        <tr><td colspan="4" class="text-right">Paid or credited</td><td class="tc-num"><%= tc_money(document.amount_due - document.total) %></td></tr>
+        <tr class="font-semibold"><td colspan="4" class="text-right">Amount due</td><td class="tc-num"><%= tc_money(document.amount_due) %></td></tr>
+      <% end %>
+    </tfoot>
+  </table>
+
+  <% if document.notes && document.sales? %><p class="whitespace-pre-line text-sm"><%= document.notes %></p><% end %>
+</article>
+<% if document.notes && document.purchases? %><p class="tc-card tc-card-body mt-4 whitespace-pre-line text-sm"><span class="tc-muted">Notes:</span> <%= document.notes %></p><% end %>

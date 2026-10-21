@@ -114,7 +114,7 @@ RSpec.describe TudlaAccounting::TaxReturnCalculator, type: :service do
       first.parts.create!(source: "tax_code_base", tax_code: code)
       first.parts.create!(source: "account", account: account("6040"))
       expect(code.destroy).to be(false)
-      expect(code.errors[:base]).to eq([ "Recurring entries, bank rules, tax returns or contacts use NEW; change them first" ])
+      expect(code.errors[:base]).to eq([ "Recurring entries, bank rules, tax returns, contacts or invoices and bills use NEW; change them first" ])
       expect(account("6040")).not_to be_deletable
     end
   end

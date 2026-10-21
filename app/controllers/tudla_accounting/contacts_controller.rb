@@ -19,10 +19,11 @@ module TudlaAccounting
       end
     end
 
-    # The contact, and for each side it is on (customer, supplier) what is open as of
-    # today, by how overdue it is.
+    # The contact, for each side it is on (customer, supplier) what is open as of today,
+    # by how overdue it is, and their latest invoices and bills.
     def show
       today = Date.current
+      @documents = @contact.documents.with_open_cents.order(issued_on: :desc, id: :desc).limit(10).to_a
       @open = @contact.party_types.to_h do |type|
         [ type, AgingReportGenerator.call(organization: accounting_organization, report_type: type, as_of_date: today, party: @contact) ]
       end

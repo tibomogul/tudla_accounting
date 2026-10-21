@@ -75,6 +75,14 @@ TudlaAccounting::Engine.routes.draw do
   resources :contacts do
     collection { post :import }
   end
+  get "sales", to: "documents#index", defaults: { side: "sales" }, as: :sales_documents
+  get "purchases", to: "documents#index", defaults: { side: "purchases" }, as: :purchase_documents
+  resources :documents, except: :index do
+    member do
+      post :approve
+      post :void
+    end
+  end
 
   resources :allocations, only: :create do
     collection { post :oldest_first }

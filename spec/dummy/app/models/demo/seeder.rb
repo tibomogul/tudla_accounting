@@ -3,8 +3,8 @@ require "csv"
 # Seeds Demo Co: last year and this year, a small chart of accounts, GST, a department
 # dimension, a couple of hundred posted entries up to today, a few drafts, the first half
 # of last year closed, a bank statement for the operating account, recurring entries,
-# this year's budget, customers with invoices on account, and a BAS with last quarter's
-# filed. Returns the organization; running it again returns the existing one, only
+# this year's budget, customers with invoices on account (the engine's contacts and
+# invoices), a supplier's bills, and a BAS with last quarter's filed. Returns the organization; running it again returns the existing one, only
 # adding the years' periods up to this one if the year has turned since it was seeded.
 #
 # The name is the demo's identity: an organization someone else names "Demo Co" is
@@ -61,6 +61,7 @@ class Demo::Seeder
     create_periods
     create_accounts
     @gst = TudlaAccounting::TaxCode.create!(organization: organization, code: "GST", name: "GST", rate: "0.1", kind: :sales, account: accounts["2200"])
+    @gstp = TudlaAccounting::TaxCode.create!(organization: organization, code: "GSTP", name: "GST on purchases", rate: "0.1", kind: :purchases, account: accounts["2200"])
     department = TudlaAccounting::Dimension.create!(organization: organization, code: "DEPT", name: "Department")
     @teams = %w[SALES ENG OPS ADMIN].map { |code| department.dimension_values.create!(code: code, name: code.capitalize) }
 
@@ -78,6 +79,7 @@ class Demo::Seeder
     add_recurring_entries
     add_budget
     add_customer_accounts
+    add_supplier_bills
     add_tax_return
   end
 
@@ -183,27 +185,47 @@ class Demo::Seeder
 
   # Invoices on account to four customers over the last three months, due in 30 days,
   # each paid 25 days later, except that Globex pays half and Umbrella nothing, so the
-  # aging report and statements have something to show. Their own random numbers, so the
-  # rest of the demo stays as it was.
+  # aging report and statements have something to show; and a draft for Initech today.
+  # Their own random numbers, so the rest of the demo stays as it was.
   def add_customer_accounts
-    amounts = Random.new(7)
-    customers = CUSTOMERS.first(4).map { |name| Demo::Customer.create!(name: name) }
+    hours = Random.new(7)
+    customers = CUSTOMERS.first(4).map do |name|
+      TudlaAccounting::Contact.create!(organization: organization, name: name, kind: "customer", payment_terms_days: 30, email: "accounts@#{name.parameterize}.example",
+                                       address: "#{name.length * 7} #{name} Way\nSydney NSW 2000", default_account: accounts["4010"], default_tax_code: @gst)
+    end
     start = today.prev_month(3).beginning_of_month
-    number = 100
     customers.each_with_index do |customer, index|
       (0..2).map { |month| start.next_month(month) + (index * 6).days }.select { |date| date <= today }.each do |date|
-        net = amounts.rand(500_00..3_000_00)
-        invoice = post(date) { |entry| invoice_on_account(entry, customer, "A-#{number += 1}", net, due: date + 30) }
+        invoice = consulting_invoice(customer, date, hours.rand(4..20)).approve!
         paid_on = date + 25
         next if customer.name == "Umbrella" || paid_on > today
 
-        paid = customer.name == "Globex" ? (net + net / 10) / 2 : net + net / 10
+        paid = customer.name == "Globex" ? invoice.total_cents / 2 : invoice.total_cents
         post(paid_on) do |entry|
-          entry.assign_attributes(particulars: "Payment – #{customer.name} (#{invoice.reference})", source: Demo::Payment.create!(customer: customer), related: invoice)
+          entry.assign_attributes(particulars: "Payment – #{customer.name} (#{invoice.number_label})", source: Demo::Payment.create!(customer: customer), related: invoice.entry)
           line(entry, accounts["1011"], :debit, paid)
           line(entry, accounts["1100"], :credit, paid)
         end
       end
+    end
+    consulting_invoice(customers.third, today, 6)
+  end
+
+  def consulting_invoice(customer, date, hours)
+    TudlaAccounting::Document.create!(organization: organization, kind: "sales_invoice", contact: customer, issued_on: date, due_on: customer.due_on(date),
+                                      notes: "Please pay within 30 days to account 123-456 789012, quoting the invoice number.",
+                                      lines_attributes: [ { description: "Consulting – #{date.strftime('%B %Y')}", quantity: hours, unit_price_cents: 150_00,
+                                                            account: accounts["4010"], tax_code: @gst } ])
+  end
+
+  # A software supplier's bills, on the first of last month and this month, not yet paid.
+  def add_supplier_bills
+    supplier = TudlaAccounting::Contact.create!(organization: organization, name: "Cloudware", kind: "supplier", payment_terms_days: 14,
+                                                default_account: accounts["6020"], default_tax_code: @gstp)
+    [ today.prev_month.beginning_of_month, today.beginning_of_month ].each do |date|
+      TudlaAccounting::Document.create!(organization: organization, kind: "bill", contact: supplier, issued_on: date, due_on: supplier.due_on(date), reference: "CW-#{date.strftime('%y%m')}",
+                                        tax_inclusive: true, lines_attributes: [ { description: "Team plan, #{date.strftime('%B')}", quantity: 5, unit_price_cents: 33_00,
+                                                                                   account: accounts["6020"], tax_code: @gstp } ]).approve!
     end
   end
 
@@ -213,19 +235,12 @@ class Demo::Seeder
     box = ->(label) { bas.boxes.find_by!(label: label) }
     box.call("G1").parts.create!(source: "tax_code_gross", tax_code: @gst)
     box.call("1A").parts.create!(source: "tax_code_tax", tax_code: @gst)
+    box.call("G11").parts.create!(source: "tax_code_gross", tax_code: @gstp)
+    box.call("1B").parts.create!(source: "tax_code_tax", tax_code: @gstp)
     box.call("W1").parts.create!(source: "account", account: accounts["6040"])
     quarter = today.beginning_of_quarter.prev_day.beginning_of_quarter
     months = [ quarter, quarter.end_of_quarter ].map { |date| TudlaAccounting::Period.leaf_periods_for_date(organization, date.in_time_zone(zone).change(hour: 12)).first }
     TudlaAccounting::FiledTaxReturn.file!(bas.reload, from: months.first.from_date, thru: months.last.thru_date)
-  end
-
-  def invoice_on_account(entry, customer, reference, net, due:)
-    tax = net / 10
-    entry.assign_attributes(particulars: "Invoice #{reference} – #{customer.name} (consulting, on account)", reference: reference,
-                            source: Demo::Invoice.create!(customer: customer, due_date: due.in_time_zone(zone).end_of_day))
-    line(entry, accounts["1100"], :debit, net + tax)
-    line(entry, accounts["4010"], :credit, net, tax_code: @gst, tax_role: :base).tags.build(dimension_value: @teams.first)
-    line(entry, accounts["2200"], :credit, tax, tax_code: @gst, tax_role: :tax)
   end
 
   # The landlord's receipt on the three latest rent payments, when the app has Active Storage.

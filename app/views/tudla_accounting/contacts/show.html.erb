@@ -1,6 +1,10 @@
 <%= tc_page_header @contact.name, subtitle: "#{@contact.kind_label}#{" · inactive" unless @contact.active?}" do %>
   <%= link_to "Contacts", contacts_path, class: "tc-btn tc-btn-ghost" %>
   <% if tc_can?(:record) %>
+    <% if @contact.active? %>
+      <% if @contact.customer? %><%= link_to "New invoice", new_document_path(kind: "sales_invoice", contact_id: @contact.id), class: "tc-btn tc-btn-secondary" %><% end %>
+      <% if @contact.supplier? %><%= link_to "New bill", new_document_path(kind: "bill", contact_id: @contact.id), class: "tc-btn tc-btn-secondary" %><% end %>
+    <% end %>
     <%= link_to "Edit", edit_contact_path(@contact), class: "tc-btn tc-btn-secondary" %>
     <% if @contact.deletable? %>
       <%= button_to "Delete", contact_path(@contact), method: :delete, class: "tc-btn tc-btn-danger",
@@ -52,5 +56,27 @@
         <% end %>
       </section>
     <% end %>
+
+    <section class="tc-card overflow-x-auto" aria-labelledby="documents" data-documents>
+      <h2 id="documents" class="tc-card-body tc-card-title">Latest invoices and bills</h2>
+      <% if @documents.any? %>
+        <table class="tc-table">
+          <thead><tr><th>Document</th><th>Date</th><th class="tc-num">Total</th><th class="tc-num">Due now</th><th>Status</th></tr></thead>
+          <tbody>
+            <% @documents.each do |document| %>
+              <tr>
+                <td><%= link_to document.title, document_path(document), class: "underline" %></td>
+                <td class="whitespace-nowrap"><%= tc_date(document.issued_on) %></td>
+                <td class="tc-num"><%= tc_money(document.total) %></td>
+                <td class="tc-num"><%= tc_money(document.amount_due) if document.approved? %></td>
+                <td><%= document_status_badge(document) %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      <% else %>
+        <p class="tc-card-body tc-muted text-sm">None yet.</p>
+      <% end %>
+    </section>
   </div>
 </div>

@@ -64,13 +64,13 @@ module TudlaAccounting
       errors.add(:kind, "can't change once lines are taxed under it; add a new code instead") if kind_changed? && used?
     end
 
-    # Taxed lines keep their code; recurring entries, bank rules, tax returns and contacts
-    # refer to it.
+    # Taxed lines keep their code; recurring entries, bank rules, tax returns, contacts and
+    # documents refer to it.
     def ensure_unused
       problem = if used? then "Lines are taxed under #{code}; make it inactive instead"
       elsif RecurringEntryLine.where(tax_code_id: id).exists? || BankRule.where(tax_code_id: id).exists? || TaxReturnBoxPart.where(tax_code_id: id).exists? ||
-            Contact.where(default_tax_code_id: id).exists?
-        "Recurring entries, bank rules, tax returns or contacts use #{code}; change them first"
+            Contact.where(default_tax_code_id: id).exists? || DocumentLine.where(tax_code_id: id).exists?
+        "Recurring entries, bank rules, tax returns, contacts or invoices and bills use #{code}; change them first"
       end
       return unless problem
 

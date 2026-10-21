@@ -95,15 +95,22 @@ module TudlaAccounting
       carrying_amount
     end
 
+    # The engine's own sources say when they fall due and who the party is; a host's are
+    # read with the due_date_method and related_party_method settings.
     def due_date
-      read_source(TudlaAccounting.configuration.due_date_method)
+      engine_source? ? @entry.source.carrying_amount_due_date : read_source(TudlaAccounting.configuration.due_date_method)
     end
 
     # The customer or supplier the amount is owed by or to, read from the source
     # (e.g. invoice.customer); otherwise the fallback (the party of what it relates to), or
     # the organization.
     def related_party(fallback = nil)
-      read_source(TudlaAccounting.configuration.related_party_method) || fallback || @entry.organization
+      party = engine_source? ? @entry.source.carrying_amount_party : read_source(TudlaAccounting.configuration.related_party_method)
+      party || fallback || @entry.organization
+    end
+
+    def engine_source?
+      CarryingAmountRole::ENGINE_SOURCES.include?(@entry.source_type)
     end
 
     def read_source(method)

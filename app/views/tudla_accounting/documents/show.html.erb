@@ -1,0 +1,58 @@
+<% sales = @document.sales? %>
+<%= tc_page_header @document.title, subtitle: @document.contact.name do %>
+  <%= link_to (sales ? "Sales" : "Purchases"), (sales ? sales_documents_path : purchase_documents_path), class: "tc-btn tc-btn-ghost" %>
+  <button type="button" class="tc-btn tc-btn-ghost" data-controller="print" data-action="print#print">Print or save as PDF</button>
+  <% if @document.draft? %>
+    <% if tc_can?(:record) %>
+      <%= link_to "Edit", edit_document_path(@document), class: "tc-btn tc-btn-secondary" %>
+      <%= button_to "Delete", document_path(@document), method: :delete, class: "tc-btn tc-btn-danger",
+                    form: { data: { controller: "confirm", confirm_message_value: "Delete this draft?", action: "submit->confirm#ask" } } %>
+    <% end %>
+    <% if tc_can?(:post) %>
+      <%= button_to "Approve", approve_document_path(@document), class: "tc-btn",
+                    form: { data: { controller: "confirm", confirm_message_value: "Approve it? It is numbered and posted, and can then only be voided.", action: "submit->confirm#ask" } } %>
+    <% end %>
+  <% elsif @document.approved? && !@document.credit? && tc_can?(:record) %>
+    <%= link_to (sales ? "Credit note" : "Supplier credit"), new_document_path(credit: @document.id), class: "tc-btn tc-btn-secondary" %>
+  <% end %>
+<% end %>
+
+<div class="mb-4 flex flex-wrap items-center gap-3 text-sm">
+  <%= document_status_badge(@document) %>
+  <% if @document.entry %><span class="tc-muted">Posted as <%= link_to entry_title(@document.entry), entry_path(@document.entry), class: "underline" %></span><% end %>
+  <% if @document.credited_document %><span class="tc-muted">Credits <%= link_to @document.credited_document.title, document_path(@document.credited_document), class: "underline" %></span><% end %>
+  <% if @document.void? %><span class="tc-muted">Voided <%= tc_date(@document.voided_on) %><%= ": “#{@document.void_reason}”" if @document.void_reason %></span><% end %>
+</div>
+
+<%= render "document", document: @document %>
+
+<% if @applied.any? %>
+  <section class="tc-card overflow-x-auto mt-6" aria-labelledby="applied">
+    <h2 id="applied" class="tc-card-body tc-card-title"><%= @document.credit? ? "Applied to" : "Payments and credits" %></h2>
+    <table class="tc-table">
+      <thead><tr><th>Date</th><th>Entry</th><th class="tc-num">Amount</th></tr></thead>
+      <tbody>
+        <% @applied.each do |row| %>
+          <tr class="<%= "tc-muted line-through" if row[:reversed] %>">
+            <td class="whitespace-nowrap"><%= tc_date(row[:on]) %></td>
+            <td><%= link_to entry_title(row[:entry]), entry_path(row[:entry]), class: "underline" %><%= " (taken off)" if row[:reversed] %></td>
+            <td class="tc-num"><%= tc_money(row[:amount]) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </section>
+<% end %>
+
+<% if @document.approved? && tc_can?(:post) %>
+  <details class="tc-card tc-card-body mt-6">
+    <summary class="cursor-pointer font-medium">Void <%= @document.title.downcase_first %></summary>
+    <%= form_with url: void_document_path(@document), class: "mt-4 grid gap-3 sm:grid-cols-4 items-end",
+                  data: { controller: "confirm", confirm_message_value: "Void it? Its entry is reversed.", action: "submit->confirm#ask" } do |form| %>
+      <div><%= form.label :on, "Reverse its entry on", class: "tc-label" %><%= form.date_field :on, value: @document.issued_on, required: true, class: "tc-input" %></div>
+      <div class="sm:col-span-2"><%= form.label :reason, "Reason", class: "tc-label" %><%= form.text_field :reason, required: true, maxlength: 255, class: "tc-input", placeholder: "Issued to the wrong customer" %></div>
+      <div><%= form.submit "Void", class: "tc-btn tc-btn-danger" %></div>
+      <p class="tc-hint sm:col-span-4">Reverse any payments or credit notes applied to it first. Its number isn't used again.</p>
+    <% end %>
+  </details>
+<% end %>

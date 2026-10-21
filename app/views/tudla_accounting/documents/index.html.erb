@@ -1,0 +1,51 @@
+<% sales = side == "sales" %>
+<% list_path = sales ? sales_documents_path : purchase_documents_path %>
+<%= tc_page_header (sales ? "Sales" : "Purchases"), subtitle: (sales ? "Invoices and credit notes to customers" : "Bills and credits from suppliers") do %>
+  <% query = request.query_parameters.except("side").to_query.presence %>
+  <%= link_to "Download CSV", "#{list_path}.csv#{"?#{query}" if query}", class: "tc-btn tc-btn-ghost", data: { turbo: false } %>
+  <% if tc_can?(:record) %>
+    <%= link_to (sales ? "New credit note" : "New supplier credit"), new_document_path(kind: sales ? "sales_credit" : "supplier_credit"), class: "tc-btn tc-btn-secondary" %>
+    <%= link_to (sales ? "New invoice" : "New bill"), new_document_path(kind: sales ? "sales_invoice" : "bill"), class: "tc-btn" %>
+  <% end %>
+<% end %>
+
+<%= form_with url: list_path, method: :get, class: "tc-card tc-card-body mb-6 flex flex-wrap items-end gap-3" do |form| %>
+  <div class="grow"><%= form.label :q, "Search", class: "tc-label" %><%= form.search_field :q, value: params[:q], placeholder: "Number, reference or #{sales ? 'customer' : 'supplier'}", class: "tc-input" %></div>
+  <div><%= form.label :kind, "Show", class: "tc-label" %>
+    <%= form.select :kind, [ [ "Everything", "" ] ] + TudlaAccounting::Document.kinds_for(side).map { |kind| [ "#{TudlaAccounting::Document::KINDS[kind][:label]}s", kind ] },
+                    { selected: params[:kind] }, class: "tc-input" %></div>
+  <div><%= form.label :status, "Status", class: "tc-label" %>
+    <%= form.select :status, [ [ "Any", "" ] ] + TudlaAccounting::DocumentsController::STATUSES.map { |key, label| [ label, key ] }, { selected: params[:status] }, class: "tc-input" %></div>
+  <%= form.submit "Search", class: "tc-btn tc-btn-secondary", name: nil %>
+<% end %>
+
+<div class="tc-card overflow-x-auto mb-4">
+  <table class="tc-table">
+    <thead>
+      <tr><th>Number</th><th>Date</th><th><%= sales ? "Customer" : "Supplier" %></th><th>Reference</th><th>Due</th>
+        <th class="tc-num">Total (<%= accounting_organization.currency %>)</th><th class="tc-num">Due now</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+      <% if @documents.empty? %>
+        <tr><td colspan="8" class="tc-muted text-center"><%= request.query_parameters.except("side").any? ? "Nothing matches." : (sales ? "No invoices yet." : "No bills yet.") %></td></tr>
+      <% end %>
+      <% @documents.each do |document| %>
+        <tr data-document-row>
+          <td class="whitespace-nowrap"><%= link_to document.number_label || "Draft", document_path(document), class: "underline" %>
+            <% if document.credit? %><span class="tc-muted text-xs"><%= document.kind_label.downcase %></span><% end %></td>
+          <td class="whitespace-nowrap"><%= tc_date(document.issued_on) %></td>
+          <td><%= link_to document.contact.name, contact_path(document.contact), class: "underline" %></td>
+          <td><%= document.reference %></td>
+          <td class="whitespace-nowrap"><%= tc_date(document.due_on) %></td>
+          <td class="tc-num"><%= tc_money(document.credit? ? -document.total : document.total) %></td>
+          <td class="tc-num"><%= tc_money(document.credit? ? -document.amount_due : document.amount_due) if document.approved? %></td>
+          <td><%= document_status_badge(document) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+    <tfoot>
+      <tr class="font-semibold"><td colspan="6"><%= sales ? "Owed by customers" : "Owed to suppliers" %>, less credits to apply (everything listed)</td><td class="tc-num"><%= tc_money(@due) %></td><td></td></tr>
+    </tfoot>
+  </table>
+</div>
+<%= render "tudla_accounting/shared/pagination", paginator: @page %>

@@ -52,7 +52,7 @@ RSpec.describe TudlaAccounting::Contact do
     northwind.update!(default_tax_code: gst)
     expect(account("4000")).not_to be_deletable
     expect(gst.destroy).to be(false)
-    expect(gst.errors[:base]).to eq([ "Recurring entries, bank rules, tax returns or contacts use GST; change them first" ])
+    expect(gst.errors[:base]).to eq([ "Recurring entries, bank rules, tax returns, contacts or invoices and bills use GST; change them first" ])
 
     entry = build(:tudla_accounting_entry, organization: organization, transacted_at: Time.zone.local(2026, 3, 1))
     receivable = entry.details.build(account: account("1100"), tally: :debit, amount_cents: 100_00, currency: "AUD", organization: organization)

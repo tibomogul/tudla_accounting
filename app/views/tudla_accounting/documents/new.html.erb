@@ -1,0 +1,2 @@
+<%= tc_page_header "New #{@document.kind_label.downcase}", subtitle: (@document.credited_document ? "Crediting #{@document.credited_document.title}" : nil) %>
+<%= render "form", document: @document %>

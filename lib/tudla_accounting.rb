@@ -36,6 +36,7 @@ module TudlaAccounting
     tax_return_form.created tax_return_form.updated tax_return_form.deleted
     tax_return.filed tax_return.withdrawn
     contact.created contact.updated contact.deleted
+    document.created document.updated document.deleted document.approved document.voided
   ].freeze
 
   # Calls the block with each TudlaAccounting::AuditEvent for an action (or for every
@@ -67,8 +68,8 @@ module TudlaAccounting
                   :due_date_method, :related_party_method, :forex_rate_provider,
                   :parent_controller, :current_organization, :current_actor, :authorize,
                   :cash_account_codes, :tax_basis, :organization_label, :entry_number_format,
-                  :attachment_content_types, :attachment_max_size
-    attr_reader :carrying_amount_sources, :entry_sources, :entry_number_series
+                  :attachment_content_types, :attachment_max_size, :document_header
+    attr_reader :carrying_amount_sources, :entry_sources, :entry_number_series, :document_number_format
 
     def initialize
       @base_currency = "USD"
@@ -114,6 +115,46 @@ module TudlaAccounting
       ]
       @attachment_max_size = 10 * 1024 * 1024
       @entry_sources = {}
+      # How approved invoices, bills and credit notes are numbered, each kind in its own run
+      # from 1; see document_number_format=.
+      @document_number_format = DOCUMENT_NUMBER_FORMAT
+      # What a printed invoice or credit note says about who it's from: a callable given the
+      # organization, returning text (lines break where it has newlines), e.g.
+      #   ->(organization) { [ organization.name, organization.address, "ABN #{organization.abn}" ].join("\n") }
+      # Without one, the organization's name (or organization_label).
+      @document_header = nil
+    end
+
+    DOCUMENT_NUMBER_FORMAT = { "sales_invoice" => "INV-%<number>04d", "sales_credit" => "CN-%<number>04d",
+                               "bill" => "BILL-%<number>04d", "supplier_credit" => "SC-%<number>04d" }.freeze
+
+    # A format string per kind of document (sales_invoice, sales_credit, bill,
+    # supplier_credit) given its number, merged over the defaults (INV-0001, CN-0001,
+    # BILL-0001, SC-0001), e.g. { "sales_invoice" => "%<number>05d" }; or a callable given
+    # the document. A document keeps the number it was approved with when this changes.
+    def document_number_format=(format)
+      unless format.respond_to?(:call)
+        format = format.to_h.transform_keys(&:to_s)
+        unknown = format.keys - DOCUMENT_NUMBER_FORMAT.keys
+        raise ArgumentError, "unknown document kind #{unknown.first.inspect}; expected one of #{DOCUMENT_NUMBER_FORMAT.keys.join(', ')}" if unknown.any?
+
+        format = DOCUMENT_NUMBER_FORMAT.merge(format).freeze
+      end
+      @document_number_format = format
+    end
+
+    # A document's number as printed (see document_number_format=).
+    def document_number_label(document)
+      return document_number_format.call(document).to_s if document_number_format.respond_to?(:call)
+
+      format(document_number_format.fetch(document.kind), number: document.number)
+    end
+
+    # The document_header setting's text for an organization.
+    def document_header_for(organization)
+      return document_header.call(organization).to_s if document_header
+
+      organization.respond_to?(:name) && organization.name.present? ? organization.name : TudlaAccounting.organization_label(organization)
     end
 
     # The run of numbers posted entries are numbered in, each counted from 1:

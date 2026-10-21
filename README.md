@@ -68,6 +68,23 @@ Once a return is lodged, **Mark as filed** on that report (or `FiledTaxReturn.fi
 
 The **Contacts** page searches them by name, email or tax number, by side, with inactive ones on request, and downloads them as CSV; each contact's page shows their details and what they owe or are owed, by how overdue, with links to their statements. `ContactImporter.call(organization, path, ".csv")` (the page's Import, CSV or Excel) adds contacts from a file with the download's columns, updating those already there by name, all or nothing. Adding and changing contacts needs `:record`.
 
+### Invoices, bills and credit notes
+`TudlaAccounting::Document` is a sales invoice (`kind: "sales_invoice"`), a supplier's bill (`"bill"`) or a credit note against either (`"sales_credit"`, `"supplier_credit"`), to or from a contact, in the organization's currency. Its lines (`DocumentLine`) each have a description, quantity, unit price, account and optional tax code of the document's side; amounts exclude the tax, or include it with `tax_inclusive`, and the tax is rounded per line as an entry's is.
+
+```ruby
+invoice = TudlaAccounting::Document.create!(organization: organization, kind: "sales_invoice", contact: northwind,
+                                            issued_on: Date.current, due_on: northwind.due_on(Date.current),
+                                            lines_attributes: [ { description: "Consulting", quantity: 3, unit_price_cents: 150_00,
+                                                                  account: sales, tax_code: gst } ])
+invoice.approve!         # numbered INV-0001 and posted
+invoice.amount_due       # what is still owed; payment_status: "unpaid", "part_paid" or "paid"
+invoice.void!(on: Date.current, reason: "Issued twice") # reverses its entry
+```
+
+`approve!` numbers a draft in its kind's own run (`document_number_format`) and posts its entry, dated `issued_on`, with the document as its source: the total to the account marked receivable (or payable), each line's net amount and tax to its accounts on the other side (the other way round for a credit note). An invoice or bill opens a receivable or payable for its contact, due on `due_on`; a credit note opens a credit, applied straight away to the invoice or bill it credits (`credited_document`) as far as that is still owed. The engine maps its own documents to these roles, whatever `carrying_amount_sources` says, so they work alongside a host's own sources. If the entry can't be posted (a closed period, say), nothing is numbered or posted. An approved document doesn't change: `void!` reverses its entry (refused while payments or credit notes are applied to it), and reversing the entry on its own page voids it too. Only drafts can be deleted. Documents are on the audit trail (`document.created`, `.updated`, `.deleted`, `.approved`, `.voided`), and keep their contacts, accounts and tax codes from being deleted.
+
+The **Sales** and **Purchases** pages list them, searched by number, reference or contact, by kind and status (draft, awaiting payment, part paid, overdue, paid, void), with what is still owed, and download as CSV. The form fills in the contact's payment terms, default account and tax code, and adds up the lines as they're typed. Each document's page prints (or saves as a PDF) as the document itself, headed by the `document_header` setting, and shows the payments and credits applied to it; an approved invoice or bill offers a credit note copying its lines. Drafting needs `:record`; approving and voiding need `:post`.
+
 ### Customer and supplier statements
 `TudlaAccounting::PartyStatement` is a statement of account for one customer (`type: :receivable`) or supplier (`:payable`) over a run of days, as it would be sent to them:
 
@@ -450,6 +467,10 @@ TudlaAccounting.configure do |config|
   }
   config.due_date_method = :due_date      # read from the source; blank if it doesn't respond
   config.related_party_method = :customer # who owes or is owed, read from the source; the organization if unset
+
+  # Invoices, bills and credit notes (the engine's own documents)
+  config.document_number_format = { "sales_invoice" => "%<number>05d" } # over INV-0001, CN-0001, BILL-0001, SC-0001; or ->(document) { ... }
+  config.document_header = ->(organization) { "#{organization.name}\n#{organization.address}" } # who a printed document is from
 
   # Foreign exchange: where missing rates come from (gains and losses go to the accounts
   # marked unrealized_fx_gain and realized_fx_gain)

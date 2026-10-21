@@ -24,7 +24,9 @@
   <% if (reversal = @entry.reversal) %>
     <span class="tc-muted text-sm">Reversed by <%= link_to entry_title(reversal), entry_path(reversal), class: "underline" %></span>
   <% end %>
-  <% if @entry.source.is_a?(TudlaAccounting::RecurringEntry) %>
+  <% if @entry.source.is_a?(TudlaAccounting::Document) %>
+    <span class="tc-muted text-sm">Posted for <%= link_to @entry.source.title, document_path(@entry.source), class: "underline" %></span>
+  <% elsif @entry.source.is_a?(TudlaAccounting::RecurringEntry) %>
     <span class="tc-muted text-sm">Made from the recurring entry <%= link_to @entry.source.name, recurring_entry_path(@entry.source), class: "underline" %></span>
   <% elsif @entry.source_type.present? %>
     <span class="tc-muted text-sm">From <%= @entry.source_type %> #<%= @entry.source_id %></span>

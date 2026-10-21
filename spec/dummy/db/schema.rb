@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_21_233000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_21_235000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -40,20 +40,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_233000) do
     t.bigint "blob_id", null: false
     t.string "variation_digest", null: false
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
-  end
-
-  create_table "demo_customers", force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.string "name", null: false
-    t.datetime "updated_at", null: false
-  end
-
-  create_table "demo_invoices", force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.bigint "customer_id", null: false
-    t.datetime "due_date"
-    t.datetime "updated_at", null: false
-    t.index ["customer_id"], name: "index_demo_invoices_on_customer_id"
   end
 
   create_table "demo_payments", force: :cascade do |t|
@@ -340,6 +326,55 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_233000) do
     t.index ["organization_type", "organization_id", "code"], name: "tudla_accounting_dimensions_unique_key", unique: true
   end
 
+  create_table "tudla_accounting_document_lines", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "amount_cents", default: 0, null: false
+    t.string "description", null: false
+    t.bigint "document_id", null: false
+    t.integer "position", default: 0, null: false
+    t.decimal "quantity", precision: 15, scale: 4, default: "1.0", null: false
+    t.bigint "tax_cents", default: 0, null: false
+    t.bigint "tax_code_id"
+    t.bigint "unit_price_cents", default: 0, null: false
+    t.index ["account_id"], name: "index_tudla_accounting_document_lines_on_account"
+    t.index ["document_id"], name: "index_tudla_accounting_document_lines_on_document"
+    t.index ["tax_code_id"], name: "index_tudla_accounting_document_lines_on_tax_code"
+    t.check_constraint "quantity >= 0::numeric AND unit_price_cents >= 0 AND amount_cents >= 0", name: "tudla_accounting_document_lines_not_negative"
+  end
+
+  create_table "tudla_accounting_documents", force: :cascade do |t|
+    t.datetime "approved_at"
+    t.bigint "contact_id", null: false
+    t.datetime "created_at", null: false
+    t.bigint "credited_document_id"
+    t.date "due_on"
+    t.bigint "entry_id"
+    t.date "issued_on", null: false
+    t.string "kind", null: false
+    t.text "notes"
+    t.bigint "number"
+    t.string "number_label"
+    t.bigint "organization_id", null: false
+    t.string "organization_type", null: false
+    t.string "reference"
+    t.string "status", default: "draft", null: false
+    t.bigint "subtotal_cents", default: 0, null: false
+    t.bigint "tax_cents", default: 0, null: false
+    t.boolean "tax_inclusive", default: false, null: false
+    t.bigint "total_cents", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.string "void_reason"
+    t.date "voided_on"
+    t.index ["contact_id"], name: "index_tudla_accounting_documents_on_contact"
+    t.index ["credited_document_id"], name: "index_tudla_accounting_documents_on_credited"
+    t.index ["entry_id"], name: "index_tudla_accounting_documents_on_entry", unique: true
+    t.index ["organization_type", "organization_id", "issued_on"], name: "index_tudla_accounting_documents_on_issued_on"
+    t.index ["organization_type", "organization_id", "kind", "number"], name: "tudla_accounting_documents_number_unique_key", unique: true, where: "(number IS NOT NULL)"
+    t.check_constraint "(status::text = 'draft'::text) = (number IS NULL) AND (status::text = 'draft'::text) = (entry_id IS NULL)", name: "tudla_accounting_documents_numbered_when_approved"
+    t.check_constraint "kind::text = ANY (ARRAY['sales_invoice'::character varying, 'sales_credit'::character varying, 'bill'::character varying, 'supplier_credit'::character varying]::text[])", name: "tudla_accounting_documents_kind_known"
+    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying, 'approved'::character varying, 'void'::character varying]::text[])", name: "tudla_accounting_documents_status_known"
+  end
+
   create_table "tudla_accounting_entries", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "idempotency_key"
@@ -530,8 +565,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_233000) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
-  add_foreign_key "demo_invoices", "demo_customers", column: "customer_id"
-  add_foreign_key "demo_payments", "demo_customers", column: "customer_id"
+  add_foreign_key "demo_payments", "tudla_accounting_contacts", column: "customer_id"
   add_foreign_key "tudla_accounting_accounts", "tudla_accounting_accounts", column: "contra_account_id"
   add_foreign_key "tudla_accounting_allocations", "tudla_accounting_carrying_amounts", column: "from_id"
   add_foreign_key "tudla_accounting_allocations", "tudla_accounting_carrying_amounts", column: "to_id"
@@ -561,6 +595,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_233000) do
   add_foreign_key "tudla_accounting_details", "tudla_accounting_entries", column: "entry_id"
   add_foreign_key "tudla_accounting_details", "tudla_accounting_tax_codes", column: "tax_code_id"
   add_foreign_key "tudla_accounting_dimension_values", "tudla_accounting_dimensions", column: "dimension_id"
+  add_foreign_key "tudla_accounting_document_lines", "tudla_accounting_accounts", column: "account_id"
+  add_foreign_key "tudla_accounting_document_lines", "tudla_accounting_documents", column: "document_id", on_delete: :cascade
+  add_foreign_key "tudla_accounting_document_lines", "tudla_accounting_tax_codes", column: "tax_code_id"
+  add_foreign_key "tudla_accounting_documents", "tudla_accounting_contacts", column: "contact_id"
+  add_foreign_key "tudla_accounting_documents", "tudla_accounting_documents", column: "credited_document_id"
+  add_foreign_key "tudla_accounting_documents", "tudla_accounting_entries", column: "entry_id"
   add_foreign_key "tudla_accounting_filed_tax_returns", "tudla_accounting_tax_return_forms", column: "form_id"
   add_foreign_key "tudla_accounting_foreign_exchanges", "tudla_accounting_details", column: "detail_id"
   add_foreign_key "tudla_accounting_recurring_entry_lines", "tudla_accounting_accounts", column: "account_id"

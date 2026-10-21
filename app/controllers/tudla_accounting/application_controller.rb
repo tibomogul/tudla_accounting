@@ -6,7 +6,7 @@ module TudlaAccounting
     layout "tudla_accounting/application"
     # Every engine helper in every engine view (the host's helpers come from parent_controller).
     helper TudlaAccounting::ApplicationHelper, TudlaAccounting::AccountsHelper, TudlaAccounting::EntriesHelper, TudlaAccounting::ReportsHelper,
-           TudlaAccounting::ActivityHelper
+           TudlaAccounting::ActivityHelper, TudlaAccounting::DocumentsHelper
 
     PERMISSIONS = %i[read record post administer].freeze
 

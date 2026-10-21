@@ -11,7 +11,7 @@ RSpec.describe Demo::Seeder do
     expect(Organization.where(name: "Demo Co").count).to eq(1)
 
     entries = TudlaAccounting::Entry.where(organization: organization)
-    expect(entries.where.not(posted_at: nil).count).to eq(52) # 30, the owner's capital, and 12 invoices on account with 9 payments
+    expect(entries.where.not(posted_at: nil).count).to eq(54) # 30, the owner's capital, 12 invoices on account with 9 payments, and 2 bills
     expect(entries.where(posted_at: nil).count).to eq(3)
     expect(entries.maximum(:transacted_at)).to be <= Time.current
     expect(entries.pluck(:particulars)).to include(a_string_starting_with("Invoice "))
@@ -83,10 +83,23 @@ RSpec.describe Demo::Seeder do
     aging = TudlaAccounting::AgingReportGenerator.call(organization: organization, report_type: :receivable, as_of_date: Date.current)
     expect(aging[:summary].values.map { |party| party[:related_party].name }).to contain_exactly("Globex", "Umbrella")
     expect(TudlaAccounting::PartyStatement.parties(organization, :receivable).map(&:name)).to eq(%w[Globex Initech Northwind Umbrella])
-    northwind = Demo::Customer.find_by!(name: "Northwind")
+    northwind = TudlaAccounting::Contact.find_by!(organization: organization, name: "Northwind")
     statement = TudlaAccounting::PartyStatement.call(organization: organization, type: :receivable, party: northwind, from: Date.new(2026, 3, 1), thru: Date.current)
     expect(statement.lines.map(&:kind)).to eq(%w[Invoice Payment Invoice Payment Invoice Payment])
     expect(statement).to have_attributes(opening: Money.new(0, "USD"), closing: Money.new(0, "USD"))
+  end
+
+  it "keeps the customers and a supplier as contacts, with the engine's invoices and bills" do
+    organization = described_class.call(entries: 30)
+
+    contacts = TudlaAccounting::Contact.where(organization: organization).order(:name)
+    expect(contacts.map { |contact| [ contact.name, contact.kind ] }).to eq([ %w[Cloudware supplier], %w[Globex customer], %w[Initech customer], %w[Northwind customer], %w[Umbrella customer] ])
+    documents = TudlaAccounting::Document.where(organization: organization)
+    expect(documents.sales.approved.order(:number).pluck(:number_label)).to eq((1..12).map { |number| format("INV-%04d", number) })
+    expect(documents.where(status: "draft").sole).to have_attributes(kind: "sales_invoice", issued_on: Date.current, contact: contacts.find_by!(name: "Initech"))
+    expect(documents.purchases.approved.map(&:total)).to eq([ Money.new(165_00, "USD") ] * 2)
+    paid = documents.sales.approved.with_open_cents.to_a.group_by(&:payment_status)
+    expect(paid.keys).to contain_exactly("paid", "part_paid", "unpaid")
   end
 
   it "sets up a BAS, with last quarter's filed as the books still give it" do
@@ -125,7 +138,7 @@ RSpec.describe Demo::Seeder do
 
       auckland = ActiveSupport::TimeZone["Pacific/Auckland"]
       times = TudlaAccounting::Entry.where(organization: organization).where.not(posted_at: nil).pluck(:transacted_at).map { |time| time.in_time_zone(auckland) }
-      expect(times.map(&:hour)).to all(eq(12))
+      expect(times.map(&:hour)).to all(eq(12).or(eq(0))) # invoices and bills are dated at the start of their day
       account = TudlaAccounting::Account.find_by(organization: organization, code: "1011")
       expect(TudlaAccounting::BankStatementLine.where(account: account).pluck(:occurred_on)).to all(be_between(Date.new(2026, 5, 1), Date.new(2026, 5, 31)))
       expect(TudlaAccounting::BalanceRebuilder.new(organization).differences).to be_empty

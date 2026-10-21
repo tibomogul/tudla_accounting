@@ -35,6 +35,7 @@ module TudlaAccounting
       when Entry then [ object.number_label, object.particulars ].compact.join(" ")
       when Account then object.code_with_name
       when RecurringEntry, BankRule, TaxReturnForm then object.name
+      when Document then "#{object.title} – #{object.contact.name}"
       when Period, Budget, FiledTaxReturn, Allocation, TaxCode, BankStatementLine, Dimension, DimensionValue then object.label
       else
         %i[name email].each { |method| return object.public_send(method).to_s if object.respond_to?(method) && object.public_send(method).present? }

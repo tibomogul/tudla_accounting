@@ -13,6 +13,7 @@ module TudlaAccounting
     belongs_to :organization, polymorphic: true
     belongs_to :default_account, class_name: "TudlaAccounting::Account", optional: true
     belongs_to :default_tax_code, class_name: "TudlaAccounting::TaxCode", optional: true
+    has_many :documents, class_name: "TudlaAccounting::Document"
 
     normalizes :name, with: ->(name) { name.squish }
     normalizes :email, :phone, :tax_number, with: ->(text) { text.strip.presence }
@@ -57,7 +58,7 @@ module TudlaAccounting
     end
 
     def deletable?
-      !CarryingAmount.where(related_party: self).exists?
+      !CarryingAmount.where(related_party: self).exists? && !Document.where(contact: self).exists?
     end
 
     private
