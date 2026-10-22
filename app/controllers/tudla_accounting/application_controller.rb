@@ -87,6 +87,14 @@ module TudlaAccounting
       nil
     end
 
+    # The dimension values chosen on a form's line (dimensions: dimension id => value id),
+    # one per dimension, each the organization's.
+    def dimension_value_ids(line)
+      line.fetch(:dimensions, {}).to_h.filter_map do |dimension_id, value_id|
+        organization_scope(Dimension).find(dimension_id).dimension_values.find(value_id).id if value_id.present?
+      end
+    end
+
     # model scoped to the current organization, e.g. organization_scope(Account).find(id)
     def organization_scope(model)
       model.where(organization: accounting_organization)

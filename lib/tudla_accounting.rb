@@ -31,6 +31,7 @@ module TudlaAccounting
     bank_statement.imported bank_line.matched bank_line.unmatched
     dimension.created dimension.updated dimension_value.created dimension_value.updated
     recurring_entry.created recurring_entry.updated recurring_entry.deleted recurring_entry.generated
+    recurring_invoice.created recurring_invoice.updated recurring_invoice.deleted recurring_invoice.generated
     bank_rule.created bank_rule.updated bank_rule.deleted
     budget.created budget.updated budget.deleted
     tax_return_form.created tax_return_form.updated tax_return_form.deleted

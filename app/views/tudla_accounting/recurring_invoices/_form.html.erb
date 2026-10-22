@@ -1,0 +1,74 @@
+<%# locals: (recurring_invoice:) %>
+<% currency = Money::Currency.new(accounting_organization.currency) %>
+<% lines = recurring_invoice.lines.to_a %>
+<% account_options = document_accounts(recurring_invoice).map { |account| [ account_option_label(account), account.id ] } %>
+<% tax_options = document_tax_codes(recurring_invoice).map { |code| [ code.label, code.id, { data: { rate: code.rate.to_s } } ] } %>
+<% dimensions = entry_dimensions(lines) %>
+<% before_amount = 5 + dimensions.size %>
+<%= form_with model: recurring_invoice, scope: :recurring_invoice, url: (recurring_invoice.persisted? ? recurring_invoice_path(recurring_invoice) : recurring_invoices_path),
+              class: "space-y-4", data: { controller: "document-lines", document_lines_exponent_value: currency.exponent } do |form| %>
+  <% if recurring_invoice.errors.any? %>
+    <div class="tc-alert tc-alert-danger" role="alert">
+      <ul class="list-disc pl-4"><% recurring_invoice.errors.full_messages.uniq.each do |message| %><li><%= message %></li><% end %></ul>
+    </div>
+  <% end %>
+
+  <div class="tc-card tc-card-body grid gap-4 sm:grid-cols-6">
+    <div class="sm:col-span-3"><%= tc_field form, :name, required: true, placeholder: "Monthly retainer" %></div>
+    <div class="sm:col-span-3 space-y-1">
+      <%= form.label :contact_id, "Customer", class: "tc-label" %>
+      <%= form.select :contact_id, document_contacts(recurring_invoice).map { |contact| [ contact.name, contact.id, { data: { account: contact.default_account_id, tax: contact.default_tax_code_id } } ] },
+                      { include_blank: "Choose a customer" }, required: true, class: "tc-input",
+                      data: { document_lines_target: "contact", action: "change->document-lines#contactChanged" } %>
+    </div>
+    <div class="sm:col-span-3"><%= tc_field form, :reference, label: "Their order number", placeholder: "Optional" %></div>
+    <div class="sm:col-span-3"><%= tc_field form, :due_days, as: :number_field, label: "Due, days after the invoice's date", min: 0, placeholder: "The customer's payment terms" %></div>
+  </div>
+
+  <fieldset class="tc-card tc-card-body grid gap-4 sm:grid-cols-6">
+    <legend class="tc-card-title px-1">Schedule</legend>
+    <%= render "tudla_accounting/recurring_entries/schedule", form: form, template: recurring_invoice, made: "invoices" %>
+    <div class="sm:col-span-6 space-y-2 text-sm" role="radiogroup" aria-label="Each invoice is">
+      <p class="tc-label">Each invoice is made as</p>
+      <% TudlaAccounting::RecurringInvoice::ISSUES.each do |issue, label| %>
+        <% allowed = issue == "draft" || tc_can?(:post) || recurring_invoice.issue == issue %>
+        <label class="flex items-center gap-2 <%= "tc-muted" unless allowed %>"><%= form.radio_button :issue, issue, disabled: !allowed %> <%= label %></label>
+      <% end %>
+      <% unless tc_can?(:post) %><p class="tc-hint">Approving or emailing them needs permission to post.</p><% end %>
+      <% if recurring_invoice.persisted? %><label class="flex items-center gap-2 pt-2"><%= form.check_box :active %> Active</label><% end %>
+    </div>
+  </fieldset>
+
+  <div class="tc-card overflow-x-auto">
+    <table class="tc-table">
+      <thead>
+        <tr><th>Description</th><th class="tc-num">Quantity</th><th class="tc-num">Unit price</th><th>Account</th><th>Tax</th><% dimensions.each do |dimension, _values| %><th><%= dimension.name %></th><% end %><th class="tc-num">Amount (<%= currency.iso_code %>)</th><th><span class="sr-only">Remove</span></th></tr>
+      </thead>
+      <tbody data-document-lines-target="lines">
+        <% lines.each_with_index do |line, index| %>
+          <%= render "tudla_accounting/documents/line", line: line, index: index, account_options: account_options, tax_options: tax_options, dimensions: dimensions, scope: "recurring_invoice" %>
+        <% end %>
+      </tbody>
+      <tfoot>
+        <tr><td colspan="<%= before_amount + 2 %>"><button type="button" class="tc-btn tc-btn-secondary tc-btn-sm" data-action="document-lines#add">Add line</button></td></tr>
+        <tr><td colspan="<%= before_amount %>" class="text-right">Subtotal</td><td class="tc-num" data-document-lines-target="subtotal"></td><td></td></tr>
+        <tr class="tc-muted"><td colspan="<%= before_amount %>" class="text-right">Tax</td><td class="tc-num" data-document-lines-target="taxTotal"></td><td></td></tr>
+        <tr class="font-semibold"><td colspan="<%= before_amount %>" class="text-right">Each invoice's total</td><td class="tc-num" data-document-lines-target="total"></td><td></td></tr>
+      </tfoot>
+    </table>
+  </div>
+  <label class="flex items-center gap-2 text-sm">
+    <%= form.check_box :tax_inclusive, data: { document_lines_target: "inclusive", action: "change->document-lines#recalculate" } %>
+    Prices include the tax
+  </label>
+  <div class="tc-card tc-card-body"><%= tc_field form, :notes, as: :text_area, rows: 3, label: "Notes", hint: "Printed on each invoice: payment details, thanks..." %></div>
+
+  <template data-document-lines-target="template">
+    <%= render "tudla_accounting/documents/line", line: TudlaAccounting::RecurringInvoiceLine.new(quantity: 1), index: "NEW_LINE", account_options: account_options, tax_options: tax_options, dimensions: dimensions, scope: "recurring_invoice" %>
+  </template>
+
+  <div class="flex gap-2">
+    <%= form.submit "Save recurring invoice", class: "tc-btn" %>
+    <%= link_to "Cancel", (recurring_invoice.persisted? ? recurring_invoice_path(recurring_invoice) : recurring_invoices_path), class: "tc-btn tc-btn-ghost" %>
+  </div>
+<% end %>

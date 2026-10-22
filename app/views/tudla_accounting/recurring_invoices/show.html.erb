@@ -1,0 +1,65 @@
+<% template = @recurring_invoice %>
+<%= tc_page_header template.name, subtitle: "#{template.contact.name} · #{template.schedule_label} from #{tc_date(template.starts_on)}#{" to #{tc_date(template.ends_on)}" if template.ends_on}" do %>
+  <%= link_to "All recurring invoices", recurring_invoices_path, class: "tc-btn tc-btn-ghost" %>
+  <% if tc_can?(:record) %>
+    <%= button_to "Make a draft for today", make_recurring_invoice_path(template), class: "tc-btn tc-btn-secondary" %>
+    <%= link_to "Edit", edit_recurring_invoice_path(template), class: "tc-btn tc-btn-secondary" %>
+    <%= button_to "Delete", recurring_invoice_path(template), method: :delete, class: "tc-btn tc-btn-danger",
+                  form: { data: { controller: "confirm", confirm_message_value: "Delete #{template.name}? The invoices made from it stay.", action: "submit->confirm#ask" } } %>
+  <% end %>
+<% end %>
+
+<% if template.last_problem %>
+  <div class="tc-alert tc-alert-danger mb-4" role="alert">Last run: <%= template.last_problem %></div>
+<% end %>
+
+<div class="grid gap-4 sm:grid-cols-4 mb-6">
+  <div class="tc-card tc-card-body"><p class="tc-stat-label">Next</p><p class="mt-1" data-next-on><%= template.finished? ? "Finished" : tc_date(template.next_on) %><%= " (inactive)" unless template.active? %></p></div>
+  <div class="tc-card tc-card-body"><p class="tc-stat-label">Makes</p><p class="mt-1" data-issue><%= template.issue_label %></p></div>
+  <div class="tc-card tc-card-body"><p class="tc-stat-label">Made so far</p><p class="mt-1"><%= template.occurrences_count %><%= " of #{template.occurrences_limit}" if template.occurrences_limit %></p></div>
+  <div class="tc-card tc-card-body"><p class="tc-stat-label">Due</p><p class="mt-1"><%= template.due_days ? "#{pluralize(template.due_days, 'day')} after its date" : "On #{template.contact.name}'s payment terms" %></p></div>
+</div>
+
+<% dimensions = @dimension_values.values.map(&:dimension).uniq.sort_by(&:code) %>
+<div class="tc-card overflow-x-auto mb-6">
+  <table class="tc-table">
+    <thead><tr><th>Description</th><th class="tc-num">Quantity</th><th class="tc-num">Unit price</th><th>Account</th><th>Tax</th><% dimensions.each do |dimension| %><th><%= dimension.name %></th><% end %><th class="tc-num">Amount</th></tr></thead>
+    <tbody>
+      <% template.lines.each do |line| %>
+        <tr data-template-line>
+          <td><%= line.description %></td>
+          <td class="tc-num"><%= document_quantity(line.quantity) %></td>
+          <td class="tc-num"><%= tc_money(line.unit_price) %></td>
+          <td><%= account_option_label(line.account) %></td>
+          <td><%= line.tax_code&.label || "—" %></td>
+          <% dimensions.each do |dimension| %><td><%= line.dimension_value_ids.filter_map { |id| @dimension_values[id] }.find { |value| value.dimension_id == dimension.id }&.name || "—" %></td><% end %>
+          <td class="tc-num"><%= tc_money(line.amount) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+    <tfoot><tr class="font-semibold"><td colspan="<%= 6 + dimensions.size %>" class="text-right">Each invoice's total<%= ", tax included" if template.tax_inclusive? %></td><td class="tc-num"><%= tc_money(template.total) %></td></tr></tfoot>
+  </table>
+</div>
+<% if template.reference || template.notes %>
+  <div class="tc-card tc-card-body mb-6 text-sm space-y-1">
+    <% if template.reference %><p><span class="tc-muted">Their order number:</span> <%= template.reference %></p><% end %>
+    <% if template.notes %><p class="whitespace-pre-line"><span class="tc-muted">Notes:</span> <%= template.notes %></p><% end %>
+  </div>
+<% end %>
+
+<section class="tc-card overflow-x-auto" aria-labelledby="made-heading">
+  <div class="tc-card-body pb-0"><h2 id="made-heading" class="tc-card-title">Invoices made from it</h2></div>
+  <table class="tc-table">
+    <tbody>
+      <% if @invoices.empty? %><tr><td class="tc-muted">None yet.</td></tr><% end %>
+      <% @invoices.each do |invoice| %>
+        <tr data-made-invoice>
+          <td class="whitespace-nowrap w-32"><%= tc_date(invoice.issued_on) %></td>
+          <td><%= link_to invoice.title, document_path(invoice), class: "underline" %></td>
+          <td><%= document_status_badge(invoice) %></td>
+          <td class="tc-num"><%= tc_money(invoice.total) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</section>

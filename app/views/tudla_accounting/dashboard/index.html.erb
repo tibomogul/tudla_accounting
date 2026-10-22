@@ -28,6 +28,16 @@
   </div>
 <% end %>
 
+<% if @recurring_invoices_due.positive? || @recurring_invoice_problems.positive? %>
+  <div class="tc-alert tc-alert-warning mb-6" role="status" data-recurring-invoices-due>
+    <span>
+      <%= "#{pluralize(@recurring_invoices_due, 'recurring invoice is', plural: 'recurring invoices are')} due." if @recurring_invoices_due.positive? %>
+      <%= "#{pluralize(@recurring_invoice_problems, 'recurring invoice')} had a problem last time." if @recurring_invoice_problems.positive? %>
+      <%= link_to "See the recurring invoices", recurring_invoices_path, class: "underline" %>.
+    </span>
+  </div>
+<% end %>
+
 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
   <div class="tc-card tc-card-body">
     <p class="tc-stat-label">Profit this year</p>

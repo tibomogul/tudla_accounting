@@ -1,5 +1,5 @@
-<%# locals: (line:, index:, account_options:, tax_options:, dimensions:) %>
-<% name = ->(field) { "document[lines][#{index}][#{field}]" } %>
+<%# locals: (line:, index:, account_options:, tax_options:, dimensions:, scope: "document") %>
+<% name = ->(field) { "#{scope}[lines][#{index}][#{field}]" } %>
 <tr data-document-lines-target="line" <%= "hidden" if line.marked_for_destruction? %>>
   <td class="min-w-56">
     <% if line.persisted? %><input type="hidden" name="<%= name.call(:id) %>" value="<%= line.id %>"><% end %>

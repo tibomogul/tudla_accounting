@@ -30,6 +30,8 @@ module TudlaAccounting
     belongs_to :contact, class_name: "TudlaAccounting::Contact"
     belongs_to :credited_document, class_name: "TudlaAccounting::Document", optional: true
     belongs_to :entry, class_name: "TudlaAccounting::Entry", optional: true
+    # The template it was made from, if any (see RecurringInvoice).
+    belongs_to :recurring_invoice, class_name: "TudlaAccounting::RecurringInvoice", optional: true, inverse_of: :invoices
     has_many :lines, -> { order(:position, :id) }, class_name: "TudlaAccounting::DocumentLine", dependent: :destroy, inverse_of: :document
     has_many :credit_notes, class_name: "TudlaAccounting::Document", foreign_key: :credited_document_id, inverse_of: :credited_document
     # The supplier's PDF on a bill, a signed order on an invoice; see Attachable. An

@@ -33,6 +33,8 @@ RSpec.describe TudlaAccounting::RecurringEntry do
 
     it "runs every few weeks, months or years" do
       expect(template(frequency: "weekly", interval: 2, starts_on: Date.new(2026, 1, 5)).first_on_or_after(Date.new(2026, 1, 6))).to eq(Date.new(2026, 1, 19))
+      weekly = template(frequency: "weekly", starts_on: Date.new(2026, 1, 5))
+      expect([ 5, 7, 12, 13 ].map { |day| weekly.first_on_or_after(Date.new(2026, 1, day)).day }).to eq([ 5, 12, 12, 19 ])
       expect(template(interval: 3).first_on_or_after(Date.new(2026, 1, 2))).to eq(Date.new(2026, 4, 1))
       expect(template(frequency: "yearly", day_of_month: 30, starts_on: Date.new(2026, 6, 1)).first_on_or_after(Date.new(2026, 7, 1))).to eq(Date.new(2027, 6, 30))
     end

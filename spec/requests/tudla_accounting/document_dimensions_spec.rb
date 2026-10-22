@@ -69,8 +69,8 @@ RSpec.describe "Dimensions on invoice and bill lines", type: :request do
     get routes.edit_document_path(draft)
     expect(chosen("document[lines][0][dimensions][#{department.id}]")).to eq([ "Engineering" ])
 
-    patch routes.document_path(draft), params: { document: invoice_params("0" => line("Consulting", "100.00", department.id.to_s => "").merge(id: draft.lines.sole.id)) }
-    expect(draft.lines.reload.sole.dimension_value_ids).to eq([])
+    patch routes.document_path(draft), params: { document: invoice_params("0" => line("Consulting", "100.00", department.id.to_s => "").merge(id: draft.lines.sole.id, tax_code_id: "")) }
+    expect(draft.lines.reload.sole).to have_attributes(dimension_value_ids: [], tax_code: nil) # both cleared
     patch routes.document_path(draft), params: { approve: "1", document: invoice_params("0" => line("Consulting", "100.00", department.id.to_s => sales.id.to_s).merge(id: draft.lines.sole.id)) }
     expect(draft.reload).to be_approved
 

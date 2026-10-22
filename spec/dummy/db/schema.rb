@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_22_006000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_23_001000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -394,6 +394,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_006000) do
     t.string "number_label"
     t.bigint "organization_id", null: false
     t.string "organization_type", null: false
+    t.bigint "recurring_invoice_id"
     t.string "reference"
     t.string "status", default: "draft", null: false
     t.bigint "subtotal_cents", default: 0, null: false
@@ -409,6 +410,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_006000) do
     t.index ["organization_type", "organization_id", "idempotency_key"], name: "tudla_accounting_documents_idempotency_key", unique: true, where: "(idempotency_key IS NOT NULL)"
     t.index ["organization_type", "organization_id", "issued_on"], name: "index_tudla_accounting_documents_on_issued_on"
     t.index ["organization_type", "organization_id", "kind", "number"], name: "tudla_accounting_documents_number_unique_key", unique: true, where: "(number IS NOT NULL)"
+    t.index ["recurring_invoice_id"], name: "index_tudla_accounting_documents_on_recurring_invoice"
     t.check_constraint "(status::text = 'draft'::text) = (number IS NULL) AND (status::text = 'draft'::text) = (entry_id IS NULL)", name: "tudla_accounting_documents_numbered_when_approved"
     t.check_constraint "kind::text = ANY (ARRAY['sales_invoice'::character varying::text, 'sales_credit'::character varying::text, 'bill'::character varying::text, 'supplier_credit'::character varying::text])", name: "tudla_accounting_documents_kind_known"
     t.check_constraint "status::text = ANY (ARRAY['draft'::character varying::text, 'approved'::character varying::text, 'void'::character varying::text])", name: "tudla_accounting_documents_status_known"
@@ -567,6 +569,54 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_006000) do
     t.check_constraint "amount_cents > 0", name: "tudla_accounting_recurring_entry_lines_amount_positive"
   end
 
+  create_table "tudla_accounting_recurring_invoice_lines", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.datetime "created_at", null: false
+    t.string "description", null: false
+    t.bigint "dimension_value_ids", default: [], null: false, array: true
+    t.integer "position", default: 0, null: false
+    t.decimal "quantity", precision: 15, scale: 4, default: "1.0", null: false
+    t.bigint "recurring_invoice_id", null: false
+    t.bigint "tax_code_id"
+    t.bigint "unit_price_cents", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_tudla_accounting_recurring_invoice_lines_on_account"
+    t.index ["recurring_invoice_id"], name: "index_tudla_accounting_recurring_invoice_lines_on_template"
+    t.index ["tax_code_id"], name: "index_tudla_accounting_recurring_invoice_lines_on_tax_code"
+    t.check_constraint "quantity >= 0::numeric AND unit_price_cents >= 0", name: "tudla_accounting_recurring_invoice_lines_not_negative"
+  end
+
+  create_table "tudla_accounting_recurring_invoices", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.bigint "contact_id", null: false
+    t.datetime "created_at", null: false
+    t.integer "day_of_month"
+    t.integer "due_days"
+    t.date "ends_on"
+    t.string "frequency", null: false
+    t.integer "interval", default: 1, null: false
+    t.string "issue", default: "draft", null: false
+    t.string "last_problem"
+    t.string "name", null: false
+    t.date "next_on"
+    t.text "notes"
+    t.integer "occurrences_count", default: 0, null: false
+    t.integer "occurrences_limit"
+    t.bigint "organization_id", null: false
+    t.string "organization_type", null: false
+    t.string "reference"
+    t.date "starts_on", null: false
+    t.boolean "tax_inclusive", default: false, null: false
+    t.datetime "updated_at", null: false
+    t.index ["active", "next_on"], name: "idx_on_active_next_on_d9e1bd3a30"
+    t.index ["contact_id"], name: "index_tudla_accounting_recurring_invoices_on_contact"
+    t.index ["organization_type", "organization_id"], name: "index_tudla_accounting_recurring_invoices_on_organization"
+    t.check_constraint "\"interval\" > 0", name: "tudla_accounting_recurring_invoices_interval_positive"
+    t.check_constraint "due_days IS NULL OR due_days >= 0", name: "tudla_accounting_recurring_invoices_due_days_not_negative"
+    t.check_constraint "frequency::text = ANY (ARRAY['weekly'::character varying, 'monthly'::character varying, 'yearly'::character varying]::text[])", name: "tudla_accounting_recurring_invoices_frequency_known"
+    t.check_constraint "issue::text = ANY (ARRAY['draft'::character varying, 'approve'::character varying, 'email'::character varying]::text[])", name: "tudla_accounting_recurring_invoices_issue_known"
+  end
+
   create_table "tudla_accounting_sequences", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.bigint "last_value", null: false
@@ -666,6 +716,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_006000) do
   add_foreign_key "tudla_accounting_documents", "tudla_accounting_contacts", column: "contact_id"
   add_foreign_key "tudla_accounting_documents", "tudla_accounting_documents", column: "credited_document_id"
   add_foreign_key "tudla_accounting_documents", "tudla_accounting_entries", column: "entry_id"
+  add_foreign_key "tudla_accounting_documents", "tudla_accounting_recurring_invoices", column: "recurring_invoice_id", on_delete: :nullify
   add_foreign_key "tudla_accounting_filed_tax_returns", "tudla_accounting_tax_return_forms", column: "form_id"
   add_foreign_key "tudla_accounting_foreign_exchanges", "tudla_accounting_details", column: "detail_id"
   add_foreign_key "tudla_accounting_payments", "tudla_accounting_accounts", column: "account_id"
@@ -674,6 +725,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_006000) do
   add_foreign_key "tudla_accounting_recurring_entry_lines", "tudla_accounting_accounts", column: "account_id"
   add_foreign_key "tudla_accounting_recurring_entry_lines", "tudla_accounting_recurring_entries", column: "recurring_entry_id"
   add_foreign_key "tudla_accounting_recurring_entry_lines", "tudla_accounting_tax_codes", column: "tax_code_id"
+  add_foreign_key "tudla_accounting_recurring_invoice_lines", "tudla_accounting_accounts", column: "account_id"
+  add_foreign_key "tudla_accounting_recurring_invoice_lines", "tudla_accounting_recurring_invoices", column: "recurring_invoice_id"
+  add_foreign_key "tudla_accounting_recurring_invoice_lines", "tudla_accounting_tax_codes", column: "tax_code_id"
+  add_foreign_key "tudla_accounting_recurring_invoices", "tudla_accounting_contacts", column: "contact_id"
   add_foreign_key "tudla_accounting_tax_codes", "tudla_accounting_accounts", column: "account_id"
   add_foreign_key "tudla_accounting_tax_return_box_parts", "tudla_accounting_accounts", column: "account_id"
   add_foreign_key "tudla_accounting_tax_return_box_parts", "tudla_accounting_tax_codes", column: "tax_code_id"

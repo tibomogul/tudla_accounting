@@ -123,12 +123,5 @@ module TudlaAccounting
       attributes[:day_of_month] = nil if attributes[:day_of_month] == "last"
       [ attributes, problems ]
     end
-
-    # The values chosen on a line, one per dimension, each the organization's.
-    def dimension_value_ids(line)
-      line.fetch(:dimensions, {}).to_h.filter_map do |dimension_id, value_id|
-        organization_scope(Dimension).find(dimension_id).dimension_values.find(value_id).id if value_id.present?
-      end
-    end
   end
 end

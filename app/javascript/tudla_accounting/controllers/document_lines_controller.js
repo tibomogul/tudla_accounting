@@ -3,7 +3,7 @@ import { Controller } from "@hotwired/stimulus"
 // The invoice and bill form's lines: adds and removes them, works out each line's amount
 // (quantity times unit price) and the subtotal, tax and total as they're typed, the way
 // the server will (tax rounded per line, added or split out). Choosing a contact sets the
-// due date from their payment terms, and their default account and tax code on lines
+// due date from their payment terms (when the form has dates), and their default account and tax code on lines
 // that have none yet. The server works it all out again.
 export default class extends Controller {
   static targets = ["lines", "line", "template", "quantity", "price", "account", "tax", "amount", "destroy",
@@ -40,7 +40,7 @@ export default class extends Controller {
     if (!option || !option.value) return
 
     const terms = option.dataset.terms
-    if (terms !== undefined && terms !== "" && this.issuedTarget.value) {
+    if (terms !== undefined && terms !== "" && this.hasIssuedTarget && this.issuedTarget.value) {
       const due = new Date(`${this.issuedTarget.value}T00:00:00Z`)
       due.setUTCDate(due.getUTCDate() + Number(terms))
       this.dueTarget.value = due.toISOString().slice(0, 10)

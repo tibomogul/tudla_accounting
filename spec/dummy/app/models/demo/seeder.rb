@@ -4,7 +4,7 @@ require "csv"
 # dimension, a couple of hundred posted entries up to today, a few drafts, the first half
 # of last year closed, a bank statement for the operating account, recurring entries,
 # this year's budget, customers with invoices on account and their payments (the engine's
-# contacts, invoices and payments), a supplier's bills, and a BAS with last quarter's
+# contacts, invoices and payments) and a recurring invoice, a supplier's bills, and a BAS with last quarter's
 # filed. Returns the organization; running it again returns the existing one, only
 # adding the years' periods up to this one if the year has turned since it was seeded.
 #
@@ -209,6 +209,15 @@ class Demo::Seeder
                                        amount_cents: paid, reference: "EFT #{invoice.number_label}", applications: [ { document: invoice, amount_cents: paid } ])
     end
     consulting_invoice(customers.third, today, 6)
+    add_recurring_invoice(customers.first)
+  end
+
+  # Northwind's support retainer from next month, drafts to check, tagged ENG.
+  def add_recurring_invoice(customer)
+    template = TudlaAccounting::RecurringInvoice.new(organization: organization, name: "Support retainer", contact: customer, frequency: "monthly", day_of_month: 1,
+                                                     starts_on: today.next_month.beginning_of_month, notes: "Monthly support, as agreed.")
+    template.lines.build(description: "Support retainer", quantity: 1, unit_price_cents: 1_200_00, account: accounts["4020"], tax_code: @gst, dimension_value_ids: [ team("ENG").id ])
+    template.save!
   end
 
   def team(code) = @teams.find { |value| value.code == code }

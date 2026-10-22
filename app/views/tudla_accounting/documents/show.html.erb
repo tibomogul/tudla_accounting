@@ -15,6 +15,7 @@
     <% end %>
   <% elsif @document.approved? %>
     <% if tc_can?(:record) && !@document.credit? %><%= link_to (sales ? "Credit note" : "Supplier credit"), new_document_path(credit: @document.id), class: "tc-btn tc-btn-secondary" %><% end %>
+    <% if tc_can?(:record) && @document.kind == "sales_invoice" %><%= link_to "Repeat", new_recurring_invoice_path(document_id: @document.id), class: "tc-btn tc-btn-secondary" %><% end %>
     <% if tc_can?(:post) && sales %><%= link_to "Email", new_email_path(document_id: @document.id), class: "tc-btn tc-btn-secondary" %><% end %>
     <% if tc_can?(:post) && @document.overdue?(ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].today) %>
       <%= link_to "Send reminder", new_email_path(document_id: @document.id, reminder: 1), class: "tc-btn tc-btn-secondary" %>
@@ -29,6 +30,7 @@
 <div class="mb-4 flex flex-wrap items-center gap-3 text-sm">
   <%= document_status_badge(@document) %>
   <% if @document.entry %><span class="tc-muted">Posted as <%= link_to entry_title(@document.entry), entry_path(@document.entry), class: "underline" %></span><% end %>
+  <% if @document.recurring_invoice %><span class="tc-muted">Made from <%= link_to @document.recurring_invoice.name, recurring_invoice_path(@document.recurring_invoice), class: "underline" %></span><% end %>
   <% if @document.credited_document %><span class="tc-muted">Credits <%= link_to @document.credited_document.title, document_path(@document.credited_document), class: "underline" %></span><% end %>
   <% if @document.void? %><span class="tc-muted">Voided <%= tc_date(@document.voided_on) %><%= ": “#{@document.void_reason}”" if @document.void_reason %></span><% end %>
 </div>

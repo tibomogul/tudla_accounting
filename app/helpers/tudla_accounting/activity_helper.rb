@@ -5,7 +5,7 @@ module TudlaAccounting
                        "allocation" => "Payments applied", "tax_code" => "Tax codes",
                        "bank_statement" => "Statement imports", "bank_line" => "Bank matches",
                        "dimension" => "Dimensions", "dimension_value" => "Dimension values",
-                       "recurring_entry" => "Recurring entries", "bank_rule" => "Bank rules",
+                       "recurring_entry" => "Recurring entries", "recurring_invoice" => "Recurring invoices", "bank_rule" => "Bank rules",
                        "budget" => "Budgets", "tax_return_form" => "Tax returns", "tax_return" => "Tax returns filed",
                        "contact" => "Contacts", "document" => "Invoices and bills", "payment" => "Payments", "api_token" => "API tokens", "email" => "Emails" }.freeze
 
@@ -47,6 +47,10 @@ module TudlaAccounting
       when "recurring_entry.updated" then safe_join([ "Changed the recurring entry ", subject, ": #{details.fetch('changes', {}).keys.map(&:humanize).join(', ').downcase}" ])
       when "recurring_entry.deleted" then safe_join([ "Deleted the recurring entry ", subject ])
       when "recurring_entry.generated" then safe_join([ "Made the entry for #{tc_date(details['on'])} from ", subject ])
+      when "recurring_invoice.created" then safe_join([ "Added the recurring invoice ", subject ])
+      when "recurring_invoice.updated" then safe_join([ "Changed the recurring invoice ", subject, ": #{details.fetch('changes', {}).keys.map(&:humanize).join(', ').downcase}" ])
+      when "recurring_invoice.deleted" then safe_join([ "Deleted the recurring invoice ", subject ])
+      when "recurring_invoice.generated" then safe_join([ "Made the invoice for #{tc_date(details['on'])} from ", subject ])
       when "bank_rule.created" then safe_join([ "Added the bank rule ", subject ])
       when "bank_rule.updated" then safe_join([ "Changed the bank rule ", subject, ": #{details.fetch('changes', {}).keys.map(&:humanize).join(', ').downcase}" ])
       when "bank_rule.deleted" then safe_join([ "Deleted the bank rule ", subject ])
@@ -148,6 +152,7 @@ module TudlaAccounting
       when TaxCode then edit_tax_code_path(subject)
       when Allocation then entry_path(subject.from.detail.entry_id)
       when RecurringEntry then recurring_entry_path(subject)
+      when RecurringInvoice then recurring_invoice_path(subject)
       when BankRule then edit_bank_rule_path(subject)
       when Budget then budget_path(subject)
       when TaxReturnForm then tax_return_form_path(subject)

@@ -10,7 +10,8 @@ module TudlaAccounting
 
     before_action :set_document, only: %i[show edit update destroy approve void]
     before_action :require_draft, only: %i[edit update]
-    helper_method :side, :document_accounts, :document_tax_codes, :document_contacts
+    helper_method :side
+    include DocumentChoices
 
     def index
       documents = filtered(organization_scope(Document).where(kind: Document.kinds_for(side)))
@@ -176,20 +177,15 @@ module TudlaAccounting
         next if line[:id].blank? && line.values_at(:description, :unit_price, :account_id).all?(&:blank?)
 
         price = amount_cents(line[:unit_price], currency) { problems << "Line #{index + 1}: #{line[:unit_price]} isn't an amount" }
-        { id: line[:id].presence, _destroy: line[:_destroy], description: line[:description].to_s, quantity: line[:quantity].presence || 1,
+        { id: line[:id].presence, _destroy: line[:_destroy] }.compact.merge( # a blank tax code clears it
+          description: line[:description].to_s, quantity: line[:quantity].presence || 1,
           unit_price_cents: price.to_i, account_id: (organization_scope(Account).find(line[:account_id]).id if line[:account_id].present?),
-          tax_code_id: (organization_scope(TaxCode).find(line[:tax_code_id]).id if line[:tax_code_id].present?), dimension_value_ids: dimension_value_ids(line) }.compact
+          tax_code_id: (organization_scope(TaxCode).find(line[:tax_code_id]).id if line[:tax_code_id].present?), dimension_value_ids: dimension_value_ids(line)
+        )
       end
       permitted[:contact_id] = organization_scope(Contact).find(permitted[:contact_id]).id if permitted[:contact_id].present?
       permitted[:credited_document_id] = organization_scope(Document).find(permitted[:credited_document_id]).id if permitted[:credited_document_id].present?
       [ permitted.merge(lines_attributes: lines), problems ]
-    end
-
-    # The values chosen on a line, one per dimension, each the organization's.
-    def dimension_value_ids(line)
-      line.fetch(:dimensions, {}).to_h.filter_map do |dimension_id, value_id|
-        organization_scope(Dimension).find(dimension_id).dimension_values.find(value_id).id if value_id.present?
-      end
     end
 
     def credit_for(original)
@@ -210,26 +206,6 @@ module TudlaAccounting
         other = carrying_amount.credit? ? allocation.to : allocation.from
         { entry: other.detail.entry, amount: Money.new(allocation.amount_cents, accounting_organization.currency), on: allocation.allocated_at, reversed: allocation.reversed_at.present? }
       end
-    end
-
-    def document_contacts(document)
-      contacts = organization_scope(Contact).order(Arel.sql("LOWER(name)"))
-      contacts = document.sales? ? contacts.customers : contacts.suppliers
-      contacts.active.or(contacts.where(id: document.contact_id))
-    end
-
-    # Active accounts other than receivables and payables, and any the lines have already.
-    def document_accounts(document)
-      used = document.lines.filter_map(&:account_id)
-      accounts = organization_scope(Account).where(role: nil).or(organization_scope(Account).where.not(role: %w[receivable payable]))
-      accounts.active.or(organization_scope(Account).where(id: used)).order(:code)
-    end
-
-    # The side's active tax codes, and any the lines have already.
-    def document_tax_codes(document)
-      used = document.lines.filter_map(&:tax_code_id)
-      codes = organization_scope(TaxCode).where(kind: document.sales? ? :sales : :purchases)
-      codes.active.or(codes.where(id: used)).order(:code)
     end
 
     def documents_table(documents)

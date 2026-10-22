@@ -34,6 +34,7 @@ All notable changes to this project are documented here. The format follows
 - Applying a leftover credit from the payment's or credit note's page and the contact's page, not only the entry's, and through the API (`POST /payments/:id/apply`, `POST /documents/:id/apply`).
 - Dimensions on invoice and bill lines: a column per dimension in the form, `dimensions` on each line in the API, shown on the document's page (not on the printed document). Approving it tags each line's posting, so profit and loss by dimension includes sales and purchases; a credit note copies its lines' values from what it credits.
 - Files on invoices, bills and credit notes (the supplier's PDF on a bill, say), as on entries, on their pages and through the API (`attachments` in an entry's or document's JSON; `POST` and `GET .../attachments`). Attaching and removing files is shared by entries and documents (`Attachable`), and is on the audit trail as `document.attachment_added` and `document.attachment_removed` too.
+- Recurring invoices (`RecurringInvoice`, `RecurringInvoiceRunner`, `RecurringInvoicesJob`): a customer's invoice made on a schedule, as a draft, approved, or approved and emailed, as each template says, never twice for a date; its lines' dimension values carry over. Under Sales → Recurring invoices, started blank or from an invoice's **Repeat**, with problems shown on the template and the dashboard. On the audit trail as `recurring_invoice.created`, `.updated`, `.deleted` and `.generated`. Recurring entries share the schedule (`RecurringSchedule`).
 - Overdue reminders: with `reminder_days` set, customers of overdue invoices are emailed a reminder on those days after the due date, each once, from Sales → Reminders due or by `SendRemindersJob` (which the host schedules), using `ReminderRunner`; and any overdue invoice can be reminded by hand from its page.
 - Emailing statements of account (one, or every one the statements page shows, naming those with no email address) and payments' receipts and payment notices (from the payment's page, or as the payment is recorded), as invoices are emailed. A contact's page lists their statements' emails.
 - Recording a payment with nothing to apply it to (no open invoices or bills) no longer fails.
@@ -69,6 +70,8 @@ Tagged but never published. Later versions don't support upgrading from it (or f
 - Lines with a foreign amount can be taxed: the tax is worked out on the converted amount and posted in the organization's currency (an inclusive line's foreign amount is split too). A tax account held in another currency is refused.
 
 ### Fixed
+- A weekly recurring entry fell on the wrong days: the first came six days after its start, and one changed part-way through a week could skip a week.
+- Clearing a line's tax code on a draft invoice or bill didn't take it off.
 - `Entry.create_from_ruby_hash` stored a foreign amount given as a decrease (`EUR -55.00`) as a negative number; it is now a magnitude, like the line's amount.
 
 ## [0.1.0] - 2026-10-06

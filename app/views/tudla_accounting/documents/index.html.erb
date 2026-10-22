@@ -4,6 +4,7 @@
   <% query = request.query_parameters.except("side").to_query.presence %>
   <%= link_to (sales ? "Payments received" : "Payments made"), (sales ? received_payments_path : paid_payments_path), class: "tc-btn tc-btn-ghost" %>
   <% if sales %><%= link_to "Reminders due#{" (#{@reminders_due})" if @reminders_due&.positive?}", reminders_path, class: "tc-btn tc-btn-ghost" %><% end %>
+  <% if sales %><%= link_to "Recurring invoices", recurring_invoices_path, class: "tc-btn tc-btn-ghost" %><% end %>
   <%= link_to "Download CSV", "#{list_path}.csv#{"?#{query}" if query}", class: "tc-btn tc-btn-ghost", data: { turbo: false } %>
   <% if tc_can?(:record) %>
     <%= link_to (sales ? "New credit note" : "New supplier credit"), new_document_path(kind: sales ? "sales_credit" : "supplier_credit"), class: "tc-btn tc-btn-secondary" %>

@@ -7,6 +7,8 @@ module TudlaAccounting
       today = ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].today
       @recurring_due = organization_scope(RecurringEntry).active.where(next_on: ..today).count
       @recurring_problems = organization_scope(RecurringEntry).active.where.not(last_problem: nil).count
+      @recurring_invoices_due = organization_scope(RecurringInvoice).active.where(next_on: ..today).count
+      @recurring_invoice_problems = organization_scope(RecurringInvoice).active.where.not(last_problem: nil).count
       @missing_roles = @account_count.zero? ? [] : Account.missing_roles(accounting_organization)
       @current_period = Period.leaf_periods_for_date(accounting_organization, Time.current).first
       # Income and expenses restart each year, so the current month's closing balances are the year to date.

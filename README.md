@@ -108,6 +108,24 @@ TudlaAccounting::EmailDraft.for_payment(payment)                        # a rece
 
 Emails go through the host's own ActionMailer setup (delivery method, SMTP), from `document_mail_from` (text, or a callable given the organization; the host's ActionMailer default otherwise) and replying to `document_mail_reply_to`. `document_email_templates` changes each kind's subject and message, with placeholders such as `%{number}`, `%{total}`, `%{amount_due}` and `%{due_on}`. To send them another way, point `document_mailer` at a mailer of your own whose `delivery(delivery, pdf:, filename:)` returns the mail. The dummy app writes them to files in `spec/dummy/tmp/mails` in development.
 
+### Recurring invoices
+`TudlaAccounting::RecurringInvoice` is an invoice made again and again (a retainer, a subscription): its customer, lines (as an invoice's: description, quantity, unit price, account, tax code, dimension values), reference and notes, and a schedule as a recurring entry has (`RecurringSchedule`). Each invoice is dated the day it falls due and due `due_days` later, or on the customer's payment terms when that is blank. What happens to each (`issue`): `draft` (the default) leaves it to check and approve, `approve` approves it (numbered and posted), `email` approves it and emails it to the customer as **Email** would.
+
+`RecurringInvoiceRunner.call(organization:, as_of:)` makes every invoice due by then (today by default), catching up any missed. Each template is locked while it runs and moves on in the same transaction, and each invoice's idempotency key is `recurring_invoice:<id>:<date>`, so a date is never invoiced twice. One that can't be made (the customer or an account made inactive since) stops its template, to try again next run; one that can't be approved (its month closed) is left a draft, and one whose customer has no email address isn't emailed. Either way the reason is kept in `last_problem`, shown on its page and the dashboard. `TudlaAccounting::RecurringInvoicesJob` runs it for every organization; schedule it as the recurring entries job is:
+
+```yaml
+production:
+  tudla_accounting_recurring_invoices:
+    class: TudlaAccounting::RecurringInvoicesJob
+    schedule: every day at 1am
+```
+
+**Sales → Recurring invoices** lists them with their customer, schedule, next date and total, makes the due ones now (`:post`), and adds, edits, deactivates and deletes them with the invoice form's line editor; only those who can post may set one to approve or email. An approved invoice's **Repeat** starts one from it, a template's **Make a draft for today** makes a one-off draft, and each invoice made links back to its template. They are on the audit trail (`recurring_invoice.*`), as is each invoice made.
+
+```ruby
+TudlaAccounting::RecurringInvoiceRunner.call(organization: organization) # => #<Result created=[...] approved=[...] emailed=[...] problems=[...]>
+```
+
 ### Overdue reminders
 With `reminder_days` set (say `[7, 14, 30]`), customers of overdue invoices are emailed a reminder on those days after the due date, from the `reminder` template, with the invoice attached: **Sales → Reminders due** lists them (the latest day each invoice has reached; no catching up on earlier ones) and sends them all (`:post`), and `TudlaAccounting::SendRemindersJob`, which the host schedules (daily, in Solid Queue's `config/recurring.yml`, say), sends them for every organization. Each goes once: one already sent or on its way isn't sent again (a failed one is), nor is one for an invoice paid or void, and customers without an email address are named instead. An overdue invoice's page can also **Send reminder** by hand, any time.
 

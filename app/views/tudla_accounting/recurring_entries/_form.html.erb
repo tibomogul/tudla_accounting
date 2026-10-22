@@ -21,19 +21,7 @@
 
   <fieldset class="tc-card tc-card-body grid gap-4 sm:grid-cols-6">
     <legend class="tc-card-title px-1">Schedule</legend>
-    <div class="sm:col-span-2 flex items-start gap-2">
-      <div class="w-20"><%= tc_field form, :interval, as: :number_field, label: "Every", min: 1, max: 120, required: true %></div>
-      <div class="flex-1"><%= tc_field form, :frequency, as: :select, label: "Period", choices: [ [ "week(s)", "weekly" ], [ "month(s)", "monthly" ], [ "year(s)", "yearly" ] ] %></div>
-    </div>
-    <div class="sm:col-span-2 space-y-1">
-      <%= form.label :day_of_month, "On the", class: "tc-label" %>
-      <%= form.select :day_of_month, (1..31).map { |day| [ day.ordinalize, day ] } + [ [ "Last day", "last" ] ],
-                      { selected: recurring_entry.day_of_month || "last" }, class: "tc-input" %>
-      <p class="tc-hint">Monthly and yearly; a short month uses its last day. Weekly runs on the start date's weekday.</p>
-    </div>
-    <div class="sm:col-span-2"><%= tc_field form, :starts_on, as: :date_field, label: "Starting", required: true %></div>
-    <div class="sm:col-span-2"><%= tc_field form, :ends_on, as: :date_field, label: "Ending (optional)" %></div>
-    <div class="sm:col-span-2"><%= tc_field form, :occurrences_limit, as: :number_field, label: "Or after this many entries", min: 1 %></div>
+    <%= render "tudla_accounting/recurring_entries/schedule", form: form, template: recurring_entry, made: "entries" %>
     <div class="sm:col-span-6 flex flex-wrap gap-x-6 gap-y-2 text-sm">
       <label class="flex items-center gap-2"><%= form.check_box :post_automatically %> Post each entry automatically (otherwise each is a draft to post)</label>
       <label class="flex items-center gap-2"><%= form.check_box :reverse_next_month %> Reverse each on the first of the next month (an accrual)</label>

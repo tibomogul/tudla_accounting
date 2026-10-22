@@ -143,6 +143,11 @@ TudlaAccounting::Engine.routes.draw do
     member { post :make }
   end
 
+  resources :recurring_invoices do
+    collection { post :run }
+    member { post :make }
+  end
+
   resources :entries do
     member do
       post :post

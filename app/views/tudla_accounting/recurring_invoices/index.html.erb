@@ -1,0 +1,36 @@
+<%= tc_page_header "Recurring invoices", subtitle: "Invoices made again on a schedule" do %>
+  <%= link_to "Sales", sales_documents_path, class: "tc-btn tc-btn-ghost" %>
+  <% if @due.any? && tc_can?(:post) %>
+    <%= button_to "Make the #{pluralize(@due.size, 'due invoice')} now", run_recurring_invoices_path, class: "tc-btn",
+                  form: { data: { controller: "confirm", confirm_message_value: "Make them now? Each is a draft, approved or emailed, as its template says.", action: "submit->confirm#ask" } } %>
+  <% end %>
+  <% if tc_can?(:record) %><%= link_to "New recurring invoice", new_recurring_invoice_path, class: "tc-btn tc-btn-secondary" %><% end %>
+<% end %>
+
+<div class="tc-card overflow-x-auto">
+  <table class="tc-table">
+    <thead><tr><th>Name</th><th>Customer</th><th>Schedule</th><th>Next</th><th>Makes</th><th class="tc-num">Each</th></tr></thead>
+    <tbody>
+      <% if @recurring_invoices.empty? %>
+        <tr><td colspan="6" class="tc-muted text-center">None yet. Add one for a retainer or a subscription, or repeat an invoice from its page.</td></tr>
+      <% end %>
+      <% @recurring_invoices.each do |template| %>
+        <tr class="<%= "tc-muted" unless template.active? %>" data-recurring-invoice>
+          <td>
+            <%= link_to template.name, recurring_invoice_path(template), class: "underline" %>
+            <% unless template.active? %><%= tc_badge "Inactive" %><% end %>
+            <% if template.last_problem %><div class="text-xs tc-negative"><%= template.last_problem %></div><% end %>
+          </td>
+          <td><%= template.contact.name %></td>
+          <td><%= template.schedule_label %></td>
+          <td class="whitespace-nowrap">
+            <% if template.finished? %><span class="tc-muted">Finished</span><% else %><%= tc_date(template.next_on) %><% if template.due?(@today) %> <%= tc_badge "Due", tone: :warning %><% end %><% end %>
+          </td>
+          <td><%= template.issue_label %></td>
+          <td class="tc-num"><%= tc_money(template.total) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+<p class="tc-hint mt-4">Due invoices are made by the host app's scheduled <code>TudlaAccounting::RecurringInvoicesJob</code> (daily, say), or with the button above.</p>

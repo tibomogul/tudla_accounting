@@ -47,8 +47,9 @@ end
 # Entries from your own records (Entry hashes; one entry per record by default):
 # TudlaAccounting.register_entry_source("Invoice", ->(invoice) { { organization_type: ..., details: [...] } })
 
-# Recurring entries are made by TudlaAccounting::RecurringEntriesJob: schedule it daily, e.g. in
-# config/recurring.yml (Solid Queue) or with cron.
+# Recurring entries and invoices are made by TudlaAccounting::RecurringEntriesJob and
+# TudlaAccounting::RecurringInvoicesJob: schedule them daily, e.g. in config/recurring.yml
+# (Solid Queue) or with cron.
 
 # Reports download as CSV; add gem "caxlsx" to the Gemfile to offer Excel workbooks too.
 
