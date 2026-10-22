@@ -1,6 +1,6 @@
 <%# locals: (bank_rule:) %>
 <% currency = accounting_organization.currency %>
-<% plain = ->(cents) { cents && Money.new(cents, currency).format(symbol: false, thousands_separator: "") } %>
+<% plain = ->(cents) { cents && tc_amount_field(Money.new(cents, currency)) } %>
 <%= form_with model: bank_rule, scope: :bank_rule, url: (bank_rule.persisted? ? bank_rule_path(bank_rule) : bank_rules_path), class: "space-y-4 max-w-3xl" do |form| %>
   <% if bank_rule.errors.any? %>
     <div class="tc-alert tc-alert-danger" role="alert">

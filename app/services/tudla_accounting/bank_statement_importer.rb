@@ -7,7 +7,7 @@ module TudlaAccounting
   # Imports a bank statement for a bank account: a CSV, an OFX or QFX file (Ofx), or an ISO
   # 20022 CAMT.053 statement (Camt053), told apart by what the file holds:
   #
-  #   BankStatementImporter.call(account, "statement.csv", date_order: :dmy)
+  #   BankStatementImporter.call(account, "statement.csv", date_order: :dmy, decimal_mark: ".")
   #   # => { imported: 42, skipped: 3, format: :csv }
   #
   # An OFX or CAMT file must be in the account's currency and for one account; its closing
@@ -19,8 +19,11 @@ module TudlaAccounting
   # signed "Amount" or separate money in and out columns ("Credit"/"Deposit"/"Money in"
   # and "Debit"/"Withdrawal"/"Money out"); and optionally "Reference", "Balance" and an
   # "Id" the bank gives each transaction. Dates are ISO (2026-03-01) or, by date_order,
-  # day/month/year or month/day/year. Amounts may carry commas, a currency symbol, or
-  # parentheses for money out.
+  # day/month/year or month/day/year. Amounts are written with decimal_mark ("1,234.56"
+  # with ".", "1.234,56" with ","), thousands separated by the other mark, a space or an
+  # apostrophe; they may carry a currency symbol or code, and show money out by a minus
+  # (before or after), parentheses or DR (CR marks money in). An amount written any other
+  # way is refused, naming its row, rather than guessed at.
   #
   # Importing the same transactions again skips them: each line is known by the bank's id
   # or, without one, by its date, description, amount, reference and balance (and how
@@ -37,15 +40,19 @@ module TudlaAccounting
       id: [ "id", "transaction id", "fitid" ]
     }.freeze
     DATE_FORMATS = { dmy: "%d/%m/%Y", mdy: "%m/%d/%Y" }.freeze
+    # Each decimal mark, and the thousands separator that goes with it.
+    DECIMAL_MARKS = { "." => ",", "," => "." }.freeze
 
     def self.call(...)
       new(...).call
     end
 
-    def initialize(account, path, date_order: :dmy)
+    def initialize(account, path, date_order: :dmy, decimal_mark: ".")
       @account = account
       @path = path
       @date_format = DATE_FORMATS.fetch(date_order.to_sym) { raise ArgumentError, "date_order must be :dmy or :mdy" }
+      @decimal_mark = decimal_mark.to_s
+      raise ArgumentError, "decimal_mark must be \".\" or \",\"" unless DECIMAL_MARKS.key?(@decimal_mark)
       @currency = account.currency.presence || account.organization.currency
     end
 
@@ -151,16 +158,39 @@ module TudlaAccounting
       raise ArgumentError, "Row #{number} has a date that can't be read: #{text}"
     end
 
+    # An amount as the bank writes it (see the class comment), in cents; nil when blank.
     def cents(text, number)
       text = text.to_s.strip
       return nil if text.empty?
 
-      negative = text.start_with?("(") && text.end_with?(")") || text.start_with?("-") || text.end_with?("-")
-      digits = text.delete("^0-9.")
-      raise ArgumentError, "Row #{number} has an amount that can't be read: #{text}" if digits.empty?
+      body = text.upcase
+      side = body.slice!(/\s*(?<![A-Z])(CR|DR)\z/)&.strip
+      body, minus = unsigned(body.strip)
+      parentheses = body.start_with?("(") && body.end_with?(")")
+      body, minus_inside = unsigned(body[1...-1].strip) if parentheses # "$(3.00)", "($3.00)"
+      signs = [ parentheses, minus, minus_inside, side == "DR" ].count(true)
+      whole, fraction = number_parts(body) if signs <= 1 && !(side == "CR" && signs.positive?)
+      raise ArgumentError, "Row #{number} has an amount that can't be read: #{text}" unless whole || fraction
 
-      value = Money.from_amount(BigDecimal(digits), @currency).cents
-      negative ? -value : value
+      value = Money.from_amount(BigDecimal("#{whole.presence || 0}.#{fraction.presence || 0}"), @currency).cents
+      signs.positive? ? -value : value
+    end
+
+    # The amount without a currency symbol or code (either side), and whether a minus sign
+    # (before or after it) made it negative.
+    def unsigned(text)
+      currency = /[\p{Sc}A-Z]{1,3}/
+      body = text.sub(/\A#{currency.source}\s*/, "").sub(/\s*#{currency.source}\z/, "")
+      minus = body.start_with?("-") || body.end_with?("-")
+      body = body.delete_prefix("-").delete_suffix("-").strip
+      [ body.sub(/\A#{currency.source}\s*/, ""), minus ] # "-$5"
+    end
+
+    # [whole digits, fraction digits] of a number written with the decimal mark, or nil.
+    def number_parts(text)
+      thousands = "[#{Regexp.escape(DECIMAL_MARKS.fetch(@decimal_mark))} '\u00A0\u202F]"
+      match = text.match(/\A(\d{1,3}(?:#{thousands}\d{3})+|\d+)?(?:#{Regexp.escape(@decimal_mark)}(\d+))?\z/)
+      [ match[1].to_s.delete("^0-9"), match[2] ] if match && (match[1] || match[2])
     end
   end
 end

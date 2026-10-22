@@ -87,8 +87,9 @@ module TudlaAccounting
       nil
     end
 
-    # A typed exchange rate, nil when blank; yields when it isn't a number.
-    def exchange_rate(text)
+    # A typed number that isn't an amount (a quantity, an exchange rate: "1,000", "1.65"),
+    # nil when blank; yields when it isn't a number.
+    def typed_decimal(text)
       text = text.to_s.strip.delete(",")
       BigDecimal(text) unless text.empty?
     rescue ArgumentError

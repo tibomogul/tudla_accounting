@@ -5,7 +5,7 @@
     year total typed in is spread over the months. typed: what was typed, shown again. %>
 <% currency = accounting_organization.currency %>
 <% money = ->(cents) { Money.new(cents, currency) } %>
-<% plain = ->(cents) { cents.zero? ? "" : money.call(cents).format(symbol: false, thousands_separator: "") } %>
+<% plain = ->(cents) { cents.zero? ? "" : tc_amount_field(money.call(cents)) } %>
 <% label_cell = "sticky left-0 z-10 bg-[var(--tc-surface)] whitespace-nowrap" %>
 <% width = grid.months.size + 2 %>
 <div class="tc-card overflow-x-auto tc-print-wide"

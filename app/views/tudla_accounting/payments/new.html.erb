@@ -26,7 +26,7 @@
       <div><%= form.label :account_id, received ? "Into" : "From", class: "tc-label" %>
         <%= form.select :account_id, payment_accounts(@currency).map { |account| [ account.code_with_name, account.id ] }, { selected: @payment.account_id, include_blank: "Choose an account" }, class: "tc-input", required: true %></div>
       <div><%= form.label :amount, "Amount (#{@currency})", class: "tc-label" %>
-        <%= form.text_field :amount, value: (@payment.amount_cents.to_i.positive? ? @payment.amount.format(symbol: false, thousands_separator: "", decimal_mark: ".") : params.dig(:payment, :amount)), inputmode: "decimal", required: true, class: "tc-input tc-num" %></div>
+        <%= form.text_field :amount, value: (@payment.amount_cents.to_i.positive? ? tc_amount_field(@payment.amount) : params.dig(:payment, :amount)), inputmode: "decimal", required: true, class: "tc-input tc-num" %></div>
       <div><%= form.label :reference, class: "tc-label" %><%= form.text_field :reference, value: @payment.reference, placeholder: "Bank reference", class: "tc-input" %></div>
       <%= render "rate", form: form, payment: @payment, currency: @currency %>
     </div>
@@ -43,7 +43,7 @@
                 <td class="whitespace-nowrap"><%= tc_date(document.issued_on) %></td>
                 <td class="whitespace-nowrap"><%= tc_date(document.due_on) %></td>
                 <td class="tc-num"><%= tc_money(document.amount_due) %></td>
-                <td class="w-36"><%= text_field_tag "payment[applications][#{document.id}]", (@applied[document.id] && Money.new(@applied[document.id], @currency).format(symbol: false, thousands_separator: "", decimal_mark: ".")),
+                <td class="w-36"><%= text_field_tag "payment[applications][#{document.id}]", (@applied[document.id] && tc_amount_field(Money.new(@applied[document.id], @currency))),
                                                     inputmode: "decimal", class: "tc-input tc-num", aria: { label: "Apply to #{document.number_label}" } %></td>
               </tr>
             <% end %>

@@ -32,7 +32,7 @@ module TudlaAccounting
 
     def import
       file = params.require(:file)
-      result = BankStatementImporter.call(@account, file.path, date_order: params[:date_order].presence || :dmy)
+      result = BankStatementImporter.call(@account, file.path, date_order: params[:date_order].presence || :dmy, decimal_mark: params[:decimal_mark].presence || ".")
       redirect_to banking_account_path(@account), notice: "Imported #{helpers.pluralize(result[:imported], 'statement line')} from the #{FORMAT_NAMES.fetch(result[:format])} file" \
                                                           "#{"; #{result[:skipped]} already imported" if result[:skipped].positive?}."
     rescue ArgumentError, CSV::MalformedCSVError, ActionController::ParameterMissing => e

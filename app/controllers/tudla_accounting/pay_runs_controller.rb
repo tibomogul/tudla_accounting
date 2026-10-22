@@ -23,7 +23,7 @@ module TudlaAccounting
       @pay_run = { paid_on: permitted[:paid_on], reference: permitted[:reference], email: permitted[:email] == "1", exchange_rate: permitted[:exchange_rate] }
       paid_on = iso_date(permitted[:paid_on])
       problems << "Give the date it is paid" unless paid_on
-      rate = exchange_rate(permitted[:exchange_rate]) { problems << "#{permitted[:exchange_rate]} isn't an exchange rate" }
+      rate = typed_decimal(permitted[:exchange_rate]) { problems << "#{permitted[:exchange_rate]} isn't an exchange rate" }
       bills = organization_scope(Document).where(id: @selected.to_a).index_by(&:id)
       chosen = @selected.map do |id|
         bill = bills.fetch(id) { raise ActiveRecord::RecordNotFound }

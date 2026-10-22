@@ -70,6 +70,23 @@ RSpec.describe "Bank reconciliation", type: :service do
         .to eq([ [ Date.new(2026, 3, 2), "Client", 250_00, "EUR", "id:T1" ], [ Date.new(2026, 3, 4), "(no description)", -12_00, "EUR", "id:T2" ] ])
     end
 
+    it "reads amounts with either decimal mark, signs, currency symbols and codes, and refuses what it can't be sure of" do
+      amounts = ->(column, mark) do
+        TudlaAccounting::BankStatementLine.delete_all
+        import("Date,Description,Amount\n#{column.each_with_index.map { |amount, index| "2026-03-0#{index + 1},Line #{index},\"#{amount}\"" }.join("\n")}\n", decimal_mark: mark)
+        TudlaAccounting::BankStatementLine.order(:occurred_on).pluck(:amount_cents)
+      end
+      expect(amounts.call([ "1,234.56", "12.50 CR", "12.50DR", "12.50-", "-$1 234.56", "AUD 7", ".5", "$(3.00)" ], "."))
+        .to eq([ 1_234_56, 12_50, -12_50, -12_50, -1_234_56, 7_00, 50, -3_00 ])
+      expect(amounts.call([ "1.234,56", "€ 1 234,56", "(0,50)", "1'000,00 DR" ], ",")).to eq([ 1_234_56, 1_234_56, -50, -1_000_00 ])
+
+      [ [ "1.234,56", "." ], [ "1,234.56", "," ], [ "1,23,4.00", "." ], [ "-(5.00)", "." ], [ "-5.00 CR", "." ], [ "5.00 DR-", "." ], [ "1.2.3", "." ] ].each do |amount, mark|
+        expect { import("Date,Description,Amount\n2026-03-01,x,\"#{amount}\"\n", decimal_mark: mark) }
+          .to raise_error(ArgumentError, "Row 2 has an amount that can't be read: #{amount}")
+      end
+      expect { import("Date,Description,Amount\n", decimal_mark: ";") }.to raise_error(ArgumentError, 'decimal_mark must be "." or ","')
+    end
+
     it "says what is wrong with a file" do
       expect { import("Description,Amount\nx,1\n") }.to raise_error(ArgumentError, "The file needs a Date column")
       expect { import("Date,Amount\n2026-03-01,1\n") }.to raise_error(ArgumentError, "The file needs a Description column")

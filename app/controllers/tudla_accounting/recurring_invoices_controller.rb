@@ -122,7 +122,8 @@ module TudlaAccounting
 
         price = amount_cents(line[:unit_price], currency) { problems << "Line #{index + 1}: #{line[:unit_price]} isn't an amount" }
         { id: line[:id].presence, _destroy: line[:_destroy] }.compact.merge( # a blank tax code clears it
-          description: line[:description].to_s, quantity: line[:quantity].presence || 1, position: index,
+          description: line[:description].to_s,
+          quantity: typed_decimal(line[:quantity]) { problems << "Line #{index + 1}: #{line[:quantity]} isn't a quantity" } || 1, position: index,
           unit_price_cents: price.to_i, account_id: (organization_scope(Account).find(line[:account_id]).id if line[:account_id].present?),
           tax_code_id: (organization_scope(TaxCode).find(line[:tax_code_id]).id if line[:tax_code_id].present?), dimension_value_ids: dimension_value_ids(line)
         )

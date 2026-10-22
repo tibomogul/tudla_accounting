@@ -69,6 +69,8 @@ RSpec.describe "Recurring invoices", type: :request do
     expect(response).to have_http_status(:unprocessable_entity)
     expect(response.body).to include("Line 1: lots isn&#39;t an amount")
     expect(css_select("select[name='recurring_invoice[day_of_month]'] option[selected]").map(&:text)).to eq([ "Last day" ])
+    post routes.recurring_invoices_path, params: { recurring_invoice: form(lines: { "0" => { description: "Retainer", quantity: "a few", unit_price: "10", account_id: account("4000").id } }) }
+    expect(response.body).to include("Line 1: a few isn&#39;t a quantity")
 
     permissions.delete(:post)
     get routes.new_recurring_invoice_path

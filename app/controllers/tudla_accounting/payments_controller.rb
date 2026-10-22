@@ -57,7 +57,7 @@ module TudlaAccounting
       contact = organization_scope(Contact).find(permitted[:contact_id]) if permitted[:contact_id].present?
       @payment = organization_scope(Payment).new(kind: permitted[:kind].presence_in(%w[received paid]) || "received", contact: contact, paid_on: permitted[:paid_on],
                                                  account_id: account&.id, amount_cents: cents.call(permitted[:amount], "the payment"), reference: permitted[:reference], notes: permitted[:notes],
-                                                 exchange_rate: exchange_rate(permitted[:exchange_rate]) { problems << "#{permitted[:exchange_rate]} isn't an exchange rate" })
+                                                 exchange_rate: typed_decimal(permitted[:exchange_rate]) { problems << "#{permitted[:exchange_rate]} isn't an exchange rate" })
       @applied = (permitted[:applications]&.to_h || {}).filter_map { |id, text| [ id.to_i, cents.call(text, "applied") ] if text.present? }.to_h.compact
       @open = open_documents(@payment, @currency)
       raise ArgumentError, problems.to_sentence if problems.any?
@@ -93,7 +93,7 @@ module TudlaAccounting
                                                  account_id: (organization_scope(Account).find(permitted[:account_id]).id if permitted[:account_id].present?),
                                                  reference: permitted[:reference], notes: permitted[:notes])
       @payment.refund_of = credit
-      @payment.exchange_rate = exchange_rate(permitted[:exchange_rate]) { raise ArgumentError, "#{permitted[:exchange_rate]} isn't an exchange rate" }
+      @payment.exchange_rate = typed_decimal(permitted[:exchange_rate]) { raise ArgumentError, "#{permitted[:exchange_rate]} isn't an exchange rate" }
       @payment.amount_cents = amount_cents(permitted[:amount], @currency) { raise ArgumentError, "#{permitted[:amount]} isn't an amount" }
       @payment = Payment.record!(**@payment.attributes.symbolize_keys.slice(:kind, :contact_id, :account_id, :paid_on, :amount_cents, :exchange_rate, :reference, :notes),
                                  organization: accounting_organization, refund_of: credit)

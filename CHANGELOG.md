@@ -73,7 +73,9 @@ Tagged but never published. Later versions don't support upgrading from it (or f
 - Lines with a foreign amount can be taxed: the tax is worked out on the converted amount and posted in the organization's currency (an inclusive line's foreign amount is split too). A tax account held in another currency is refused.
 
 ### Fixed
-- The amount fields of the invoice, entry, payment and opening balance forms showed amounts with the currency's own decimal mark (`1000,00` in euros), which they then read as a hundred times as much.
+- The amount fields of the invoice, entry, payment, opening balance, budget and bank rule forms showed amounts with the currency's own decimal mark (`1000,00` in euros), which they then read as a hundred times as much: saving a budget or bank rule unchanged multiplied its amounts by 100. Every amount field is now filled the way the forms read it (`tc_amount_field`).
+- An invoice line's quantity typed with a thousands separator (`1,000`) was refused as not a number, though the form's total read it; it is read as amounts are, and one that isn't a number says so by its line.
+- Bank statement CSVs: an amount written with a decimal comma (`1.234,56`) was read as 1.23, a `CR` or `DR` marker was ignored, and a minus sign after a currency symbol (`$(3.00)`) was lost. The importer now takes the file's `decimal_mark` (asked for on the banking page next to the date order), reads signs, currency symbols and codes, and refuses an amount it can't read for certain instead of guessing.
 - A weekly recurring entry fell on the wrong days: the first came six days after its start, and one changed part-way through a week could skip a week.
 - Clearing a line's tax code on a draft invoice or bill didn't take it off.
 - `Entry.create_from_ruby_hash` stored a foreign amount given as a decrease (`EUR -55.00`) as a negative number; it is now a magnitude, like the line's amount.

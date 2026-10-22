@@ -36,7 +36,7 @@
                 <td><%= bill.reference %></td>
                 <td class="whitespace-nowrap <%= "tc-negative" if bill.due_on && bill.due_on < Date.current %>"><%= tc_date(bill.due_on) %></td>
                 <td class="tc-num"><%= tc_money(bill.amount_due) %></td>
-                <td class="w-36"><%= text_field_tag "pay_run[amounts][#{bill.id}]", @amounts[bill.id] || bill.amount_due.format(symbol: false, thousands_separator: "", decimal_mark: "."),
+                <td class="w-36"><%= text_field_tag "pay_run[amounts][#{bill.id}]", @amounts[bill.id] || tc_amount_field(bill.amount_due),
                                                     inputmode: "decimal", class: "tc-input tc-num", aria: { label: "Pay on #{bill.number_label}" } %></td>
               </tr>
             <% end %>

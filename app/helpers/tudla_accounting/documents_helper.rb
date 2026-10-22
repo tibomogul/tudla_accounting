@@ -52,7 +52,7 @@ module TudlaAccounting
 
     # A typed amount for the line editor: "1234.50", or "" for nothing yet.
     def document_price(line)
-      line.unit_price_cents.to_i.positive? ? line.unit_price.format(symbol: false, thousands_separator: "", decimal_mark: ".") : ""
+      line.unit_price_cents.to_i.positive? ? tc_amount_field(line.unit_price) : ""
     end
   end
 end

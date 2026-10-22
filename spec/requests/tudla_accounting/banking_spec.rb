@@ -50,6 +50,13 @@ RSpec.describe "Banking", type: :request do
       CSV
     end
 
+    it "imports a CSV written with decimal commas when told so" do
+      get routes.banking_account_path(bank)
+      expect(css_select("select[name=decimal_mark] option").map(&:text)).to eq([ "1,234.56", "1.234,56" ])
+      post routes.banking_import_path(bank), params: { file: statement("Date,Description,Amount\n06/03/2026,Refund,\"1.234,50\"\n"), decimal_mark: "," }
+      expect(TudlaAccounting::BankStatementLine.find_by!(description: "Refund").amount_cents).to eq(1_234_50)
+    end
+
     it "imports an OFX file too, saying so" do
       post routes.banking_import_path(bank), params: { file: fixture_file_upload("statement_ofx1.ofx", "application/x-ofx") }
       expect(flash[:notice]).to eq("Imported 3 statement lines from the OFX file.")

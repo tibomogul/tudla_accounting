@@ -22,6 +22,13 @@ module TudlaAccounting
       money.negative? ? tag.span("(#{text})", class: "tc-negative") : text
     end
 
+    # An amount as a form field holds it: "1234.50", with "." for decimals and no thousands
+    # separators whatever the currency's own style, as the forms read amounts back ("" for
+    # none). Every amount field is filled with it, so saving a form unchanged keeps it.
+    def tc_amount_field(money)
+      money ? money.format(symbol: false, thousands_separator: "", decimal_mark: ".") : ""
+    end
+
     def tc_date(value)
       value&.to_date&.strftime("%-d %b %Y")
     end
