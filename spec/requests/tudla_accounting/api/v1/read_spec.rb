@@ -180,7 +180,7 @@ RSpec.describe "JSON API: reading the books", type: :request do
                                 "contact" => { "id" => northwind.id, "name" => "Northwind" }, "issued_on" => "2026-04-01", "due_on" => "2026-05-01", "currency" => "AUD",
                                 "subtotal" => "250.00", "tax" => "25.00", "total" => "275.00", "amount_due" => "75.00", "entry_id" => invoice.entry_id)
     expect(document["lines"]).to eq([ { "description" => "Consulting", "quantity" => "2.5", "unit_price" => "100.00", "amount" => "250.00", "account_code" => "4010",
-                                        "tax_code" => "GST", "tax" => "25.00" } ])
+                                        "tax_code" => "GST", "tax" => "25.00", "dimensions" => {} } ])
     numbers = ->(**filters) { api_get(routes.api_v1_documents_path, **filters)["data"].map { |row| row["number"] } }
     expect(numbers.call(kind: "sales_invoice", status: "approved", contact_id: northwind.id, from: "2026-04-01", to: "2026-04-30")).to eq(%w[INV-0001])
     expect(numbers.call(number: "INV-0001")).to eq(%w[INV-0001])

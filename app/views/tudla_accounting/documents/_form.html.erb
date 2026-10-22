@@ -5,6 +5,8 @@
 <% account_options = document_accounts(document).map { |account| [ account_option_label(account), account.id ] } %>
 <% tax_options = document_tax_codes(document).map { |code| [ code.label, code.id, { data: { rate: code.rate.to_s } } ] } %>
 <% contacts = document_contacts(document) %>
+<% dimensions = entry_dimensions(lines) %>
+<% before_amount = 5 + dimensions.size %>
 <%= form_with model: document, scope: :document, url: (document.persisted? ? document_path(document) : documents_path),
               class: "space-y-4", data: { controller: "document-lines", document_lines_exponent_value: currency.exponent } do |form| %>
   <% if document.errors.any? %>
@@ -37,18 +39,18 @@
   <div class="tc-card overflow-x-auto">
     <table class="tc-table">
       <thead>
-        <tr><th>Description</th><th class="tc-num">Quantity</th><th class="tc-num">Unit price</th><th>Account</th><th>Tax</th><th class="tc-num">Amount (<%= currency.iso_code %>)</th><th><span class="sr-only">Remove</span></th></tr>
+        <tr><th>Description</th><th class="tc-num">Quantity</th><th class="tc-num">Unit price</th><th>Account</th><th>Tax</th><% dimensions.each do |dimension, _values| %><th><%= dimension.name %></th><% end %><th class="tc-num">Amount (<%= currency.iso_code %>)</th><th><span class="sr-only">Remove</span></th></tr>
       </thead>
       <tbody data-document-lines-target="lines">
         <% lines.each_with_index do |line, index| %>
-          <%= render "tudla_accounting/documents/line", line: line, index: index, account_options: account_options, tax_options: tax_options %>
+          <%= render "tudla_accounting/documents/line", line: line, index: index, account_options: account_options, tax_options: tax_options, dimensions: dimensions %>
         <% end %>
       </tbody>
       <tfoot>
-        <tr><td colspan="7"><button type="button" class="tc-btn tc-btn-secondary tc-btn-sm" data-action="document-lines#add">Add line</button></td></tr>
-        <tr><td colspan="5" class="text-right">Subtotal</td><td class="tc-num" data-document-lines-target="subtotal"></td><td></td></tr>
-        <tr class="tc-muted"><td colspan="5" class="text-right">Tax</td><td class="tc-num" data-document-lines-target="taxTotal"></td><td></td></tr>
-        <tr class="font-semibold"><td colspan="5" class="text-right">Total</td><td class="tc-num" data-document-lines-target="total"></td><td></td></tr>
+        <tr><td colspan="<%= before_amount + 2 %>"><button type="button" class="tc-btn tc-btn-secondary tc-btn-sm" data-action="document-lines#add">Add line</button></td></tr>
+        <tr><td colspan="<%= before_amount %>" class="text-right">Subtotal</td><td class="tc-num" data-document-lines-target="subtotal"></td><td></td></tr>
+        <tr class="tc-muted"><td colspan="<%= before_amount %>" class="text-right">Tax</td><td class="tc-num" data-document-lines-target="taxTotal"></td><td></td></tr>
+        <tr class="font-semibold"><td colspan="<%= before_amount %>" class="text-right">Total</td><td class="tc-num" data-document-lines-target="total"></td><td></td></tr>
       </tfoot>
     </table>
   </div>
@@ -59,7 +61,7 @@
   <div class="tc-card tc-card-body"><%= tc_field form, :notes, as: :text_area, rows: 3, label: "Notes", hint: sales ? "Printed on the document: payment details, thanks..." : "For your own records" %></div>
 
   <template data-document-lines-target="template">
-    <%= render "tudla_accounting/documents/line", line: TudlaAccounting::DocumentLine.new(quantity: 1), index: "NEW_LINE", account_options: account_options, tax_options: tax_options %>
+    <%= render "tudla_accounting/documents/line", line: TudlaAccounting::DocumentLine.new(quantity: 1), index: "NEW_LINE", account_options: account_options, tax_options: tax_options, dimensions: dimensions %>
   </template>
 
   <div class="flex flex-wrap gap-2">

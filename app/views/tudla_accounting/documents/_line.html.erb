@@ -1,4 +1,4 @@
-<%# locals: (line:, index:, account_options:, tax_options:) %>
+<%# locals: (line:, index:, account_options:, tax_options:, dimensions:) %>
 <% name = ->(field) { "document[lines][#{index}][#{field}]" } %>
 <tr data-document-lines-target="line" <%= "hidden" if line.marked_for_destruction? %>>
   <td class="min-w-56">
@@ -14,6 +14,10 @@
                                       aria: { label: "Account" }, data: { document_lines_target: "account" } %></td>
   <td class="min-w-32"><%= select_tag name.call(:tax_code_id), options_for_select(tax_options, line.tax_code_id), include_blank: "No tax", class: "tc-input", aria: { label: "Tax" },
                                       data: { document_lines_target: "tax", action: "change->document-lines#recalculate" } %></td>
+  <% dimensions.each do |dimension, values| %>
+    <td class="min-w-32"><%= select_tag "#{name.call(:dimensions)}[#{dimension.id}]", options_for_select(values, line.dimension_value_for(dimension)&.id), include_blank: "—",
+                                        class: "tc-input", aria: { label: dimension.name } %></td>
+  <% end %>
   <td class="tc-num whitespace-nowrap" data-document-lines-target="amount"></td>
   <td class="text-right"><button type="button" class="tc-btn tc-btn-ghost tc-btn-sm" data-action="document-lines#remove" aria-label="Remove line">✕</button></td>
 </tr>

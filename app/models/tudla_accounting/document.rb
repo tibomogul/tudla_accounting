@@ -196,7 +196,8 @@ module TudlaAccounting
     end
 
     # The entry: the total to the receivable or payable account, and each line's net amount
-    # and tax to its accounts on the other side (the other way round for a credit note).
+    # (tagged with the line's dimension values) and tax to its accounts on the other side
+    # (the other way round for a credit note).
     def build_entry
       control = control_account
       charge = sales? != credit? ? Detail::TALLY_DEBIT : Detail::TALLY_CREDIT
@@ -208,7 +209,10 @@ module TudlaAccounting
       line = ->(account, tally, cents, **extra) { posting.details.build(account: account, tally: tally, amount_cents: cents, currency: organization.currency, **extra) }
       line.call(control, charge, total_cents)
       live_lines.each do |item|
-        line.call(item.account, other, item.net_cents, description: item.description, **({ tax_code: item.tax_code, tax_role: :base } if item.tax_code).to_h) if item.net_cents.positive?
+        if item.net_cents.positive?
+          net = line.call(item.account, other, item.net_cents, description: item.description, **({ tax_code: item.tax_code, tax_role: :base } if item.tax_code).to_h)
+          item.dimension_values.each { |value| net.tags.build(dimension_value: value) }
+        end
         line.call(item.tax_code.account, other, item.tax_cents, description: item.description, tax_code: item.tax_code, tax_role: :tax) if item.tax_cents.positive?
       end
       posting

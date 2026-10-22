@@ -32,6 +32,7 @@ module TudlaAccounting
         format.html do
           @applied = applied(@document)
           @deliveries = Delivery.where(subject: @document).newest_first.to_a
+          @dimension_values = DimensionValue.where(id: @document.lines.flat_map(&:dimension_value_ids)).includes(:dimension).index_by(&:id)
         end
         format.pdf { send_pdf(@document.number_label || "draft-#{@document.kind.dasherize}-#{@document.id}", fallback: document_path(@document)) { PdfMaker.document(@document) } }
       end
@@ -163,11 +164,11 @@ module TudlaAccounting
     end
 
     # The form's fields and lines, each amount read as typed and each account, tax code,
-    # contact and credited document the organization's own; and the amounts that couldn't
+    # dimension value, contact and credited document the organization's own; and the amounts that couldn't
     # be read.
     def document_attributes
       permitted = params.require(:document).permit(:kind, :contact_id, :reference, :issued_on, :due_on, :tax_inclusive, :notes, :credited_document_id,
-                                                   lines: %i[id description quantity unit_price account_id tax_code_id _destroy])
+                                                   lines: [ :id, :description, :quantity, :unit_price, :account_id, :tax_code_id, :_destroy, { dimensions: {} } ])
       permitted.delete(:kind) if @document.persisted?
       currency = accounting_organization.currency
       problems = []
@@ -177,18 +178,25 @@ module TudlaAccounting
         price = amount_cents(line[:unit_price], currency) { problems << "Line #{index + 1}: #{line[:unit_price]} isn't an amount" }
         { id: line[:id].presence, _destroy: line[:_destroy], description: line[:description].to_s, quantity: line[:quantity].presence || 1,
           unit_price_cents: price.to_i, account_id: (organization_scope(Account).find(line[:account_id]).id if line[:account_id].present?),
-          tax_code_id: (organization_scope(TaxCode).find(line[:tax_code_id]).id if line[:tax_code_id].present?) }.compact
+          tax_code_id: (organization_scope(TaxCode).find(line[:tax_code_id]).id if line[:tax_code_id].present?), dimension_value_ids: dimension_value_ids(line) }.compact
       end
       permitted[:contact_id] = organization_scope(Contact).find(permitted[:contact_id]).id if permitted[:contact_id].present?
       permitted[:credited_document_id] = organization_scope(Document).find(permitted[:credited_document_id]).id if permitted[:credited_document_id].present?
       [ permitted.merge(lines_attributes: lines), problems ]
     end
 
+    # The values chosen on a line, one per dimension, each the organization's.
+    def dimension_value_ids(line)
+      line.fetch(:dimensions, {}).to_h.filter_map do |dimension_id, value_id|
+        organization_scope(Dimension).find(dimension_id).dimension_values.find(value_id).id if value_id.present?
+      end
+    end
+
     def credit_for(original)
       @document.assign_attributes(kind: original.sales? ? "sales_credit" : "supplier_credit", contact: original.contact, credited_document: original,
                                   tax_inclusive: original.tax_inclusive, reference: original.number_label)
       original.lines.each do |line|
-        @document.lines.build(line.attributes.slice("description", "quantity", "unit_price_cents", "account_id", "tax_code_id"))
+        @document.lines.build(line.attributes.slice("description", "quantity", "unit_price_cents", "account_id", "tax_code_id", "dimension_value_ids"))
       end
     end
 

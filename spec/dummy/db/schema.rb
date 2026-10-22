@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_22_004000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_22_005000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -302,8 +302,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_004000) do
     t.datetime "updated_at", null: false
     t.index ["organization_type", "organization_id", "created_at"], name: "index_tudla_accounting_deliveries_on_organization"
     t.index ["subject_type", "subject_id"], name: "index_tudla_accounting_deliveries_on_subject"
-    t.check_constraint "kind::text = ANY (ARRAY['document'::character varying, 'reminder'::character varying, 'statement'::character varying, 'receipt'::character varying, 'payment_notice'::character varying]::text[])", name: "tudla_accounting_deliveries_kind_known"
-    t.check_constraint "status::text = ANY (ARRAY['queued'::character varying, 'sent'::character varying, 'failed'::character varying]::text[])", name: "tudla_accounting_deliveries_status_known"
+    t.check_constraint "kind::text = ANY (ARRAY['document'::character varying::text, 'reminder'::character varying::text, 'statement'::character varying::text, 'receipt'::character varying::text, 'payment_notice'::character varying::text])", name: "tudla_accounting_deliveries_kind_known"
+    t.check_constraint "status::text = ANY (ARRAY['queued'::character varying::text, 'sent'::character varying::text, 'failed'::character varying::text])", name: "tudla_accounting_deliveries_status_known"
   end
 
   create_table "tudla_accounting_detail_tags", force: :cascade do |t|
@@ -366,6 +366,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_004000) do
     t.bigint "account_id", null: false
     t.bigint "amount_cents", default: 0, null: false
     t.string "description", null: false
+    t.bigint "dimension_value_ids", default: [], null: false, array: true
     t.bigint "document_id", null: false
     t.integer "position", default: 0, null: false
     t.decimal "quantity", precision: 15, scale: 4, default: "1.0", null: false

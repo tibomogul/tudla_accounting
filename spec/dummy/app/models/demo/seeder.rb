@@ -211,11 +211,13 @@ class Demo::Seeder
     consulting_invoice(customers.third, today, 6)
   end
 
+  def team(code) = @teams.find { |value| value.code == code }
+
   def consulting_invoice(customer, date, hours)
     TudlaAccounting::Document.create!(organization: organization, kind: "sales_invoice", contact: customer, issued_on: date, due_on: customer.due_on(date),
                                       notes: "Please pay within 30 days to account 123-456 789012, quoting the invoice number.",
                                       lines_attributes: [ { description: "Consulting – #{date.strftime('%B %Y')}", quantity: hours, unit_price_cents: 150_00,
-                                                            account: accounts["4010"], tax_code: @gst } ])
+                                                            account: accounts["4010"], tax_code: @gst, dimension_value_ids: [ team("ENG").id ] } ])
   end
 
   # A software supplier's bills, on the first of last month and this month, not yet paid.
@@ -225,7 +227,7 @@ class Demo::Seeder
     [ today.prev_month.beginning_of_month, today.beginning_of_month ].each do |date|
       TudlaAccounting::Document.create!(organization: organization, kind: "bill", contact: supplier, issued_on: date, due_on: supplier.due_on(date), reference: "CW-#{date.strftime('%y%m')}",
                                         tax_inclusive: true, lines_attributes: [ { description: "Team plan, #{date.strftime('%B')}", quantity: 5, unit_price_cents: 33_00,
-                                                                                   account: accounts["6020"], tax_code: @gstp } ]).approve!
+                                                                                   account: accounts["6020"], tax_code: @gstp, dimension_value_ids: [ team("ENG").id ] } ]).approve!
     end
   end
 

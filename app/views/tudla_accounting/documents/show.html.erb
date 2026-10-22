@@ -32,6 +32,26 @@
 
 <%= render "document", document: @document %>
 
+<% if @dimension_values.any? %>
+  <% dimensions = @dimension_values.values.map(&:dimension).uniq.sort_by(&:code) %>
+  <section class="tc-card overflow-x-auto mt-6 print:hidden" aria-labelledby="line-dimensions">
+    <h2 id="line-dimensions" class="tc-card-body tc-card-title">Dimensions</h2>
+    <table class="tc-table">
+      <thead><tr><th>Line</th><th>Account</th><% dimensions.each do |dimension| %><th><%= dimension.name %></th><% end %></tr></thead>
+      <tbody>
+        <% @document.lines.each do |line| %>
+          <% values = line.dimension_value_ids.filter_map { |id| @dimension_values[id] } %>
+          <tr data-line-dimensions>
+            <td><%= line.description %></td>
+            <td><%= line.account.code_with_name %></td>
+            <% dimensions.each do |dimension| %><td><%= values.find { |value| value.dimension_id == dimension.id }&.name || "—" %></td><% end %>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </section>
+<% end %>
+
 <% if TudlaAccounting.attachments? %>
   <div class="mt-6 print:hidden"><%= render "tudla_accounting/attachments/list", record: @document, label: "Attach files", empty: "No files attached." %></div>
 <% end %>

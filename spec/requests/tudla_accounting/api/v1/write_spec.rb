@@ -164,7 +164,7 @@ RSpec.describe "JSON API: recording in the books", type: :request do
 
       changed = call(:patch, routes.api_v1_document_path(data["id"]), { due_on: "2026-04-20", lines: [ { description: "Design", unit_price: "50", account_code: "4000" } ] })["data"]
       expect(changed).to include("due_on" => "2026-04-20", "reference" => "PO 9", "total" => "50.00")
-      expect(changed["lines"]).to eq([ { "description" => "Design", "quantity" => "1.0", "unit_price" => "50.00", "amount" => "50.00", "account_code" => "4000", "tax_code" => nil, "tax" => "0.00" } ])
+      expect(changed["lines"]).to eq([ { "description" => "Design", "quantity" => "1.0", "unit_price" => "50.00", "amount" => "50.00", "account_code" => "4000", "tax_code" => nil, "tax" => "0.00", "dimensions" => {} } ])
       expect(call(:patch, routes.api_v1_document_path(data["id"]), { notes: "Thanks" })["data"]["lines"].size).to eq(1)
 
       approved = call(:post, routes.approve_api_v1_document_path(data["id"]))["data"]

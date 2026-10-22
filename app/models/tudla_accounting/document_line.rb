@@ -6,7 +6,8 @@ module TudlaAccounting
   # the document's side (a sales code on sales, a purchases code on bills). amount_cents is
   # quantity times unit price, rounded to the cent; tax_cents the tax on it, added or
   # (when the document's amounts include the tax) split out, rounded per line as an
-  # entry's tax is.
+  # entry's tax is. dimension_value_ids tag it (one value per dimension) as an entry's line
+  # is tagged; approving the document tags its posting.
   class DocumentLine < ApplicationRecord
     belongs_to :document, class_name: "TudlaAccounting::Document", inverse_of: :lines
     belongs_to :account, class_name: "TudlaAccounting::Account"
@@ -31,6 +32,14 @@ module TudlaAccounting
       document&.tax_inclusive? ? amount_cents - tax_cents.to_i : amount_cents
     end
 
+    def dimension_values
+      DimensionValue.where(id: dimension_value_ids).includes(:dimension)
+    end
+
+    def dimension_value_for(dimension)
+      dimension_values.find { |value| value.dimension_id == dimension.id }
+    end
+
     def unit_price = money(unit_price_cents)
     def amount = money(amount_cents)
 
@@ -51,11 +60,20 @@ module TudlaAccounting
       if account&.role.in?(%w[receivable payable])
         errors.add(:account, "can't be the receivables or payables account; the document posts its total there")
       end
+      dimensions_fit(organization)
       return unless tax_code
 
       errors.add(:tax_code, "must belong to the same organization") if tax_code.organization != organization
       wanted = document.sales? ? "sales" : "purchases"
       errors.add(:tax_code, "must be a #{wanted} code") if Document::KINDS.key?(document.kind) && tax_code.kind != wanted
+    end
+
+    def dimensions_fit(organization)
+      return if dimension_value_ids.empty?
+
+      values = dimension_values.to_a
+      errors.add(:dimension_value_ids, "must belong to the same organization") if values.size < dimension_value_ids.uniq.size || values.any? { |value| value.dimension.organization != organization }
+      errors.add(:dimension_value_ids, "can have one value of each dimension") if values.map(&:dimension_id).uniq.size < values.size
     end
   end
 end

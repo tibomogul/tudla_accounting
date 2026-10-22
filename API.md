@@ -115,7 +115,7 @@ end
   "tax_inclusive": false, "currency": "AUD", "subtotal": "250.00", "tax": "25.00", "total": "275.00", "amount_due": "75.00",
   "credited_document_id": null, "entry_id": 81, "notes": null,
   "lines": [ { "description": "Consulting", "quantity": "2.5", "unit_price": "100.00", "amount": "250.00",
-               "account_code": "4010", "tax_code": "GST", "tax": "25.00" } ],
+               "account_code": "4010", "tax_code": "GST", "tax": "25.00", "dimensions": { "DEPT": "SALES" } } ],
   "approved_at": "...", "voided_on": null, "void_reason": null, "created_at": "...", "updated_at": "..." }
 ```
 
@@ -188,7 +188,7 @@ Idempotency-Key: shop-order-1042
   "lines": [ { "description": "Consulting", "quantity": "2.5", "unit_price": "100.00", "account_code": "4010", "tax_code": "GST" } ] }
 ```
 
-`kind` is `sales_invoice`, `sales_credit`, `bill` or `supplier_credit`. `due_on` defaults to the contact's payment terms after `issued_on`. Lines need a `description`, `unit_price` and `account_code` (not the receivables or payables account); `quantity` is 1 if not given; `tax_code` must be of the document's side. `tax_inclusive` says the prices include the tax. A credit note can name the approved invoice (or bill) it credits, `credited_document_id`, and is applied to it when approved.
+`kind` is `sales_invoice`, `sales_credit`, `bill` or `supplier_credit`. `due_on` defaults to the contact's payment terms after `issued_on`. Lines need a `description`, `unit_price` and `account_code` (not the receivables or payables account); `quantity` is 1 if not given; `tax_code` must be of the document's side. `dimensions` (dimension code to value code, one value per dimension) tag a line, and its posting once approved. `tax_inclusive` says the prices include the tax. A credit note can name the approved invoice (or bill) it credits, `credited_document_id`, and is applied to it when approved.
 
 Their files: an entry's or document's JSON lists them under `attachments` (`id`, `filename`, `content_type`, `byte_size`, `created_at`; empty when the app keeps no attachments). `POST /documents/:id/attachments` and `POST /entries/:id/attachments` (`record`) upload them as multipart form data, `file` (or several as `files[]`), each checked as on the pages (the `attachment_content_types` and `attachment_max_size` settings); the answer lists the record's files. `GET /documents/:id/attachments/:attachment_id` (and the same for entries) downloads one.
 
