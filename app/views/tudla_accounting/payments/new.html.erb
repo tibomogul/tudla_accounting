@@ -1,4 +1,5 @@
 <% received = @payment.received? %>
+<% currencies = payment_currencies %>
 <%= tc_page_header (received ? "Record a payment received" : "Record a payment made") %>
 
 <% contacts = TudlaAccounting::Contact.where(organization: accounting_organization).active.then { |scope| received ? scope.customers : scope.suppliers }.order(Arel.sql("LOWER(name)")) %>
@@ -7,6 +8,9 @@
   <div class="grow"><%= form.label :contact_id, received ? "Customer" : "Supplier", class: "tc-label" %>
     <%= form.select :contact_id, contacts.map { |contact| [ contact.name, contact.id ] }, { include_blank: "Choose #{received ? 'a customer' : 'a supplier'}", selected: @payment.contact_id },
                     class: "tc-input", required: true %></div>
+  <% if currencies.size > 1 %>
+    <div><%= form.label :currency, "Currency", class: "tc-label" %><%= form.select :currency, currencies, { selected: @currency }, class: "tc-input" %></div>
+  <% end %>
   <%= form.submit (@payment.contact ? "Change" : "Show what they owe"), class: "tc-btn tc-btn-secondary", name: nil %>
 <% end %>
 
@@ -20,10 +24,11 @@
     <div class="tc-card tc-card-body grid gap-4 sm:grid-cols-4">
       <div><%= form.label :paid_on, "Date", class: "tc-label" %><%= form.date_field :paid_on, value: @payment.paid_on, required: true, class: "tc-input" %></div>
       <div><%= form.label :account_id, received ? "Into" : "From", class: "tc-label" %>
-        <%= form.select :account_id, payment_accounts.map { |account| [ account.code_with_name, account.id ] }, { selected: @payment.account_id, include_blank: "Choose an account" }, class: "tc-input", required: true %></div>
-      <div><%= form.label :amount, "Amount (#{accounting_organization.currency})", class: "tc-label" %>
+        <%= form.select :account_id, payment_accounts(@currency).map { |account| [ account.code_with_name, account.id ] }, { selected: @payment.account_id, include_blank: "Choose an account" }, class: "tc-input", required: true %></div>
+      <div><%= form.label :amount, "Amount (#{@currency})", class: "tc-label" %>
         <%= form.text_field :amount, value: (@payment.amount_cents.to_i.positive? ? @payment.amount.format(symbol: false, thousands_separator: "", decimal_mark: ".") : params.dig(:payment, :amount)), inputmode: "decimal", required: true, class: "tc-input tc-num" %></div>
       <div><%= form.label :reference, class: "tc-label" %><%= form.text_field :reference, value: @payment.reference, placeholder: "Bank reference", class: "tc-input" %></div>
+      <%= render "rate", form: form, payment: @payment, currency: @currency %>
     </div>
 
     <div class="tc-card overflow-x-auto">
@@ -38,14 +43,14 @@
                 <td class="whitespace-nowrap"><%= tc_date(document.issued_on) %></td>
                 <td class="whitespace-nowrap"><%= tc_date(document.due_on) %></td>
                 <td class="tc-num"><%= tc_money(document.amount_due) %></td>
-                <td class="w-36"><%= text_field_tag "payment[applications][#{document.id}]", (@applied[document.id] && Money.new(@applied[document.id], accounting_organization.currency).format(symbol: false, thousands_separator: "")),
+                <td class="w-36"><%= text_field_tag "payment[applications][#{document.id}]", (@applied[document.id] && Money.new(@applied[document.id], @currency).format(symbol: false, thousands_separator: "", decimal_mark: ".")),
                                                     inputmode: "decimal", class: "tc-input tc-num", aria: { label: "Apply to #{document.number_label}" } %></td>
               </tr>
             <% end %>
           </tbody>
         </table>
       <% else %>
-        <p class="tc-card-body tc-muted text-sm">Nothing is owed <%= received ? "by" : "to" %> <%= @payment.contact.name %>; the payment is kept as a credit to apply later.</p>
+        <p class="tc-card-body tc-muted text-sm">Nothing is owed <%= received ? "by" : "to" %> <%= @payment.contact.name %><%= " in #{@currency}" if currencies.size > 1 %>; the payment is kept as a credit to apply later.</p>
       <% end %>
       <p class="tc-card-body tc-hint">Whatever isn't applied stays as a credit for <%= @payment.contact.name %>.</p>
     </div>

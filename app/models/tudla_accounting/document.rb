@@ -40,12 +40,12 @@ module TudlaAccounting
     # The supplier's PDF on a bill, a signed order on an invoice; see Attachable. An
     # approved document's are part of its record.
     include Attachable
+    include ForeignCurrency
 
     accepts_nested_attributes_for :lines, allow_destroy: true
 
     normalizes :reference, with: ->(reference) { reference.strip.presence }
     normalizes :notes, with: ->(notes) { notes.strip.presence }
-    normalizes :currency, with: ->(currency) { currency.strip.upcase.presence }
 
     validates :kind, inclusion: { in: KINDS.keys }
     validates :status, inclusion: { in: STATUSES }
@@ -54,11 +54,11 @@ module TudlaAccounting
     validate :contact_fits
     validate :due_after_issue
     validate :credited_document_fits
-    validate :currency_fits
+    validate { currency_rated(issued_on) }
     validate :has_lines
     validate :unchanged_once_approved, on: :update
 
-    before_validation :settle_currency, if: :draft?
+    before_validation(if: :draft?) { settle_currency(issued_on) }
     before_validation :work_out_totals, if: :draft?
     before_destroy :ensure_draft, prepend: true
     after_create { audit("document.created") }
@@ -91,10 +91,6 @@ module TudlaAccounting
     def draft? = status == "draft"
     def approved? = status == "approved"
     def void? = status == "void"
-
-    # Its currency: the organization's unless it is a foreign document.
-    def currency = self[:currency] || organization&.currency || TudlaAccounting.configuration.base_currency
-    def foreign? = self[:currency].present?
 
     # "Invoice INV-0001", or "Draft invoice" before it is numbered.
     def title
@@ -150,11 +146,6 @@ module TudlaAccounting
 
     # The receivable or payable its entry opened.
     def carrying_amount = entry&.details&.filter_map(&:carrying_amount)&.first
-
-    # An amount of its currency in the organization's, at its rate.
-    def in_base_cents(cents)
-      foreign? ? (cents * exchange_rate).round(0, TudlaAccounting.configuration.rounding).to_i : cents
-    end
 
     # draft, void, or for an approved document how far it is paid (or a credit note
     # applied): unpaid, part_paid or paid.
@@ -264,28 +255,6 @@ module TudlaAccounting
       posting
     end
 
-    # The organization's own currency is kept as none; a foreign one without a rate gets
-    # the day's from ForexRateRetriever, when it has one.
-    def settle_currency
-      self.currency = nil if self[:currency] == organization&.currency
-      return self.exchange_rate = nil unless foreign?
-      return if exchange_rate || issued_on.nil? || !Money::Currency.find(self[:currency])
-
-      self.exchange_rate = ForexRateRetriever.call(from: currency, to: organization.currency, date: issued_on)
-    rescue ForexRateRetriever::RateNotFound
-      nil
-    end
-
-    def currency_fits
-      return unless foreign?
-      return errors.add(:currency, "is not a known currency code") unless Money::Currency.find(self[:currency])
-
-      if exchange_rate.nil?
-        errors.add(:exchange_rate, "is needed: no #{currency} rate was found for #{issued_on&.strftime('%-d %b %Y')}")
-      elsif !exchange_rate.positive?
-        errors.add(:exchange_rate, "must be more than zero")
-      end
-    end
 
     def contact_fits
       return unless contact

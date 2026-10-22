@@ -18,7 +18,7 @@
   <table class="tc-table">
     <thead>
       <tr><th>Date</th><th><%= received ? "Customer" : "Supplier" %></th><th>Reference</th><th>Account</th>
-        <th class="tc-num">Amount (<%= accounting_organization.currency %>)</th><th class="tc-num">Unapplied</th><th>Status</th></tr>
+        <th class="tc-num">Amount</th><th class="tc-num">Unapplied</th><th>Status</th></tr>
     </thead>
     <tbody>
       <% if @page.records.empty? %>
@@ -30,8 +30,8 @@
           <td><%= link_to payment.contact.name, contact_path(payment.contact), class: "underline" %></td>
           <td><%= payment.reference %></td>
           <td><%= payment.account.code_with_name %></td>
-          <td class="tc-num"><%= tc_money(payment.amount) %></td>
-          <td class="tc-num"><%= tc_money(payment.unapplied) unless payment.void? || payment.refund? %></td>
+          <td class="tc-num"><%= document_money(payment.amount) %></td>
+          <td class="tc-num"><%= document_money(payment.unapplied) unless payment.void? || payment.refund? %></td>
           <td><%= payment_status_badge(payment) %></td>
         </tr>
       <% end %>

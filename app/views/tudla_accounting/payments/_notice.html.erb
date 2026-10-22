@@ -22,7 +22,7 @@
 
   <% applications = payment.applications.select { |_target, _amount, allocation| allocation.active? } %>
   <table class="tc-table">
-    <thead><tr><th><%= received ? "For invoice" : "For bill" %></th><th>Dated</th><th class="tc-num">Amount (<%= payment.organization.currency %>)</th></tr></thead>
+    <thead><tr><th><%= received ? "For invoice" : "For bill" %></th><th>Dated</th><th class="tc-num">Amount (<%= payment.currency %>)</th></tr></thead>
     <tbody>
       <% applications.each do |target, amount, _allocation| %>
         <tr>

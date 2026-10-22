@@ -69,7 +69,7 @@ RSpec.describe "Payments", type: :request do
     get routes.received_payments_path(q: "nobody")
     expect(response.body).to include("Nothing matches.")
     get routes.received_payments_path(format: :csv)
-    expect(response.body.lines.map(&:chomp)).to eq([ "Date,Contact,Reference,Account,Amount,Unapplied,Status,Kind", "2026-04-14,Northwind,EFT 1,1000,120.00,20.00,posted,Payment received" ])
+    expect(response.body.lines.map(&:chomp)).to eq([ "Date,Contact,Reference,Account,Amount,Unapplied,Status,Kind,Currency", "2026-04-14,Northwind,EFT 1,1000,120.00,20.00,posted,Payment received,AUD" ])
     get routes.paid_payments_path
     expect(response.body).to include("No payments yet.")
     get routes.entry_path(payment.entry)

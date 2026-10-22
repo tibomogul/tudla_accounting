@@ -6,7 +6,7 @@ module TudlaAccounting
     permits :post, only: %i[new create new_refund create_refund void]
 
     before_action :set_payment, only: %i[show void]
-    helper_method :payment_accounts
+    helper_method :payment_accounts, :payment_currencies
 
     def index
       @kind = kind_param
@@ -34,34 +34,37 @@ module TudlaAccounting
       end
     end
 
-    # A payment from (or to) a contact, with their open invoices (or bills) to apply it to;
-    # document_id starts it from one of them, for what is still owed.
+    # A payment from (or to) a contact, in a currency (the organization's by default), with
+    # their open invoices (or bills) in it to apply it to; document_id starts it from one of
+    # them, for what is still owed.
     def new
       document = organization_scope(Document).approved.find(params[:document_id]) if params[:document_id].present?
+      @currency = document&.currency || currency_param
       @payment = organization_scope(Payment).new(kind: document ? (document.sales? ? "received" : "paid") : kind_param, paid_on: today, contact: document&.contact,
-                                                 account_id: default_account_id)
+                                                 account_id: default_account_id(@currency))
       @payment.contact ||= organization_scope(Contact).find_by(id: params[:contact_id]) if params[:contact_id].present?
       @applied = document ? { document.id => document.amount_due.cents } : {}
       @payment.amount_cents = @applied.values.sum if document
-      @open = open_documents(@payment)
+      @open = open_documents(@payment, @currency)
     end
 
     def create
-      permitted = params.require(:payment).permit(:kind, :contact_id, :account_id, :paid_on, :amount, :reference, :notes, :email_it, applications: {})
-      currency = accounting_organization.currency
+      permitted = params.require(:payment).permit(:kind, :contact_id, :account_id, :paid_on, :amount, :exchange_rate, :reference, :notes, :email_it, applications: {})
+      account = organization_scope(Account).find(permitted[:account_id]) if permitted[:account_id].present?
+      @currency = account ? account.currency.presence || accounting_organization.currency : currency_param
       problems = []
-      cents = ->(text, label) { amount_cents(text, currency) { problems << "#{text} isn't an amount (#{label})" } }
+      cents = ->(text, label) { amount_cents(text, @currency) { problems << "#{text} isn't an amount (#{label})" } }
       contact = organization_scope(Contact).find(permitted[:contact_id]) if permitted[:contact_id].present?
       @payment = organization_scope(Payment).new(kind: permitted[:kind].presence_in(%w[received paid]) || "received", contact: contact, paid_on: permitted[:paid_on],
-                                                 account_id: (organization_scope(Account).find(permitted[:account_id]).id if permitted[:account_id].present?),
-                                                 amount_cents: cents.call(permitted[:amount], "the payment"), reference: permitted[:reference], notes: permitted[:notes])
+                                                 account_id: account&.id, amount_cents: cents.call(permitted[:amount], "the payment"), reference: permitted[:reference], notes: permitted[:notes],
+                                                 exchange_rate: exchange_rate(permitted[:exchange_rate]) { problems << "#{permitted[:exchange_rate]} isn't an exchange rate" })
       @applied = (permitted[:applications]&.to_h || {}).filter_map { |id, text| [ id.to_i, cents.call(text, "applied") ] if text.present? }.to_h.compact
-      @open = open_documents(@payment)
+      @open = open_documents(@payment, @currency)
       raise ArgumentError, problems.to_sentence if problems.any?
 
       documents = organization_scope(Document).where(id: @applied.keys).index_by(&:id)
       applications = @applied.map { |id, applied| { document: documents.fetch(id) { raise ActiveRecord::RecordNotFound }, amount_cents: applied } }
-      @payment = Payment.record!(**@payment.attributes.symbolize_keys.slice(:kind, :contact_id, :account_id, :paid_on, :amount_cents, :reference, :notes),
+      @payment = Payment.record!(**@payment.attributes.symbolize_keys.slice(:kind, :contact_id, :account_id, :paid_on, :amount_cents, :exchange_rate, :reference, :notes),
                                  organization: accounting_organization, applications: applications)
       redirect_to payment_path(@payment), notice: "#{@payment.title} of #{@payment.amount.format} recorded.#{email_it(@payment) if permitted[:email_it] == '1'}"
     rescue ArgumentError => e
@@ -76,20 +79,23 @@ module TudlaAccounting
       left = Payment.credit_left_cents(credit)
       return redirect_to(credit_path(credit), alert: "Nothing is left of it to refund.") unless left.positive?
 
+      @currency = credit.currency
       @payment = organization_scope(Payment).new(kind: credit.sales? ? "refund" : "supplier_refund", contact: credit.contact, paid_on: today,
-                                                 account_id: default_account_id, amount_cents: left)
+                                                 account_id: default_account_id(@currency), amount_cents: left)
       @payment.refund_of = credit
     end
 
     def create_refund
       credit = refund_credit
-      permitted = params.require(:payment).permit(:account_id, :paid_on, :amount, :reference, :notes)
+      @currency = credit.currency
+      permitted = params.require(:payment).permit(:account_id, :paid_on, :amount, :exchange_rate, :reference, :notes)
       @payment = organization_scope(Payment).new(kind: credit.sales? ? "refund" : "supplier_refund", contact: credit.contact, paid_on: permitted[:paid_on],
                                                  account_id: (organization_scope(Account).find(permitted[:account_id]).id if permitted[:account_id].present?),
                                                  reference: permitted[:reference], notes: permitted[:notes])
       @payment.refund_of = credit
-      @payment.amount_cents = amount_cents(permitted[:amount], accounting_organization.currency) { raise ArgumentError, "#{permitted[:amount]} isn't an amount" }
-      @payment = Payment.record!(**@payment.attributes.symbolize_keys.slice(:kind, :contact_id, :account_id, :paid_on, :amount_cents, :reference, :notes),
+      @payment.exchange_rate = exchange_rate(permitted[:exchange_rate]) { raise ArgumentError, "#{permitted[:exchange_rate]} isn't an exchange rate" }
+      @payment.amount_cents = amount_cents(permitted[:amount], @currency) { raise ArgumentError, "#{permitted[:amount]} isn't an amount" }
+      @payment = Payment.record!(**@payment.attributes.symbolize_keys.slice(:kind, :contact_id, :account_id, :paid_on, :amount_cents, :exchange_rate, :reference, :notes),
                                  organization: accounting_organization, refund_of: credit)
       redirect_to payment_path(@payment), notice: "#{@payment.title} of #{@payment.amount.format} recorded."
     rescue ArgumentError => e
@@ -123,6 +129,9 @@ module TudlaAccounting
 
     def kind_param = params[:kind].presence_in(%w[received paid]) || "received"
 
+    # The currency asked for, if known; the organization's otherwise.
+    def currency_param = Money::Currency.find(params[:currency].to_s)&.iso_code || accounting_organization.currency
+
     # The credit a refund pays back: a posted payment received or made, or an approved
     # credit note.
     def refund_credit
@@ -139,32 +148,52 @@ module TudlaAccounting
       ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].today
     end
 
-    # The contact's approved invoices (or bills) with something still owed, oldest due first.
-    def open_documents(payment)
+    # The contact's approved invoices (or bills) in the currency with something still owed,
+    # oldest due first.
+    def open_documents(payment, currency)
       return [] unless payment.contact
 
       kind = payment.sales? ? "sales_invoice" : "bill"
-      organization_scope(Document).approved.where(kind: kind, contact: payment.contact).with_open_cents.order(Arel.sql("due_on ASC NULLS LAST"), :issued_on, :id)
-        .to_a.select { |document| document.amount_due.positive? }
+      documents = organization_scope(Document).approved.where(kind: kind, contact: payment.contact, currency: (currency unless currency == accounting_organization.currency))
+      documents.with_open_cents.order(Arel.sql("due_on ASC NULLS LAST"), :issued_on, :id).to_a.select { |document| document.amount_due.positive? }
     end
 
-    # The bank and cash accounts a payment can go through.
-    def payment_accounts
-      accounts = organization_scope(Account).active.where(category: [ Account::CATEGORY_ASSET, Account::CATEGORY_LIABILITY ], currency: [ nil, accounting_organization.currency ])
-      accounts.where(role: nil).or(accounts.where.not(role: %w[receivable payable])).order(:code)
+    # The bank and cash accounts a payment in a currency can go through (in the
+    # organization's, those held in no other).
+    def payment_accounts(currency = accounting_organization.currency)
+      held = currency == accounting_organization.currency ? [ nil, currency ] : currency
+      bank_accounts.where(currency: held)
     end
 
-    # The account the last payment went through, or the first cash account.
-    def default_account_id
-      organization_scope(Payment).order(:id).last&.account_id ||
-        organization_scope(Account).where(code: TudlaAccounting.configuration.cash_account_codes_for(accounting_organization)).order(:code).first&.id
+    # The currencies payments can be in: the organization's, and those of its other bank
+    # accounts.
+    def payment_currencies
+      [ accounting_organization.currency, *bank_accounts.where.not(currency: [ nil, accounting_organization.currency ]).reorder(nil).distinct.pluck(:currency).sort ]
+    end
+
+    # Active asset and liability accounts other than receivables and payables (and their
+    # sub-accounts).
+    def bank_accounts
+      control = organization_scope(Account).where(role: %w[receivable payable]).flat_map(&:subtree_ids)
+      organization_scope(Account).active.where(category: [ Account::CATEGORY_ASSET, Account::CATEGORY_LIABILITY ]).where.not(id: control).order(:code)
+    end
+
+    # The account in the currency the last payment went through, or the first cash account
+    # (in a foreign currency, the first account held in it).
+    def default_account_id(currency)
+      accounts = payment_accounts(currency)
+      last = organization_scope(Payment).order(:id).last&.account_id
+      return last if last && accounts.exists?(id: last)
+
+      accounts.where(code: TudlaAccounting.configuration.cash_account_codes_for(accounting_organization)).first&.id ||
+        (accounts.first&.id unless currency == accounting_organization.currency)
     end
 
     def payments_table(payments)
       rows = payments.map do |payment|
-        [ payment.paid_on, payment.contact.name, payment.reference, payment.account.code, payment.amount, payment.unapplied, payment.status, payment.kind_label ]
+        [ payment.paid_on, payment.contact.name, payment.reference, payment.account.code, payment.amount, payment.unapplied, payment.status, payment.kind_label, payment.currency ]
       end
-      Reports::Table.new([ [ "Date", "Contact", "Reference", "Account", "Amount", "Unapplied", "Status", "Kind" ], *rows ])
+      Reports::Table.new([ [ "Date", "Contact", "Reference", "Account", "Amount", "Unapplied", "Status", "Kind", "Currency" ], *rows ])
     end
   end
 end

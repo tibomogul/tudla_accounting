@@ -55,7 +55,7 @@ RSpec.describe "Invoices and bills in another currency", type: :request do
     expect(css_select("[data-exchange-rate]").first.text.squish).to eq("In EUR at 1.6 AUD: 1,813.33 AUD posted")
     expect(css_select("[data-document] thead th").last.text).to eq("Amount (EUR)")
     expect(cells("[data-document] tfoot tr").last).to eq([ "Total", "1,133.33" ])
-    expect(response.body).not_to include("Record payment")
+    expect(css_select("a[href='#{routes.new_payment_path(document_id: invoice.id)}']")).not_to be_empty
 
     get routes.sales_documents_path
     expect(cells("tr[data-document-row]").sole.values_at(5, 6)).to eq([ "EUR 1,133.33", "EUR 1,133.33" ])
@@ -92,7 +92,7 @@ RSpec.describe "Invoices and bills in another currency", type: :request do
     expect(invoice.tap(&:valid?).errors.full_messages).to eq([ "Currency is not a known currency code" ])
   end
 
-  it "credits a euro invoice in euros, applying it, and keeps euro documents apart from payments in dollars" do
+  it "credits a euro invoice in euros, applying it, and keeps euro documents apart from payments and refunds in dollars" do
     post routes.documents_path, params: { approve: "1", document: invoice_params }
     invoice = TudlaAccounting::Document.sole
     get routes.new_document_path(credit: invoice.id)
@@ -106,7 +106,7 @@ RSpec.describe "Invoices and bills in another currency", type: :request do
     get routes.document_path(invoice)
     expect(cells("section[aria-labelledby=applied] tbody tr").sole.last).to eq("100.00")
     get routes.document_path(credit)
-    expect(response.body).not_to include("Refund to them")
+    expect(credit.reload.amount_due).to eq(Money.new(0, "EUR")) # all of it went to the invoice
 
     other = TudlaAccounting::Document.new(organization: organization, kind: "sales_credit", contact: northwind, issued_on: Date.new(2026, 4, 12), credited_document: invoice,
                                           lines_attributes: [ { description: "x", unit_price_cents: 1, account: account("4000") } ])
@@ -120,7 +120,7 @@ RSpec.describe "Invoices and bills in another currency", type: :request do
     }.to raise_error(ArgumentError, "#{invoice.number_label} is in EUR, and the payment is in AUD")
     expect {
       TudlaAccounting::Payment.record!(organization: organization, kind: "refund", contact: northwind, account: account("1000"), paid_on: Date.new(2026, 4, 14), amount_cents: 1_00, refund_of: credit)
-    }.to raise_error(ArgumentError, "#{credit.title} is in EUR, and the refund is in AUD")
+    }.to raise_error(ArgumentError, "#{credit.number_label} is in EUR, and the refund is in AUD")
   end
 
   it "posts a bill in US dollars to a US dollar payables account" do

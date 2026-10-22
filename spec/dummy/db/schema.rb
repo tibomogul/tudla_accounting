@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_23_002000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_23_003000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -492,7 +492,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_23_002000) do
     t.bigint "amount_cents", null: false
     t.bigint "contact_id", null: false
     t.datetime "created_at", null: false
+    t.string "currency", limit: 3
     t.bigint "entry_id"
+    t.decimal "exchange_rate", precision: 24, scale: 8
     t.string "idempotency_key"
     t.string "kind", null: false
     t.text "notes"
@@ -509,6 +511,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_23_002000) do
     t.index ["entry_id"], name: "index_tudla_accounting_payments_on_entry", unique: true
     t.index ["organization_type", "organization_id", "idempotency_key"], name: "tudla_accounting_payments_idempotency_key", unique: true, where: "(idempotency_key IS NOT NULL)"
     t.index ["organization_type", "organization_id", "paid_on"], name: "index_tudla_accounting_payments_on_paid_on"
+    t.check_constraint "(currency IS NULL) = (exchange_rate IS NULL) AND (exchange_rate IS NULL OR exchange_rate > 0::numeric)", name: "tudla_accounting_payments_foreign_currency_rated"
     t.check_constraint "amount_cents > 0", name: "tudla_accounting_payments_amount_positive"
     t.check_constraint "kind::text = ANY (ARRAY['received'::character varying, 'paid'::character varying, 'refund'::character varying, 'supplier_refund'::character varying]::text[])", name: "tudla_accounting_payments_kind_known"
     t.check_constraint "status::text = ANY (ARRAY['posted'::character varying::text, 'void'::character varying::text])", name: "tudla_accounting_payments_status_known"

@@ -71,7 +71,7 @@ RSpec.describe TudlaAccounting::Payment do
     expect { record(contact: supplier) }.to raise_error(ArgumentError, "Contact must be a customer")
     expect { record(account: account("1100")) }.to raise_error(ArgumentError, "Account must be a bank or cash account")
     expect { record(account: account("4000")) }.to raise_error(ArgumentError, "Account must be a bank or cash account")
-    expect { record(account: account("1050")) }.to raise_error(ArgumentError, "Account must be held in AUD")
+    expect { record(account: account("1050")) }.to raise_error(ArgumentError, "Exchange rate is needed: no EUR rate was found for 20 Mar 2026")
     expect { record(amount_cents: 0, kind: "gift", paid_on: nil) }.to raise_error(ArgumentError, /Kind is not included in the list.*Paid on can't be blank.*Amount cents must be more than zero/)
     account("1000").update!(active: false)
     expect { record }.to raise_error(ArgumentError, "Account is inactive")

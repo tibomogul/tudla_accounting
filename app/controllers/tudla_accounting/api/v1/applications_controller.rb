@@ -21,8 +21,19 @@ module TudlaAccounting
 
           day = date_param(:on) || Date.current
           at = ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].local(day.year, day.month, day.day)
-          Allocator.allocate!(credit.entry, charge, at: at, **({ amount_cents: cents(body[:amount], "amount") } if body[:amount].present?).to_h)
+          Allocator.allocate!(credit.entry, charge, at: at, **amount_given(charge))
           render json: { data: credit.is_a?(Payment) ? payment_json(credit.reload) : document_json(organization_scope(Document).with_open_cents.find(credit.id)) }, status: :created
+        end
+
+        private
+
+        # The amount given, if any: in the charge's currency when it is foreign (the credit's
+        # being the same), else the organization's.
+        def amount_given(charge)
+          return {} if body[:amount].blank?
+          return { other_currency_cents: cents(body[:amount], "amount", currency: charge.forex.other_currency) } if charge.forex
+
+          { amount_cents: cents(body[:amount], "amount") }
         end
       end
     end

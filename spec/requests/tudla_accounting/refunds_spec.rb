@@ -79,7 +79,7 @@ RSpec.describe "Applying credits and refunding them", type: :request do
     get routes.received_payments_path
     expect(css_select("tr[data-payment-row]").map { |row| row.text.squish }).to include(a_string_including("Northwind EFT 9 1000 - Bank 20.00 Refund"))
     get routes.received_payments_path(format: :csv)
-    expect(CSV.parse(response.body).map(&:last)).to eq([ "Kind", "Refund to customer", "Payment received" ])
+    expect(CSV.parse(response.body).map { |row| row[-2] }).to eq([ "Kind", "Refund to customer", "Payment received" ])
     get routes.payment_path(refund, format: :pdf)
     expect(response).to have_http_status(:not_found)
     get routes.new_email_path(payment_id: refund.id)

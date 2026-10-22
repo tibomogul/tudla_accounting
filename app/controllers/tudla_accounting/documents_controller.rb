@@ -191,15 +191,6 @@ module TudlaAccounting
       [ permitted.merge(lines_attributes: lines), problems ]
     end
 
-    # A typed rate, nil when blank; yields when it isn't a number.
-    def exchange_rate(text)
-      text = text.to_s.strip.delete(",")
-      BigDecimal(text) unless text.empty?
-    rescue ArgumentError
-      yield
-      nil
-    end
-
     def credit_for(original)
       @document.assign_attributes(kind: original.sales? ? "sales_credit" : "supplier_credit", contact: original.contact, credited_document: original,
                                   tax_inclusive: original.tax_inclusive, reference: original.number_label, currency: original[:currency], exchange_rate: original.exchange_rate)

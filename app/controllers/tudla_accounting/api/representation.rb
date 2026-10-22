@@ -72,7 +72,8 @@ module TudlaAccounting
 
       def payment_json(payment)
         { id: payment.id, kind: payment.kind, status: payment.status, contact: { id: payment.contact_id, name: payment.contact.name },
-          account_code: payment.account.code, paid_on: date(payment.paid_on), currency: payment.organization.currency,
+          account_code: payment.account.code, paid_on: date(payment.paid_on), currency: payment.currency,
+          exchange_rate: payment.exchange_rate&.to_s("F"),
           amount: amount(payment.amount), unapplied: amount(payment.unapplied), reference: payment.reference, notes: payment.notes, entry_id: payment.entry_id,
           applied: payment.applications.map do |target, applied, allocation|
             { document_id: (target.id if target.is_a?(Document)), number: (target.number_label if target.is_a?(Document)), payment_id: (target.id if target.is_a?(Payment)),

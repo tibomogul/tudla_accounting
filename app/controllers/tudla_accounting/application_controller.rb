@@ -87,6 +87,15 @@ module TudlaAccounting
       nil
     end
 
+    # A typed exchange rate, nil when blank; yields when it isn't a number.
+    def exchange_rate(text)
+      text = text.to_s.strip.delete(",")
+      BigDecimal(text) unless text.empty?
+    rescue ArgumentError
+      yield
+      nil
+    end
+
     # The dimension values chosen on a form's line (dimensions: dimension id => value id),
     # one per dimension, each the organization's.
     def dimension_value_ids(line)

@@ -2,7 +2,9 @@
 
 module TudlaAccounting
   # Money received from a customer (kind received) or paid to a supplier (paid), through a
-  # bank or cash account, in the organization's currency. Recording one posts its entry
+  # bank or cash account, in the account's currency: the organization's, or for an account
+  # held in another, that one at exchange_rate (ForeignCurrency), applied to documents in
+  # it. Recording one posts its entry
   # straight away, dated paid_on, with the payment as its source: the bank account against
   # the account marked receivable (or payable), opening a credit for the contact, which is
   # applied to the invoices or bills given, as much to each as said. What isn't applied
@@ -24,6 +26,11 @@ module TudlaAccounting
   # roles itself (see CarryingAmountRole). void! reverses the entry, taking the payment off
   # what it was applied to (a refund off the credit it paid back), and so does reversing
   # the entry itself.
+  #
+  # A foreign payment posts its amount converted at its rate, the bank line and the
+  # receivable or payable line (the account's sub-account in its currency) each with the
+  # foreign amount. Applied to an invoice or bill booked at another rate, the difference
+  # is posted as a realized exchange gain or loss (see Allocator).
   class Payment < ApplicationRecord
     KINDS = {
       "received" => { label: "Payment received", role: :receipt, side: :sales, money_in: true },
@@ -37,6 +44,7 @@ module TudlaAccounting
     belongs_to :contact, class_name: "TudlaAccounting::Contact"
     belongs_to :account, class_name: "TudlaAccounting::Account"
     belongs_to :entry, class_name: "TudlaAccounting::Entry", optional: true
+    include ForeignCurrency
 
     normalizes :reference, with: ->(reference) { reference.strip.presence }
     normalizes :notes, with: ->(notes) { notes.strip.presence }
@@ -48,8 +56,13 @@ module TudlaAccounting
     validates :reference, length: { maximum: 255 }
     validate :contact_fits, on: :create
     validate :account_fits, on: :create
+    validate(on: :create) { currency_rated(paid_on) }
     validate :unchanged_once_recorded, on: :update
 
+    before_validation(on: :create) do
+      self.currency = account&.currency # its account's
+      settle_currency(paid_on)
+    end
     before_destroy { throw :abort } # a payment is voided, never deleted
 
     scope :received, -> { where(kind: "received") }
@@ -95,9 +108,12 @@ module TudlaAccounting
     def bank_detail = entry&.details&.find { |detail| detail.account_id == account_id }
     def credit = entry&.details&.filter_map(&:carrying_amount)&.first
 
-    # What is left to apply (nothing on a refund, which only pays a credit back).
+    # What is left to apply, in its currency (nothing on a refund, which only pays a credit
+    # back).
     def unapplied
-      void? || refund? ? money(0) : money(-credit.amount_cents)
+      return money(0) if void? || refund?
+
+      money(-(foreign? ? credit.forex.other_currency_amount_cents : credit.amount_cents))
     end
 
     # The payment or credit note a refund paid back.
@@ -115,7 +131,7 @@ module TudlaAccounting
       sources = [ Document, Payment ].flat_map { |model| model.where(entry_id: entry_ids).to_a }.index_by(&:entry_id)
       allocations.map do |allocation|
         entry = allocation.to.detail.entry
-        [ sources[entry.id] || entry, money(allocation.amount_cents), allocation ]
+        [ sources[entry.id] || entry, money(foreign? ? allocation.other_currency_cents.to_i : allocation.amount_cents), allocation ]
       end
     end
 
@@ -137,7 +153,7 @@ module TudlaAccounting
       posting.post(at)
       update!(entry: posting)
       applications.each do |document, cents|
-        Allocator.allocate!(credit, document.entry, amount_cents: cents, at: at)
+        Allocator.allocate!(credit, document.entry, **(foreign? ? { other_currency_cents: cents } : { amount_cents: cents }), at: at)
       end
       AuditEvent.record!("payment.recorded", organization: organization, subject: self, details: { amount_cents: amount_cents, documents: applications.map { |document, _| document.number_label },
                                                                                                     refund_of: (refund_of_label if refund?) }.compact)
@@ -166,7 +182,7 @@ module TudlaAccounting
 
     private
 
-    def money(cents) = Money.new(cents, organization&.currency || TudlaAccounting.configuration.base_currency)
+    def money(cents) = Money.new(cents, currency)
 
     def check_applications(applications)
       wanted = sales? ? "sales_invoice" : "bill"
@@ -174,9 +190,9 @@ module TudlaAccounting
         unless document.kind == wanted && document.approved? && document.contact_id == contact_id && document.organization == organization
           raise ArgumentError, "#{document.title} isn't an approved #{Document::KINDS[wanted][:label].downcase} of #{contact.name}'s"
         end
-        raise ArgumentError, "#{document.number_label} is in #{document.currency}, and the payment is in #{organization.currency}" if document.foreign?
+        raise ArgumentError, "#{document.number_label} is in #{document.currency}, and the payment is in #{currency}" if document.currency != currency
         raise ArgumentError, "Apply a positive amount to #{document.number_label}" unless cents.positive?
-        raise ArgumentError, "#{Money.new(cents, organization.currency).format} is more than is owed on #{document.number_label}" if cents > document.amount_due.cents
+        raise ArgumentError, "#{money(cents).format} is more than is owed on #{document.number_label}" if cents > document.amount_due.cents
       end
       total = applications.sum(&:last)
       raise ArgumentError, "The payment is #{amount.format} but #{money(total).format} is applied" if total > amount_cents
@@ -196,7 +212,7 @@ module TudlaAccounting
         raise ArgumentError, "#{credit.title} isn't a credit of #{contact.name}'s to refund"
       end
 
-      raise ArgumentError, "#{credit.title} is in #{credit.currency}, and the refund is in #{organization.currency}" if credit.is_a?(Document) && credit.foreign?
+      raise ArgumentError, "#{refund_of_label.upcase_first} is in #{credit.currency}, and the refund is in #{currency}" if credit.currency != currency
 
       left = self.class.credit_left_cents(credit)
       raise ArgumentError, "Only #{money(left).format} of #{refund_of_label} is left to refund" if amount_cents > left
@@ -207,17 +223,20 @@ module TudlaAccounting
     end
 
     # The bank account against the receivable (a customer's payment or refund) or payable
-    # (a supplier's) account; a refund's related to the credit it pays back.
+    # (a supplier's) account, or its sub-account in a foreign payment's currency, both lines
+    # then with the foreign amount; a refund's related to the credit it pays back.
     def build_entry(documents)
-      control = Account.for_role!(organization, sales? ? :receivable : :payable)
-      control = control.children.find_by(currency: organization.currency) || control
+      control = Account.for_role_in_currency!(organization, sales? ? :receivable : :payable, self[:currency])
       at = ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].local(paid_on.year, paid_on.month, paid_on.day)
       numbers = refund? ? [ (refund_of.number_label if refund_of.is_a?(Document)) ].compact : documents.map(&:number_label)
       posting = Entry.new(organization: organization, source: self, transacted_at: at, reference: reference, related: (refund_of.entry if refund?),
                           particulars: "#{title}#{" (#{numbers.join(', ')})" if numbers.any?}")
       debit, credit_account = money_in? ? [ account, control ] : [ control, account ]
-      posting.details.build(account: debit, tally: Detail::TALLY_DEBIT, amount_cents: amount_cents, currency: organization.currency)
-      posting.details.build(account: credit_account, tally: Detail::TALLY_CREDIT, amount_cents: amount_cents, currency: organization.currency)
+      cents = in_base_cents(amount_cents)
+      [ [ debit, Detail::TALLY_DEBIT ], [ credit_account, Detail::TALLY_CREDIT ] ].each do |line_account, tally|
+        line = posting.details.build(account: line_account, tally: tally, amount_cents: cents, currency: organization.currency)
+        line.build_foreign_exchange(other_currency: currency, other_currency_cents: amount_cents, rate: exchange_rate) if foreign?
+      end
       posting
     end
 
@@ -231,14 +250,14 @@ module TudlaAccounting
       errors.add(:contact, "must be a supplier") if !sales? && !contact.supplier?
     end
 
-    # A bank or cash account of the organization's, in its currency, not receivables or payables.
+    # A bank or cash account of the organization's, not receivables or payables.
     def account_fits
       return unless account
 
       errors.add(:account, "must belong to the same organization") if account.organization != organization
       errors.add(:account, "is inactive") unless account.active?
-      errors.add(:account, "must be a bank or cash account") if account.role.in?(%w[receivable payable]) || !account.category.in?([ Account::CATEGORY_ASSET, Account::CATEGORY_LIABILITY ])
-      errors.add(:account, "must be held in #{organization.currency}") if organization && account.currency.present? && account.currency != organization.currency
+      control = account.path.any? { |held| held.role.in?(%w[receivable payable]) } # receivables or payables, or beneath them
+      errors.add(:account, "must be a bank or cash account") if control || !account.category.in?([ Account::CATEGORY_ASSET, Account::CATEGORY_LIABILITY ])
     end
 
     def unchanged_once_recorded

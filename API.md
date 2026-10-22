@@ -203,7 +203,7 @@ Their files: an entry's or document's JSON lists them under `attachments` (`id`,
   "applications": [ { "document_id": 7, "amount": "275.00" } ] }
 ```
 
-`kind` is `received` (from a customer, applied to their invoices) or `paid` (to a supplier, applied to their bills). `account_code` is the bank or cash account it went through, in the organization's currency. Each application can't be more than is still owed on its document, nor all of them more than the payment; what isn't applied stays as a credit for the contact. `POST /payments/:id/void` (`post`) voids it, reversing its entry on `on` with a `reason` and taking it off what it paid; refused while it is matched to a bank statement line.
+`kind` is `received` (from a customer, applied to their invoices) or `paid` (to a supplier, applied to their bills). `account_code` is the bank or cash account it went through; the amounts are in its currency, and for one held in another than the organization's, `exchange_rate` gives the rate (the date's is looked up when it isn't given). It applies only to documents in its currency. A payment's JSON has its `currency` and `exchange_rate` (null for the organization's own). Each application can't be more than is still owed on its document, nor all of them more than the payment; what isn't applied stays as a credit for the contact. `POST /payments/:id/void` (`post`) voids it, reversing its entry on `on` with a `reason` and taking it off what it paid; refused while it is matched to a bank statement line.
 
 A refund pays a credit back: `kind` `refund` (money back to a customer) or `supplier_refund` (back from a supplier), with `refund_of` naming the contact's posted payment or approved credit note, `{ "payment_id": 5 }` or `{ "document_id": 9 }`, and no more than is left of it:
 
@@ -211,7 +211,7 @@ A refund pays a credit back: `kind` `refund` (money back to a customer) or `supp
 { "kind": "refund", "contact_id": 3, "account_code": "1000", "paid_on": "2026-04-14", "amount": "100.00", "refund_of": { "payment_id": 5 } }
 ```
 
-`POST /payments/:id/apply` and `POST /documents/:id/apply` (a credit note; `post`) apply what is left of a payment or credit note to one of the contact's open invoices or bills, `document_id`, all it can or `amount`, on `on` (today by default). They answer with the payment or credit note.
+`POST /payments/:id/apply` and `POST /documents/:id/apply` (a credit note; `post`) apply what is left of a payment or credit note to one of the contact's open invoices or bills, `document_id`, all it can or `amount` (in the invoice's currency), on `on` (today by default). They answer with the payment or credit note.
 
 ## Reports
 

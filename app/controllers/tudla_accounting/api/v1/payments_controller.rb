@@ -31,14 +31,17 @@ module TudlaAccounting
           existing = replay(organization_scope(Payment))
           return render_made(payment_json(existing)) if existing
 
+          account = account_by_code(body[:account_code], "account_code")
+          currency = account.currency.presence || accounting_organization.currency # amounts are in the account's
           applications = Array.wrap(body[:applications]).each_with_index.map do |application, index|
             raise ArgumentError, "Application #{index + 1} must be an object with document_id and amount" unless application.is_a?(Hash)
 
-            { document: organization_scope(Document).find(application[:document_id]), amount_cents: cents(application[:amount], "Application #{index + 1}'s amount") }
+            { document: organization_scope(Document).find(application[:document_id]), amount_cents: cents(application[:amount], "Application #{index + 1}'s amount", currency: currency) }
           end
           payment = Payment.record!(organization: accounting_organization, kind: body[:kind].to_s, contact: contact_by_id(body[:contact_id]),
-                                    account: account_by_code(body[:account_code], "account_code"), paid_on: date_param(:paid_on) || raise(ArgumentError, "paid_on is missing"),
-                                    amount_cents: cents(body[:amount], "amount"), reference: body[:reference], notes: body[:notes],
+                                    account: account, paid_on: date_param(:paid_on) || raise(ArgumentError, "paid_on is missing"),
+                                    amount_cents: cents(body[:amount], "amount", currency: currency), reference: body[:reference], notes: body[:notes],
+                                    exchange_rate: body[:exchange_rate].presence && decimal(body[:exchange_rate], "exchange_rate"),
                                     idempotency_key: idempotency_key, applications: applications, refund_of: refund_of)
           render_made(payment_json(payment))
         rescue ActiveRecord::RecordNotUnique
