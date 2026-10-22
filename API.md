@@ -112,14 +112,14 @@ end
 ```json
 { "id": 7, "kind": "sales_invoice", "status": "approved", "payment_status": "part_paid", "number": "INV-0001",
   "contact": { "id": 3, "name": "Northwind" }, "reference": "PO 9", "issued_on": "2026-04-01", "due_on": "2026-05-01",
-  "tax_inclusive": false, "currency": "AUD", "subtotal": "250.00", "tax": "25.00", "total": "275.00", "amount_due": "75.00",
+  "tax_inclusive": false, "currency": "AUD", "exchange_rate": null, "amount_due_in_base": null, "subtotal": "250.00", "tax": "25.00", "total": "275.00", "amount_due": "75.00",
   "credited_document_id": null, "entry_id": 81, "notes": null,
   "lines": [ { "description": "Consulting", "quantity": "2.5", "unit_price": "100.00", "amount": "250.00",
                "account_code": "4010", "tax_code": "GST", "tax": "25.00", "dimensions": { "DEPT": "SALES" } } ],
   "approved_at": "...", "voided_on": null, "void_reason": null, "created_at": "...", "updated_at": "..." }
 ```
 
-`payment_status` is `draft`, `void`, or for an approved document `unpaid`, `part_paid` or `paid` (for a credit note: how much of it has been applied). `amount_due` is what is still owed (or, on a credit note, left to apply). A line's `amount` is its quantity times its unit price; with `tax_inclusive` it includes its `tax`.
+`payment_status` is `draft`, `void`, or for an approved document `unpaid`, `part_paid` or `paid` (for a credit note: how much of it has been applied). `amount_due` is what is still owed (or, on a credit note, left to apply). Amounts are in the document's `currency`; for one in another currency than the organization's, `exchange_rate` is its rate and `amount_due_in_base` what is owed in the organization's currency, as the books carry it (both null otherwise). A line's `amount` is its quantity times its unit price; with `tax_inclusive` it includes its `tax`.
 
 ### Payments
 
@@ -188,7 +188,7 @@ Idempotency-Key: shop-order-1042
   "lines": [ { "description": "Consulting", "quantity": "2.5", "unit_price": "100.00", "account_code": "4010", "tax_code": "GST" } ] }
 ```
 
-`kind` is `sales_invoice`, `sales_credit`, `bill` or `supplier_credit`. `due_on` defaults to the contact's payment terms after `issued_on`. Lines need a `description`, `unit_price` and `account_code` (not the receivables or payables account); `quantity` is 1 if not given; `tax_code` must be of the document's side. `dimensions` (dimension code to value code, one value per dimension) tag a line, and its posting once approved. `tax_inclusive` says the prices include the tax. A credit note can name the approved invoice (or bill) it credits, `credited_document_id`, and is applied to it when approved.
+`kind` is `sales_invoice`, `sales_credit`, `bill` or `supplier_credit`. `due_on` defaults to the contact's payment terms after `issued_on`. Lines need a `description`, `unit_price` and `account_code` (not the receivables or payables account); `quantity` is 1 if not given; `tax_code` must be of the document's side. `dimensions` (dimension code to value code, one value per dimension) tag a line, and its posting once approved. `tax_inclusive` says the prices include the tax. A credit note can name the approved invoice (or bill) it credits, `credited_document_id`, and is applied to it when approved. A document in another currency gives its `currency` (an ISO code; prices are in it) and `exchange_rate`, how many of the organization's currency one unit is worth; without a rate the date's is looked up (`forex_rate_provider`), and the document is refused if there is none. A credit note is in the currency of what it credits.
 
 Their files: an entry's or document's JSON lists them under `attachments` (`id`, `filename`, `content_type`, `byte_size`, `created_at`; empty when the app keeps no attachments). `POST /documents/:id/attachments` and `POST /entries/:id/attachments` (`record`) upload them as multipart form data, `file` (or several as `files[]`), each checked as on the pages (the `attachment_content_types` and `attachment_max_size` settings); the answer lists the record's files. `GET /documents/:id/attachments/:attachment_id` (and the same for entries) downloads one.
 

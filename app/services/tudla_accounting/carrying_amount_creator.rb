@@ -40,7 +40,7 @@ module TudlaAccounting
 
       ActiveRecord::Base.transaction do
         source = @source&.call(row)
-        account = account_for(type, other_currency(row))
+        account = TudlaAccounting::Account.for_role_in_currency!(organization, type, other_currency(row))
         entry = TudlaAccounting::Entry.create_from_ruby_hash(entry_hash(row, type, account, source))
         open_carrying_amount(row, type, entry.details.find { |detail| detail.account_id == account.id }, source)
       end
@@ -83,17 +83,6 @@ module TudlaAccounting
         )
       end
       carrying_amount
-    end
-
-    # The receivable or payable account, or its sub-account in a foreign currency.
-    def account_for(type, foreign_currency)
-      base = TudlaAccounting::Account.for_role!(organization, type)
-      return base.children.find_by(currency: currency) || base unless foreign_currency
-
-      base.children.find_by(currency: foreign_currency) ||
-        TudlaAccounting::Account.create!(organization: organization, parent: base, code: "#{base.code}-#{foreign_currency}",
-                                         name: "#{base.name} - #{foreign_currency}", category: base.category,
-                                         currency: foreign_currency, contra_account_id: base.contra_account_id)
     end
 
     def related_party(source)

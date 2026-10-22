@@ -174,6 +174,7 @@ module TudlaAccounting
         unless document.kind == wanted && document.approved? && document.contact_id == contact_id && document.organization == organization
           raise ArgumentError, "#{document.title} isn't an approved #{Document::KINDS[wanted][:label].downcase} of #{contact.name}'s"
         end
+        raise ArgumentError, "#{document.number_label} is in #{document.currency}, and the payment is in #{organization.currency}" if document.foreign?
         raise ArgumentError, "Apply a positive amount to #{document.number_label}" unless cents.positive?
         raise ArgumentError, "#{Money.new(cents, organization.currency).format} is more than is owed on #{document.number_label}" if cents > document.amount_due.cents
       end
@@ -194,6 +195,8 @@ module TudlaAccounting
       unless fits && credit.contact_id == contact_id && credit.organization == organization
         raise ArgumentError, "#{credit.title} isn't a credit of #{contact.name}'s to refund"
       end
+
+      raise ArgumentError, "#{credit.title} is in #{credit.currency}, and the refund is in #{organization.currency}" if credit.is_a?(Document) && credit.foreign?
 
       left = self.class.credit_left_cents(credit)
       raise ArgumentError, "Only #{money(left).format} of #{refund_of_label} is left to refund" if amount_cents > left

@@ -26,7 +26,7 @@
   <table class="tc-table">
     <thead>
       <tr><th>Number</th><th>Date</th><th><%= sales ? "Customer" : "Supplier" %></th><th>Reference</th><th>Due</th>
-        <th class="tc-num">Total (<%= accounting_organization.currency %>)</th><th class="tc-num">Due now</th><th>Status</th></tr>
+        <th class="tc-num">Total</th><th class="tc-num">Due now</th><th>Status</th></tr>
     </thead>
     <tbody>
       <% if @documents.empty? %>
@@ -41,14 +41,14 @@
           <td><%= link_to document.contact.name, contact_path(document.contact), class: "underline" %></td>
           <td><%= document.reference %></td>
           <td class="whitespace-nowrap"><%= tc_date(document.due_on) %></td>
-          <td class="tc-num"><%= tc_money(document.credit? ? -document.total : document.total) %></td>
-          <td class="tc-num"><%= tc_money(document.credit? ? -document.amount_due : document.amount_due) if document.approved? %></td>
+          <td class="tc-num"><%= document_money(document.credit? ? -document.total : document.total) %></td>
+          <td class="tc-num"><%= document_money(document.credit? ? -document.amount_due : document.amount_due) if document.approved? %></td>
           <td><%= document_status_badge(document) %></td>
         </tr>
       <% end %>
     </tbody>
     <tfoot>
-      <tr class="font-semibold"><td colspan="6"><%= sales ? "Owed by customers" : "Owed to suppliers" %>, less credits to apply (everything listed)</td><td class="tc-num"><%= tc_money(@due) %></td><td></td></tr>
+      <tr class="font-semibold"><td colspan="6"><%= sales ? "Owed by customers" : "Owed to suppliers" %>, less credits to apply (everything listed, in <%= accounting_organization.currency %>)</td><td class="tc-num"><%= tc_money(@due) %></td><td></td></tr>
     </tfoot>
   </table>
 </div>

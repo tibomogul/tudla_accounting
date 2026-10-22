@@ -22,7 +22,7 @@ module TudlaAccounting
           @reminders_due = ReminderRunner.due(organization: accounting_organization).size if side == "sales"
           @emailed = Delivery.sent.where(subject_type: Document.name, subject_id: @documents.map(&:id)).distinct.pluck(:subject_id).to_set
           open = Document.where(id: documents.approved.select(:id)).with_open_cents
-          @due = Money.new(open.sum { |document| document.credit? ? -document.amount_due.cents : document.amount_due.cents }, accounting_organization.currency)
+          @due = Money.new(open.sum { |document| (document.credit? ? -1 : 1) * document.amount_due_in_base.cents }, accounting_organization.currency)
         end
         format.csv { send_data documents_table(documents).to_csv, filename: "#{side}.csv", type: "text/csv" }
       end
@@ -168,11 +168,14 @@ module TudlaAccounting
     # dimension value, contact and credited document the organization's own; and the amounts that couldn't
     # be read.
     def document_attributes
-      permitted = params.require(:document).permit(:kind, :contact_id, :reference, :issued_on, :due_on, :tax_inclusive, :notes, :credited_document_id,
+      permitted = params.require(:document).permit(:kind, :contact_id, :reference, :issued_on, :due_on, :tax_inclusive, :notes, :credited_document_id, :currency, :exchange_rate,
                                                    lines: [ :id, :description, :quantity, :unit_price, :account_id, :tax_code_id, :_destroy, { dimensions: {} } ])
       permitted.delete(:kind) if @document.persisted?
-      currency = accounting_organization.currency
       problems = []
+      if permitted.key?(:exchange_rate) # blank: the day's rate is looked up
+        permitted[:exchange_rate] = exchange_rate(permitted[:exchange_rate]) { problems << "#{permitted[:exchange_rate]} isn't an exchange rate" }
+      end
+      currency = Money::Currency.find(permitted[:currency].presence || @document.currency)&.iso_code || accounting_organization.currency
       lines = permitted.delete(:lines).to_h.values.each_with_index.filter_map do |line, index|
         next if line[:id].blank? && line.values_at(:description, :unit_price, :account_id).all?(&:blank?)
 
@@ -188,9 +191,18 @@ module TudlaAccounting
       [ permitted.merge(lines_attributes: lines), problems ]
     end
 
+    # A typed rate, nil when blank; yields when it isn't a number.
+    def exchange_rate(text)
+      text = text.to_s.strip.delete(",")
+      BigDecimal(text) unless text.empty?
+    rescue ArgumentError
+      yield
+      nil
+    end
+
     def credit_for(original)
       @document.assign_attributes(kind: original.sales? ? "sales_credit" : "supplier_credit", contact: original.contact, credited_document: original,
-                                  tax_inclusive: original.tax_inclusive, reference: original.number_label)
+                                  tax_inclusive: original.tax_inclusive, reference: original.number_label, currency: original[:currency], exchange_rate: original.exchange_rate)
       original.lines.each do |line|
         @document.lines.build(line.attributes.slice("description", "quantity", "unit_price_cents", "account_id", "tax_code_id", "dimension_value_ids"))
       end
@@ -204,16 +216,19 @@ module TudlaAccounting
 
       carrying_amount.allocations.includes(from: { detail: :entry }, to: { detail: :entry }).order(:allocated_at, :id).map do |allocation|
         other = carrying_amount.credit? ? allocation.to : allocation.from
-        { entry: other.detail.entry, amount: Money.new(allocation.amount_cents, accounting_organization.currency), on: allocation.allocated_at, reversed: allocation.reversed_at.present? }
+        amount = document.foreign? ? Money.new(allocation.other_currency_cents.to_i, document.currency) : Money.new(allocation.amount_cents, accounting_organization.currency)
+        { entry: other.detail.entry, amount: amount, on: allocation.allocated_at, reversed: allocation.reversed_at.present? }
       end
     end
 
     def documents_table(documents)
       rows = Document.with_open_cents.where(id: documents.select(:id)).includes(:contact).order(issued_on: :desc, id: :desc).map do |document|
         [ document.kind_label, document.number_label, document.issued_on, document.contact.name, document.reference, document.due_on,
-          document.subtotal, document.tax, document.total, document.amount_due, STATUSES.fetch(document.payment_status, document.payment_status.humanize) ]
+          document.subtotal, document.tax, document.total, document.amount_due, STATUSES.fetch(document.payment_status, document.payment_status.humanize),
+          document.currency, document.amount_due_in_base ]
       end
-      Reports::Table.new([ [ "Kind", "Number", "Date", "Contact", "Reference", "Due", "Subtotal", "Tax", "Total", "Due now", "Status" ], *rows ])
+      Reports::Table.new([ [ "Kind", "Number", "Date", "Contact", "Reference", "Due", "Subtotal", "Tax", "Total", "Due now", "Status",
+                             "Currency", "Due now (#{accounting_organization.currency})" ], *rows ])
     end
   end
 end

@@ -2,12 +2,15 @@
 
 module TudlaAccounting
   # A sales invoice, a supplier's bill, or a credit note against either (kind), to or from
-  # a contact, in the organization's currency. It is drafted line by line (DocumentLine:
+  # a contact, in the organization's currency or (currency, with exchange_rate: how many of
+  # the organization's currency one unit was worth) another. It is drafted line by line (DocumentLine:
   # a description, quantity, unit price, account and tax code), with amounts that exclude
   # the tax or (tax_inclusive) include it.
   #
   # approve! numbers it in its kind's own run (the document_number_format setting) and
-  # posts its entry, dated issued_on, with the document as the entry's source: an invoice
+  # posts its entry, dated issued_on, with the document as the entry's source (a foreign
+  # one's amounts converted at its rate, the total to the receivable or payable account's
+  # sub-account in its currency, with its foreign amount): an invoice
   # or bill opens a receivable or payable for the contact, due on due_on; a credit note
   # opens a credit, applied straight away to the invoice or bill it credits
   # (credited_document) as far as that is still owed. The engine maps its documents to
@@ -42,6 +45,7 @@ module TudlaAccounting
 
     normalizes :reference, with: ->(reference) { reference.strip.presence }
     normalizes :notes, with: ->(notes) { notes.strip.presence }
+    normalizes :currency, with: ->(currency) { currency.strip.upcase.presence }
 
     validates :kind, inclusion: { in: KINDS.keys }
     validates :status, inclusion: { in: STATUSES }
@@ -50,9 +54,11 @@ module TudlaAccounting
     validate :contact_fits
     validate :due_after_issue
     validate :credited_document_fits
+    validate :currency_fits
     validate :has_lines
     validate :unchanged_once_approved, on: :update
 
+    before_validation :settle_currency, if: :draft?
     before_validation :work_out_totals, if: :draft?
     before_destroy :ensure_draft, prepend: true
     after_create { audit("document.created") }
@@ -63,12 +69,16 @@ module TudlaAccounting
     scope :purchases, -> { where(kind: %w[bill supplier_credit]) }
     scope :approved, -> { where(status: "approved") }
     # What is still owed on it (or, on a credit note, left to apply), in cents, as
-    # open_cents: the receivable or payable its entry opened.
+    # open_cents (and open_base_cents): the receivable or payable its entry opened.
     scope :with_open_cents, lambda {
-      select("#{table_name}.*", <<~SQL.squish)
-        (SELECT ABS(c.amount_cents) FROM tudla_accounting_carrying_amounts c
-         JOIN tudla_accounting_details d ON d.id = c.detail_id WHERE d.entry_id = #{table_name}.entry_id) AS open_cents
+      # A foreign document's in its currency (open_base_cents in the organization's).
+      open = <<~SQL.squish
+        FROM tudla_accounting_carrying_amounts c JOIN tudla_accounting_details d ON d.id = c.detail_id
+        LEFT JOIN tudla_accounting_carrying_amount_forexes f ON f.carrying_amount_id = c.id WHERE d.entry_id = #{table_name}.entry_id
       SQL
+      select("#{table_name}.*",
+             "(SELECT ABS(CASE WHEN #{table_name}.currency IS NULL THEN c.amount_cents ELSE COALESCE(f.other_currency_amount_cents, 0) END) #{open}) AS open_cents",
+             "(SELECT ABS(c.amount_cents) #{open}) AS open_base_cents")
     }
 
     def self.kinds_for(side) = KINDS.select { |_kind, about| about[:side] == side.to_sym }.keys
@@ -81,6 +91,10 @@ module TudlaAccounting
     def draft? = status == "draft"
     def approved? = status == "approved"
     def void? = status == "void"
+
+    # Its currency: the organization's unless it is a foreign document.
+    def currency = self[:currency] || organization&.currency || TudlaAccounting.configuration.base_currency
+    def foreign? = self[:currency].present?
 
     # "Invoice INV-0001", or "Draft invoice" before it is numbered.
     def title
@@ -108,13 +122,38 @@ module TudlaAccounting
     def tax = money(tax_cents)
     def total = money(total_cents)
 
-    # What is still owed on an approved invoice or bill, or left to apply of a credit note;
-    # nothing on a draft or a voided one. From with_open_cents when the query has it.
+    # What is still owed on an approved invoice or bill, or left to apply of a credit note,
+    # in its currency; nothing on a draft or a voided one. From with_open_cents when the
+    # query has it.
     def amount_due
       return money(0) unless approved?
 
-      cents = has_attribute?(:open_cents) ? self[:open_cents] : entry&.details&.filter_map(&:carrying_amount)&.first&.amount_cents&.abs
-      money(cents.to_i)
+      cents = if has_attribute?(:open_cents) then self[:open_cents]
+      elsif (open = carrying_amount)
+        foreign? ? open.forex&.other_currency_amount_cents : open.amount_cents
+      end
+      money(cents.to_i.abs)
+    end
+
+    # The same in the organization's currency, as the books carry it.
+    def amount_due_in_base
+      return Money.new(0, organization.currency) unless approved?
+
+      cents = has_attribute?(:open_base_cents) ? self[:open_base_cents] : carrying_amount&.amount_cents
+      Money.new(cents.to_i.abs, organization.currency)
+    end
+
+    # The total in the organization's currency, as posting converts it: line by line.
+    def total_in_base
+      Money.new(live_lines.sum { |line| in_base_cents(line.net_cents.to_i) + in_base_cents(line.tax_cents.to_i) }, organization.currency)
+    end
+
+    # The receivable or payable its entry opened.
+    def carrying_amount = entry&.details&.filter_map(&:carrying_amount)&.first
+
+    # An amount of its currency in the organization's, at its rate.
+    def in_base_cents(cents)
+      foreign? ? (cents * exchange_rate).round(0, TudlaAccounting.configuration.rounding).to_i : cents
     end
 
     # draft, void, or for an approved document how far it is paid (or a credit note
@@ -186,7 +225,7 @@ module TudlaAccounting
     private
 
     def zone = ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone]
-    def money(cents) = Money.new(cents, organization&.currency || TudlaAccounting.configuration.base_currency)
+    def money(cents) = Money.new(cents, currency)
 
     def live_lines = lines.reject(&:marked_for_destruction?)
 
@@ -199,9 +238,11 @@ module TudlaAccounting
 
     # The entry: the total to the receivable or payable account, and each line's net amount
     # (tagged with the line's dimension values) and tax to its accounts on the other side
-    # (the other way round for a credit note).
+    # (the other way round for a credit note). A foreign document's amounts are converted
+    # line by line, the total being their sum, and its total goes to the account's
+    # sub-account in its currency with its foreign amount.
     def build_entry
-      control = control_account
+      control = Account.for_role_in_currency!(organization, sales? ? :receivable : :payable, self[:currency])
       charge = sales? != credit? ? Detail::TALLY_DEBIT : Detail::TALLY_CREDIT
       other = charge == Detail::TALLY_DEBIT ? Detail::TALLY_CREDIT : Detail::TALLY_DEBIT
       at = zone.local(issued_on.year, issued_on.month, issued_on.day)
@@ -209,20 +250,41 @@ module TudlaAccounting
                           particulars: "#{title} – #{contact.name}#{" (their #{reference})" if purchases? && reference}",
                           related: credited_document&.entry)
       line = ->(account, tally, cents, **extra) { posting.details.build(account: account, tally: tally, amount_cents: cents, currency: organization.currency, **extra) }
-      line.call(control, charge, total_cents)
+      total = line.call(control, charge, 0)
+      total.build_foreign_exchange(other_currency: currency, other_currency_cents: total_cents, rate: exchange_rate) if foreign?
       live_lines.each do |item|
-        if item.net_cents.positive?
-          net = line.call(item.account, other, item.net_cents, description: item.description, **({ tax_code: item.tax_code, tax_role: :base } if item.tax_code).to_h)
+        net_cents, tax_cents = in_base_cents(item.net_cents), in_base_cents(item.tax_cents.to_i)
+        if net_cents.positive?
+          net = line.call(item.account, other, net_cents, description: item.description, **({ tax_code: item.tax_code, tax_role: :base } if item.tax_code).to_h)
           item.dimension_values.each { |value| net.tags.build(dimension_value: value) }
         end
-        line.call(item.tax_code.account, other, item.tax_cents, description: item.description, tax_code: item.tax_code, tax_role: :tax) if item.tax_cents.positive?
+        line.call(item.tax_code.account, other, tax_cents, description: item.description, tax_code: item.tax_code, tax_role: :tax) if tax_cents.positive?
       end
+      total.amount_cents = posting.details.sum(&:amount_cents)
       posting
     end
 
-    def control_account
-      base = Account.for_role!(organization, sales? ? :receivable : :payable)
-      base.children.find_by(currency: organization.currency) || base
+    # The organization's own currency is kept as none; a foreign one without a rate gets
+    # the day's from ForexRateRetriever, when it has one.
+    def settle_currency
+      self.currency = nil if self[:currency] == organization&.currency
+      return self.exchange_rate = nil unless foreign?
+      return if exchange_rate || issued_on.nil? || !Money::Currency.find(self[:currency])
+
+      self.exchange_rate = ForexRateRetriever.call(from: currency, to: organization.currency, date: issued_on)
+    rescue ForexRateRetriever::RateNotFound
+      nil
+    end
+
+    def currency_fits
+      return unless foreign?
+      return errors.add(:currency, "is not a known currency code") unless Money::Currency.find(self[:currency])
+
+      if exchange_rate.nil?
+        errors.add(:exchange_rate, "is needed: no #{currency} rate was found for #{issued_on&.strftime('%-d %b %Y')}")
+      elsif !exchange_rate.positive?
+        errors.add(:exchange_rate, "must be more than zero")
+      end
     end
 
     def contact_fits
@@ -248,6 +310,7 @@ module TudlaAccounting
       wanted = sales? ? "sales_invoice" : "bill"
       errors.add(:credited_document, "must be an approved #{KINDS[wanted][:label].downcase}") unless credited_document.kind == wanted && !credited_document.draft?
       errors.add(:credited_document, "must be to the same contact") unless credited_document.contact_id == contact_id
+      errors.add(:credited_document, "is in #{credited_document.currency}; a credit note for it must be too") unless credited_document.currency == currency
     end
 
     def has_lines

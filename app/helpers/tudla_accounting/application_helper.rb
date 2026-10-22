@@ -10,11 +10,15 @@ module TudlaAccounting
     end
 
     # An amount in accounting style: thousands separators, no currency symbol (the
-    # currency is shown once per table), negatives in parentheses.
+    # currency is shown once per table), negatives in parentheses. One in a foreign
+    # currency is written as the organization's own amounts are, not as that currency's
+    # country writes it.
     def tc_money(money)
       return "" if money.nil?
 
-      text = money.abs.format(symbol: false)
+      home = Money::Currency.find(accounting_organization.currency) if respond_to?(:accounting_organization)
+      marks = home && money.currency != home ? { decimal_mark: home.decimal_mark, thousands_separator: home.thousands_separator } : {}
+      text = money.abs.format(symbol: false, **marks)
       money.negative? ? tag.span("(#{text})", class: "tc-negative") : text
     end
 

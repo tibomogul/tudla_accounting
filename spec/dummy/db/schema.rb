@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_23_001000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_23_002000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -384,8 +384,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_23_001000) do
     t.bigint "contact_id", null: false
     t.datetime "created_at", null: false
     t.bigint "credited_document_id"
+    t.string "currency", limit: 3
     t.date "due_on"
     t.bigint "entry_id"
+    t.decimal "exchange_rate", precision: 24, scale: 8
     t.string "idempotency_key"
     t.date "issued_on", null: false
     t.string "kind", null: false
@@ -411,6 +413,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_23_001000) do
     t.index ["organization_type", "organization_id", "issued_on"], name: "index_tudla_accounting_documents_on_issued_on"
     t.index ["organization_type", "organization_id", "kind", "number"], name: "tudla_accounting_documents_number_unique_key", unique: true, where: "(number IS NOT NULL)"
     t.index ["recurring_invoice_id"], name: "index_tudla_accounting_documents_on_recurring_invoice"
+    t.check_constraint "(currency IS NULL) = (exchange_rate IS NULL) AND (exchange_rate IS NULL OR exchange_rate > 0::numeric)", name: "tudla_accounting_documents_foreign_currency_rated"
     t.check_constraint "(status::text = 'draft'::text) = (number IS NULL) AND (status::text = 'draft'::text) = (entry_id IS NULL)", name: "tudla_accounting_documents_numbered_when_approved"
     t.check_constraint "kind::text = ANY (ARRAY['sales_invoice'::character varying::text, 'sales_credit'::character varying::text, 'bill'::character varying::text, 'supplier_credit'::character varying::text])", name: "tudla_accounting_documents_kind_known"
     t.check_constraint "status::text = ANY (ARRAY['draft'::character varying::text, 'approved'::character varying::text, 'void'::character varying::text])", name: "tudla_accounting_documents_status_known"

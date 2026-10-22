@@ -45,7 +45,7 @@ module TudlaAccounting
 
     private
 
-    def money(cents) = Money.new(cents.to_i, document&.organization&.currency || TudlaAccounting.configuration.base_currency)
+    def money(cents) = Money.new(cents.to_i, document&.currency || TudlaAccounting.configuration.base_currency)
 
     def document_is_a_draft
       errors.add(:base, "An approved document's lines can't be changed") if document && document.status_was != "draft" && document.persisted? && has_changes_to_save?

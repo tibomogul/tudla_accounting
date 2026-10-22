@@ -54,7 +54,7 @@ module TudlaAccounting
     def entry_line_amount(detail, tally)
       return "" unless detail.amount_cents.to_i.positive? && detail.tally == tally
 
-      detail.amount.format(symbol: false, thousands_separator: "")
+      detail.amount.format(symbol: false, thousands_separator: "", decimal_mark: ".")
     end
   end
 end

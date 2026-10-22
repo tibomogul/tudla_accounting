@@ -1,5 +1,6 @@
 <%# locals: (document:) %>
-<% currency = Money::Currency.new(accounting_organization.currency) %>
+<% currency = Money::Currency.new(document.currency) %>
+<% home = accounting_organization.currency %>
 <% sales = document.sales? %>
 <% lines = document.lines.to_a %>
 <% account_options = document_accounts(document).map { |account| [ account_option_label(account), account.id ] } %>
@@ -27,6 +28,17 @@
     <div class="sm:col-span-3"><%= tc_field form, :reference, label: sales ? "Their order number" : "Supplier's invoice number", placeholder: "Optional" %></div>
     <div class="sm:col-span-2"><%= tc_field form, :issued_on, as: :date_field, label: "Date", required: true, data: { document_lines_target: "issued", action: "change->document-lines#contactChanged" } %></div>
     <div class="sm:col-span-2"><%= tc_field form, :due_on, as: :date_field, label: "Due", data: { document_lines_target: "due" } %></div>
+    <div class="sm:col-span-2 space-y-1">
+      <%= form.label :currency, "Currency", class: "tc-label" %>
+      <%= form.select :currency, document_currency_options(home), { selected: document.currency }, class: "tc-input",
+                      disabled: document.credited_document.present?, data: { document_lines_target: "currency", action: "change->document-lines#currencyChanged" } %>
+      <% if document.credited_document %><%= form.hidden_field :currency, value: document.currency %><% end %>
+    </div>
+    <div class="sm:col-span-2 space-y-1" data-document-lines-target="rate" <%= "hidden" unless document.foreign? %>>
+      <%= form.label :exchange_rate, safe_join([ "Rate: 1 ", tag.span(document.currency, data: { document_lines_target: "rateCurrency" }), " in #{home}" ]), class: "tc-label" %>
+      <%= form.text_field :exchange_rate, value: document.exchange_rate&.to_s("F"), inputmode: "decimal", class: "tc-input tc-num", placeholder: "The day's rate" %>
+      <p class="tc-hint">Left blank, the date's rate is looked up, if there is one.</p>
+    </div>
     <% if document.credit? %>
       <% charges = TudlaAccounting::Document.where(organization: accounting_organization, kind: sales ? "sales_invoice" : "bill").approved.with_open_cents
                      .where(contact: document.contact_id ? document.contact_id : contacts.select(:id)).order(issued_on: :desc).limit(200).includes(:contact).to_a %>
@@ -39,7 +51,7 @@
   <div class="tc-card overflow-x-auto">
     <table class="tc-table">
       <thead>
-        <tr><th>Description</th><th class="tc-num">Quantity</th><th class="tc-num">Unit price</th><th>Account</th><th>Tax</th><% dimensions.each do |dimension, _values| %><th><%= dimension.name %></th><% end %><th class="tc-num">Amount (<%= currency.iso_code %>)</th><th><span class="sr-only">Remove</span></th></tr>
+        <tr><th>Description</th><th class="tc-num">Quantity</th><th class="tc-num">Unit price</th><th>Account</th><th>Tax</th><% dimensions.each do |dimension, _values| %><th><%= dimension.name %></th><% end %><th class="tc-num">Amount (<span data-document-lines-target="currencyLabel"><%= currency.iso_code %></span>)</th><th><span class="sr-only">Remove</span></th></tr>
       </thead>
       <tbody data-document-lines-target="lines">
         <% lines.each_with_index do |line, index| %>

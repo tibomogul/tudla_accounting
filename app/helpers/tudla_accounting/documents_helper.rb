@@ -34,9 +34,25 @@ module TudlaAccounting
       quantity.to_d.to_s("F").sub(/\.?0+\z/, "")
     end
 
+    # An amount, marked with its currency when that isn't the organization's.
+    def document_money(money)
+      return tc_money(money) if money.currency.iso_code == accounting_organization.currency
+
+      safe_join([ tag.span(money.currency.iso_code, class: "tc-muted text-xs"), " ", tc_money(money) ])
+    end
+
+    # The currencies a document can be in, the organization's first, each with its minor
+    # units for the line editor.
+    def document_currency_options(organization_currency)
+      others = Money::Currency.all.uniq(&:iso_code).reject { |currency| currency.iso_code == organization_currency }.sort_by(&:iso_code)
+      [ Money::Currency.new(organization_currency), *others ].map do |currency|
+        [ "#{currency.iso_code} – #{currency.name}", currency.iso_code, { data: { exponent: currency.exponent } } ]
+      end
+    end
+
     # A typed amount for the line editor: "1234.50", or "" for nothing yet.
     def document_price(line)
-      line.unit_price_cents.to_i.positive? ? line.unit_price.format(symbol: false, thousands_separator: "") : ""
+      line.unit_price_cents.to_i.positive? ? line.unit_price.format(symbol: false, thousands_separator: "", decimal_mark: ".") : ""
     end
   end
 end

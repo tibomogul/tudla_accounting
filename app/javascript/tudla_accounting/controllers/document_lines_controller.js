@@ -3,11 +3,12 @@ import { Controller } from "@hotwired/stimulus"
 // The invoice and bill form's lines: adds and removes them, works out each line's amount
 // (quantity times unit price) and the subtotal, tax and total as they're typed, the way
 // the server will (tax rounded per line, added or split out). Choosing a contact sets the
-// due date from their payment terms (when the form has dates), and their default account and tax code on lines
-// that have none yet. The server works it all out again.
+// due date from their payment terms (when the form has dates), and their default account
+// and tax code on lines that have none yet. Choosing another currency asks for its rate.
+// The server works it all out again.
 export default class extends Controller {
   static targets = ["lines", "line", "template", "quantity", "price", "account", "tax", "amount", "destroy",
-    "subtotal", "taxTotal", "total", "inclusive", "contact", "issued", "due"]
+    "subtotal", "taxTotal", "total", "inclusive", "contact", "issued", "due", "currency", "currencyLabel", "rate", "rateCurrency"]
   static values = { exponent: { type: Number, default: 2 } }
 
   connect() {
@@ -46,6 +47,17 @@ export default class extends Controller {
       this.dueTarget.value = due.toISOString().slice(0, 10)
     }
     this.lineTargets.forEach((line) => this.applyDefaults(line))
+    this.recalculate()
+  }
+
+  // Another currency: amounts in its minor units, and a rate to the organization's
+  // (the first option) unless it is that one.
+  currencyChanged() {
+    const option = this.currencyTarget.selectedOptions[0]
+    this.exponentValue = Number(option.dataset.exponent)
+    this.currencyLabelTargets.forEach((label) => { label.textContent = option.value })
+    this.rateCurrencyTargets.forEach((label) => { label.textContent = option.value })
+    if (this.hasRateTarget) this.rateTarget.hidden = this.currencyTarget.selectedIndex === 0
     this.recalculate()
   }
 

@@ -29,7 +29,7 @@
                 </td>
                 <td class="tc-num">
                   <% if @form.leaf?(account) %>
-                    <%= text_field_tag "amounts[#{account.id}]", @form.amount(account).format(symbol: false, thousands_separator: ""), id: "amounts_#{account.id}",
+                    <%= text_field_tag "amounts[#{account.id}]", @form.amount(account).format(symbol: false, thousands_separator: "", decimal_mark: "."), id: "amounts_#{account.id}",
                                        inputmode: "decimal", class: "tc-input tc-num",
                                        data: { opening_balances_target: "amount", side: (@form.debit_side?(account) ? "debit" : "credit"), action: "input->opening-balances#recalculate" } %>
                   <% else %>

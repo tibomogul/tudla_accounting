@@ -79,6 +79,10 @@ module TudlaAccounting
 
         def document_attributes(document)
           attributes = body.slice(:reference, :notes, :tax_inclusive)
+          if body.key?(:currency)
+            attributes[:currency] = Money::Currency.find(body[:currency].to_s)&.iso_code or raise ArgumentError, "currency must be a currency code, such as \"EUR\""
+          end
+          attributes[:exchange_rate] = body[:exchange_rate].presence && decimal(body[:exchange_rate], "exchange_rate") if body.key?(:exchange_rate)
           attributes[:contact] = contact_by_id(body[:contact_id]) if body.key?(:contact_id) || document.new_record?
           attributes[:issued_on] = date_param(:issued_on) if body.key?(:issued_on) || document.new_record?
           attributes[:due_on] = date_param(:due_on) if body.key?(:due_on)
@@ -86,11 +90,13 @@ module TudlaAccounting
           if body.key?(:credited_document_id)
             attributes[:credited_document] = body[:credited_document_id].presence && organization_scope(Document).find(body[:credited_document_id])
           end
-          attributes[:lines_attributes] = document.lines.map { |line| { id: line.id, _destroy: true } } + line_attributes if body.key?(:lines) || document.new_record?
+          currency = attributes[:currency] || document.currency
+          attributes[:lines_attributes] = document.lines.map { |line| { id: line.id, _destroy: true } } + line_attributes(currency) if body.key?(:lines) || document.new_record?
           attributes
         end
 
-        def line_attributes
+        # The lines, their prices in the document's currency.
+        def line_attributes(currency)
           lines = body[:lines]
           raise ArgumentError, "lines must be a list" unless lines.is_a?(Array)
 
@@ -99,7 +105,7 @@ module TudlaAccounting
             raise ArgumentError, "#{label} must be an object" unless line.is_a?(Hash)
 
             { description: line[:description].to_s, quantity: (line[:quantity].presence && decimal(line[:quantity], "#{label}'s quantity")) || 1,
-              unit_price_cents: cents(line[:unit_price], "#{label}'s unit_price"), account: account_by_code(line[:account_code], label),
+              unit_price_cents: cents(line[:unit_price], "#{label}'s unit_price", currency: currency), account: account_by_code(line[:account_code], label),
               tax_code: line[:tax_code].presence && tax_code_by_code(line[:tax_code], label), dimension_value_ids: dimension_value_ids(line[:dimensions], label) }
           end
         end

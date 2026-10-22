@@ -145,7 +145,8 @@ RSpec.describe "Invoices and bills", type: :request do
     expect(numbers).to eq(%w[CN-0001 INV-0001])
     expect(css_select("tfoot").first.text.squish).to include("66.00")
     get routes.sales_documents_path(format: :csv, q: "INV")
-    expect(response.body.lines.map(&:chomp)).to eq([ "Kind,Number,Date,Contact,Reference,Due,Subtotal,Tax,Total,Due now,Status", "Invoice,INV-0001,2026-04-01,Northwind,,2026-04-30,100.00,10.00,110.00,66.00,Part paid" ])
+    expect(response.body.lines.map(&:chomp)).to eq([ "Kind,Number,Date,Contact,Reference,Due,Subtotal,Tax,Total,Due now,Status,Currency,Due now (AUD)",
+                                                            "Invoice,INV-0001,2026-04-01,Northwind,,2026-04-30,100.00,10.00,110.00,66.00,Part paid,AUD,66.00" ])
 
     post routes.void_document_path(invoice), params: { on: "2026-04-15", reason: "Wrong" }
     expect(flash[:alert]).to eq("It wasn't voided: reverse the payments against it first.")

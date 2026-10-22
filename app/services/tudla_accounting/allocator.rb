@@ -43,7 +43,14 @@ module TudlaAccounting
                  tudla_accounting_details: { organization_type: credit.detail.organization_type, organization_id: credit.detail.organization_id })
           .where("tudla_accounting_carrying_amounts.amount_cents > 0")
           .order(Arel.sql("tudla_accounting_carrying_amounts.due_date ASC NULLS LAST"), "tudla_accounting_entries.transacted_at", :id)
-          .select(&:charge?)
+          .select { |charge| charge.charge? && currencies_fit?(credit, charge) }
+      end
+
+      # What the pages offer: a foreign charge takes a credit in its currency (one in the
+      # organization's would leave its foreign amount owing); one in the organization's
+      # takes any.
+      def currencies_fit?(credit, charge)
+        !charge.forex || charge.forex.other_currency == credit.forex&.other_currency
       end
 
       def carrying_amount(record)
@@ -82,7 +89,6 @@ module TudlaAccounting
 
       self.class.open_charges(credit).each_with_object([]) do |charge, made|
         break made unless credit.reload.amount_cents.negative?
-        next if charge.forex && credit.forex && charge.forex.other_currency != credit.forex.other_currency
 
         made << allocate(credit, charge)
       end

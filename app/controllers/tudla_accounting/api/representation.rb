@@ -51,7 +51,8 @@ module TudlaAccounting
       def document_json(document)
         { id: document.id, kind: document.kind, status: document.status, payment_status: document.payment_status, number: document.number_label,
           contact: { id: document.contact_id, name: document.contact.name }, reference: document.reference,
-          issued_on: date(document.issued_on), due_on: date(document.due_on), tax_inclusive: document.tax_inclusive?, currency: document.organization.currency,
+          issued_on: date(document.issued_on), due_on: date(document.due_on), tax_inclusive: document.tax_inclusive?, currency: document.currency,
+          exchange_rate: document.exchange_rate&.to_s("F"), amount_due_in_base: (amount(document.amount_due_in_base) if document.foreign?),
           subtotal: amount(document.subtotal), tax: amount(document.tax), total: amount(document.total), amount_due: amount(document.amount_due),
           credited_document_id: document.credited_document_id, entry_id: document.entry_id, notes: document.notes,
           lines: document_lines_json(document),
@@ -64,7 +65,7 @@ module TudlaAccounting
         values = DimensionValue.where(id: document.lines.flat_map(&:dimension_value_ids)).includes(:dimension).index_by(&:id)
         document.lines.map do |line|
           { description: line.description, quantity: line.quantity.to_s("F"), unit_price: amount(line.unit_price), amount: amount(line.amount),
-            account_code: line.account.code, tax_code: line.tax_code&.code, tax: amount(Money.new(line.tax_cents, document.organization.currency)),
+            account_code: line.account.code, tax_code: line.tax_code&.code, tax: amount(Money.new(line.tax_cents, document.currency)),
             dimensions: line.dimension_value_ids.filter_map { |id| values[id] }.to_h { |value| [ value.dimension.code, value.code ] } }
         end
       end

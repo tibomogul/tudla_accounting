@@ -22,7 +22,7 @@
       <div><%= form.label :account_id, received ? "Into" : "From", class: "tc-label" %>
         <%= form.select :account_id, payment_accounts.map { |account| [ account.code_with_name, account.id ] }, { selected: @payment.account_id, include_blank: "Choose an account" }, class: "tc-input", required: true %></div>
       <div><%= form.label :amount, "Amount (#{accounting_organization.currency})", class: "tc-label" %>
-        <%= form.text_field :amount, value: (@payment.amount_cents.to_i.positive? ? @payment.amount.format(symbol: false, thousands_separator: "") : params.dig(:payment, :amount)), inputmode: "decimal", required: true, class: "tc-input tc-num" %></div>
+        <%= form.text_field :amount, value: (@payment.amount_cents.to_i.positive? ? @payment.amount.format(symbol: false, thousands_separator: "", decimal_mark: ".") : params.dig(:payment, :amount)), inputmode: "decimal", required: true, class: "tc-input tc-num" %></div>
       <div><%= form.label :reference, class: "tc-label" %><%= form.text_field :reference, value: @payment.reference, placeholder: "Bank reference", class: "tc-input" %></div>
     </div>
 

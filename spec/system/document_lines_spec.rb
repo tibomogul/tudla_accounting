@@ -48,4 +48,18 @@ RSpec.describe "Writing an invoice", type: :system do
     expect(page).to have_content("Invoice INV-0001 approved and posted.")
     within("[data-document]") { expect(page).to have_content("Consulting").and have_content("2,500.00") }
   end
+
+  it "asks for a rate in another currency, and works out the amounts in its minor units" do
+    visit new_document_path(kind: "sales_invoice")
+    expect(page).to have_no_field("document[exchange_rate]")
+    select "JPY – Japanese Yen", from: "Currency"
+    expect(page).to have_field("Rate: 1 JPY in AUD")
+    expect(page).to have_css("[data-document-lines-target=currencyLabel]", exact_text: "JPY")
+    fill_in "Unit price", with: "1500"
+    within("tfoot") { expect(page).to have_content("1,500") }
+
+    select "AUD – Australian Dollar", from: "Currency"
+    expect(page).to have_no_field("document[exchange_rate]")
+    within("tfoot") { expect(page).to have_content("1,500.00") }
+  end
 end

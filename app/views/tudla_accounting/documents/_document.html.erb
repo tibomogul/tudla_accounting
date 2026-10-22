@@ -1,6 +1,6 @@
 <%# locals: (document:) %>
 <%# The document as it prints: on paper (or a PDF) it is all that shows. %>
-<% currency = document.organization.currency %>
+<% currency = document.currency %>
 <article class="tc-card tc-card-body space-y-6" data-document aria-label="<%= document.title %>">
   <header class="flex flex-wrap justify-between gap-6">
     <div class="whitespace-pre-line text-sm"><%= TudlaAccounting.configuration.document_header_for(document.organization) %></div>
