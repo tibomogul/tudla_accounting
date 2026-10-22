@@ -54,10 +54,8 @@ module TudlaAccounting
 
       credit = Allocator.carrying_amount(@credit_entry)
       currency = credit.forex && charge.forex ? charge.forex.other_currency : accounting_organization.currency
-      cents = Money.from_amount(BigDecimal(params[:amount].to_s.delete(",")), currency).cents
+      cents = AmountParser.cents(params[:amount], currency)
       credit.forex && charge.forex ? { other_currency_cents: cents } : { amount_cents: cents }
-    rescue ArgumentError
-      raise ArgumentError, "#{params[:amount]} isn't an amount"
     end
   end
 end

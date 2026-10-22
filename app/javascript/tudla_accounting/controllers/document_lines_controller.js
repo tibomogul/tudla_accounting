@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { parseNumber, parseUnits, formatUnits } from "tudla_accounting/amounts"
 
 // The invoice and bill form's lines: adds and removes them, works out each line's amount
 // (quantity times unit price) and the subtotal, tax and total as they're typed, the way
@@ -77,8 +78,9 @@ export default class extends Controller {
     let amounts = 0
     let taxes = 0
     this.lineTargets.filter((line) => !line.hidden).forEach((line) => {
-      const quantity = Number(String(line.querySelector("[data-document-lines-target=quantity]").value).replaceAll(",", "").trim() || 1)
-      const amount = Math.round((Number.isFinite(quantity) ? quantity : 0) * this.parse(line.querySelector("[data-document-lines-target=price]").value))
+      const typed = line.querySelector("[data-document-lines-target=quantity]").value
+      const quantity = typed.trim() === "" ? 1 : parseNumber(typed) ?? 0
+      const amount = Math.round(quantity * this.parse(line.querySelector("[data-document-lines-target=price]").value))
       const rate = Number(line.querySelector("[data-document-lines-target=tax]").selectedOptions[0]?.dataset.rate || 0)
       const tax = Math.round(inclusive ? amount * rate / (1 + rate) : amount * rate)
       line.querySelector("[data-document-lines-target=amount]").textContent = this.format(amount)
@@ -91,13 +93,7 @@ export default class extends Controller {
     this.totalTarget.textContent = this.format(subtotal + taxes)
   }
 
-  // Amounts in minor units (cents), so totals don't pick up floating-point error.
-  parse(text) {
-    const number = Number(String(text).replaceAll(",", "").trim())
-    return Number.isFinite(number) ? Math.round(number * 10 ** this.exponentValue) : 0
-  }
-
-  format(units) {
-    return (units / 10 ** this.exponentValue).toLocaleString("en", { minimumFractionDigits: this.exponentValue, maximumFractionDigits: this.exponentValue })
-  }
+  // Amounts in the currency's minor units (see tudla_accounting/amounts).
+  parse(text) { return parseUnits(text, this.exponentValue) }
+  format(units) { return formatUnits(units, this.exponentValue) }
 }

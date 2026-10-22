@@ -118,8 +118,8 @@ module TudlaAccounting
         if account && !account.active? && line[:_destroy] != "1" && saved_account_id(line) != account.id
           problems << "Line #{index + 1}: #{account.code_with_name} is inactive"
         end
-        debit = amount_cents(line[:debit], currency) { problems << "Line #{index + 1}: #{line[:debit]} isn't an amount" }
-        credit = amount_cents(line[:credit], currency) { problems << "Line #{index + 1}: #{line[:credit]} isn't an amount" }
+        debit = amount_cents(line[:debit], currency) { |problem| problems << "Line #{index + 1}: #{problem}" }
+        credit = amount_cents(line[:credit], currency) { |problem| problems << "Line #{index + 1}: #{problem}" }
         problems << "Line #{index + 1} has both a debit and a credit; use one line for each" if debit && credit && line[:_destroy] != "1"
 
         { id: line[:id].presence, _destroy: line[:_destroy],

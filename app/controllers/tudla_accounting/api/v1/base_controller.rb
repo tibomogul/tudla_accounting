@@ -129,16 +129,22 @@ module TudlaAccounting
         end
 
         # Cents for an amount given as a decimal string (or number) in the organization's
-        # currency (or another); ArgumentError naming what it was for otherwise.
+        # currency (or another), read as AmountParser reads it; ArgumentError naming what it
+        # was for otherwise, or that it has more decimal places than the currency.
         def cents(value, label, currency: accounting_organization.currency)
           raise ArgumentError, "#{label} is missing" if value.blank?
 
-          Money.from_amount(decimal(value, label), currency).cents
+          decimal(value, label) # a number at all
+          begin
+            AmountParser.cents(value, currency)
+          rescue ArgumentError => e # too many decimal places
+            raise ArgumentError, "#{label}: #{e.message}"
+          end
         end
 
         def decimal(value, label)
-          BigDecimal(value.to_s)
-        rescue ArgumentError, TypeError
+          AmountParser.decimal(value)
+        rescue ArgumentError
           raise ArgumentError, "#{label} must be a decimal number, such as \"1234.50\""
         end
 

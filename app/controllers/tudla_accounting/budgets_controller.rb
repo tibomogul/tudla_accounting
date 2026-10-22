@@ -121,8 +121,7 @@ module TudlaAccounting
 
     # The percentage to change actual results by ("5", "-2.5", "+10%").
     def percent
-      text = params[:percent].to_s.strip.delete_suffix("%").delete_prefix("+")
-      text.empty? ? 0 : BigDecimal(text)
+      AmountParser.decimal(params[:percent].to_s.strip.delete_suffix("%")) || 0
     rescue ArgumentError
       raise ArgumentError, "#{params[:percent]} isn't a percentage"
     end
@@ -137,8 +136,8 @@ module TudlaAccounting
       typed = params.fetch(:amounts, {}).to_unsafe_h.to_h do |account_id, by_month|
         by_month = by_month.is_a?(Hash) ? by_month : {}
         [ account_id.to_i, by_month.to_h do |month_id, text|
-          [ month_id.to_i, amount_cents(text, currency) do
-            problems << "#{accounts[account_id.to_i]&.code_with_name || account_id}, #{months[month_id.to_i]&.label || month_id}: #{text} isn't an amount"
+          [ month_id.to_i, amount_cents(text, currency) do |problem|
+            problems << "#{accounts[account_id.to_i]&.code_with_name || account_id}, #{months[month_id.to_i]&.label || month_id}: #{problem}"
           end.to_i ]
         end ]
       end

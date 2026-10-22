@@ -228,7 +228,7 @@ module TudlaAccounting
       return ForexRateRetriever.call(from: currency, to: @organization.currency, date: line.occurred_on) if given.blank?
 
       rate = begin
-        BigDecimal(given.to_s.strip)
+        AmountParser.decimal(given)
       rescue ArgumentError
         raise ArgumentError, "The rate #{given} isn't a number"
       end

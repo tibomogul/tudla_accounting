@@ -76,24 +76,21 @@ module TudlaAccounting
       redirect_to fallback, alert: "#{e.message}."
     end
 
-    # Cents for a typed amount ("1,234.50"), nil when blank; yields when it isn't a number.
+    # Cents for a typed amount ("1,234.50"; see AmountParser), nil when blank; yields what
+    # is wrong with it ("lots isn't an amount", too many decimal places) when it can't be read.
     def amount_cents(text, currency)
-      text = text.to_s.strip.delete(",")
-      return nil if text.empty?
-
-      Money.from_amount(BigDecimal(text), currency).cents
-    rescue ArgumentError
-      yield
+      AmountParser.cents(text, currency)
+    rescue ArgumentError => e
+      yield e.message
       nil
     end
 
     # A typed number that isn't an amount (a quantity, an exchange rate: "1,000", "1.65"),
     # nil when blank; yields when it isn't a number.
     def typed_decimal(text)
-      text = text.to_s.strip.delete(",")
-      BigDecimal(text) unless text.empty?
-    rescue ArgumentError
-      yield
+      AmountParser.decimal(text)
+    rescue ArgumentError => e
+      yield e.message
       nil
     end
 

@@ -94,10 +94,7 @@ module TudlaAccounting
     end
 
     def amount_cents(value, code)
-      text = value.to_s.strip.delete(",")
-      return 0 if text.empty?
-
-      Money.from_amount(BigDecimal(text), organization.currency).cents
+      AmountParser.cents(value, organization.currency, round: true) || 0
     rescue ArgumentError
       raise ArgumentError, "Starting Balance #{value.inspect} for account #{code} is not a number"
     end

@@ -31,7 +31,7 @@ module TudlaAccounting
     end
 
     def rate_percent=(percent)
-      self.rate = percent.blank? ? nil : BigDecimal(percent.to_s) / 100
+      self.rate = AmountParser.decimal(percent)&./(100)
     rescue ArgumentError
       self.rate = nil
       @unreadable_rate = percent

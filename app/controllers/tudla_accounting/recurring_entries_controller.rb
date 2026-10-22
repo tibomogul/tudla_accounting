@@ -109,8 +109,8 @@ module TudlaAccounting
       lines = permitted.fetch(:lines, {}).to_h.values.each_with_index.filter_map do |line, index|
         next if line[:id].blank? && line.values_at(:account_id, :debit, :credit, :description).all?(&:blank?)
 
-        debit = amount_cents(line[:debit], currency) { problems << "Line #{index + 1}: #{line[:debit]} isn't an amount" }
-        credit = amount_cents(line[:credit], currency) { problems << "Line #{index + 1}: #{line[:credit]} isn't an amount" }
+        debit = amount_cents(line[:debit], currency) { |problem| problems << "Line #{index + 1}: #{problem}" }
+        credit = amount_cents(line[:credit], currency) { |problem| problems << "Line #{index + 1}: #{problem}" }
         problems << "Line #{index + 1} has both a debit and a credit; use one line for each" if debit && credit && line[:_destroy] != "1"
         { id: line[:id].presence, _destroy: line[:_destroy] }.compact.merge( # a blank tax code or description clears it
           account_id: (organization_scope(Account).find(line[:account_id]).id if line[:account_id].present?),

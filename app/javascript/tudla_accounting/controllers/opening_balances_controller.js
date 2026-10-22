@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { parseUnits, formatUnits } from "tudla_accounting/amounts"
 
 // Opening balances: totals the debit-side and credit-side amounts as they are typed and
 // says whether they balance. The server checks again before saving.
@@ -26,17 +27,14 @@ export default class extends Controller {
     }
   }
 
-  parse(text) {
-    const number = Number(String(text).replaceAll(",", "").trim())
-    return Number.isFinite(number) ? Math.round(number * 10 ** this.exponentValue) : 0
-  }
 
-  format(units) {
-    return (units / 10 ** this.exponentValue).toLocaleString("en", { minimumFractionDigits: this.exponentValue, maximumFractionDigits: this.exponentValue })
-  }
 
   show(message, className) {
     this.statusTarget.textContent = message
     this.statusTarget.className = `text-sm mt-1 ${className}`
   }
+
+  // Amounts in the currency's minor units (see tudla_accounting/amounts).
+  parse(text) { return parseUnits(text, this.exponentValue) }
+  format(units) { return formatUnits(units, this.exponentValue) }
 }

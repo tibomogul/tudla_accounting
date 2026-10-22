@@ -147,10 +147,7 @@ module TudlaAccounting
     end
 
     def cents_in(cell)
-      return 0 if cell.blank?
-      return (BigDecimal(cell.to_s) * 10**Money::Currency.new(budget.organization.currency).exponent).round if cell.is_a?(Numeric)
-
-      Money.from_amount(BigDecimal(cell.to_s.strip.delete(",")), budget.organization.currency).cents
+      AmountParser.cents(cell, budget.organization.currency, round: true) || 0
     rescue ArgumentError
       yield
       0

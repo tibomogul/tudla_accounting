@@ -105,7 +105,7 @@ module TudlaAccounting
     end
 
     def decimal(value, row)
-      BigDecimal(value.to_s.strip.delete(","))
+      AmountParser.decimal(value) or raise ArgumentError
     rescue ArgumentError
       raise ArgumentError, "#{value.inspect} is not a number (#{row[:particulars]})"
     end

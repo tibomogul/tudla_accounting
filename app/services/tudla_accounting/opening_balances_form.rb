@@ -59,11 +59,10 @@ module TudlaAccounting
       raise ArgumentError, "Create a financial year first" unless year
 
       @accounts.select { |account| leaf?(account) }.each do |account|
-        text = typed.fetch(account.id.to_s, "").to_s.strip.delete(",")
-        @amounts[account.id] = text.empty? ? Money.new(0, currency) : Money.from_amount(BigDecimal(text), currency)
-      rescue ArgumentError
+        @amounts[account.id] = Money.new(AmountParser.cents(typed.fetch(account.id.to_s, ""), currency) || 0, currency)
+      rescue ArgumentError => e
         @amounts[account.id] = Money.new(0, currency)
-        @errors << "#{account.code_with_name}: #{typed[account.id.to_s]} isn't an amount"
+        @errors << "#{account.code_with_name}: #{e.message}"
       end
       if @errors.empty? && !balanced?
         @errors << "Debits (#{total(:debit).format(symbol: false)}) and credits (#{total(:credit).format(symbol: false)}) don't balance, in #{currency}"

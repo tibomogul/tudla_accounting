@@ -62,4 +62,13 @@ RSpec.describe "Writing an invoice", type: :system do
     expect(page).to have_no_field("document[exchange_rate]")
     within("tfoot") { expect(page).to have_content("1,500.00") }
   end
+
+  it "reads quantities and prices as the server does: thousands commas, and nothing it can't read" do
+    visit new_document_path(kind: "sales_invoice")
+    fill_in "Quantity", with: "1,000"
+    fill_in "Unit price", with: "1.50"
+    within("tfoot") { expect(page).to have_content("1,500.00") }
+    fill_in "Quantity", with: "1e3"
+    within("tfoot") { expect(page).to have_css("[data-document-lines-target=total]", exact_text: "0.00") }
+  end
 end

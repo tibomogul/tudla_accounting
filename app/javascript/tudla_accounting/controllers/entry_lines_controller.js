@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { parseUnits, formatUnits } from "tudla_accounting/amounts"
 
 // The entry form's lines: adds and removes lines, and keeps debit and credit totals
 // with a balanced / unbalanced message as amounts are typed. A line with a tax code adds
@@ -69,18 +70,14 @@ export default class extends Controller {
     }, 0)
   }
 
-  // Amounts in minor units (cents), so totals don't pick up floating-point error.
-  parse(text) {
-    const number = Number(String(text).replaceAll(",", "").trim())
-    return Number.isFinite(number) ? Math.round(number * 10 ** this.exponentValue) : 0
-  }
 
-  format(units) {
-    return (units / 10 ** this.exponentValue).toLocaleString("en", { minimumFractionDigits: this.exponentValue, maximumFractionDigits: this.exponentValue })
-  }
 
   show(message, className) {
     this.statusTarget.textContent = message
     this.statusTarget.className = `text-sm ${className}`
   }
+
+  // Amounts in the currency's minor units (see tudla_accounting/amounts).
+  parse(text) { return parseUnits(text, this.exponentValue) }
+  format(units) { return formatUnits(units, this.exponentValue) }
 }

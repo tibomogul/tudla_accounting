@@ -53,7 +53,7 @@ module TudlaAccounting
       account = organization_scope(Account).find(permitted[:account_id]) if permitted[:account_id].present?
       @currency = account ? account.currency.presence || accounting_organization.currency : currency_param
       problems = []
-      cents = ->(text, label) { amount_cents(text, @currency) { problems << "#{text} isn't an amount (#{label})" } }
+      cents = ->(text, label) { amount_cents(text, @currency) { |problem| problems << "#{problem} (#{label})" } }
       contact = organization_scope(Contact).find(permitted[:contact_id]) if permitted[:contact_id].present?
       @payment = organization_scope(Payment).new(kind: permitted[:kind].presence_in(%w[received paid]) || "received", contact: contact, paid_on: permitted[:paid_on],
                                                  account_id: account&.id, amount_cents: cents.call(permitted[:amount], "the payment"), reference: permitted[:reference], notes: permitted[:notes],
@@ -94,7 +94,7 @@ module TudlaAccounting
                                                  reference: permitted[:reference], notes: permitted[:notes])
       @payment.refund_of = credit
       @payment.exchange_rate = typed_decimal(permitted[:exchange_rate]) { raise ArgumentError, "#{permitted[:exchange_rate]} isn't an exchange rate" }
-      @payment.amount_cents = amount_cents(permitted[:amount], @currency) { raise ArgumentError, "#{permitted[:amount]} isn't an amount" }
+      @payment.amount_cents = amount_cents(permitted[:amount], @currency) { |problem| raise ArgumentError, problem }
       @payment = Payment.record!(**@payment.attributes.symbolize_keys.slice(:kind, :contact_id, :account_id, :paid_on, :amount_cents, :exchange_rate, :reference, :notes),
                                  organization: accounting_organization, refund_of: credit)
       redirect_to payment_path(@payment), notice: "#{@payment.title} of #{@payment.amount.format} recorded."

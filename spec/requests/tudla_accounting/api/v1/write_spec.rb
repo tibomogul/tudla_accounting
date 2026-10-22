@@ -107,6 +107,7 @@ RSpec.describe "JSON API: recording in the books", type: :request do
         sale.merge(lines: [ { account_code: "1000", debit: "1", credit: "1" }, sale[:lines].last ]) => "Line 1 needs a debit or a credit, not both",
         sale.merge(lines: [ { account_code: "1000", debit: "lots" }, sale[:lines].last ]) => "Line 1's debit must be a decimal number, such as \"1234.50\"",
         sale.merge(lines: [ { account_code: "1000", debit: "-5" }, sale[:lines].last ]) => "Line 1's amount must be more than zero",
+        sale.merge(lines: [ { account_code: "1000", debit: "10.005" }, sale[:lines].last ]) => "Line 1's debit: 10.005 has too many decimal places for AUD, which has 2",
         sale.merge(lines: [ { account_code: "1050", debit: "1", foreign: "EUR" }, sale[:lines].last ]) => "Line 1's foreign must be an object with currency, amount and rate",
         sale.merge(lines: [ { account_code: "1050", debit: "1", foreign: { currency: "XYZ" } }, sale[:lines].last ]) => "Line 1's foreign currency \"XYZ\" isn't known",
         sale.merge(lines: [ { account_code: "1000", debit: "5" }, { account_code: "4000", credit: "4" } ]) => "The credit and debit amounts are not equal"

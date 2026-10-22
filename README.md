@@ -228,6 +228,16 @@ With Active Storage set up in the host app (`bin/rails active_storage:install`),
 
 The entry and document pages list their files, upload more (`:record` permission) and remove them: a draft's with `:record`, a posted entry's or approved document's with `:administer` and a reason. Files are served through the engine (`/entries/:id/attachments/:id`, `/documents/:id/attachments/:id`), which checks the permissions and the organization. Active Storage's own routes serve a file to anyone with its signed URL, so the engine's pages never link to them; keep that in mind if the host app does.
 
+### Typing amounts
+Every amount and number people type, and the JSON API is given, is read one way (`AmountParser`): digits with `.` for decimals, optionally grouped in thousands by commas (`1,234,567.89`), signed by a leading `+` or `-` or by parentheses for a negative (`(5.00)`). Nothing else is read (no `1.234,50`, `10,00`, `1e3`, symbols or words), so a number is never half read, and an amount can't have more decimal places than its currency (cents, or none for the yen); the form or API says what is wrong. Imports (the chart of accounts, open receivables and payables, budgets) round extra places as the `rounding` setting says, as files often carry them; bank statements have their own formats (see [Bank reconciliation](#bank-reconciliation)). The forms' live totals read amounts the same way, and every amount field is filled the way it is read back (`tc_amount_field`).
+
+```ruby
+TudlaAccounting::AmountParser.cents("1,234.50", "AUD")              # => 123450
+TudlaAccounting::AmountParser.cents("10.005", "AUD")                # ArgumentError: 10.005 has too many decimal places for AUD, which has 2
+TudlaAccounting::AmountParser.cents("10.005", "AUD", round: true)   # => 1001
+TudlaAccounting::AmountParser.decimal("1.65")                       # => 1.65, for rates, quantities and percentages
+```
+
 ### Posting and balances
 `entry.post(posted_at)` posts every line to the period that contains `posted_at`, then stamps the entry. The whole post is one transaction: if any line fails, nothing is posted. Posting an entry twice raises `ArgumentError`. Posts lock the organization's row while they run, so concurrent posts for the same organization take turns instead of overwriting each other's balance updates; other organizations aren't blocked. Each account has one `TudlaAccounting::Balance` per period, holding starting, current and ending amounts. Posting:
 - adds the amount to the balance of the deepest period containing `posted_at`, e.g. the month

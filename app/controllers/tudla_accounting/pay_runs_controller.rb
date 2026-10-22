@@ -27,7 +27,7 @@ module TudlaAccounting
       bills = organization_scope(Document).where(id: @selected.to_a).index_by(&:id)
       chosen = @selected.map do |id|
         bill = bills.fetch(id) { raise ActiveRecord::RecordNotFound }
-        cents = amount_cents(@amounts[id], @currency) { problems << "#{@amounts[id]} isn't an amount (#{bill.number_label})" }
+        cents = amount_cents(@amounts[id], @currency) { |problem| problems << "#{problem} (#{bill.number_label})" }
         { document: bill, amount_cents: cents || bill.amount_due.cents }
       end
       raise ArgumentError, problems.to_sentence if problems.any?

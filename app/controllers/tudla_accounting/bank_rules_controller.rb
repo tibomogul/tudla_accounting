@@ -61,7 +61,7 @@ module TudlaAccounting
       problems = []
       currency = accounting_organization.currency
       amounts = %i[amount_min amount_max].to_h do |field|
-        [ :"#{field}_cents", amount_cents(permitted[field], currency) { problems << "#{field.to_s.humanize}: #{permitted[field]} isn't an amount" }&.abs ]
+        [ :"#{field}_cents", amount_cents(permitted[field], currency) { |problem| problems << "#{field.to_s.humanize}: #{problem}" }&.abs ]
       end
       @bank_rule.assign_attributes(permitted.slice(:name, :position, :description_contains, :direction, :particulars, :active).to_h.merge(amounts).merge(
         account_id: (organization_scope(Account).find(permitted[:account_id]).id if permitted[:account_id].present?),

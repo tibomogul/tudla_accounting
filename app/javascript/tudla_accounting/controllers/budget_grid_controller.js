@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { parseUnits, formatUnits, fieldUnits } from "tudla_accounting/amounts"
 
 // A budget's grid: keeps each account's year total, its parents' totals, each section's
 // totals and the net profit up to date as amounts are typed, and spreads a year total
@@ -51,19 +52,11 @@ export default class extends Controller {
     this.recalculate()
   }
 
-  // Amounts in minor units (cents), so totals don't pick up floating-point error.
-  parse(text) {
-    const number = Number(String(text).replaceAll(",", "").trim())
-    return Number.isFinite(number) ? Math.round(number * 10 ** this.exponentValue) : 0
-  }
 
-  plain(units) {
-    return (units / 10 ** this.exponentValue).toFixed(this.exponentValue)
-  }
 
   // An amount as the page shows amounts: separators, negatives in parentheses.
   show(cell, units) {
-    const text = (Math.abs(units) / 10 ** this.exponentValue).toLocaleString("en", { minimumFractionDigits: this.exponentValue, maximumFractionDigits: this.exponentValue })
+    const text = this.format(Math.abs(units))
     cell.innerHTML = ""
     if (units < 0) {
       const span = document.createElement("span")
@@ -74,4 +67,9 @@ export default class extends Controller {
       cell.textContent = text
     }
   }
+
+  // Amounts in the currency's minor units (see tudla_accounting/amounts).
+  parse(text) { return parseUnits(text, this.exponentValue) }
+  format(units) { return formatUnits(units, this.exponentValue) }
+  plain(units) { return fieldUnits(units, this.exponentValue) }
 }

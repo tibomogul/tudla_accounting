@@ -120,7 +120,7 @@ module TudlaAccounting
       lines = permitted.delete(:lines).to_h.values.each_with_index.filter_map do |line, index|
         next if line[:id].blank? && line.values_at(:description, :unit_price, :account_id).all?(&:blank?)
 
-        price = amount_cents(line[:unit_price], currency) { problems << "Line #{index + 1}: #{line[:unit_price]} isn't an amount" }
+        price = amount_cents(line[:unit_price], currency) { |problem| problems << "Line #{index + 1}: #{problem}" }
         { id: line[:id].presence, _destroy: line[:_destroy] }.compact.merge( # a blank tax code clears it
           description: line[:description].to_s,
           quantity: typed_decimal(line[:quantity]) { problems << "Line #{index + 1}: #{line[:quantity]} isn't a quantity" } || 1, position: index,
