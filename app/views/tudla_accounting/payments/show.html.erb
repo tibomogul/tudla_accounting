@@ -1,30 +1,42 @@
 <% received = @payment.received? %>
+<% money_in = @payment.money_in? %>
+<% refund = @payment.refund? %>
 <%= tc_page_header "#{@payment.title} of #{@payment.amount.format}", subtitle: tc_date(@payment.paid_on) do %>
-  <%= link_to (received ? "Payments received" : "Payments made"), (received ? received_payments_path : paid_payments_path), class: "tc-btn tc-btn-ghost" %>
-  <% if TudlaAccounting.pdf? %>
-    <%= link_to (received ? "Download receipt" : "Download payment notice"), payment_path(@payment, format: :pdf), class: "tc-btn tc-btn-ghost", data: { turbo: false } %>
-  <% end %>
-  <button type="button" class="tc-btn tc-btn-ghost" data-controller="print" data-action="print#print"><%= received ? "Print receipt" : "Print payment notice" %></button>
-  <% if tc_can?(:post) && !@payment.void? %>
-    <%= link_to (received ? "Email receipt" : "Email payment notice"), new_email_path(payment_id: @payment.id), class: "tc-btn tc-btn-secondary" %>
+  <%= link_to (@payment.sales? ? "Payments received" : "Payments made"), (@payment.sales? ? received_payments_path : paid_payments_path), class: "tc-btn tc-btn-ghost" %>
+  <% unless refund %>
+    <% if TudlaAccounting.pdf? %>
+      <%= link_to (received ? "Download receipt" : "Download payment notice"), payment_path(@payment, format: :pdf), class: "tc-btn tc-btn-ghost", data: { turbo: false } %>
+    <% end %>
+    <button type="button" class="tc-btn tc-btn-ghost" data-controller="print" data-action="print#print"><%= received ? "Print receipt" : "Print payment notice" %></button>
+    <% if tc_can?(:post) && !@payment.void? %>
+      <%= link_to (received ? "Email receipt" : "Email payment notice"), new_email_path(payment_id: @payment.id), class: "tc-btn tc-btn-secondary" %>
+      <% if @payment.unapplied.positive? %><%= link_to (received ? "Refund to them" : "Record their refund"), new_refund_path(payment_id: @payment.id), class: "tc-btn tc-btn-secondary" %><% end %>
+    <% end %>
   <% end %>
 <% end %>
 
 <div class="mb-4 flex flex-wrap items-center gap-3 text-sm">
-  <%= @payment.void? ? tc_badge("Void", tone: :danger) : (@payment.unapplied.zero? ? tc_badge("Applied", tone: :success) : tc_badge("Credit to apply", tone: :primary)) %>
+  <%= payment_status_badge(@payment) %>
   <% if @payment.entry %><span class="tc-muted">Posted as <%= link_to entry_title(@payment.entry), entry_path(@payment.entry), class: "underline" %></span><% end %>
   <% if @payment.void? %><span class="tc-muted">Voided <%= tc_date(@payment.voided_on) %><%= ": “#{@payment.void_reason}”" if @payment.void_reason %></span><% end %>
 </div>
 
 <div class="grid gap-6 lg:grid-cols-3">
   <section class="tc-card tc-card-body space-y-2 text-sm" aria-label="Details" data-details>
-    <% { (received ? "From" : "To") => link_to(@payment.contact.name, contact_path(@payment.contact), class: "underline"), (received ? "Into" : "Out of") => @payment.account.code_with_name,
-         "Reference" => @payment.reference, "Amount" => @payment.amount.format, "Not applied yet" => (@payment.unapplied.format unless @payment.void?) }.each do |label, value| %>
+    <% details = { (money_in ? "From" : "To") => link_to(@payment.contact.name, contact_path(@payment.contact), class: "underline"), (money_in ? "Into" : "Out of") => @payment.account.code_with_name,
+                   "Reference" => @payment.reference, "Amount" => @payment.amount.format } %>
+    <% if refund %>
+      <% details["Pays back"] = @payment.refund_of && credit_link(@payment.refund_of) %>
+    <% else %>
+      <% details["Not applied yet"] = (@payment.unapplied.format unless @payment.void?) %>
+    <% end %>
+    <% details.each do |label, value| %>
       <div class="flex justify-between gap-4"><span class="tc-muted"><%= label %></span><span class="text-right"><%= value || "—" %></span></div>
     <% end %>
     <% if @payment.notes %><div><p class="tc-muted">Notes</p><p class="whitespace-pre-line"><%= @payment.notes %></p></div><% end %>
   </section>
 
+  <% unless refund %>
   <section class="lg:col-span-2 tc-card overflow-x-auto" aria-labelledby="applied">
     <h2 id="applied" class="tc-card-body tc-card-title pb-0">Applied to</h2>
     <% applications = @payment.applications %>
@@ -35,7 +47,7 @@
           <% applications.each do |target, amount, allocation| %>
             <tr class="<%= "tc-muted line-through" unless allocation.active? %>">
               <td class="whitespace-nowrap"><%= tc_date(allocation.allocated_at) %></td>
-              <td><%= target.is_a?(TudlaAccounting::Document) ? link_to(target.title, document_path(target), class: "underline") : link_to(entry_title(target), entry_path(target), class: "underline") %><%= " (taken off)" unless allocation.active? %></td>
+              <td><%= target.is_a?(TudlaAccounting::Entry) ? link_to(entry_title(target), entry_path(target), class: "underline") : credit_link(target) %><%= " (taken off)" unless allocation.active? %></td>
               <td class="tc-num"><%= tc_money(amount) %></td>
             </tr>
           <% end %>
@@ -44,10 +56,11 @@
     <% else %>
       <p class="tc-card-body tc-muted text-sm">Nothing yet.</p>
     <% end %>
-    <% if !@payment.void? && @payment.unapplied.positive? && tc_can?(:post) %>
-      <p class="tc-card-body text-sm"><%= link_to "Apply the rest", entry_path(@payment.entry), class: "underline" %> to other <%= received ? "invoices" : "bills" %> from its entry's page.</p>
+    <% if !@payment.void? && @payment.unapplied.positive? %>
+      <%= render "tudla_accounting/allocations/apply", entry: @payment.entry, carrying_amount: @payment.credit, back: payment_path(@payment) %>
     <% end %>
   </section>
+  <% end %>
 </div>
 
 <%= render "tudla_accounting/emails/list", deliveries: @deliveries %>
@@ -64,7 +77,9 @@
   </details>
 <% end %>
 
-<section class="mt-6 space-y-2" aria-labelledby="notice-heading">
-  <h2 id="notice-heading" class="tc-card-title print:hidden"><%= received ? "The receipt, as it prints" : "The payment notice, as it prints" %></h2>
-  <%= render "notice", payment: @payment %>
-</section>
+<% unless refund %>
+  <section class="mt-6 space-y-2" aria-labelledby="notice-heading">
+    <h2 id="notice-heading" class="tc-card-title print:hidden"><%= received ? "The receipt, as it prints" : "The payment notice, as it prints" %></h2>
+    <%= render "notice", payment: @payment %>
+  </section>
+<% end %>

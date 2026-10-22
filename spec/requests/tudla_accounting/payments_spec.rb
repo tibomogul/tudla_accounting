@@ -59,7 +59,7 @@ RSpec.describe "Payments", type: :request do
 
     get routes.payment_path(payment)
     expect(css_select("[data-details]").first.text.squish).to include("1000 - Bank", "EFT 1", "$120.00", "Not applied yet$20.00")
-    expect(response.body).to include("Invoice INV-0001", "Apply the rest", "Credit to apply")
+    expect(response.body).to include("Invoice INV-0001", "Credit to apply", "Nothing is owed that it could be applied to.", "Refund to them")
     get routes.new_payment_path(document_id: invoice.id) # paid now, but it can still be chosen from the page...
     expect(css_select("tr[data-open-document]")).to be_empty # ...though there's nothing left to apply
     expect(css_select("select[name='payment[account_id]'] option[selected]").map(&:text)).to eq([ "1000 - Bank" ]) # the last one used
@@ -69,7 +69,7 @@ RSpec.describe "Payments", type: :request do
     get routes.received_payments_path(q: "nobody")
     expect(response.body).to include("Nothing matches.")
     get routes.received_payments_path(format: :csv)
-    expect(response.body.lines.map(&:chomp)).to eq([ "Date,Contact,Reference,Account,Amount,Unapplied,Status", "2026-04-14,Northwind,EFT 1,1000,120.00,20.00,posted" ])
+    expect(response.body.lines.map(&:chomp)).to eq([ "Date,Contact,Reference,Account,Amount,Unapplied,Status,Kind", "2026-04-14,Northwind,EFT 1,1000,120.00,20.00,posted,Payment received" ])
     get routes.paid_payments_path
     expect(response.body).to include("No payments yet.")
     get routes.entry_path(payment.entry)

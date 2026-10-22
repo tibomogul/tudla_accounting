@@ -1,15 +1,16 @@
 module TudlaAccounting
-  # Payments received from customers and made to suppliers: the lists, recording one
-  # against a contact's open invoices or bills, and voiding it. See Payment.
+  # Payments received from customers and made to suppliers: the lists (with refunds),
+  # recording one against a contact's open invoices or bills, refunding what is left of a
+  # payment or credit note, and voiding either. See Payment.
   class PaymentsController < ApplicationController
-    permits :post, only: %i[new create void]
+    permits :post, only: %i[new create new_refund create_refund void]
 
     before_action :set_payment, only: %i[show void]
     helper_method :payment_accounts
 
     def index
       @kind = kind_param
-      payments = organization_scope(Payment).where(kind: @kind).includes(:contact, :account, entry: { details: :carrying_amount })
+      payments = organization_scope(Payment).where(kind: Payment.kinds_for(@kind == "received" ? :sales : :purchases)).includes(:contact, :account, entry: { details: :carrying_amount })
       if params[:q].present?
         pattern = "%#{Payment.sanitize_sql_like(params[:q].strip)}%"
         payments = payments.left_joins(:contact).where("tudla_accounting_payments.reference ILIKE :pattern OR tudla_accounting_contacts.name ILIKE :pattern", pattern: pattern)
@@ -26,6 +27,7 @@ module TudlaAccounting
       respond_to do |format|
         format.html { @deliveries = Delivery.where(subject: @payment).newest_first.to_a }
         format.pdf do
+          raise ActiveRecord::RecordNotFound if @payment.refund? # a refund has no receipt or notice
           name = "#{@payment.received? ? 'receipt' : 'payment-notice'}-#{@payment.contact.name}-#{@payment.paid_on}"
           send_pdf(name, fallback: payment_path(@payment)) { PdfMaker.payment(@payment) }
         end
@@ -50,7 +52,7 @@ module TudlaAccounting
       problems = []
       cents = ->(text, label) { amount_cents(text, currency) { problems << "#{text} isn't an amount (#{label})" } }
       contact = organization_scope(Contact).find(permitted[:contact_id]) if permitted[:contact_id].present?
-      @payment = organization_scope(Payment).new(kind: permitted[:kind].presence_in(Payment::KINDS.keys) || "received", contact: contact, paid_on: permitted[:paid_on],
+      @payment = organization_scope(Payment).new(kind: permitted[:kind].presence_in(%w[received paid]) || "received", contact: contact, paid_on: permitted[:paid_on],
                                                  account_id: (organization_scope(Account).find(permitted[:account_id]).id if permitted[:account_id].present?),
                                                  amount_cents: cents.call(permitted[:amount], "the payment"), reference: permitted[:reference], notes: permitted[:notes])
       @applied = (permitted[:applications]&.to_h || {}).filter_map { |id, text| [ id.to_i, cents.call(text, "applied") ] if text.present? }.to_h.compact
@@ -65,6 +67,34 @@ module TudlaAccounting
     rescue ArgumentError => e
       @payment.errors.add(:base, e.message)
       render :new, status: :unprocessable_entity
+    end
+
+    # Paying back what is left of a payment or credit note (payment_id or document_id), all
+    # of it unless less is typed.
+    def new_refund
+      credit = refund_credit
+      left = Payment.credit_left_cents(credit)
+      return redirect_to(credit_path(credit), alert: "Nothing is left of it to refund.") unless left.positive?
+
+      @payment = organization_scope(Payment).new(kind: credit.sales? ? "refund" : "supplier_refund", contact: credit.contact, paid_on: today,
+                                                 account_id: default_account_id, amount_cents: left)
+      @payment.refund_of = credit
+    end
+
+    def create_refund
+      credit = refund_credit
+      permitted = params.require(:payment).permit(:account_id, :paid_on, :amount, :reference, :notes)
+      @payment = organization_scope(Payment).new(kind: credit.sales? ? "refund" : "supplier_refund", contact: credit.contact, paid_on: permitted[:paid_on],
+                                                 account_id: (organization_scope(Account).find(permitted[:account_id]).id if permitted[:account_id].present?),
+                                                 reference: permitted[:reference], notes: permitted[:notes])
+      @payment.refund_of = credit
+      @payment.amount_cents = amount_cents(permitted[:amount], accounting_organization.currency) { raise ArgumentError, "#{permitted[:amount]} isn't an amount" }
+      @payment = Payment.record!(**@payment.attributes.symbolize_keys.slice(:kind, :contact_id, :account_id, :paid_on, :amount_cents, :reference, :notes),
+                                 organization: accounting_organization, refund_of: credit)
+      redirect_to payment_path(@payment), notice: "#{@payment.title} of #{@payment.amount.format} recorded."
+    rescue ArgumentError => e
+      @payment.errors.add(:base, e.message)
+      render :new_refund, status: :unprocessable_entity
     end
 
     def void
@@ -91,7 +121,19 @@ module TudlaAccounting
       @payment = organization_scope(Payment).includes(:contact, :account).find(params[:id])
     end
 
-    def kind_param = params[:kind].presence_in(Payment::KINDS.keys) || "received"
+    def kind_param = params[:kind].presence_in(%w[received paid]) || "received"
+
+    # The credit a refund pays back: a posted payment received or made, or an approved
+    # credit note.
+    def refund_credit
+      if params[:document_id].present?
+        organization_scope(Document).approved.where(kind: %w[sales_credit supplier_credit]).find(params[:document_id])
+      else
+        organization_scope(Payment).where(kind: %w[received paid], status: "posted").find(params.require(:payment_id))
+      end
+    end
+
+    def credit_path(credit) = credit.is_a?(Document) ? document_path(credit) : payment_path(credit)
 
     def today
       ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].today
@@ -101,7 +143,7 @@ module TudlaAccounting
     def open_documents(payment)
       return [] unless payment.contact
 
-      kind = payment.received? ? "sales_invoice" : "bill"
+      kind = payment.sales? ? "sales_invoice" : "bill"
       organization_scope(Document).approved.where(kind: kind, contact: payment.contact).with_open_cents.order(Arel.sql("due_on ASC NULLS LAST"), :issued_on, :id)
         .to_a.select { |document| document.amount_due.positive? }
     end
@@ -120,9 +162,9 @@ module TudlaAccounting
 
     def payments_table(payments)
       rows = payments.map do |payment|
-        [ payment.paid_on, payment.contact.name, payment.reference, payment.account.code, payment.amount, payment.unapplied, payment.status ]
+        [ payment.paid_on, payment.contact.name, payment.reference, payment.account.code, payment.amount, payment.unapplied, payment.status, payment.kind_label ]
       end
-      Reports::Table.new([ [ "Date", "Contact", "Reference", "Account", "Amount", "Unapplied", "Status" ], *rows ])
+      Reports::Table.new([ [ "Date", "Contact", "Reference", "Account", "Amount", "Unapplied", "Status", "Kind" ], *rows ])
     end
   end
 end

@@ -20,9 +20,11 @@ TudlaAccounting::Engine.routes.draw do
           post :void
         end
         resources :attachments, only: %i[show create]
+        post :apply, on: :member, to: "applications#create", defaults: { credit: "document" }
       end
       resources :payments, only: %i[index show create] do
         member { post :void }
+        post :apply, on: :member, to: "applications#create", defaults: { credit: "payment" }
       end
       resources :tax_codes, only: :index
       resources :periods, only: :index
@@ -117,6 +119,8 @@ TudlaAccounting::Engine.routes.draw do
   resources :payments, only: %i[show new create] do
     member { post :void }
   end
+  get "refunds/new", to: "payments#new_refund", as: :new_refund
+  post "refunds", to: "payments#create_refund", as: :refunds
   resources :emails, only: %i[new create] do
     collection { post :statements }
     member { post :resend }

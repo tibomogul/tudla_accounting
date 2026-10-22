@@ -24,8 +24,8 @@ module TudlaAccounting
       self.accounting_permissions = accounting_permissions.merge(Array(only).to_h { |action| [ action.to_s, permission ] })
     end
 
-    rescue_from ActiveRecord::RecordNotFound do
-      render "tudla_accounting/shared/not_found", status: :not_found
+    rescue_from ActiveRecord::RecordNotFound do # as a page, whatever was asked for (a PDF, a CSV...)
+      render "tudla_accounting/shared/not_found", status: :not_found, formats: [ :html ]
     end
 
     helper_method :accounting_organization, :tc_can?

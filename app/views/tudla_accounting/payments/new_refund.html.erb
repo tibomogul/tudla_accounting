@@ -1,0 +1,24 @@
+<% credit = @payment.refund_of %>
+<% to_customer = @payment.kind == "refund" %>
+<%= tc_page_header (to_customer ? "Refund to #{@payment.contact.name}" : "Refund from #{@payment.contact.name}"),
+                   subtitle: "Pays back what is left of #{credit.title.downcase_first}: #{Money.new(TudlaAccounting::Payment.credit_left_cents(credit), accounting_organization.currency).format}" %>
+
+<%= form_with url: refunds_path, scope: :payment, class: "space-y-4" do |form| %>
+  <% if @payment.errors.any? %>
+    <div class="tc-alert tc-alert-danger" role="alert"><ul class="list-disc pl-4"><% @payment.errors.full_messages.uniq.each do |message| %><li><%= message %></li><% end %></ul></div>
+  <% end %>
+  <%= hidden_field_tag (credit.is_a?(TudlaAccounting::Document) ? :document_id : :payment_id), credit.id %>
+  <div class="tc-card tc-card-body grid gap-4 sm:grid-cols-4">
+    <div><%= form.label :paid_on, "Date", class: "tc-label" %><%= form.date_field :paid_on, value: @payment.paid_on, required: true, class: "tc-input" %></div>
+    <div><%= form.label :account_id, to_customer ? "Out of" : "Into", class: "tc-label" %>
+      <%= form.select :account_id, payment_accounts.map { |account| [ account.code_with_name, account.id ] }, { selected: @payment.account_id, include_blank: "Choose an account" }, class: "tc-input", required: true %></div>
+    <div><%= form.label :amount, "Amount (#{accounting_organization.currency})", class: "tc-label" %>
+      <%= form.text_field :amount, value: (@payment.amount_cents.to_i.positive? ? @payment.amount.format(symbol: false, thousands_separator: "") : params.dig(:payment, :amount)), inputmode: "decimal", required: true, class: "tc-input tc-num" %></div>
+    <div><%= form.label :reference, class: "tc-label" %><%= form.text_field :reference, value: @payment.reference, placeholder: "Bank reference", class: "tc-input" %></div>
+    <div class="sm:col-span-4"><%= form.label :notes, class: "tc-label" %><%= form.text_area :notes, value: @payment.notes, rows: 2, class: "tc-input" %></div>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <%= form.submit "Record refund", class: "tc-btn" %>
+    <%= link_to "Cancel", (credit.is_a?(TudlaAccounting::Document) ? document_path(credit) : payment_path(credit)), class: "tc-btn tc-btn-ghost" %>
+  </div>
+<% end %>

@@ -31,8 +31,8 @@
           <td><%= payment.reference %></td>
           <td><%= payment.account.code_with_name %></td>
           <td class="tc-num"><%= tc_money(payment.amount) %></td>
-          <td class="tc-num"><%= tc_money(payment.unapplied) unless payment.void? %></td>
-          <td><%= payment.void? ? tc_badge("Void", tone: :danger) : (payment.unapplied.zero? ? tc_badge("Applied", tone: :success) : tc_badge("Credit to apply", tone: :primary)) %></td>
+          <td class="tc-num"><%= tc_money(payment.unapplied) unless payment.void? || payment.refund? %></td>
+          <td><%= payment_status_badge(payment) %></td>
         </tr>
       <% end %>
     </tbody>

@@ -41,24 +41,6 @@
       </div>
     <% end %>
 
-    <% if carrying_amount.credit? && carrying_amount.amount_cents.negative? && entry.reversal.nil? && tc_can?(:post) %>
-      <% charges = TudlaAccounting::Allocator.open_charges(carrying_amount) %>
-      <div class="tc-card-body border-t border-[var(--tc-border)]">
-        <% if charges.empty? %>
-          <p class="tc-muted text-sm">Nothing is owed that it could be applied to.</p>
-        <% else %>
-          <%= form_with url: allocations_path, class: "grid gap-3 sm:grid-cols-6 items-end" do |form| %>
-            <%= form.hidden_field :entry_id, value: entry.id %>
-            <div class="sm:col-span-3"><%= form.label :to_id, "Apply to", class: "tc-label" %>
-              <%= form.select :to_id, charges.map { |charge| [ "#{entry_title(charge.detail.entry)} · owes #{tc_money(charge.amount)}#{" (#{Money.new(charge.forex.other_currency_amount_cents, charge.forex.other_currency).format})" if charge.forex}#{" · due #{tc_date(charge.due_date)}" if charge.due_date}", charge.id ] }, {}, class: "tc-input" %></div>
-            <div><%= form.label :amount, (carrying_amount.forex ? "Amount (#{carrying_amount.forex.other_currency} for #{carrying_amount.forex.other_currency} invoices)" : "Amount"), class: "tc-label" %>
-              <%= form.text_field :amount, class: "tc-input", inputmode: "decimal", placeholder: "All it can" %></div>
-            <div><%= form.label :on, "On", class: "tc-label" %><%= form.date_field :on, value: Date.current, class: "tc-input" %></div>
-            <div><%= form.submit "Apply", class: "tc-btn" %></div>
-          <% end %>
-          <%= button_to "Apply oldest first", oldest_first_allocations_path, params: { entry_id: entry.id }, class: "tc-btn tc-btn-secondary tc-btn-sm mt-3" %>
-        <% end %>
-      </div>
-    <% end %>
+    <%= render "tudla_accounting/allocations/apply", entry: entry, carrying_amount: carrying_amount %>
   </section>
 <% end %>

@@ -74,9 +74,10 @@ module TudlaAccounting
           account_code: payment.account.code, paid_on: date(payment.paid_on), currency: payment.organization.currency,
           amount: amount(payment.amount), unapplied: amount(payment.unapplied), reference: payment.reference, notes: payment.notes, entry_id: payment.entry_id,
           applied: payment.applications.map do |target, applied, allocation|
-            { document_id: (target.id if target.is_a?(Document)), number: (target.number_label if target.is_a?(Document)),
-              entry_id: (target.is_a?(Document) ? target.entry_id : target.id), amount: amount(applied), applied_at: time(allocation.allocated_at), active: allocation.active? }
+            { document_id: (target.id if target.is_a?(Document)), number: (target.number_label if target.is_a?(Document)), payment_id: (target.id if target.is_a?(Payment)),
+              entry_id: (target.is_a?(Entry) ? target.id : target.entry_id), amount: amount(applied), applied_at: time(allocation.allocated_at), active: allocation.active? }
           end,
+          refund_of: payment.refund_of&.then { |credit| credit.is_a?(Payment) ? { payment_id: credit.id } : { document_id: credit.id } },
           voided_on: date(payment.voided_on), void_reason: payment.void_reason, created_at: time(payment.created_at), updated_at: time(payment.updated_at) }
       end
 

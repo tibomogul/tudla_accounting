@@ -16,6 +16,19 @@ module TudlaAccounting
       end
     end
 
+    # How a payment stands: Void, Refund, Applied, or Credit to apply.
+    def payment_status_badge(payment)
+      return tc_badge("Void", tone: :danger) if payment.void?
+      return tc_badge("Refund") if payment.refund?
+
+      payment.unapplied.zero? ? tc_badge("Applied", tone: :success) : tc_badge("Credit to apply", tone: :primary)
+    end
+
+    # A link to a payment's or document's page, by its title.
+    def credit_link(record)
+      link_to(record.title, record.is_a?(Document) ? document_path(record) : payment_path(record), class: "underline")
+    end
+
     # "1" for 1.0000, "2.5" for 2.5000.
     def document_quantity(quantity)
       quantity.to_d.to_s("F").sub(/\.?0+\z/, "")

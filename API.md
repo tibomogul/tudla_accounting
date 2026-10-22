@@ -123,18 +123,18 @@ end
 
 ### Payments
 
-`GET /payments`: oldest first. Filters: `kind` (received or paid), `status` (posted or void), `contact_id`, `from` and `to` (the days they were paid), `updated_since`.
+`GET /payments`: oldest first. Filters: `kind` (received, paid, refund or supplier_refund), `status` (posted or void), `contact_id`, `from` and `to` (the days they were paid), `updated_since`.
 
 `GET /payments/:id`
 
 ```json
 { "id": 5, "kind": "received", "status": "posted", "contact": { "id": 3, "name": "Northwind" }, "account_code": "1000",
   "paid_on": "2026-04-10", "currency": "AUD", "amount": "300.00", "unapplied": "100.00", "reference": "EFT 1", "notes": null, "entry_id": 90,
-  "applied": [ { "document_id": 7, "number": "INV-0001", "entry_id": 81, "amount": "200.00", "applied_at": "...", "active": true } ],
-  "voided_on": null, "void_reason": null, "created_at": "...", "updated_at": "..." }
+  "applied": [ { "document_id": 7, "number": "INV-0001", "payment_id": null, "entry_id": 81, "amount": "200.00", "applied_at": "...", "active": true } ],
+  "refund_of": null, "voided_on": null, "void_reason": null, "created_at": "...", "updated_at": "..." }
 ```
 
-`unapplied` is the credit the contact still has from it. An application taken off again (the payment voided, say) has `"active": false`.
+`unapplied` is the credit the contact still has from it. An application taken off again (the payment voided, say) has `"active": false`. What was refunded of it is listed in `applied` with the refund's `payment_id`. A refund has `refund_of`, `{ "payment_id": 5 }` or `{ "document_id": 9 }` (a credit note), and nothing `applied` or `unapplied`.
 
 ### Tax codes and periods
 
@@ -204,6 +204,14 @@ Their files: an entry's or document's JSON lists them under `attachments` (`id`,
 ```
 
 `kind` is `received` (from a customer, applied to their invoices) or `paid` (to a supplier, applied to their bills). `account_code` is the bank or cash account it went through, in the organization's currency. Each application can't be more than is still owed on its document, nor all of them more than the payment; what isn't applied stays as a credit for the contact. `POST /payments/:id/void` (`post`) voids it, reversing its entry on `on` with a `reason` and taking it off what it paid; refused while it is matched to a bank statement line.
+
+A refund pays a credit back: `kind` `refund` (money back to a customer) or `supplier_refund` (back from a supplier), with `refund_of` naming the contact's posted payment or approved credit note, `{ "payment_id": 5 }` or `{ "document_id": 9 }`, and no more than is left of it:
+
+```json
+{ "kind": "refund", "contact_id": 3, "account_code": "1000", "paid_on": "2026-04-14", "amount": "100.00", "refund_of": { "payment_id": 5 } }
+```
+
+`POST /payments/:id/apply` and `POST /documents/:id/apply` (a credit note; `post`) apply what is left of a payment or credit note to one of the contact's open invoices or bills, `document_id`, all it can or `amount`, on `on` (today by default). They answer with the payment or credit note.
 
 ## Reports
 

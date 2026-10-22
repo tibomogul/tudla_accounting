@@ -190,7 +190,7 @@ RSpec.describe "JSON API: reading the books", type: :request do
     shown = api_get(routes.api_v1_payment_path(payment))["data"]
     expect(shown).to include("kind" => "received", "status" => "posted", "account_code" => "1000", "paid_on" => "2026-04-10", "amount" => "300.00", "unapplied" => "100.00", "reference" => "EFT 1")
     expect(shown["applied"]).to eq([ { "document_id" => invoice.id, "number" => "INV-0001", "entry_id" => invoice.entry_id, "amount" => "200.00",
-                                       "applied_at" => "2026-04-10T00:00:00Z", "active" => true } ])
+                                       "applied_at" => "2026-04-10T00:00:00Z", "active" => true, "payment_id" => nil } ])
     expect(api_get(routes.api_v1_payments_path, kind: "received", status: "posted", contact_id: northwind.id, from: "2026-04-10", to: "2026-04-10")["meta"]["total_count"]).to eq(1)
     expect(api_get(routes.api_v1_payments_path, kind: "paid")["data"]).to eq([])
 

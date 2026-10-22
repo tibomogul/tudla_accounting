@@ -29,6 +29,9 @@
           <% if target.is_a?(TudlaAccounting::Document) %>
             <td><%= target.number_label %><%= " (your #{target.reference})" if target.purchases? && target.reference %></td>
             <td><%= tc_date(target.issued_on) %></td>
+          <% elsif target.is_a?(TudlaAccounting::Payment) %>
+            <td><%= received ? "Refunded to you" : "Refunded to us" %><%= " (#{target.reference})" if target.reference %></td>
+            <td><%= tc_date(target.paid_on) %></td>
           <% else %>
             <td><%= target.reference || target.particulars %></td>
             <td><%= tc_date(target.transacted_at) %></td>

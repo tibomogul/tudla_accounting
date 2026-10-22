@@ -5,7 +5,9 @@ module TudlaAccounting
       # (posted, void), contact, paid from and to, or changed since a time.
       #
       # Recording one (create) and voiding it need :post. An Idempotency-Key makes a
-      # retried create return the payment the first recorded.
+      # retried create return the payment the first recorded. A refund (kind refund or
+      # supplier_refund) names the credit it pays back: refund_of { payment_id } or
+      # { document_id } (a credit note).
       class PaymentsController < BaseController
         include Representation
 
@@ -37,7 +39,7 @@ module TudlaAccounting
           payment = Payment.record!(organization: accounting_organization, kind: body[:kind].to_s, contact: contact_by_id(body[:contact_id]),
                                     account: account_by_code(body[:account_code], "account_code"), paid_on: date_param(:paid_on) || raise(ArgumentError, "paid_on is missing"),
                                     amount_cents: cents(body[:amount], "amount"), reference: body[:reference], notes: body[:notes],
-                                    idempotency_key: idempotency_key, applications: applications)
+                                    idempotency_key: idempotency_key, applications: applications, refund_of: refund_of)
           render_made(payment_json(payment))
         rescue ActiveRecord::RecordNotUnique
           render_made(payment_json(replay(organization_scope(Payment)) || raise))
@@ -47,6 +49,16 @@ module TudlaAccounting
           payment = organization_scope(Payment).find(params[:id])
           payment.void!(on: date_param(:on) || raise(ArgumentError, "on is missing"), reason: body[:reason])
           render json: { data: payment_json(payment.reload) }
+        end
+
+        private
+
+        def refund_of
+          given = body[:refund_of]
+          return if given.blank?
+          raise ArgumentError, "refund_of must be an object with payment_id or document_id" unless given.is_a?(Hash) && (given[:payment_id].present? ^ given[:document_id].present?)
+
+          given[:payment_id].present? ? organization_scope(Payment).find(given[:payment_id]) : organization_scope(Document).find(given[:document_id])
         end
       end
     end

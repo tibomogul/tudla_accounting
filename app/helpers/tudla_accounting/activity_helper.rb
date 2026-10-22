@@ -80,7 +80,7 @@ module TudlaAccounting
       when "api_token.revoked" then safe_join([ "Revoked ", subject ])
       when "payment.recorded"
         applied = details["documents"].presence
-        safe_join([ "Recorded ", subject, (" for #{applied.to_sentence}" if applied) ].compact)
+        safe_join([ "Recorded ", subject, (" for #{applied.to_sentence}" if applied), (" paying back #{details['refund_of']}" if details["refund_of"]) ].compact)
       when "payment.voided" then safe_join([ "Voided ", subject, " on #{tc_date(details['on'])}: “#{details['reason']}”" ])
       when "document.voided" then safe_join([ "Voided ", subject, " on #{tc_date(details['on'])}: “#{details['reason']}”" ])
       when "tax_return.filed" then safe_join([ "Filed the tax return ", subject ])

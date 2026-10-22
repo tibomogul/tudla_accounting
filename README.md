@@ -117,7 +117,7 @@ TudlaAccounting::ReminderRunner.call(organization: organization) # => #<Result s
 ```
 
 ### Payments
-`TudlaAccounting::Payment` is money received from a customer (`kind: "received"`) or paid to a supplier (`"paid"`), through a bank or cash account in the organization's currency. `Payment.record!` saves it and posts its entry straight away, dated `paid_on`, with the payment as its source: the bank account against the account marked receivable (or payable), opening a credit for the contact that is applied to the invoices or bills given, as much to each as said. What isn't applied stays as a credit, applied later from the entry's page as any credit is. With `bank_line:` it is matched to that bank statement line too. All or nothing; `ArgumentError` says what's wrong.
+`TudlaAccounting::Payment` is money received from a customer (`kind: "received"`) or paid to a supplier (`"paid"`), through a bank or cash account in the organization's currency. `Payment.record!` saves it and posts its entry straight away, dated `paid_on`, with the payment as its source: the bank account against the account marked receivable (or payable), opening a credit for the contact that is applied to the invoices or bills given, as much to each as said. What isn't applied stays as a credit, applied later (from the payment's page, the contact's or the entry's) or refunded. With `bank_line:` it is matched to that bank statement line too. All or nothing; `ArgumentError` says what's wrong.
 
 ```ruby
 payment = TudlaAccounting::Payment.record!(organization: organization, kind: "received", contact: northwind, account: bank,
@@ -127,9 +127,17 @@ payment.unapplied # $170.00, a credit to apply
 payment.void!(on: Date.current, reason: "Bounced") # reverses its entry and takes it off the invoice
 ```
 
-The engine maps its payments to the receipt and disbursement roles itself (see `carrying_amount_sources`). A payment isn't changed or deleted once recorded: `void!` reverses its entry (refused while it is matched to a bank statement line), and reversing the entry itself voids it too. Payments are on the audit trail (`payment.recorded`, `payment.voided`).
+A refund is a payment too: money paid back to a customer (`kind: "refund"`) or back from a supplier (`"supplier_refund"`), using up what is left of a payment or credit note of theirs (`refund_of:`, no more than is left). Its entry is the bank account against the same receivable or payable account, related to the credit's entry:
 
-**Record payment** on an approved invoice or bill (or on a contact's page) opens a form listing the contact's open invoices or bills, oldest due first, to apply it to. **Payments received** and **Payments made** (from the Sales and Purchases pages) list them, searched and downloadable as CSV, and each payment's page shows what it was applied to. On the banking page, an unmatched statement line can be recorded as a payment of an open invoice (money in) or bill (money out), those owing exactly its amount first: it applies as much as is owed, keeps the rest as a credit, and matches the line. Recording and voiding payments need `:post`.
+```ruby
+TudlaAccounting::Payment.record!(organization: organization, kind: "refund", contact: northwind, account: bank,
+                                 paid_on: Date.current, amount_cents: 170_00, refund_of: payment)
+payment.unapplied # $0.00
+```
+
+The engine maps its payments to the receipt, disbursement, refund and supplier_refund roles itself (see `carrying_amount_sources`). A payment isn't changed or deleted once recorded: `void!` reverses its entry (refused while it is matched to a bank statement line), and reversing the entry itself voids it too. Payments are on the audit trail (`payment.recorded`, `payment.voided`).
+
+**Record payment** on an approved invoice or bill (or on a contact's page) opens a form listing the contact's open invoices or bills, oldest due first, to apply it to. **Payments received** and **Payments made** (from the Sales and Purchases pages) list them, searched and downloadable as CSV, and each payment's page shows what it was applied to. A payment or credit note with something left offers to apply it to the contact's other open invoices or bills (one, or oldest first), or to refund it (**Refund to them**, **Record their refund**); so does each credit on the contact's page. Refunds are listed with the payments, and have no receipt or notice to send. On the banking page, an unmatched statement line can be recorded as a payment of an open invoice (money in) or bill (money out), those owing exactly its amount first: it applies as much as is owed, keeps the rest as a credit, and matches the line. Recording and voiding payments need `:post`.
 
 ### API tokens
 `TudlaAccounting::ApiToken` lets another system (a shop, a payroll app) reach an organization's books through the JSON API, with the permissions it is given: `read`, `record`, `post` and `administer`, as the `authorize` setting checks them on the pages. Only a SHA-256 digest of the token is kept, so its secret is seen once, when it is issued:

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_22_005000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_22_006000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -505,7 +505,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_005000) do
     t.index ["organization_type", "organization_id", "idempotency_key"], name: "tudla_accounting_payments_idempotency_key", unique: true, where: "(idempotency_key IS NOT NULL)"
     t.index ["organization_type", "organization_id", "paid_on"], name: "index_tudla_accounting_payments_on_paid_on"
     t.check_constraint "amount_cents > 0", name: "tudla_accounting_payments_amount_positive"
-    t.check_constraint "kind::text = ANY (ARRAY['received'::character varying::text, 'paid'::character varying::text])", name: "tudla_accounting_payments_kind_known"
+    t.check_constraint "kind::text = ANY (ARRAY['received'::character varying, 'paid'::character varying, 'refund'::character varying, 'supplier_refund'::character varying]::text[])", name: "tudla_accounting_payments_kind_known"
     t.check_constraint "status::text = ANY (ARRAY['posted'::character varying::text, 'void'::character varying::text])", name: "tudla_accounting_payments_status_known"
   end
 

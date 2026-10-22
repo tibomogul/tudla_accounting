@@ -88,7 +88,7 @@ module TudlaAccounting
     end
 
     def payment_target
-      @subject = organization_scope(Payment).where(status: "posted").find(params[:payment_id])
+      @subject = organization_scope(Payment).where(status: "posted", kind: %w[received paid]).find(params[:payment_id])
       @draft = EmailDraft.for_payment(@subject)
       @recipient = @subject.contact.name
       @title = "the #{@subject.received? ? 'receipt' : 'payment notice'} for the #{@subject.title.downcase_first}"

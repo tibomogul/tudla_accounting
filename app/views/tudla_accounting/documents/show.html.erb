@@ -20,6 +20,9 @@
       <%= link_to "Send reminder", new_email_path(document_id: @document.id, reminder: 1), class: "tc-btn tc-btn-secondary" %>
     <% end %>
     <% if tc_can?(:post) && !@document.credit? && @document.amount_due.positive? %><%= link_to "Record payment", new_payment_path(document_id: @document.id), class: "tc-btn" %><% end %>
+    <% if tc_can?(:post) && @document.credit? && @document.amount_due.positive? %>
+      <%= link_to (sales ? "Refund to them" : "Record their refund"), new_refund_path(document_id: @document.id), class: "tc-btn tc-btn-secondary" %>
+    <% end %>
   <% end %>
 <% end %>
 
@@ -73,6 +76,13 @@
         <% end %>
       </tbody>
     </table>
+  </section>
+<% end %>
+
+<% if @document.approved? && @document.credit? && @document.amount_due.positive? && tc_can?(:post) %>
+  <section class="tc-card mt-6 print:hidden" aria-labelledby="apply-credit">
+    <h2 id="apply-credit" class="tc-card-body tc-card-title pb-0">Left to apply: <%= tc_money(@document.amount_due) %></h2>
+    <%= render "tudla_accounting/allocations/apply", entry: @document.entry, carrying_amount: @document.entry.details.filter_map(&:carrying_amount).first, back: document_path(@document) %>
   </section>
 <% end %>
 

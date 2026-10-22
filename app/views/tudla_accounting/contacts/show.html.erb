@@ -46,7 +46,7 @@
         <% lines = report[:details].values.first || [] %>
         <% if lines.any? %>
           <table class="tc-table">
-            <thead><tr><th>Date</th><th>For</th><th>Due</th><th class="tc-num">Outstanding</th></tr></thead>
+            <thead><tr><th>Date</th><th>For</th><th>Due</th><th class="tc-num">Outstanding</th><th><span class="sr-only">Actions</span></th></tr></thead>
             <tbody>
               <% lines.each do |line| %>
                 <tr>
@@ -54,6 +54,17 @@
                   <td><%= entry_source_link(line[:entry]) %></td>
                   <td class="whitespace-nowrap"><%= line[:credit] ? tc_badge("Credit to apply") : (tc_date(line[:carrying_amount].due_date) || "—") %></td>
                   <td class="tc-num"><%= tc_money(line[:outstanding]) %></td>
+                  <td class="text-right whitespace-nowrap">
+                    <% if line[:credit] && tc_can?(:post) %>
+                      <div class="flex justify-end gap-1">
+                        <%= button_to "Apply oldest first", oldest_first_allocations_path, params: { entry_id: line[:entry].id, back: contact_path(@contact) }, class: "tc-btn tc-btn-ghost tc-btn-sm" %>
+                        <% source = line[:entry].source %>
+                        <% if source.is_a?(TudlaAccounting::Payment) || source.is_a?(TudlaAccounting::Document) %>
+                          <%= link_to "Refund", new_refund_path(source.is_a?(TudlaAccounting::Payment) ? { payment_id: source.id } : { document_id: source.id }), class: "tc-btn tc-btn-ghost tc-btn-sm" %>
+                        <% end %>
+                      </div>
+                    <% end %>
+                  </td>
                 </tr>
               <% end %>
             </tbody>
