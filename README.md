@@ -159,6 +159,16 @@ The engine maps its payments to the receipt, disbursement, refund and supplier_r
 
 **Record payment** on an approved invoice or bill (or on a contact's page) opens a form listing the contact's open invoices or bills, oldest due first, to apply it to. **Payments received** and **Payments made** (from the Sales and Purchases pages) list them, searched and downloadable as CSV, and each payment's page shows what it was applied to. A payment or credit note with something left offers to apply it to the contact's other open invoices or bills (one, or oldest first), or to refund it (**Refund to them**, **Record their refund**); so does each credit on the contact's page. Refunds are listed with the payments, and have no receipt or notice to send. On the banking page, an unmatched statement line can be recorded as a payment of an open invoice (money in) or bill (money out), those owing exactly its amount first: it applies as much as is owed, keeps the rest as a credit, and matches the line. Recording and voiding payments need `:post`.
 
+### Pay runs
+**Purchases → Pay run** (`:post`) lists the bills owed by a date (a week from today by default), from one bank account's currency, for every supplier or one, grouped by supplier and all ticked. Untick any, change what is paid of each, give the date and a reference, and pay them: one payment to each supplier from that account, applied to its bills, and (by default) its payment notice emailed; suppliers without an email address are named. All the payments are recorded or none, and an error says whose couldn't be. In code:
+
+```ruby
+TudlaAccounting::PayRun.due(organization, currency: "AUD", due_by: Date.current + 7) # the bills, by supplier
+TudlaAccounting::PayRun.call(organization: organization, account: bank, paid_on: Date.current, reference: "Pay run",
+                             bills: [ { document: bill, amount_cents: bill.amount_due.cents } ], email: true)
+# => #<Result payments=[...] emailed=[...] no_address=[...]>
+```
+
 ### API tokens
 `TudlaAccounting::ApiToken` lets another system (a shop, a payroll app) reach an organization's books through the JSON API, with the permissions it is given: `read`, `record`, `post` and `administer`, as the `authorize` setting checks them on the pages. Only a SHA-256 digest of the token is kept, so its secret is seen once, when it is issued:
 

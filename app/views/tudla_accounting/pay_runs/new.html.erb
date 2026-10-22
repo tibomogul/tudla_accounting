@@ -1,0 +1,60 @@
+<%= tc_page_header "Pay run", subtitle: "Pay suppliers' bills in one go: one payment to each, with its payment notice" do %>
+  <%= link_to "Purchases", purchase_documents_path, class: "tc-btn tc-btn-ghost" %>
+<% end %>
+
+<% suppliers = TudlaAccounting::Contact.where(organization: accounting_organization).suppliers.order(Arel.sql("LOWER(name)")) %>
+<%= form_with url: new_pay_run_path, method: :get, class: "tc-card tc-card-body mb-4 flex flex-wrap items-end gap-3" do |form| %>
+  <div><%= form.label :account_id, "Pay from", class: "tc-label" %>
+    <%= form.select :account_id, bank_accounts.map { |account| [ "#{account.code_with_name}#{" (#{account.currency})" if account.currency.present? && account.currency != accounting_organization.currency}", account.id ] },
+                    { selected: @account&.id }, class: "tc-input" %></div>
+  <div><%= form.label :due_by, "Due by", class: "tc-label" %><%= form.date_field :due_by, value: @due_by, class: "tc-input" %></div>
+  <div><%= form.label :contact_id, "Supplier", class: "tc-label" %>
+    <%= form.select :contact_id, suppliers.map { |supplier| [ supplier.name, supplier.id ] }, { include_blank: "All suppliers", selected: @contact&.id }, class: "tc-input" %></div>
+  <%= form.submit "Show bills", class: "tc-btn tc-btn-secondary", name: nil %>
+<% end %>
+
+<% if @bills.empty? %>
+  <p class="tc-card tc-card-body tc-muted text-sm" data-no-bills>No <%= @currency %> bills are owed<%= " to #{@contact.name}" if @contact %> that are due by <%= tc_date(@due_by) %>.</p>
+<% else %>
+  <%= form_with url: pay_run_path, scope: :pay_run, class: "space-y-4",
+                data: { controller: "confirm", confirm_message_value: "Pay the chosen bills? A payment to each supplier is recorded and posted.", action: "submit->confirm#ask" } do |form| %>
+    <% if @error %><div class="tc-alert tc-alert-danger" role="alert"><%= @error %></div><% end %>
+    <%= form.hidden_field :account_id, value: @account.id %>
+    <%= form.hidden_field :due_by, value: @due_by %>
+    <%= form.hidden_field :contact_id, value: @contact&.id %>
+
+    <div class="tc-card overflow-x-auto">
+      <table class="tc-table">
+        <thead><tr><th><span class="sr-only">Pay</span></th><th>Bill</th><th>Their number</th><th>Due</th><th class="tc-num">Owed (<%= @currency %>)</th><th class="tc-num">Pay (<%= @currency %>)</th></tr></thead>
+        <% @bills.group_by(&:contact).each do |supplier, bills| %>
+          <tbody data-supplier="<%= supplier.name %>">
+            <tr><th colspan="6" class="text-left"><%= supplier.name %><span class="tc-muted font-normal"> · <%= tc_money(bills.sum(Money.new(0, @currency), &:amount_due)) %> owed<%= " · no email address" unless supplier.email %></span></th></tr>
+            <% bills.each do |bill| %>
+              <tr data-bill>
+                <td><%= hidden_field_tag "pay_run[pay][#{bill.id}]", "0", id: nil %><%= check_box_tag "pay_run[pay][#{bill.id}]", "1", @selected.include?(bill.id), aria: { label: "Pay #{bill.number_label}" } %></td>
+                <td><%= link_to bill.number_label, document_path(bill), class: "underline" %></td>
+                <td><%= bill.reference %></td>
+                <td class="whitespace-nowrap <%= "tc-negative" if bill.due_on && bill.due_on < Date.current %>"><%= tc_date(bill.due_on) %></td>
+                <td class="tc-num"><%= tc_money(bill.amount_due) %></td>
+                <td class="w-36"><%= text_field_tag "pay_run[amounts][#{bill.id}]", @amounts[bill.id] || bill.amount_due.format(symbol: false, thousands_separator: "", decimal_mark: "."),
+                                                    inputmode: "decimal", class: "tc-input tc-num", aria: { label: "Pay on #{bill.number_label}" } %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        <% end %>
+        <tfoot><tr class="font-semibold"><td colspan="4" class="text-right">Owed on the bills listed</td><td class="tc-num"><%= tc_money(@bills.sum(Money.new(0, @currency), &:amount_due)) %></td><td></td></tr></tfoot>
+      </table>
+    </div>
+
+    <div class="tc-card tc-card-body grid gap-4 sm:grid-cols-4">
+      <div><%= form.label :paid_on, "Paid on", class: "tc-label" %><%= form.date_field :paid_on, value: @pay_run[:paid_on], required: true, class: "tc-input" %></div>
+      <div class="sm:col-span-2"><%= form.label :reference, class: "tc-label" %><%= form.text_field :reference, value: @pay_run[:reference], class: "tc-input" %></div>
+      <%= render "tudla_accounting/payments/rate", form: form, payment: TudlaAccounting::Payment.new(exchange_rate: @pay_run[:exchange_rate].presence), currency: @currency %>
+      <label class="sm:col-span-4 flex items-center gap-2 text-sm"><%= form.check_box :email, { checked: @pay_run[:email] }, "1", "0" %> Email each supplier its payment notice</label>
+    </div>
+    <div class="flex gap-2">
+      <%= form.submit "Pay the chosen bills", class: "tc-btn" %>
+      <span class="tc-hint self-center">One payment to each supplier, from <%= @account.code_with_name %>, posted straight away.</span>
+    </div>
+  <% end %>
+<% end %>

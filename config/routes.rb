@@ -119,6 +119,7 @@ TudlaAccounting::Engine.routes.draw do
   resources :payments, only: %i[show new create] do
     member { post :void }
   end
+  resource :pay_run, only: %i[new create]
   get "refunds/new", to: "payments#new_refund", as: :new_refund
   post "refunds", to: "payments#create_refund", as: :refunds
   resources :emails, only: %i[new create] do
