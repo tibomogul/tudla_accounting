@@ -62,7 +62,7 @@ module TudlaAccounting
 
       def self.csv_cell(cell)
         case cell
-        when Money then cell.format(symbol: false, thousands_separator: "", decimal_mark: ".")
+        when Money then AmountParser.text(cell)
         when Date, Time, ActiveSupport::TimeWithZone then cell.to_date.iso8601
         when String then cell.match?(FORMULA_START) ? "'#{cell}" : cell
         else cell

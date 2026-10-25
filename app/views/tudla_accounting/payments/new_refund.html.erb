@@ -1,7 +1,7 @@
 <% credit = @payment.refund_of %>
 <% to_customer = @payment.kind == "refund" %>
 <%= tc_page_header (to_customer ? "Refund to #{@payment.contact.name}" : "Refund from #{@payment.contact.name}"),
-                   subtitle: "Pays back what is left of #{credit.title.downcase_first}: #{Money.new(TudlaAccounting::Payment.credit_left_cents(credit), @currency).format}" %>
+                   subtitle: "Pays back what is left of #{credit.title.downcase_first}: #{tc_money_text(Money.new(TudlaAccounting::Payment.credit_left_cents(credit), @currency))}" %>
 
 <%= form_with url: refunds_path, scope: :payment, class: "space-y-4" do |form| %>
   <% if @payment.errors.any? %>

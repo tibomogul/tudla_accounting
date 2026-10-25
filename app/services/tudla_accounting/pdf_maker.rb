@@ -18,22 +18,23 @@ module TudlaAccounting
     module_function
 
     def document(document)
-      render("tudla_accounting/documents/document", { document: document }, title: "#{document.title} – #{document.contact.name}")
+      render("tudla_accounting/documents/document", { document: document }, title: "#{document.title} – #{document.contact.name}", organization: document.organization)
     end
 
     def statements(statements, open_items:)
-      render("tudla_accounting/reports/party_statement", { open_items: open_items }, collection: statements, as: :statement, title: "Statement of account")
+      render("tudla_accounting/reports/party_statement", { open_items: open_items }, collection: statements, as: :statement, title: "Statement of account",
+                                                                                     organization: statements.first&.organization)
     end
 
     def payment(payment)
-      render("tudla_accounting/payments/notice", { payment: payment }, title: payment.title)
+      render("tudla_accounting/payments/notice", { payment: payment }, title: payment.title, organization: payment.organization)
     end
 
-    # The PDF of a partial, in the PDF layout.
-    def render(partial, locals, title:, **options)
+    # The PDF of a partial, in the PDF layout, for an organization's amounts.
+    def render(partial, locals, title:, organization:, **options)
       raise Error, "PDFs need the ferrum gem" unless TudlaAccounting.pdf?
 
-      html = PdfViewsController.render(template: "tudla_accounting/pdf_views/page", layout: "tudla_accounting/pdf", assigns: { title: title },
+      html = PdfViewsController.render(template: "tudla_accounting/pdf_views/page", layout: "tudla_accounting/pdf", assigns: { title: title, organization: organization },
                                        locals: { partial: partial, locals: locals, **options })
       from_html(html)
     end

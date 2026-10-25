@@ -183,6 +183,7 @@ module TudlaAccounting
     private
 
     def money(cents) = Money.new(cents, currency)
+    def text(money) = MoneyFormatter.labelled(money, organization.currency)
 
     def check_applications(applications)
       wanted = sales? ? "sales_invoice" : "bill"
@@ -192,10 +193,10 @@ module TudlaAccounting
         end
         raise ArgumentError, "#{document.number_label} is in #{document.currency}, and the payment is in #{currency}" if document.currency != currency
         raise ArgumentError, "Apply a positive amount to #{document.number_label}" unless cents.positive?
-        raise ArgumentError, "#{money(cents).format} is more than is owed on #{document.number_label}" if cents > document.amount_due.cents
+        raise ArgumentError, "#{text(money(cents))} is more than is owed on #{document.number_label}" if cents > document.amount_due.cents
       end
       total = applications.sum(&:last)
-      raise ArgumentError, "The payment is #{amount.format} but #{money(total).format} is applied" if total > amount_cents
+      raise ArgumentError, "The payment is #{text(amount)} but #{text(money(total))} is applied" if total > amount_cents
     end
 
     # A refund pays back a posted payment or approved credit note of the contact's, on the
@@ -215,7 +216,7 @@ module TudlaAccounting
       raise ArgumentError, "#{refund_of_label.upcase_first} is in #{credit.currency}, and the refund is in #{currency}" if credit.currency != currency
 
       left = self.class.credit_left_cents(credit)
-      raise ArgumentError, "Only #{money(left).format} of #{refund_of_label} is left to refund" if amount_cents > left
+      raise ArgumentError, "Only #{text(money(left))} of #{refund_of_label} is left to refund" if amount_cents > left
     end
 
     def refund_of_label

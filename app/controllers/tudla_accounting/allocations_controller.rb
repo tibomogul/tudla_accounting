@@ -12,7 +12,7 @@ module TudlaAccounting
       raise ArgumentError, "Choose an invoice or bill that is still owed" unless charge
 
       allocation = Allocator.allocate!(@credit_entry, charge, at: on, **amount(charge))
-      redirect_to back_or(entry_path(@credit_entry)), notice: "Applied #{helpers.tc_money(allocation.amount)} to #{charge.detail.entry.particulars}."
+      redirect_to back_or(entry_path(@credit_entry)), notice: "Applied #{helpers.tc_money_text(allocation.amount)} to #{charge.detail.entry.particulars}."
     rescue ArgumentError, ActionController::ParameterMissing => e
       redirect_to back_or(entry_path(@credit_entry)), alert: "Nothing was applied: #{e.message.downcase_first}."
     end
@@ -28,7 +28,7 @@ module TudlaAccounting
     def reverse
       allocation = organization_scope(Allocation).find(params[:id])
       Allocator.unallocate!(allocation, at: on)
-      redirect_to back_or(entry_path(allocation.from.detail.entry)), notice: "Took #{helpers.tc_money(allocation.amount)} off #{allocation.to.detail.entry.particulars}."
+      redirect_to back_or(entry_path(allocation.from.detail.entry)), notice: "Took #{helpers.tc_money_text(allocation.amount)} off #{allocation.to.detail.entry.particulars}."
     rescue ArgumentError => e
       redirect_to back_or(entry_path(allocation.from.detail.entry)), alert: "It was not taken off: #{e.message.downcase_first}."
     end

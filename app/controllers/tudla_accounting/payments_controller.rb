@@ -66,7 +66,7 @@ module TudlaAccounting
       applications = @applied.map { |id, applied| { document: documents.fetch(id) { raise ActiveRecord::RecordNotFound }, amount_cents: applied } }
       @payment = Payment.record!(**@payment.attributes.symbolize_keys.slice(:kind, :contact_id, :account_id, :paid_on, :amount_cents, :exchange_rate, :reference, :notes),
                                  organization: accounting_organization, applications: applications)
-      redirect_to payment_path(@payment), notice: "#{@payment.title} of #{@payment.amount.format} recorded.#{email_it(@payment) if permitted[:email_it] == '1'}"
+      redirect_to payment_path(@payment), notice: "#{@payment.title} of #{helpers.tc_money_text(@payment.amount)} recorded.#{email_it(@payment) if permitted[:email_it] == '1'}"
     rescue ArgumentError => e
       @payment.errors.add(:base, e.message)
       render :new, status: :unprocessable_entity
@@ -97,7 +97,7 @@ module TudlaAccounting
       @payment.amount_cents = amount_cents(permitted[:amount], @currency) { |problem| raise ArgumentError, problem }
       @payment = Payment.record!(**@payment.attributes.symbolize_keys.slice(:kind, :contact_id, :account_id, :paid_on, :amount_cents, :exchange_rate, :reference, :notes),
                                  organization: accounting_organization, refund_of: credit)
-      redirect_to payment_path(@payment), notice: "#{@payment.title} of #{@payment.amount.format} recorded."
+      redirect_to payment_path(@payment), notice: "#{@payment.title} of #{helpers.tc_money_text(@payment.amount)} recorded."
     rescue ArgumentError => e
       @payment.errors.add(:base, e.message)
       render :new_refund, status: :unprocessable_entity

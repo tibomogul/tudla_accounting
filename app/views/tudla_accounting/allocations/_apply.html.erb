@@ -10,7 +10,7 @@
         <%= form.hidden_field :entry_id, value: entry.id %>
         <% if back %><%= form.hidden_field :back, value: back %><% end %>
         <div class="sm:col-span-3"><%= form.label :to_id, "Apply to", class: "tc-label" %>
-          <%= form.select :to_id, charges.map { |charge| [ "#{entry_title(charge.detail.entry)} · owes #{tc_money(charge.amount)}#{" (#{Money.new(charge.forex.other_currency_amount_cents, charge.forex.other_currency).format})" if charge.forex}#{" · due #{tc_date(charge.due_date)}" if charge.due_date}", charge.id ] }, {}, class: "tc-input" %></div>
+          <%= form.select :to_id, charges.map { |charge| [ "#{entry_title(charge.detail.entry)} · owes #{tc_money(charge.amount)}#{" (#{tc_money_text(Money.new(charge.forex.other_currency_amount_cents, charge.forex.other_currency))})" if charge.forex}#{" · due #{tc_date(charge.due_date)}" if charge.due_date}", charge.id ] }, {}, class: "tc-input" %></div>
         <div><%= form.label :amount, (carrying_amount.forex ? "Amount (#{carrying_amount.forex.other_currency} for #{carrying_amount.forex.other_currency} invoices)" : "Amount"), class: "tc-label" %>
           <%= form.text_field :amount, class: "tc-input", inputmode: "decimal", placeholder: "All it can" %></div>
         <div><%= form.label :on, "On", class: "tc-label" %><%= form.date_field :on, value: Date.current, class: "tc-input" %></div>

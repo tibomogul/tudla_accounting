@@ -149,7 +149,7 @@ RSpec.describe "Bank reconciliation", type: :service do
         -> { other.match!(line("Deposit"), [ deposit ]) } => "That statement line is for another account",
         -> { reconciler.match!(line("Deposit"), []) } => "Choose the ledger lines it matches",
         -> { reconciler.match!(line("Deposit"), [ draft ]) } => "Only posted lines on 1000 - Bank can be matched",
-        -> { reconciler.match!(line("Deposit"), [ fee_in_books ]) } => "The ledger lines add up to AUD -5.00 but the statement line is AUD 1,100.00"
+        -> { reconciler.match!(line("Deposit"), [ fee_in_books ]) } => "The ledger lines add up to -$5.00 but the statement line is $1,100.00"
       }.each { |attempt, message| expect(&attempt).to raise_error(ArgumentError, message) }
 
       reconciler.match!(line("Deposit"), [ deposit ])

@@ -2,7 +2,7 @@
 <% carrying_amount = entry.details.filter_map(&:carrying_amount).first %>
 <% if carrying_amount %>
   <% currency = accounting_organization.currency %>
-  <% foreign = ->(cents) { cents && carrying_amount.forex ? Money.new(cents, carrying_amount.forex.other_currency).format : nil } %>
+  <% foreign = ->(cents) { cents && carrying_amount.forex ? tc_money_text(Money.new(cents, carrying_amount.forex.other_currency)) : nil } %>
   <% allocations = carrying_amount.allocations.includes(from: { detail: :entry }, to: { detail: :entry }).order(:allocated_at, :id) %>
   <section class="tc-card mb-6" aria-labelledby="allocations-heading">
     <div class="tc-card-body pb-0 flex flex-wrap items-baseline justify-between gap-2">

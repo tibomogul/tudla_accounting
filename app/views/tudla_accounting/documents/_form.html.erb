@@ -44,7 +44,7 @@
                      .where(contact: document.contact_id ? document.contact_id : contacts.select(:id)).order(issued_on: :desc).limit(200).includes(:contact).to_a %>
       <% charges = charges.select { |charge| charge.amount_due.positive? || charge.id == document.credited_document_id } %>
       <div class="sm:col-span-2"><%= tc_field form, :credited_document_id, as: :select, label: "Apply to",
-                                              choices: [ [ "Nothing yet (a credit to apply later)", "" ] ] + charges.map { |charge| [ "#{charge.number_label} – #{charge.contact.name} (#{charge.amount_due.format} due)", charge.id ] } %></div>
+                                              choices: [ [ "Nothing yet (a credit to apply later)", "" ] ] + charges.map { |charge| [ "#{charge.number_label} – #{charge.contact.name} (#{tc_money_text(charge.amount_due)} due)", charge.id ] } %></div>
     <% end %>
   </div>
 

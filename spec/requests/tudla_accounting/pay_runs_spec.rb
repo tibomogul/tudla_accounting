@@ -76,7 +76,7 @@ RSpec.describe "Pay runs", type: :request do
 
     pay([ [ first, "100" ], [ second, "150.00" ], [ other, "" ] ])
     expect(response).to redirect_to(routes.paid_payments_path)
-    expect(flash[:notice]).to eq("Paid 2 suppliers AUD 300.00 in all. Emailing payment notices to Cloudware. Not emailed, as they have no email address: Stationers.")
+    expect(flash[:notice]).to eq("Paid 2 suppliers $300.00 in all. Emailing payment notices to Cloudware. Not emailed, as they have no email address: Stationers.")
     payments = TudlaAccounting::Payment.order(:id)
     expect(payments.map { |payment| [ payment.contact.name, payment.amount_cents, payment.reference, payment.account.code ] })
       .to eq([ [ "Cloudware", 250_00, "Pay run 20 Apr", "1000" ], [ "Stationers", 50_00, "Pay run 20 Apr", "1000" ] ])

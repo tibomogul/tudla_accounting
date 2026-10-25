@@ -47,7 +47,7 @@
     <% if @report.reconciles? %>
       <%= tc_badge "The change in cash is fully explained", tone: :success %>
     <% else %>
-      <%= tc_badge "Unexplained difference of #{(@report.closing - @report.opening - @report.net_change).format(symbol: false)}", tone: :danger %>
+      <%= tc_badge "Unexplained difference of #{tc_money_text(@report.closing - @report.opening - @report.net_change)}", tone: :danger %>
     <% end %>
   </p>
   <p class="tc-hint mt-2">Cash is <%= @report.cash_accounts.map(&:code_with_name).to_sentence %> and the accounts beneath them. Each account's activity is set on the account (equity defaults to financing, the rest to operating).</p>

@@ -238,6 +238,15 @@ TudlaAccounting::AmountParser.cents("10.005", "AUD", round: true)   # => 1001
 TudlaAccounting::AmountParser.decimal("1.65")                       # => 1.65, for rates, quantities and percentages
 ```
 
+### Showing amounts
+Amounts are written for people one way (`MoneyFormatter`), in the organization's style: its currency's decimal mark and thousands separator, for amounts in any currency, so a euro amount in Australian books reads `1,234.56` and an Australian dollar amount in euro books `1.234,56`. Tables give the number alone (the currency is in the column heading), with negatives in parentheses. An amount standing alone, in a heading, a message, an error, an email or a document, carries the organization's currency symbol (`$1,234.56`), or for any other currency its code (`USD 1,234.56`), since symbols such as `$` are shared. The PDFs and the forms' live totals follow the same style; CSV, Excel, the JSON API and form fields have plain numbers (`1234.56`, `AmountParser.text`). Views use `tc_money` (in a table) and `tc_money_text` (standing alone).
+
+```ruby
+TudlaAccounting::MoneyFormatter.labelled(Money.new(123456, "AUD"), "AUD") # => "$1,234.56"
+TudlaAccounting::MoneyFormatter.labelled(Money.new(123456, "EUR"), "AUD") # => "EUR 1,234.56"
+TudlaAccounting::MoneyFormatter.number(Money.new(123456, "EUR"), "AUD")   # => "1,234.56"
+```
+
 ### Posting and balances
 `entry.post(posted_at)` posts every line to the period that contains `posted_at`, then stamps the entry. The whole post is one transaction: if any line fails, nothing is posted. Posting an entry twice raises `ArgumentError`. Posts lock the organization's row while they run, so concurrent posts for the same organization take turns instead of overwriting each other's balance updates; other organizations aren't blocked. Each account has one `TudlaAccounting::Balance` per period, holding starting, current and ending amounts. Posting:
 - adds the amount to the balance of the deepest period containing `posted_at`, e.g. the month

@@ -126,7 +126,7 @@ RSpec.describe "General ledger and cash flow pages", type: :request do
       it "shows an unexplained difference if the balances disagree with the lines" do
         TudlaAccounting::Balance.find_by(account: account("1010"), period: month(2)).update_columns(ending_amount_cents: 900_00)
         get routes.reports_cash_flow_path(cash_account_ids: [ account("1010").id ], from_id: month(2).id, thru_id: month(2).id)
-        expect(response.body).to include("Unexplained difference of 50.00")
+        expect(response.body).to include("Unexplained difference of $50.00")
       end
     end
 

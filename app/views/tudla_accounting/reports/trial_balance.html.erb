@@ -9,7 +9,7 @@
     <% if @report.balanced? %>
       <%= tc_badge "Debits equal credits", tone: :success %>
     <% else %>
-      <%= tc_badge "Debits and credits differ by #{(@report.total_debits - @report.total_credits).abs.format(symbol: false)}", tone: :danger %>
+      <%= tc_badge "Debits and credits differ by #{tc_money_text((@report.total_debits - @report.total_credits).abs)}", tone: :danger %>
     <% end %>
   </div>
   <div class="tc-card overflow-x-auto">

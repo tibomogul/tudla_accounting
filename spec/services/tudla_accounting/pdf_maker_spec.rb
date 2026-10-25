@@ -36,6 +36,14 @@ RSpec.describe TudlaAccounting::PdfMaker, type: :service do
     expect(pdf).not_to include("Payments and credits", "Void invoice")
   end
 
+  it "writes a foreign document's amounts as the organization's pages do" do
+    euros = TudlaAccounting::Document.create!(organization: organization, kind: "sales_invoice", contact: northwind, issued_on: Date.new(2026, 3, 10), currency: "EUR", exchange_rate: "1.6",
+                                              lines_attributes: [ { description: "Work", unit_price_cents: 1_234_50, account: account("4000") } ])
+    pdf = text(described_class.document(euros))
+    expect(pdf).to include("AMOUNT (EUR)", "1,234.50")
+    expect(pdf).not_to include("1.234,50")
+  end
+
   it "makes statements, each on its own page" do
     invoice
     globex = TudlaAccounting::Contact.create!(organization: organization, name: "Globex")

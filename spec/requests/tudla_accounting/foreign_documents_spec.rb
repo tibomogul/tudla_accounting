@@ -63,7 +63,7 @@ RSpec.describe "Invoices and bills in another currency", type: :request do
     get routes.sales_documents_path(format: :csv)
     expect(response.body.lines.last.chomp).to end_with("1033.33,100.00,1133.33,1133.33,Awaiting payment,EUR,1813.33")
 
-    expect(TudlaAccounting::EmailDraft.for_document(invoice)[:message]).to include("€1.133,33").or include("€1,133.33")
+    expect(TudlaAccounting::EmailDraft.for_document(invoice)[:message]).to include("for EUR 1,133.33,")
   end
 
   it "looks up the date's rate when none is given, and says when there is none" do

@@ -248,7 +248,7 @@ module TudlaAccounting
     end
 
     def plain(cents)
-      "#{currency} #{money(cents).format(symbol: false)}"
+      MoneyFormatter.labelled(money(cents), @organization.currency)
     end
 
     def money(cents)

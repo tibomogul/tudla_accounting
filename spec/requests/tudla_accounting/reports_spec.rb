@@ -90,9 +90,9 @@ RSpec.describe "Report pages", type: :request do
     it "shows when the books are out of balance" do
       TudlaAccounting::Balance.get(account("3100"), march).update!(ending_amount_cents: 1_100_00)
       get routes.reports_balance_sheet_path(period_id: march.id)
-      expect(response.body).to include("Out of balance by 100.00")
+      expect(response.body).to include("Out of balance by $100.00")
       get routes.reports_trial_balance_path(period_id: march.id)
-      expect(response.body).to include("Debits and credits differ by 100.00")
+      expect(response.body).to include("Debits and credits differ by $100.00")
     end
 
     it "falls back to the latest month before today, then the earliest" do

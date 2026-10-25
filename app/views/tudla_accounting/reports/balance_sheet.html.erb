@@ -10,7 +10,7 @@
     <% if unbalanced.empty? %>
       <%= tc_badge "Balanced at each date: assets equal liabilities plus equity", tone: :success %>
     <% else %>
-      <% unbalanced.each do |report| %><%= tc_badge "#{comparison_label(report.period, @compare)} out of balance by #{report.difference.abs.format(symbol: false)}", tone: :danger %><% end %>
+      <% unbalanced.each do |report| %><%= tc_badge "#{comparison_label(report.period, @compare)} out of balance by #{tc_money_text(report.difference.abs)}", tone: :danger %><% end %>
     <% end %>
   </div>
   <%= render "comparison", comparison: @comparison,
@@ -23,7 +23,7 @@
     <% if @report.balanced? %>
       <%= tc_badge "Balanced: assets equal liabilities plus equity", tone: :success %>
     <% else %>
-      <%= tc_badge "Out of balance by #{@report.difference.abs.format(symbol: false)}", tone: :danger %>
+      <%= tc_badge "Out of balance by #{tc_money_text(@report.difference.abs)}", tone: :danger %>
     <% end %>
   </div>
   <div class="space-y-6">

@@ -134,8 +134,8 @@ RSpec.describe "Payments", type: :request do
     money_out = TudlaAccounting::BankStatementLine.create!(organization: organization, account: account("1000"), occurred_on: Date.new(2026, 4, 13), description: "NORTHWIND SUPPLIES",
                                                            amount_cents: -40_00, currency: "AUD", external_id: "b")
     get routes.banking_account_path(account("1000"))
-    expect(css_select("select#document_id_#{money_in.id} option").map(&:text)).to eq([ "INV-0001 Northwind (100.00 owed)" ])
-    expect(css_select("select#document_id_#{money_out.id} option").map(&:text)).to eq([ "BILL-0001 Northwind (40.00 owed)" ])
+    expect(css_select("select#document_id_#{money_in.id} option").map(&:text)).to eq([ "INV-0001 Northwind ($100.00 owed)" ])
+    expect(css_select("select#document_id_#{money_out.id} option").map(&:text)).to eq([ "BILL-0001 Northwind ($40.00 owed)" ])
 
     post routes.record_payment_bank_statement_line_path(money_in), params: { document_id: bill.id }
     expect(flash[:alert]).to eq("No payment was recorded: choose an invoice.")

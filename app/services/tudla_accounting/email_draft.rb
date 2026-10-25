@@ -22,21 +22,22 @@ module TudlaAccounting
     end
 
     def document_values(document)
-      { number: document.number_label, kind: document.kind_label, total: document.total.format, amount_due: document.amount_due.format,
+      home = document.organization.currency
+      { number: document.number_label, kind: document.kind_label, total: MoneyFormatter.labelled(document.total, home), amount_due: MoneyFormatter.labelled(document.amount_due, home),
         issued_on: day(document.issued_on), due_on: day(document.due_on) }
     end
 
     # A statement's (a PartyStatement), to its customer or supplier: their contact, or a host
     # app's record with an email.
     def for_statement(statement, open_items:)
-      values = { from: day(statement.from), thru: day(statement.thru), balance: statement.closing.format }
+      values = { from: day(statement.from), thru: day(statement.thru), balance: MoneyFormatter.labelled(statement.closing, statement.organization.currency) }
       details = { "type" => statement.type.to_s, "from" => statement.from.iso8601, "thru" => statement.thru.iso8601, "open_items" => open_items }
       draft("statement", "statement", statement.organization, statement.party, values).merge(details: details)
     end
 
     def for_payment(payment)
       kind = payment.received? ? "receipt" : "payment_notice"
-      draft(kind, kind, payment.organization, payment.contact, amount: payment.amount.format, paid_on: day(payment.paid_on), reference: payment.reference)
+      draft(kind, kind, payment.organization, payment.contact, amount: MoneyFormatter.labelled(payment.amount, payment.organization.currency), paid_on: day(payment.paid_on), reference: payment.reference)
     end
 
     def draft(kind, template, organization, party, values)

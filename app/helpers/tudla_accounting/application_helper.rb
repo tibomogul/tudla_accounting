@@ -12,14 +12,23 @@ module TudlaAccounting
     # An amount in accounting style: thousands separators, no currency symbol (the
     # currency is shown once per table), negatives in parentheses. One in a foreign
     # currency is written as the organization's own amounts are, not as that currency's
-    # country writes it.
+    # country writes it (MoneyFormatter.number).
     def tc_money(money)
       return "" if money.nil?
 
-      home = Money::Currency.find(accounting_organization.currency) if respond_to?(:accounting_organization)
-      marks = home && money.currency != home ? { decimal_mark: home.decimal_mark, thousands_separator: home.thousands_separator } : {}
-      text = money.abs.format(symbol: false, **marks)
+      text = MoneyFormatter.number(money.abs, tc_home_currency(money))
       money.negative? ? tag.span("(#{text})", class: "tc-negative") : text
+    end
+
+    # An amount standing alone, in a heading, a badge or a message: "$1,234.56" in the
+    # organization's currency, "EUR 1,234.56" in another (MoneyFormatter.labelled).
+    def tc_money_text(money)
+      money && MoneyFormatter.labelled(money, tc_home_currency(money))
+    end
+
+    # The currency whose style amounts are written in: the organization's.
+    def tc_home_currency(money)
+      respond_to?(:accounting_organization) ? accounting_organization.currency : money.currency
     end
 
     # An amount as a form field holds it: "1234.50", with "." for decimals and no thousands

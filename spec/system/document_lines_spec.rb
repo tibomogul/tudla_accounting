@@ -71,4 +71,15 @@ RSpec.describe "Writing an invoice", type: :system do
     fill_in "Quantity", with: "1e3"
     within("tfoot") { expect(page).to have_css("[data-document-lines-target=total]", exact_text: "0.00") }
   end
+
+  context "when the books are in euros" do
+    let(:organization) { create(:organization, name: "Acme", currency: "EUR") }
+
+    it "adds up the lines in the organization's style, as its pages show amounts" do
+      visit new_document_path(kind: "sales_invoice")
+      fill_in "Quantity", with: "1,000"
+      fill_in "Unit price", with: "1.50"
+      within("tfoot") { expect(page).to have_css("[data-document-lines-target=subtotal]", exact_text: "1.500,00") }
+    end
+  end
 end

@@ -69,11 +69,11 @@ RSpec.describe "Customer and supplier statements", type: :request do
     expect(response.body).to include("Open items at 31 Mar 2026")
     expect(rows("[data-open-items]")).to eq([
       [ "10 Feb 2026", "INV-1", "Invoice 1", "12 Mar 2026", "19", "", "300.00", "50.00" ],
-      [ "20 Mar 2026", "#3", "Invoice EUR", "30 Apr 2026", "", "€100,00", "150.00", "150.00" ]
+      [ "20 Mar 2026", "#3", "Invoice EUR", "30 Apr 2026", "", "EUR 100.00", "150.00", "150.00" ]
     ])
 
     get routes.reports_statement_path(party: key, from: "2026-03-01", thru: "2026-03-31")
-    expect(rows("[data-activity]")[2]).to eq([ "20 Mar 2026", "Invoice", "#3", "Invoice EUR", "30 Apr 2026", "€100,00", "150.00", "", "200.00" ])
+    expect(rows("[data-activity]")[2]).to eq([ "20 Mar 2026", "Invoice", "#3", "Invoice EUR", "30 Apr 2026", "EUR 100.00", "150.00", "", "200.00" ])
   end
 
   it "makes a supplier's, says when there are none, and asks again when the type changes" do

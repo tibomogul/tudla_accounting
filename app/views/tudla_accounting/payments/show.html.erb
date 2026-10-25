@@ -1,7 +1,7 @@
 <% received = @payment.received? %>
 <% money_in = @payment.money_in? %>
 <% refund = @payment.refund? %>
-<%= tc_page_header "#{@payment.title} of #{@payment.amount.format}", subtitle: tc_date(@payment.paid_on) do %>
+<%= tc_page_header "#{@payment.title} of #{tc_money_text(@payment.amount)}", subtitle: tc_date(@payment.paid_on) do %>
   <%= link_to (@payment.sales? ? "Payments received" : "Payments made"), (@payment.sales? ? received_payments_path : paid_payments_path), class: "tc-btn tc-btn-ghost" %>
   <% unless refund %>
     <% if TudlaAccounting.pdf? %>
@@ -25,11 +25,11 @@
 <div class="grid gap-6 lg:grid-cols-3">
   <section class="tc-card tc-card-body space-y-2 text-sm" aria-label="Details" data-details>
     <% details = { (money_in ? "From" : "To") => link_to(@payment.contact.name, contact_path(@payment.contact), class: "underline"), (money_in ? "Into" : "Out of") => @payment.account.code_with_name,
-                   "Reference" => @payment.reference, "Amount" => @payment.amount.format } %>
+                   "Reference" => @payment.reference, "Amount" => tc_money_text(@payment.amount) } %>
     <% if refund %>
       <% details["Pays back"] = @payment.refund_of && credit_link(@payment.refund_of) %>
     <% else %>
-      <% details["Not applied yet"] = (@payment.unapplied.format unless @payment.void?) %>
+      <% details["Not applied yet"] = (tc_money_text(@payment.unapplied) unless @payment.void?) %>
     <% end %>
     <% details.each do |label, value| %>
       <div class="flex justify-between gap-4"><span class="tc-muted"><%= label %></span><span class="text-right"><%= value || "—" %></span></div>

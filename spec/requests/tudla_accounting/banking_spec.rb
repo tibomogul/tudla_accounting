@@ -103,7 +103,7 @@ RSpec.describe "Banking", type: :request do
 
     it "matches by hand, unmatches, and explains what it can't do" do
       post routes.match_bank_statement_line_path(line("Account fee")), params: { detail_ids: [ cheque.details.find { |d| d.account == bank }.id ] }
-      expect(flash[:alert]).to eq("It was not matched: the ledger lines add up to AUD -30.00 but the statement line is AUD -4.00.")
+      expect(flash[:alert]).to eq("It was not matched: the ledger lines add up to -$30.00 but the statement line is -$4.00.")
 
       deposit_line = capital.details.find { |d| d.account == bank }
       post routes.match_bank_statement_line_path(line("Deposit"), show: "all"), params: { detail_ids: [ deposit_line.id ] }
@@ -139,7 +139,7 @@ RSpec.describe "Banking", type: :request do
       get routes.banking_account_path(bank)
       fee_row = css_select("##{ActionView::RecordIdentifier.dom_id(line('Account fee'))}").first
       expect(fee_row.text).to include("Match or record it", "Record it as spent on")
-      expect(fee_row.css("select[name='detail_ids[]'] option").map(&:text)).to eq([ "20 Mar 2026 #2 Cheque 7 -30.00" ])
+      expect(fee_row.css("select[name='detail_ids[]'] option").map(&:text)).to eq([ "20 Mar 2026 #2 Cheque 7 -$30.00" ])
     end
 
     it "reports what is wrong with an import" do
@@ -193,7 +193,7 @@ RSpec.describe "Banking", type: :request do
     TudlaAccounting::BankStatementLine.create!(organization: organization, account: bank, occurred_on: Date.new(2026, 3, 1), description: "Deposit",
                                                amount_cents: 5_00, balance_cents: 7_00, currency: "AUD", external_id: "a")
     get routes.banking_account_path(bank, as_of: "2026-03-31")
-    expect(response.body).to include("Out by 2.00")
+    expect(response.body).to include("Out by $2.00")
   end
 
   it "asks for a statement with balances when there is none" do

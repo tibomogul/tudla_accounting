@@ -23,9 +23,13 @@ export function parseUnits(text, exponent) {
   return number === null ? 0 : Math.round(number * 10 ** exponent)
 }
 
-// Minor units as the page shows amounts: "1,234.50".
+// Minor units as the page shows amounts, in the organization's style the layout gives
+// (as tc_money writes them): "1,234.50", or "1.234,50" for books in euros.
 export function formatUnits(units, exponent) {
-  return (units / 10 ** exponent).toLocaleString("en", { minimumFractionDigits: exponent, maximumFractionDigits: exponent })
+  const { tcDecimalMark: decimalMark = ".", tcThousandsSeparator: separator = "," } = document.body.dataset
+  const [whole, fraction] = (Math.abs(units) / 10 ** exponent).toFixed(exponent).split(".")
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, separator)
+  return `${units < 0 ? "-" : ""}${grouped}${fraction ? decimalMark + fraction : ""}`
 }
 
 // Minor units as a form field holds them: "1234.50" (as tc_amount_field writes them).

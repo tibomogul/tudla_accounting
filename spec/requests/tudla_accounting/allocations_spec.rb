@@ -57,7 +57,7 @@ RSpec.describe "Applying payments", type: :request do
   it "applies part of it to a chosen invoice, then the rest oldest first, and takes one off" do
     post routes.allocations_path, params: { entry_id: pay.id, to_id: open_item(inv1).id, amount: "120", on: "2026-03-21" }
     expect(response).to redirect_to(routes.entry_path(pay))
-    expect(flash[:notice]).to eq("Applied 120.00 to Invoice 1.")
+    expect(flash[:notice]).to eq("Applied $120.00 to Invoice 1.")
 
     post routes.oldest_first_allocations_path, params: { entry_id: pay.id, on: "2026-03-22" }
     expect(flash[:notice]).to eq("Applied to Invoice 2 and Invoice 1.")
@@ -70,7 +70,7 @@ RSpec.describe "Applying payments", type: :request do
 
     first = TudlaAccounting::Allocation.order(:id).first
     post routes.reverse_allocation_path(first), params: { on: "2026-03-23" }
-    expect(flash[:notice]).to eq("Took 120.00 off Invoice 1.")
+    expect(flash[:notice]).to eq("Took $120.00 off Invoice 1.")
     get routes.entry_path(pay)
     expect(rows.first).to eq([ "#1 Invoice 1", "21 Mar 2026", "120.00", "Taken off 23 Mar 2026" ])
     expect(total("left_to_apply")).to eq("Left to apply: 120.00")
@@ -124,12 +124,12 @@ RSpec.describe "Applying payments", type: :request do
 
     get routes.entry_path(eur_pay)
     expect(css_select("label[for=amount]").text).to eq("Amount (EUR for EUR invoices)")
-    expect(total("left_to_apply")).to eq("Left to apply: 160.00 (€100,00)")
+    expect(total("left_to_apply")).to eq("Left to apply: 160.00 (EUR 100.00)")
 
     post routes.allocations_path, params: { entry_id: eur_pay.id, to_id: open_item(eur_inv).id, amount: "60", on: "2026-03-12" }
     expect(TudlaAccounting::Allocation.last).to have_attributes(amount_cents: 96_00, other_currency_cents: 60_00)
     get routes.entry_path(eur_pay)
-    expect(rows).to eq([ [ "#4 Invoice EUR", "12 Mar 2026", "96.00 (€60,00)", "Take off" ] ])
+    expect(rows).to eq([ [ "#4 Invoice EUR", "12 Mar 2026", "96.00 (EUR 60.00)", "Take off" ] ])
   end
 
   it "shows what a refund paid back" do

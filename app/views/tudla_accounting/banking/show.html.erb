@@ -29,7 +29,7 @@
     <% elsif @summary[:difference].zero? %>
       <%= tc_badge "Reconciled: the books agree with the bank", tone: :success %>
     <% else %>
-      <%= tc_badge "Out by #{@summary[:difference].format(symbol: false)}", tone: :danger %>
+      <%= tc_badge "Out by #{tc_money_text(@summary[:difference])}", tone: :danger %>
     <% end %>
   </p>
 </section>
@@ -95,7 +95,7 @@
                       <% if candidates.any? %>
                         <%= form_with url: match_bank_statement_line_path(line, show: params[:show]), class: "flex flex-wrap items-end gap-2" do |form| %>
                           <div><%= form.label "detail_ids_#{line.id}", "Ledger lines that add up to it", class: "tc-label" %>
-                            <%= select_tag "detail_ids[]", options_for_select(candidates.map { |detail| [ "#{tc_date(detail.entry.posted_at)} #{entry_title(detail.entry)} #{Money.new(@reconciler.bank_cents(detail), @reconciler.currency).format(symbol: false)}", detail.id ] }),
+                            <%= select_tag "detail_ids[]", options_for_select(candidates.map { |detail| [ "#{tc_date(detail.entry.posted_at)} #{entry_title(detail.entry)} #{tc_money_text(Money.new(@reconciler.bank_cents(detail), @reconciler.currency))}", detail.id ] }),
                                            multiple: true, id: "detail_ids_#{line.id}", class: "tc-input min-w-72", size: [ candidates.size, 4 ].min %></div>
                           <%= form.submit "Match", class: "tc-btn tc-btn-secondary tc-btn-sm" %>
                         <% end %>
@@ -116,7 +116,7 @@
                       <% if documents.any? %>
                         <%= form_with url: record_payment_bank_statement_line_path(line, show: params[:show]), class: "flex flex-wrap items-end gap-2" do |form| %>
                           <div><%= form.label "document_id_#{line.id}", (line.amount_cents.positive? ? "Record it as a payment of" : "Record it as paying"), class: "tc-label" %>
-                            <%= select_tag :document_id, options_for_select(documents.map { |document| [ "#{document.number_label} #{document.contact.name} (#{document.amount_due.format(symbol: false)} owed)", document.id ] }),
+                            <%= select_tag :document_id, options_for_select(documents.map { |document| [ "#{document.number_label} #{document.contact.name} (#{tc_money_text(document.amount_due)} owed)", document.id ] }),
                                            id: "document_id_#{line.id}", class: "tc-input" %></div>
                           <%= form.submit "Record payment", class: "tc-btn tc-btn-secondary tc-btn-sm" %>
                         <% end %>
