@@ -222,7 +222,7 @@ RSpec.describe TudlaAccounting::Entry, type: :model do
       expect(TudlaAccounting::Balance.count).to eq(0)
     end
 
-    it "reads every currency code, including ones Monetize only knows by a shared symbol" do
+    it "reads every currency code, including ones whose symbol is shared (AUD and NZD are both $)" do
       %w[AUD NZD].each do |code|
         org = create(:organization, currency: code)
         create(:tudla_accounting_account, code: "1000", category: :asset, currency: code, organization: org)
@@ -236,9 +236,26 @@ RSpec.describe TudlaAccounting::Entry, type: :model do
       end
     end
 
-    it "rejects an unknown currency code" do
-      expect { described_class.create_from_ruby_hash(with_first_detail(amount: "XYZ 10.00")) }
-        .to raise_error(ArgumentError, 'unknown currency XYZ in amount "XYZ 10.00"')
+    it "reads an amount only as a currency code and a number, naming the line it can't read" do
+      { "XYZ 10.00" => 'line 1: unknown currency XYZ in amount "XYZ 10.00"', "USD lots" => "line 1: lots isn't an amount",
+        "USD 1e3" => "line 1: 1e3 isn't an amount", "USD 1.234,50" => "line 1: 1.234,50 isn't an amount",
+        "$2,750.00" => "line 1: $2,750.00 isn't an amount", "USD 2750.005" => "line 1: 2750.005 has too many decimal places for USD, which has 2",
+        "USD" => "line 1: USD isn't an amount" }.each do |amount, message|
+        expect { described_class.create_from_ruby_hash(with_first_detail(amount: amount)) }.to raise_error(ArgumentError, message), amount
+      end
+      receipt = { account_code: "1000", amount: "USD (2,750.00)" }
+      entry = described_class.create_from_ruby_hash(invoice_hash.merge(details: [ receipt, { account_code: "1100", amount: "2750" } ]))
+      expect(detail_for(entry, cash)).to have_attributes(tally: "credit", amount: Money.new(2750_00, "USD"))
+      expect(detail_for(entry, receivable)).to have_attributes(tally: "debit", amount: Money.new(2750_00, "USD"))
+    end
+
+    it "reads a line's foreign amount and rate as strictly, naming the line" do
+      line = ->(fx) { invoice_hash.merge(details: [ { account_code: "4100", amount: "USD 15400.00" }, { account_code: "1100-EUR", amount: "USD 15400.00", fx: fx } ]) }
+      { { other_currency_amount: "EUR 10.000,00", fx_rate: "1.54" } => "line 2's fx amount: 10.000,00 isn't an amount",
+        { other_currency_amount: 10_000, fx_rate: "1.54" } => "fx other_currency_amount must be a string",
+        { other_currency_amount: "EUR 10000.00", fx_rate: "1e0" } => "line 2's fx_rate: 1e0 isn't a number" }.each do |fx, message|
+        expect { described_class.create_from_ruby_hash(line.call(fx)) }.to raise_error(ArgumentError, message)
+      end
     end
 
     it "records foreign exchange details" do

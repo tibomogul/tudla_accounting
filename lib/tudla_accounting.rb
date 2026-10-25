@@ -4,7 +4,6 @@ require "tailwindcss-rails"
 require "importmap-rails"
 require "stimulus-rails"
 require "money-rails"
-require "monetize"
 require "ancestry"
 
 require "tudla_accounting/version"

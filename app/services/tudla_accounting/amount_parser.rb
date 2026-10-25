@@ -57,5 +57,9 @@ module TudlaAccounting
       end
       Money.from_amount(number, currency).cents
     end
+
+    # An amount as these read it back ("1234.50", "-1000" for the yen), whatever the
+    # currency's own style: for form fields and the amounts given to Entry.create_from_ruby_hash.
+    def text(money) = money.format(symbol: false, thousands_separator: "", decimal_mark: ".")
   end
 end

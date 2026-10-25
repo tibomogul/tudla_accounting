@@ -124,7 +124,7 @@ module TudlaAccounting
             fx_rate: decimal(given[:rate], "#{label}'s foreign rate").to_s("F") }
         end
 
-        def plain(cents, currency) = Money.new(cents, currency).format(symbol: false, thousands_separator: "", decimal_mark: ".")
+        def plain(cents, currency) = AmountParser.text(Money.new(cents, currency))
       end
     end
   end

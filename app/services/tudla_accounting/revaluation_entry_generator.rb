@@ -90,7 +90,7 @@ module TudlaAccounting
     end
 
     def amount(money)
-      "#{money.currency.iso_code} #{money}"
+      "#{money.currency.iso_code} #{AmountParser.text(money)}"
     end
   end
 end

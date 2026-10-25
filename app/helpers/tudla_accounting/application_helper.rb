@@ -26,7 +26,7 @@ module TudlaAccounting
     # separators whatever the currency's own style, as the forms read amounts back ("" for
     # none). Every amount field is filled with it, so saving a form unchanged keeps it.
     def tc_amount_field(money)
-      money ? money.format(symbol: false, thousands_separator: "", decimal_mark: ".") : ""
+      money ? AmountParser.text(money) : ""
     end
 
     def tc_date(value)

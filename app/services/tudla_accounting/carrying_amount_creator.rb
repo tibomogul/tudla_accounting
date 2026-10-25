@@ -101,7 +101,7 @@ module TudlaAccounting
     end
 
     def money(value, currency, row)
-      Money.from_amount(decimal(value, row), currency).to_s
+      AmountParser.text(Money.from_amount(decimal(value, row), currency))
     end
 
     def decimal(value, row)

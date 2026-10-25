@@ -33,4 +33,11 @@ RSpec.describe TudlaAccounting::AmountParser do
       expect(described_class.cents("10.500", "AUD")).to eq(10_50) # trailing zeros are no extra places
     end
   end
+
+  describe ".text" do
+    it "writes an amount as it is read back, whatever the currency's own style" do
+      expect([ Money.new(-1_234_567_89, "EUR"), Money.new(1_234_50, "CHF"), Money.new(1_234, "JPY"), Money.new(1_234, "BHD") ].map { |money| described_class.text(money) })
+        .to eq([ "-1234567.89", "1234.50", "1234", "1.234" ])
+    end
+  end
 end

@@ -12,7 +12,7 @@ RSpec.describe "money-rails configuration" do
   # Engine initializers load before the host's, so this boots a fresh app process
   # with the settings made from a host initializer (spec/dummy/config/initializers).
   it "applies settings made in a host app initializer" do
-    script = 'puts [Money.default_currency.iso_code, Money.rounding_mode, Monetize.parse("1100.00").currency.iso_code].join(",")'
+    script = 'puts [Money.default_currency.iso_code, Money.rounding_mode, Money.from_amount(1).currency.iso_code].join(",")'
     output, status = Open3.capture2e({ "RAILS_ENV" => "test", "TUDLA_SPEC_BASE_CURRENCY" => "AUD" },
                                      "bin/rails", "runner", script, chdir: TudlaAccounting::Engine.root.to_s)
 
@@ -35,17 +35,17 @@ RSpec.describe "money-rails configuration" do
       expect(Money.from_amount(BigDecimal("0.025")).cents).to eq(2)
     end
 
-    it "reads amounts without a currency in the base currency" do
-      org = create(:organization, currency: "AUD")
-      create(:tudla_accounting_account, code: "1000", category: :asset, currency: "AUD", organization: org)
-      create(:tudla_accounting_account, code: "4000", category: :income, currency: "AUD", organization: org)
+    it "reads amounts without a currency in the organization's currency, not the base currency" do
+      org = create(:organization, currency: "NZD")
+      create(:tudla_accounting_account, code: "1000", category: :asset, currency: "NZD", organization: org)
+      create(:tudla_accounting_account, code: "4000", category: :income, currency: "NZD", organization: org)
 
       entry = TudlaAccounting::Entry.create_from_ruby_hash(
         organization_type: "Organization", organization_id: org.id, particulars: "Sale", transacted_at: "2026-03-10T09:00:00Z",
         details: [ { account_code: "1000", amount: "1100.00" }, { account_code: "4000", amount: "1100.00" } ]
       )
 
-      expect(entry.details.map(&:amount)).to all(eq(Money.new(1100_00, "AUD")))
+      expect(entry.details.map(&:amount)).to all(eq(Money.new(1100_00, "NZD")))
     end
   end
 

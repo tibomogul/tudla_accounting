@@ -35,7 +35,7 @@ module TudlaAccounting
     # the natural way for it (positive increases it).
     def detail_hash(currency)
       increases = debit? == account.debit_balance?
-      amount = Money.new(amount_cents, currency).format(symbol: false, thousands_separator: "", decimal_mark: ".")
+      amount = AmountParser.text(Money.new(amount_cents, currency))
       { account_code: account.code, amount: "#{currency} #{'-' unless increases}#{amount}", description: description,
         tax_code: tax_code&.code, dimensions: dimension_values.to_h { |value| [ value.dimension.code, value.code ] }.presence }.compact
     end

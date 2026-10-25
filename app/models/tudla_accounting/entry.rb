@@ -182,8 +182,10 @@ module TudlaAccounting
       raise ArgumentError, "details must be an array" unless hash[:details].is_a?(Array)
       raise ArgumentError, "details must have at least 2 elements" unless hash[:details].length >= 2
 
+      organization = new(organization_type: hash[:organization_type], organization_id: hash[:organization_id]).organization
+      default_currency = organization&.currency || TudlaAccounting.configuration.base_currency
       details_attributes = []
-      hash[:details].each do |detail|
+      hash[:details].each.with_index(1) do |detail, line|
         raise ArgumentError, "each detail must have an account_code" unless detail[:account_code].present?
         raise ArgumentError, "each detail must have an amount" unless detail[:amount].present?
         raise ArgumentError, "amount must be a string" unless detail[:amount].is_a?(String)
@@ -193,7 +195,7 @@ module TudlaAccounting
         raise ArgumentError, "invalid account_code: #{detail[:account_code]}" unless account
         raise ArgumentError, "account #{detail[:account_code]} is inactive" unless account.active?
 
-        money = parse_money(detail[:amount])
+        money = parse_money(detail[:amount], default_currency, "line #{line}")
 
         amount_positive = money.positive?
         amount_cents = money.cents.abs
@@ -219,10 +221,16 @@ module TudlaAccounting
           raise ArgumentError, "fx node must have an other_currency_amount" unless fx_hash[:other_currency_amount].present?
           raise ArgumentError, "fx node must have an fx_rate" unless fx_hash[:fx_rate].present?
 
-          other_currency_money = parse_money(fx_hash[:other_currency_amount])
+          raise ArgumentError, "fx other_currency_amount must be a string" unless fx_hash[:other_currency_amount].is_a?(String)
+
+          other_currency_money = parse_money(fx_hash[:other_currency_amount], default_currency, "line #{line}'s fx amount")
           raise ArgumentError, "fx currency does not match the account currency" unless other_currency_money.currency.iso_code == account.currency
 
-          rate = BigDecimal(fx_hash[:fx_rate])
+          rate = begin
+            AmountParser.decimal(fx_hash[:fx_rate])
+          rescue ArgumentError => e
+            raise ArgumentError, "line #{line}'s fx_rate: #{e.message}"
+          end
 
           detail_attributes[:foreign_exchange_attributes] = {
             other_currency_cents: other_currency_money.cents.abs, # a magnitude: the line's tally gives the side
@@ -300,17 +308,20 @@ module TudlaAccounting
     end
     private_class_method :add_tax
 
-    # Parses "AUD 1,100.00" (or "1100.00" in the default currency). Monetize 2 only
-    # recognizes a currency code that is also in its symbol table, so codes such as AUD
-    # and NZD would silently fall back to the default currency; read the code here.
-    def self.parse_money(text)
-      code, number = text.to_s.strip.match(/\A([A-Za-z]{3})\s+(.+)\z/)&.captures
-      return Monetize.parse(text) unless code
+    # Reads "AUD 1,100.00", or "1100.00" in the organization's currency, as AmountParser
+    # reads a typed amount: nothing else ("$1,100", "AUD lots", "AUD 1e3", more decimal
+    # places than the currency has) is read, and ArgumentError names the line.
+    def self.parse_money(text, default_currency, label)
+      code, number = text.strip.match(/\A(?:([A-Za-z]{3})\s+)?(.+)\z/).captures
+      currency = code ? Money::Currency.find(code) : Money::Currency.wrap(default_currency)
+      raise ArgumentError, "#{label}: unknown currency #{code} in amount #{text.inspect}" unless currency
 
-      currency = Money::Currency.find(code)
-      raise ArgumentError, "unknown currency #{code} in amount #{text.inspect}" unless currency
-
-      Monetize.parse(number, currency)
+      begin
+        cents = AmountParser.cents(number, currency)
+      rescue ArgumentError => e
+        raise ArgumentError, "#{label}: #{e.message}"
+      end
+      Money.new(cents, currency)
     end
     private_class_method :parse_money
 

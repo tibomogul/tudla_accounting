@@ -352,8 +352,8 @@ Rails.application.config.to_prepare do
       particulars: "Invoice ##{invoice.number}",
       transacted_at: invoice.issued_at.iso8601,
       details: [
-        { account_code: "1100", amount: "USD #{invoice.total}" },
-        { account_code: "4000", amount: "USD #{invoice.total}" }
+        { account_code: "1100", amount: "USD #{TudlaAccounting::AmountParser.text(invoice.total)}" },
+        { account_code: "4000", amount: "USD #{TudlaAccounting::AmountParser.text(invoice.total)}" }
       ]
     } # return nil to skip
   })
@@ -362,6 +362,8 @@ end
 entry = TudlaAccounting.create_entry_from_source!(invoice) # linked back via source_type/source_id
 TudlaAccounting::EntryPostingJob.perform_later(entry.id)
 ```
+
+Each line's `amount` is a currency code and a number (`"USD 1100.00"`, `"USD -1,100.00"`, `"USD (1100)"`), or a number alone in the organization's currency, read as [typed amounts](#typing-amounts) are: anything else (`"$1,100"`, `"USD lots"`, `"USD 1e3"`, more decimal places than the currency has) raises `ArgumentError` naming the line, as does a foreign amount (`fx: { other_currency_amount:, fx_rate: }`) or rate that can't be read. Write a `Money` with `AmountParser.text`, not `to_s`, which uses the currency's own decimal mark (`1100,00` for the euro).
 
 `EntryPostingJob` posts the entry into the period of its `transacted_at`, on the `entry_posting` queue. With Solid Queue, only one posting job per organization runs at a time. A failed job is logged and discarded, not retried, and the entry stays unposted.
 
