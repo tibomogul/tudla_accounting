@@ -13,7 +13,8 @@ module TudlaAccounting
     # with a leading apostrophe, so opening the file never runs it.
     #
     # to_xlsx (with the caxlsx gem; see TudlaAccounting.xlsx?) writes a workbook of one
-    # sheet: amounts as numbers in an accounting format, dates as dates, text always as
+    # sheet: amounts as numbers with their currency's decimal places (none for the yen,
+    # three for the Bahraini dinar), dates as dates, text always as
     # text (never a formula), the headings and total rows (Table.total) in bold.
     class Table
       FORMULA_START = /\A[=+\-@\t\r]/
@@ -43,7 +44,7 @@ module TudlaAccounting
             bold = index.zero? || row.is_a?(TotalRow)
             cells = row.map { |cell| xlsx_cell(cell) }
             sheet.add_row cells.map(&:first), types: cells.map { |cell| cell[1] },
-                                              style: cells.map { |cell| styles.fetch([ cell[2], bold ]) }
+                                              style: cells.map { |cell| styles[[ cell[2], bold ]] }
           end
         end
         package.to_stream.read
@@ -75,7 +76,7 @@ module TudlaAccounting
       # dates, anything else as text.
       def xlsx_cell(cell)
         case cell
-        when Money then [ cell.to_d, :float, :money ]
+        when Money then [ cell.to_d, :float, [ :money, cell.currency.exponent ] ]
         when Integer then [ cell, :integer, :plain ]
         when Numeric then [ cell.to_d, :float, :plain ]
         when Date, Time, ActiveSupport::TimeWithZone then [ cell.to_date, :date, :date ]
@@ -84,9 +85,18 @@ module TudlaAccounting
         end
       end
 
+      # A style for each [kind, bold] the sheet uses, added as it is first used.
       def xlsx_styles(workbook)
-        formats = { money: { num_fmt: 4 }, date: { format_code: "yyyy-mm-dd" }, plain: {} } # 4: #,##0.00
-        formats.flat_map { |kind, format| [ false, true ].map { |bold| [ [ kind, bold ], workbook.styles.add_style(bold ? format.merge(b: true) : format) ] } }.to_h
+        Hash.new { |styles, (kind, bold)| styles[[ kind, bold ]] = workbook.styles.add_style(xlsx_format(kind).merge(bold ? { b: true } : {})) }
+      end
+
+      def xlsx_format(kind)
+        case kind
+        in [ :money, 0 ] then { format_code: "#,##0" }
+        in [ :money, places ] then { format_code: "#,##0.#{'0' * places}" }
+        in :date then { format_code: "yyyy-mm-dd" }
+        in :plain then {}
+        end
       end
     end
   end

@@ -48,6 +48,15 @@ RSpec.describe TudlaAccounting::Reports::Table, "#to_xlsx" do
       expect(workbook.excelx_format(2, 2)).to eq("#,##0.00")
     end
   end
+
+  it "gives each amount its currency's decimal places" do
+    table = described_class.new([ [ "Amount" ], [ Money.new(1_234, "JPY") ], [ Money.new(1_234_567, "BHD") ], [ Money.new(1_234_56, "EUR") ] ])
+
+    read(table.to_xlsx("Amounts")) do |workbook|
+      expect((2..4).map { |row| workbook.cell(row, 1) }).to eq([ 1234, 1234.567, 1234.56 ])
+      expect((2..4).map { |row| workbook.excelx_format(row, 1) }).to eq([ "#,##0", "#,##0.000", "#,##0.00" ])
+    end
+  end
 end
 
 RSpec.describe TudlaAccounting, ".xlsx?" do
