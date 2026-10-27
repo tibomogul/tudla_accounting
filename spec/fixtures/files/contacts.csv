@@ -1,0 +1,4 @@
+Name,Kind,Email,Phone,Address,Tax number,Payment terms (days),Default account,Default tax code,Notes
+Northwind Traders,customer,accounts@northwind.test,02 9000 1234,"1 Harbour St, Sydney",51 824 753 556,14,,GST,
+Globex,customer,payables@globex.test,,,,30,,GST,
+Initech Supplies,supplier,billing@initech.test,,,,30,,,Office supplies

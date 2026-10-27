@@ -53,6 +53,7 @@ RSpec.describe "USAGE.md" do
     # The files the examples name, in the directory they run in.
     FileUtils.cp(fixtures.join("coa_saas_services.xlsx"), @dir.join("chart.xlsx"))
     FileUtils.cp(fixtures.join("carrying_amounts.csv"), @dir.join("open_items.csv"))
+    FileUtils.cp(fixtures.join("contacts.csv"), @dir.join("contacts.csv"))
     roles = { "1020" => "receivable", "2011" => "payable", "3030" => "retained_earnings" }
     chart = CSV.read(fixtures.join("coa_saas_services.csv"), headers: true)
     @dir.join("chart.csv").write(CSV.generate do |csv|
@@ -86,6 +87,10 @@ RSpec.describe "USAGE.md" do
     expect(%w[1010 1500 1510 3100].map { |code| TudlaAccounting::Balance.peek(account(code), year).starting_amount.to_f }).to eq([ 25_000.0, 6_000.0, 1_000.0, 30_000.0 ])
     expect(TudlaAccounting::TaxCode.where(organization: organization).pluck(:code)).to contain_exactly("GST", "GST-P", "FRE")
     expect(TudlaAccounting::Dimension.find_by!(organization: organization, code: "DEPT").dimension_values.pluck(:code)).to eq(%w[ENG OPS SALES])
+    contacts = TudlaAccounting::Contact.where(organization: organization).index_by(&:name)
+    expect(contacts.keys).to contain_exactly("Northwind Traders", "Globex", "Initech Supplies", "Cloudnine Hosting")
+    expect(contacts["Northwind Traders"]).to have_attributes(kind: "customer", payment_terms_days: 14, default_tax_code: have_attributes(code: "GST"))
+    expect(contacts["Cloudnine Hosting"]).to have_attributes(default_account: account("6020"), default_tax_code: have_attributes(code: "GST-P"))
     expect(TudlaAccounting::CarryingAmount.joins(:detail).where(tudla_accounting_details: { organization_id: organization.id }).count).to eq(3)
     expect(TudlaAccounting::Entry.where(organization: organization).where("particulars LIKE ?", "%Revaluation of%").count).to eq(2) # the revaluation and its reversal
     expect(year.children.order(:from_date).first.closed?).to be(false) # closed, then reopened

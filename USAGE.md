@@ -17,8 +17,9 @@ This guide takes an organization from nothing to books ready for day-to-day post
 4. [Mark the accounts the books treat specially](#4-mark-the-accounts-the-books-treat-specially)
 5. [Enter opening balances](#5-enter-opening-balances)
 6. [Add tax codes and dimensions](#6-add-tax-codes-and-dimensions) (optional)
-7. [Import open receivables and payables](#7-import-open-receivables-and-payables) (optional)
-8. [Check the books](#8-check-the-books)
+7. [Add customers and suppliers](#7-add-customers-and-suppliers) (optional)
+8. [Import open receivables and payables](#8-import-open-receivables-and-payables) (optional)
+9. [Check the books](#9-check-the-books)
 
 Then, as the books run: [revaluing foreign currency](#revaluing-foreign-currency), [closing periods](#closing-periods) and [the next year](#the-next-year).
 
@@ -29,7 +30,7 @@ org = Organization.find(1) # your host model; it must respond to #currency
 TudlaAccounting::Current.actor = "Setup script" # who the audit trail says did it (optional; "System" otherwise)
 ```
 
-There are no rake tasks for loading books, only for checking them (step 8) and installing. A one-off script works for anything below:
+There are no rake tasks for loading books, only for checking them (step 9) and installing. A one-off script works for anything below:
 
 ```bash
 bin/rails runner 'org = Organization.find(1); TudlaAccounting::PeriodCreator.call(org, 2026)'
@@ -57,6 +58,14 @@ end
 ```
 
 The rest of the settings (receivables and payables, cash accounts, exchange rates, authorization) are described in the [README](README.md#configuration).
+
+To send invoices, statements and payment receipts to customers and suppliers, also set:
+
+- `document_header`: who printed documents are from, such as the organization's name and address;
+- `document_mail_from` and `document_mail_reply_to`: the addresses emails go from and are answered to. Emails go through the host's own ActionMailer setup, in the background, so the host's Active Job backend must run jobs;
+- `reminder_days`: the days after the due date to remind customers of overdue invoices, such as `[7, 14, 30]`. Without it, no reminders go out.
+
+PDFs need the `ferrum` gem in the host's bundle and Chrome or Chromium on the server; without them, documents can only be printed from the browser. Attachments, such as a supplier's bill on its record, need Active Storage (`bin/rails active_storage:install`). The [README](README.md#pdfs) has the details of each.
 
 If the database was built without Rails' schema tasks, install the triggers that protect posted entries:
 
@@ -296,7 +305,38 @@ department = TudlaAccounting::Dimension.create!(organization: org, code: "DEPT",
 %w[SALES ENG OPS].each { |code| department.dimension_values.create!(code: code, name: code.capitalize) }
 ```
 
-## 7. Import open receivables and payables
+## 7. Add customers and suppliers
+
+Contacts are the customers and suppliers that invoices and bills are to or from. Each has a kind (`customer`, `supplier` or `both`), an email address for sending them documents, and optionally payment terms in days and a default account and tax code. New documents for the contact start from these.
+
+Contacts can be imported from a spreadsheet (CSV or Excel) with these columns. Only `Name` is needed:
+
+```csv
+Name,Kind,Email,Phone,Address,Tax number,Payment terms (days),Default account,Default tax code,Notes
+Northwind Traders,customer,accounts@northwind.test,02 9000 1234,"1 Harbour St, Sydney",51 824 753 556,14,,GST,
+Globex,customer,payables@globex.test,,,,30,,GST,
+Initech Supplies,supplier,billing@initech.test,,,,30,,,Office supplies
+```
+
+- `Default account` and `Default tax code` are codes, which must already exist.
+- A row whose name is already a contact updates that contact, ignoring case.
+- The whole file imports or nothing does.
+- See `spec/fixtures/files/contacts.csv` for this example.
+
+**In the UI:** Contacts → Import contacts (CSV or Excel), or New contact to add one at a time. The Contacts page's Download CSV writes the same columns, so a list can be downloaded, changed and imported again.
+
+**In the console:**
+
+```ruby
+TudlaAccounting::ContactImporter.call(org, "contacts.csv", ".csv") # => { added: 3, updated: 0 }
+TudlaAccounting::Contact.create!(organization: org, name: "Cloudnine Hosting", kind: "supplier", email: "billing@cloudnine.test",
+                                 payment_terms_days: 30, default_account: TudlaAccounting::Account.find_by!(organization: org, code: "6020"),
+                                 default_tax_code: TudlaAccounting::TaxCode.find_by!(organization: org, code: "GST-P"))
+```
+
+A contact with invoices, bills or payments can't be deleted; make it inactive instead (`active: false`), and it keeps its history but isn't offered for new documents.
+
+## 8. Import open receivables and payables
 
 When moving from another system, import the invoices and bills still unpaid at the cut-over. That way the aging report is right from day one, and later payments can be applied to them. The opening balances already include these amounts, so the import records them without changing any balance.
 
@@ -330,7 +370,7 @@ TudlaAccounting::CarryingAmountsCreator.call(
 
 The whole file imports or nothing does. Pass `source: ->(row) { Invoice.create!(number: row[:particulars]) }` to turn each row into a host record, which becomes the entry's source (and gives the related party through the `related_party_method` setting).
 
-## 8. Check the books
+## 9. Check the books
 
 Look over the opening position first:
 

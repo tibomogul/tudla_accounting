@@ -34,7 +34,7 @@ RSpec.describe "USAGE.md, in the UI", type: :system do
   # belong to the document").
   def nav(name)
     within("nav[aria-label=Accounting]") { click_link name }
-    expect(page).to have_current_path({ "Periods" => periods_path, "Setup" => setup_path, "Accounts" => accounts_path }.fetch(name))
+    expect(page).to have_current_path({ "Periods" => periods_path, "Setup" => setup_path, "Accounts" => accounts_path, "Contacts" => contacts_path }.fetch(name))
   end
 
   def wait_for_confirm = expect(page).to have_css("form[data-confirm-ready]")
@@ -124,7 +124,16 @@ RSpec.describe "USAGE.md, in the UI", type: :system do
     expect(page).to have_current_path(dimensions_path)
     expect(page).to have_content("was added.")
 
-    # 7. Setup → Open receivables and payables
+    # 7. Contacts → Import contacts (CSV or Excel)
+    nav "Contacts"
+    attach_file "Import contacts (CSV or Excel)", fixtures.join("contacts.csv")
+    click_button "Import"
+    expect(page).to have_current_path(contacts_path)
+    expect(page).to have_content("3 contacts added and 0 updated from contacts.csv.")
+    expect(page).to have_link("Northwind Traders").and have_link("Initech Supplies")
+    expect(TudlaAccounting::Contact.find_by!(organization: organization, name: "Globex").default_tax_code.code).to eq("GST")
+
+    # 8. Setup → Open receivables and payables
     nav "Setup"
     attach_file "CSV file", fixtures.join("carrying_amounts.csv")
     fill_in "Day before the cut-over", with: Date.new(year - 1, 12, 31)
@@ -155,7 +164,7 @@ RSpec.describe "USAGE.md, in the UI", type: :system do
     expect(page).to have_current_path(entries_path(q: "Revaluation"))
     expect(page).to have_content("Posted 2 revaluation entries for 31 Jan #{year}.")
 
-    # 8. Setup → Check balances
+    # 9. Setup → Check balances
     nav "Setup"
     click_link "Check balances"
     expect(page).to have_current_path(setup_balances_path)
