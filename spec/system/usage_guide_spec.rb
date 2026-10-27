@@ -34,7 +34,8 @@ RSpec.describe "USAGE.md, in the UI", type: :system do
   # belong to the document").
   def nav(name)
     within("nav[aria-label=Accounting]") { click_link name }
-    expect(page).to have_current_path({ "Periods" => periods_path, "Setup" => setup_path, "Accounts" => accounts_path, "Contacts" => contacts_path }.fetch(name))
+    expect(page).to have_current_path({ "Periods" => periods_path, "Setup" => setup_path, "Accounts" => accounts_path, "Contacts" => contacts_path,
+                                          "Sales" => sales_documents_path, "Purchases" => purchase_documents_path, "Banking" => banking_path, "Reports" => reports_path }.fetch(name))
   end
 
   def wait_for_confirm = expect(page).to have_css("form[data-confirm-ready]")
@@ -181,5 +182,180 @@ RSpec.describe "USAGE.md, in the UI", type: :system do
     fill_in "Reason for reopening Jan #{year}", with: "Late supplier bill"
     click_button_and_reload "Reopen"
     expect(page).to have_content("Jan #{year} is open again.")
+  end
+
+  # Running the books, on books set up as the guide's first part leaves them.
+  context "with the books set up" do
+    let(:today) { Date.current }
+
+    before do
+      TudlaAccounting.configuration.reminder_days = [ 7, 14, 30 ]
+      [ today.year - 1, today.year ].each { |calendar_year| TudlaAccounting::PeriodCreator.call(organization, calendar_year) }
+      TudlaAccounting::AccountsCreator.call([
+        { code: "1010", name: "Cash at bank", category: "asset" }, { code: "1100", name: "Accounts receivable", category: "asset", role: "receivable" },
+        { code: "2100", name: "Accounts payable", category: "liability", role: "payable" }, { code: "2200", name: "GST", category: "liability" },
+        { code: "4010", name: "Sales", category: "income" }, { code: "6000", name: "Expenses", category: "expense" }, { code: "6020", name: "Software", category: "expense" }
+      ], organization)
+      gst = TudlaAccounting::TaxCode.create!(organization: organization, code: "GST", name: "GST on sales", rate: "0.1", kind: :sales, account: account("2200"))
+      gst_paid = TudlaAccounting::TaxCode.create!(organization: organization, code: "GST-P", name: "GST on purchases", rate: "0.1", kind: :purchases, account: account("2200"))
+      TudlaAccounting::Contact.create!(organization: organization, name: "Northwind Traders", kind: "customer", email: "accounts@northwind.test", payment_terms_days: 14,
+                                       default_account: account("4010"), default_tax_code: gst)
+      TudlaAccounting::Contact.create!(organization: organization, name: "Cloudnine Hosting", kind: "supplier", email: "billing@cloudnine.test", payment_terms_days: 30,
+                                       default_account: account("6020"), default_tax_code: gst_paid)
+      globex = TudlaAccounting::Contact.create!(organization: organization, name: "Globex", kind: "customer", email: "payables@globex.test", payment_terms_days: 30)
+      # An invoice 15 days overdue, for the reminders
+      TudlaAccounting::Document.create!(organization: organization, kind: "sales_invoice", contact: globex, issued_on: today - 45, due_on: today - 15,
+                                        lines_attributes: [ { description: "Licence", quantity: 1, unit_price_cents: 1_000_00, account: account("4010") } ]).approve!
+    end
+
+    it "invoices, gets paid, pays suppliers, chases, reconciles and budgets" do
+      # Invoices and bills: Sales → New invoice
+      nav "Sales"
+      click_link "New invoice"
+      expect(page).to have_current_path(new_document_path, ignore_query: true)
+      select "Northwind Traders", from: "Customer"
+      expect(page).to have_field("Due", with: (today + 14).iso8601)
+      fill_in "Description", with: "Consulting"
+      fill_in "Quantity", with: "10"
+      fill_in "Unit price", with: "150"
+      within("tfoot") { expect(page).to have_content("1,650.00") }
+      click_button "Save and approve"
+      expect(page).to have_current_path(%r{/documents/\d+\z})
+      expect(page).to have_content("Invoice INV-0002 approved and posted.")
+
+      # Payments, credits and refunds: Record payment, then Refund to them
+      click_link "Record payment"
+      expect(page).to have_current_path(new_payment_path, ignore_query: true)
+      select "1010 - Cash at bank", from: "Into"
+      fill_in "Amount (USD)", with: "1,700.00"
+      fill_in "Apply to INV-0002", with: "1,650.00"
+      click_button "Record payment"
+      expect(page).to have_current_path(%r{/payments/\d+\z})
+      expect(page).to have_content("Payment from Northwind Traders of $1,700.00 recorded.")
+      click_link "Refund to them"
+      expect(page).to have_current_path(new_refund_path, ignore_query: true)
+      fill_in "Amount (USD)", with: "50"
+      click_button "Record refund"
+      expect(page).to have_current_path(%r{/payments/\d+\z})
+      expect(page).to have_content("of $50.00 recorded.")
+
+      # Purchases → New bill, then Purchases → Pay run
+      nav "Purchases"
+      click_link "New bill"
+      expect(page).to have_current_path(new_document_path, ignore_query: true)
+      select "Cloudnine Hosting", from: "Supplier"
+      fill_in "Description", with: "Hosting"
+      fill_in "Unit price", with: "200"
+      click_button "Save and approve"
+      expect(page).to have_current_path(%r{/documents/\d+\z})
+      expect(page).to have_content("Bill BILL-0001 approved and posted.")
+      nav "Purchases"
+      click_link "Pay run"
+      expect(page).to have_current_path(new_pay_run_path, ignore_query: true)
+      fill_in "Due by", with: today + 60
+      click_button "Show bills"
+      expect(page).to have_checked_field("Pay BILL-0001")
+      wait_for_confirm
+      click_button "Pay the chosen bills"
+      click_button_and_reload "Pay the chosen bills? A payment to each supplier is recorded and posted. Click again to confirm"
+      expect(page).to have_current_path(paid_payments_path)
+      expect(page).to have_content("Paid 1 supplier $220.00 in all. Emailing payment notices to Cloudnine Hosting.")
+
+      # Recurring invoices: Sales → Recurring invoices → New recurring invoice
+      nav "Sales"
+      click_link "Recurring invoices"
+      expect(page).to have_current_path(recurring_invoices_path)
+      click_link "New recurring invoice"
+      expect(page).to have_current_path(new_recurring_invoice_path)
+      fill_in "Name", with: "Support retainer"
+      select "Northwind Traders", from: "Customer"
+      fill_in "Description", with: "Support retainer"
+      fill_in "Unit price", with: "500"
+      fill_in "Starting", with: today
+      select today.day.ordinalize, from: "On the"
+      choose "Approved invoices"
+      click_button "Save recurring invoice"
+      expect(page).to have_current_path(%r{/recurring_invoices/\d+\z})
+      expect(page).to have_content("Recurring invoice saved.")
+      nav "Sales"
+      click_link "Recurring invoices"
+      expect(page).to have_current_path(recurring_invoices_path)
+      wait_for_confirm
+      click_button "Make the 1 due invoice now"
+      click_button_and_reload "Make them now? Each is a draft, approved or emailed, as its template says. Click again to confirm"
+      expect(page).to have_content("Made 1 invoice: 1 approved, 0 emailed.")
+
+      # Statements and reminders: Reports → Statements; Sales → Reminders due
+      nav "Reports"
+      click_link "Statements"
+      expect(page).to have_current_path(reports_statement_path, ignore_query: true)
+      select "Northwind Traders", from: "Customer"
+      fill_in "From", with: today.beginning_of_month
+      fill_in "To", with: today
+      click_button "Show"
+      expect(page).to have_current_path(/party=/)
+      expect(page).to have_content("550.00") # the retainer, still owed
+
+      nav "Sales"
+      click_link "Reminders due (1)"
+      expect(page).to have_current_path(reminders_path)
+      wait_for_confirm
+      click_button "Send 1 reminder"
+      click_button_and_reload "Email 1 reminder, each as the reminder template says? Click again to confirm"
+      expect(TudlaAccounting::Delivery.where(organization: organization, kind: "reminder").pluck(:to)).to eq([ "payables@globex.test" ])
+
+      # Banking: the account, Import statement, Match N suggestions; Bank rules; Record N lines by their rules
+      statement = Rails.root.join("tmp/usage_guide_statement.csv")
+      statement.write(<<~CSV)
+        Date,Description,Amount,Reference
+        #{today.iso8601},NORTHWIND TRADERS EFT,1700.00,EFT
+        #{today.iso8601},REFUND NORTHWIND TRADERS,-50.00,
+        #{today.iso8601},MONTHLY ACCOUNT FEE,-12.50,
+        #{today.iso8601},CLOUDNINE HOSTING,-220.00,Pay run
+      CSV
+      nav "Banking"
+      click_link "1010 - Cash at bank"
+      expect(page).to have_current_path(banking_account_path(account("1010")))
+      attach_file "Statement (CSV, OFX, QFX or CAMT.053)", statement
+      click_button "Import statement"
+      expect(page).to have_current_path(banking_account_path(account("1010")))
+      expect(page).to have_content("Imported 4 statement lines from the CSV file")
+      click_button_and_reload "Match 3 suggestions"
+      expect(page).to have_content("Matched 3 statement lines.")
+      click_link "Bank rules"
+      expect(page).to have_current_path(bank_rules_path)
+      click_link "New rule"
+      expect(page).to have_current_path(new_bank_rule_path, ignore_query: true)
+      fill_in "Name", with: "Bank fees"
+      fill_in "Whose description contains", with: "account fee"
+      select "6000 - Expenses", from: "Against the account"
+      click_button "Save rule"
+      expect(page).to have_current_path(bank_rules_path)
+      expect(page).to have_content("Bank rule Bank fees saved.")
+      nav "Banking"
+      click_link "1010 - Cash at bank"
+      expect(page).to have_current_path(banking_account_path(account("1010")))
+      wait_for_confirm
+      click_button "Record 1 line by their rules"
+      click_button_and_reload "Post an entry for each of these lines, as its rule says? Click again to confirm"
+      expect(page).to have_content("Recorded 1 statement line by their rules.")
+
+      # Budgets: Reports → Budgets → New budget, Add budget
+      nav "Reports"
+      click_link "Budgets"
+      expect(page).to have_current_path(budgets_path)
+      click_link "New budget"
+      expect(page).to have_current_path(new_budget_path, ignore_query: true)
+      select today.year.to_s, from: "For the year"
+      fill_in "Name", with: "Plan"
+      click_button "Add budget"
+      expect(page).to have_current_path(%r{/budgets/\d+/edit\z})
+      expect(page).to have_content("Budget Plan (#{today.year}) added. Enter its amounts.")
+      fill_in "4010 - Sales, the year (spread over the months)", with: "24000"
+      find("body").click
+      click_button "Save budget"
+      expect(page).to have_current_path(%r{/budgets/\d+\z})
+      expect(page).to have_content("Budget Plan (#{today.year}) saved.")
+    end
   end
 end

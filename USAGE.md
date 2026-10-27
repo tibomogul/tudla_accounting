@@ -9,7 +9,7 @@ specs when a heading or a label changes.
 
 # Setting up the books
 
-This guide takes an organization from nothing to books ready for day-to-day posting. Each step can be done in the engine's pages or from a Rails console (or `bin/rails runner`), and the steps go in this order:
+This guide takes an organization from nothing to books ready for day-to-day posting, then through keeping them: invoicing, paying and being paid, the bank, budgets and the month and year end. Each step can be done in the engine's pages or from a Rails console (or `bin/rails runner`), and the steps go in this order:
 
 1. [Install the engine](#1-install-the-engine) (once per host app)
 2. [Create a financial year](#2-create-a-financial-year)
@@ -21,7 +21,16 @@ This guide takes an organization from nothing to books ready for day-to-day post
 8. [Import open receivables and payables](#8-import-open-receivables-and-payables) (optional)
 9. [Check the books](#9-check-the-books)
 
-Then, as the books run: [revaluing foreign currency](#revaluing-foreign-currency), [closing periods](#closing-periods) and [the next year](#the-next-year).
+Then [running the books](#running-the-books):
+
+- [invoices and bills](#invoices-and-bills);
+- [payments, credits and refunds](#payments-credits-and-refunds);
+- [recurring invoices](#recurring-invoices);
+- [paying suppliers](#paying-suppliers);
+- [statements and reminders](#statements-and-reminders);
+- [banking](#banking);
+- [budgets](#budgets);
+- and at month and year end, [revaluing foreign currency](#revaluing-foreign-currency), [closing periods](#closing-periods) and [the next year](#the-next-year).
 
 The pages are at the engine's mount path (`/accounting` by default), for the organization the `current_organization` setting returns. Setup pages need the `:administer` permission (see `config.authorize` in the [README](README.md#hooks-for-the-host-app)). The console examples assume:
 
@@ -400,6 +409,189 @@ bin/rails tudla_accounting:balances:rebuild ORGANIZATION=Organization:42
 The books are now ready. Record entries under Entries, or from host records with `TudlaAccounting.create_entry_from_source!` (see the [README](README.md#entries-from-host-app-records)).
 
 ---
+
+# Running the books
+
+Day to day, the books are kept by recording what the organization sells and buys, what it is paid and pays, and what the bank says happened. These sections go through each, then the month-end and year-end jobs. They follow on from the setup above: the console examples use its accounts, tax codes and contacts, and the money moves through the bank account `1010`.
+
+## Invoices and bills
+
+An invoice (to a customer), a bill (from a supplier) and a credit note against either are **documents**. A document starts as a draft, which can be changed or deleted. Approving it numbers it (`INV-0001`, `BILL-0001`) and posts its entry: the total to the receivable or payable account, each line's amount and tax to its accounts. After that it doesn't change; voiding it reverses its entry.
+
+Each line has a description, quantity, unit price, account and optional tax code and dimension values. Prices exclude the tax unless the document says they include it. A document in another currency gives the rate to the organization's currency, or leaves it blank for the date's rate from the `forex_rate_provider` setting, and goes to a sub-account of the receivable or payable account in that currency, such as `1100-EUR`.
+
+**In the UI:** Sales → New invoice, or Purchases → New bill. Choosing the customer or supplier fills in the due date from their payment terms, and each line's account and tax code from their defaults; the totals add up as the lines are typed. **Save draft** or **Save and approve**. An approved document's page offers Record payment, Email, a credit note, and (with Active Storage) Attach files, for a supplier's PDF.
+
+**In the console:**
+
+```ruby
+sales = TudlaAccounting::Account.find_by!(organization: org, code: "4010")
+gst_on_sales = TudlaAccounting::TaxCode.find_by!(organization: org, code: "GST")
+northwind = TudlaAccounting::Contact.find_by!(organization: org, name: "Northwind Traders")
+invoice = TudlaAccounting::Document.create!(
+  organization: org, kind: "sales_invoice", contact: northwind, issued_on: Date.new(2026, 6, 1), due_on: northwind.due_on(Date.new(2026, 6, 1)),
+  lines_attributes: [ { description: "Consulting, May", quantity: 10, unit_price_cents: 150_00, account: sales, tax_code: gst_on_sales,
+                        dimension_value_ids: [ department.dimension_values.find_by!(code: "SALES").id ] } ]
+)
+invoice.approve!        # numbered INV-0001 and posted
+invoice.total           # $1,650.00, with the tax
+invoice.payment_status  # "unpaid"
+
+cloudnine = TudlaAccounting::Contact.find_by!(organization: org, name: "Cloudnine Hosting")
+bill = TudlaAccounting::Document.create!(
+  organization: org, kind: "bill", contact: cloudnine, reference: "CN-7781", issued_on: Date.new(2026, 6, 2), due_on: cloudnine.due_on(Date.new(2026, 6, 2)),
+  lines_attributes: [ { description: "Hosting, June", quantity: 1, unit_price_cents: 200_00, account: cloudnine.default_account, tax_code: cloudnine.default_tax_code } ]
+)
+bill.approve!           # BILL-0001, $220.00
+
+globex = TudlaAccounting::Contact.find_by!(organization: org, name: "Globex")
+euro_invoice = TudlaAccounting::Document.create!(
+  organization: org, kind: "sales_invoice", contact: globex, currency: "EUR", exchange_rate: "1.08", issued_on: Date.new(2026, 5, 1), due_on: globex.due_on(Date.new(2026, 5, 1)),
+  lines_attributes: [ { description: "Licence", quantity: 1, unit_price_cents: 1_000_00, account: sales } ]
+)
+euro_invoice.approve!   # INV-0002: EUR 1,000.00, posted as $1,080.00 to 1100-EUR
+# euro_invoice.void!(on: Date.current, reason: "Issued twice") would reverse its entry
+```
+
+Only drafts can be deleted. A void is refused while payments or credit notes are applied to the document.
+
+## Payments, credits and refunds
+
+A payment is money received from a customer or paid to a supplier, through a bank or cash account. Recording one posts it at once, and applies it to the invoices or bills given; whatever isn't applied stays as a **credit** for the contact, to apply later or refund. A credit note is applied to the invoice or bill it credits as far as that is still owed.
+
+**In the UI:**
+
+- **Record payment** on an approved invoice or bill (or Sales → Payments received, Purchases → Payments made) lists the contact's open invoices or bills, oldest due first, with an amount to apply to each. It can email a receipt, or a payment notice, at the same time.
+- **Credit note** on an approved invoice (Supplier credit on a bill) starts one with its lines.
+- A payment or credit note with something left offers to apply it to the contact's other open items, or to refund it (**Refund to them**, **Record their refund**).
+
+**In the console:**
+
+```ruby
+bank = TudlaAccounting::Account.find_by!(organization: org, code: "1010")
+payment = TudlaAccounting::Payment.record!(organization: org, kind: "received", contact: northwind, account: bank, paid_on: Date.new(2026, 6, 12),
+                                           amount_cents: 1_700_00, reference: "EFT 88213", applications: [ { document: invoice, amount_cents: 1_650_00 } ])
+invoice.reload.payment_status # "paid"
+payment.unapplied             # $50.00, a credit for Northwind
+TudlaAccounting::Payment.record!(organization: org, kind: "refund", contact: northwind, account: bank, paid_on: Date.new(2026, 6, 13),
+                                 amount_cents: 50_00, refund_of: payment)
+
+credit = TudlaAccounting::Document.create!(
+  organization: org, kind: "supplier_credit", contact: cloudnine, credited_document: bill, issued_on: Date.new(2026, 6, 5),
+  lines_attributes: [ { description: "Outage credit", quantity: 1, unit_price_cents: 20_00, account: cloudnine.default_account, tax_code: cloudnine.default_tax_code } ]
+)
+credit.approve!          # SC-0001, applied to the bill straight away
+bill.reload.amount_due   # $198.00
+```
+
+A payment in another currency goes through a bank account held in it, and applies only to documents in that currency; any difference from the rate they were booked at is posted to the `realized_fx_gain` account. A payment isn't changed or deleted once recorded: `payment.void!(on:, reason:)` reverses it, and takes it off what it paid.
+
+## Recurring invoices
+
+A recurring invoice makes the same invoice on a schedule: every N weeks, months or years from a start date, until an end date or a number of invoices. Each one is left as a draft, approved, or approved and emailed to the customer.
+
+**In the UI:** Sales → Recurring invoices → New recurring invoice, or **Repeat** on an approved invoice. The list's **Make the N due invoices now** makes those due.
+
+**In the console:**
+
+```ruby
+retainer = TudlaAccounting::RecurringInvoice.create!(
+  organization: org, name: "Globex support", contact: globex, frequency: "monthly", day_of_month: 1, starts_on: Date.new(2026, 6, 1), issue: "approve",
+  lines_attributes: [ { description: "Support retainer", quantity: 1, unit_price_cents: 500_00, account: sales, tax_code: gst_on_sales } ]
+)
+TudlaAccounting::RecurringInvoiceRunner.call(organization: org) # makes every invoice due by today; here June's, approved
+retainer.reload.next_on # 1 July 2026
+```
+
+Schedule `TudlaAccounting::RecurringInvoicesJob` to run them every day (see the [README](README.md#recurring-invoices)). A date is never invoiced twice, and an invoice that can't be made or approved is left, with the reason on the template's page and the dashboard.
+
+## Paying suppliers
+
+A **pay run** pays a batch of bills from one bank account: one payment to each supplier, applied to their bills, with each supplier's payment notice emailed.
+
+**In the UI:** Purchases → Pay run lists the bills due by a date (a week from today by default), grouped by supplier and all ticked. Untick any, change what is paid of each, give the date and a reference, then **Pay the chosen bills**.
+
+**In the console:**
+
+```ruby
+due = TudlaAccounting::PayRun.due(org, currency: org.currency, due_by: Date.new(2026, 7, 15)) # => [bill]
+TudlaAccounting::PayRun.call(organization: org, account: bank, paid_on: Date.new(2026, 6, 15), reference: "Pay run 15 June",
+                             bills: due.map { |due_bill| { document: due_bill, amount_cents: due_bill.amount_due.cents } }, email: true)
+# => #<Result payments=[...] emailed=[...] no_address=[...]>
+```
+
+All the payments are recorded or none. Bills imported in step 8 are open payables, not documents, so they're paid with **Record payment** on the supplier's page instead.
+
+## Statements and reminders
+
+A **statement** shows a customer (or supplier) what they owed at the start of a run of days, each invoice, payment and credit since, and what they owe at the end, by how overdue. **Reminders** email customers about overdue invoices on the days after the due date that the `reminder_days` setting names.
+
+**In the UI:**
+
+- **Statements:** Reports → Statements, or the Statement link on a contact's page. It prints, downloads as CSV or Excel, and has an Email button; **All customers** shows and emails every statement with something to send.
+- **Reminders:** Sales → Reminders due lists them, and **Send N reminders** sends them all. An overdue invoice's page has **Send reminder**.
+
+**In the console:**
+
+```ruby
+statement = TudlaAccounting::PartyStatement.call(organization: org, type: :receivable, party: northwind, from: Date.new(2026, 6, 1), thru: Date.new(2026, 6, 30))
+statement.closing.zero? # true: invoiced, paid, and the overpayment refunded
+
+TudlaAccounting::ReminderRunner.due(organization: org)  # => [#<Reminder invoice=INV-0002 days=14 ...>] with reminder_days = [7, 14, 30]
+TudlaAccounting::ReminderRunner.call(organization: org) # emails them
+```
+
+Schedule `TudlaAccounting::SendRemindersJob` to send them every day. Each reminder goes once; one for an invoice since paid or voided doesn't go.
+
+## Banking
+
+Importing the bank's statement and matching its lines to the books shows what the books are missing, and that they agree with the bank.
+
+- **Importing:** CSV, OFX, QFX or CAMT.053 files. Lines already imported are skipped, so statements can overlap.
+- **Matching:** each statement line with a posted line on the bank account for the same amount within a week is suggested, and can be matched.
+- **Recording:** a line the books don't have yet can be recorded as an entry against another account, or as a payment of an open invoice or bill. **Bank rules** say how to record lines by their description, such as the bank's fees.
+
+**In the UI:** Banking, then the account. Choose the file and how its dates and amounts are written, and **Import statement**. **Match N suggestions** matches the suggested pairs, and **Record N lines by their rules** records the lines a rule suggests; Bank rules, on the same page, adds the rules. An unmatched line can also be matched by hand, posted as an entry, or recorded as a payment. The page shows the reconciliation: the balance in the books against the bank's.
+
+**In the console:**
+
+```ruby
+TudlaAccounting::BankStatementImporter.call(bank, "statement.csv", date_order: :dmy, decimal_mark: ".") # => { imported: 4, skipped: 0, format: :csv }
+TudlaAccounting::BankRule.create!(organization: org, name: "Bank fees", description_contains: "account fee", direction: "out",
+                                  counter_account: TudlaAccounting::Account.find_by!(organization: org, code: "6000"))
+reconciler = TudlaAccounting::BankReconciler.new(bank)
+reconciler.match_suggestions! # the payments, the refund and the pay run, matched to their entries
+reconciler.record_by_rules!   # the fee, posted against 6000
+reconciler.summary(as_of: Date.new(2026, 6, 30))[:difference] # $0.00: the books agree with the bank's balance
+```
+
+The statement file has a date, a description and an amount (or money in and money out) in each row, and optionally a reference and the running balance:
+
+```csv
+Date,Description,Amount,Reference,Balance
+12/06/2026,NORTHWIND TRADERS EFT,1700.00,EFT 88213,26700.00
+13/06/2026,REFUND NORTHWIND TRADERS,-50.00,,26650.00
+14/06/2026,MONTHLY ACCOUNT FEE,-12.50,,26637.50
+15/06/2026,CLOUDNINE HOSTING,-198.00,Pay run 15 June,26439.50
+```
+
+See `spec/fixtures/files/bank_statement.csv` for this example, and the [README](README.md#bank-reconciliation) for the columns and formats it reads.
+
+## Budgets
+
+A budget is an amount for each income and expense account in each month of a year. The profit and loss compares the actual results with it.
+
+**In the UI:** Reports → Budgets → New budget, then **Add budget**. It starts blank, from a year's actual results changed by a percentage, or as a copy of another budget. Its grid has the accounts down the side and the months across, and an amount typed in the Year column is spread over the months. A budget downloads as a spreadsheet and uploads again. The profit and loss's **Compare with** shows a budget against the actual results.
+
+**In the console:**
+
+```ruby
+budget = TudlaAccounting::Budget.create!(organization: org, period: year, name: "2026", main: true)
+months = year.children.order(:from_date)
+budget.set_amounts!(sales.id => months.to_h { |month| [ month.id, 2_000_00 ] }, cloudnine.default_account.id => months.to_h { |month| [ month.id, 200_00 ] })
+TudlaAccounting::Reports::BudgetComparison.new(budget, year) # actual, budget, and the variance for each account
+# Next year's, from this year's results plus 5%: budget.fill_from_actuals!(year, percent: 5)
+```
 
 ## Revaluing foreign currency
 

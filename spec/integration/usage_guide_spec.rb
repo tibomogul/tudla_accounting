@@ -50,10 +50,12 @@ RSpec.describe "USAGE.md" do
 
   before do
     TudlaAccounting.configuration.forex_rate_provider = ->(from:, to:, date:) { 1.6 } # for the revaluation
+    TudlaAccounting.configuration.reminder_days = [ 7, 14, 30 ] # as the guide's reminders have it
     # The files the examples name, in the directory they run in.
     FileUtils.cp(fixtures.join("coa_saas_services.xlsx"), @dir.join("chart.xlsx"))
     FileUtils.cp(fixtures.join("carrying_amounts.csv"), @dir.join("open_items.csv"))
     FileUtils.cp(fixtures.join("contacts.csv"), @dir.join("contacts.csv"))
+    FileUtils.cp(fixtures.join("bank_statement.csv"), @dir.join("statement.csv"))
     roles = { "1020" => "receivable", "2011" => "payable", "3030" => "retained_earnings" }
     chart = CSV.read(fixtures.join("coa_saas_services.csv"), headers: true)
     @dir.join("chart.csv").write(CSV.generate do |csv|
@@ -91,7 +93,25 @@ RSpec.describe "USAGE.md" do
     expect(contacts.keys).to contain_exactly("Northwind Traders", "Globex", "Initech Supplies", "Cloudnine Hosting")
     expect(contacts["Northwind Traders"]).to have_attributes(kind: "customer", payment_terms_days: 14, default_tax_code: have_attributes(code: "GST"))
     expect(contacts["Cloudnine Hosting"]).to have_attributes(default_account: account("6020"), default_tax_code: have_attributes(code: "GST-P"))
-    expect(TudlaAccounting::CarryingAmount.joins(:detail).where(tudla_accounting_details: { organization_id: organization.id }).count).to eq(3)
+    expect(TudlaAccounting::CarryingAmount.joins(detail: :entry).where(tudla_accounting_details: { organization_id: organization.id })
+                                          .where(tudla_accounting_entries: { source_type: nil }).count).to eq(3) # the open items imported
+
+    # Running the books
+    documents = TudlaAccounting::Document.where(organization: organization).order(:id)
+    expect(documents.map { |document| [ document.number_label, document.payment_status, document.amount_due.format ] })
+      .to eq([ [ "INV-0001", "paid", "$0.00" ], [ "BILL-0001", "paid", "$0.00" ], [ "INV-0002", "unpaid", "€1.000,00" ], [ "SC-0001", "paid", "$0.00" ], [ "INV-0003", "unpaid", "$550.00" ] ])
+    expect(documents.third.entry.details.map { |detail| detail.account.code }).to include("1100-EUR")
+    expect(TudlaAccounting::Payment.where(organization: organization).order(:id).map { |payment| [ payment.kind, payment.amount_cents ] })
+      .to eq([ [ "received", 1_700_00 ], [ "refund", 50_00 ], [ "paid", 198_00 ] ])
+    expect(TudlaAccounting::RecurringInvoice.find_by!(organization: organization).next_on).to eq(Date.new(2026, 7, 1))
+    expect(TudlaAccounting::Delivery.where(organization: organization).order(:id).map { |delivery| [ delivery.kind, delivery.to ] })
+      .to eq([ %w[payment_notice billing@cloudnine.test], %w[reminder payables@globex.test] ])
+    bank_lines = TudlaAccounting::BankStatementLine.where(account: account("1010"))
+    expect(bank_lines.count).to eq(4)
+    expect(bank_lines.where.missing(:bank_matches).count).to eq(0)
+    expect(TudlaAccounting::BankReconciler.new(account("1010")).summary(as_of: Date.new(2026, 6, 30))[:difference]).to eq(Money.new(0, "USD"))
+    budget = TudlaAccounting::Budget.find_by!(organization: organization, main: true)
+    expect(budget.amounts.transform_values { |months| months.values.sum }).to eq(account("4010").id => 24_000_00, account("6020").id => 2_400_00)
     expect(TudlaAccounting::Entry.where(organization: organization).where("particulars LIKE ?", "%Revaluation of%").count).to eq(2) # the revaluation and its reversal
     expect(year.children.order(:from_date).first.closed?).to be(false) # closed, then reopened
     expect(differences).to be_empty
