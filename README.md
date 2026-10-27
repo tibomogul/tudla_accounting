@@ -483,13 +483,13 @@ docker compose exec rails bash -lc 'RAILS_ENV=test bundle exec rspec --format do
 SimpleCov generates an HTML report in `coverage/` after each test run. Open `coverage/index.html` to view detailed metrics.
 
 ### Benchmark
-`perf/benchmark.rb` builds a throwaway organization's books (two years, a chart of 30 accounts, taxed and tagged entries on random dates), then times posting and every report and heavy page, with the number of SQL queries each takes. It checks the balances against the posted lines with `BalanceRebuilder`, and deletes the books afterwards (unless `KEEP=1`):
+`perf/benchmark.rb` builds a throwaway organization's books (two years, a chart of 30 accounts, taxed and tagged entries on random dates, and a quarter as many invoices and bills for 40 contacts, most of them paid, with credit notes, refunds, a recurring invoice and a budget), then times posting and every report and heavy page, with the number of SQL queries each takes. It checks the balances against the posted lines with `BalanceRebuilder`, and deletes the books afterwards (unless `KEEP=1`):
 
 ```bash
 docker compose exec rails bash -lc 'ENTRIES=10000 bin/rails runner perf/benchmark.rb'
 ```
 
-With 10,000 entries (25,000 lines) posting takes about 21 ms an entry, and every report and page answers in under half a second; reports read balances for all accounts in a handful of queries, and the general ledger and banking pages show their lines a page at a time.
+With 10,000 entries and 2,500 invoices and bills (41,000 lines), posting takes about 27 ms an entry and approving a document or recording a payment about 80 ms. The financial reports and the general ledger, entries, banking, payments, budget and contacts pages answer in under a second, in queries that don't grow with the books: reports read balances for all accounts in a handful, and long lists come a page at a time. What works out open receivables and payables one by one still takes queries for each: at that size the dashboard takes 14 seconds (9,400 queries), the receivables aging and the statements for every customer 10 to 14 seconds, and the Sales and Purchases lists, the pay run and a contact's page over half a second.
 
 ### Linting
 ```bash
