@@ -45,8 +45,8 @@ module TudlaAccounting
     def outstanding(as_of: nil)
       return { cents: 0, foreign_cents: 0 } if reversed?(detail.entry, as_of)
 
-      active = allocations.active(as_of).order(:allocated_at, :id)
-      return { cents: -detail.amount_cents + active.sum(:amount_cents), foreign_cents: -opening_foreign_cents + active.sum(:other_currency_cents).to_i } if credit?
+      active = active_allocations(as_of)
+      return { cents: -detail.amount_cents + active.sum(&:amount_cents), foreign_cents: -opening_foreign_cents + active.sum { |allocation| allocation.other_currency_cents.to_i } } if credit?
 
       remaining = detail.amount_cents
       remaining_foreign = opening_foreign_cents
@@ -106,7 +106,22 @@ module TudlaAccounting
       { reduction_cents: book_cents + (cash_cents - cash_for_settled), realized_cents: cash_for_settled - book_cents }
     end
 
+    # The scope to load many carrying amounts with, so outstanding reads nothing more for
+    # each: what it uses of their lines and entries (reversals included) and their
+    # allocations.
+    def self.with_outstanding
+      includes(:forex, :allocations_from, :allocations_to, detail: [ :foreign_exchange, { entry: [ :source, :posted_reversal ] } ])
+    end
+
     private
+
+    # The allocations in force at as_of, in the order they were made: from those preloaded
+    # (with_outstanding), or else from the database.
+    def active_allocations(as_of)
+      return allocations.active(as_of).order(:allocated_at, :id).to_a unless allocations.loaded?
+
+      allocations.select { |allocation| allocation.active_at?(as_of) }.sort_by { |allocation| [ allocation.allocated_at, allocation.id ] }
+    end
 
     def reversed?(entry, as_of)
       reversal = entry.reversal

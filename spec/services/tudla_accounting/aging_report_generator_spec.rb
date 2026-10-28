@@ -95,6 +95,29 @@ RSpec.describe TudlaAccounting::AgingReportGenerator, type: :service do
     expect(report[:totals]).to include(days_1_30: usd(500), total: usd(500)) # 30 June: the March invoice is paid
   end
 
+  it "reads the same number of queries however many amounts are open" do
+    queries = lambda do
+      count = 0
+      counter = ->(*, payload) { count += 1 unless payload[:name] == "SCHEMA" }
+      ActiveSupport::Notifications.subscribed(counter, "sql.active_record") { report }
+      count
+    end
+    # Part paid, paid after the date, and reversed; one customer, then two.
+    add = lambda do |customer|
+      payment(invoice(300, customer: customer, due: Date.new(2026, 6, 1)), 120, on: Time.zone.local(2026, 2, 1))
+      payment(invoice(200, customer: customer, due: Date.new(2026, 6, 1)), 200, on: Time.zone.local(2026, 7, 1))
+      invoice(100, customer: customer, due: Date.new(2026, 6, 1)).reverse!(on: Date.new(2026, 3, 1))
+    end
+
+    add.call(acme)
+    few = queries.call
+    add.call(acme)
+    add.call(globex)
+
+    expect(report[:totals][:total]).to eq(usd(1_140))
+    expect(queries.call).to eq(few)
+  end
+
   it "reports payables from bills, reduced by disbursements" do
     bill = post_entry([ [ "5000", :debit, 400 ], [ "2100", :credit, 400 ] ], on: Time.zone.local(2026, 2, 1),
                       source: Bill.create!(due_date: Time.zone.local(2026, 5, 1), customer: globex))

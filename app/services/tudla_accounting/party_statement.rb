@@ -79,16 +79,14 @@ module TudlaAccounting
 
     def call
       items = self.class.carrying_amounts(organization, type).where(related_party: party).where(tudla_accounting_entries: { transacted_at: ..end_of(thru) })
-                  .includes(:forex, detail: { entry: :source }).order("tudla_accounting_entries.transacted_at", :id).to_a
-      reversals = Entry.where(related: items.map { |item| item.detail.entry }).where.not(posted_at: nil).where("particulars LIKE ?", "#{Entry::REVERSAL_PREFIX}%")
-                       .index_by(&:related_id)
+                  .with_outstanding.order("tudla_accounting_entries.transacted_at", :id).to_a
       before = end_of(from - 1)
       @opening = money(items.sum { |item| item.detail.entry.transacted_at <= before ? item.outstanding(as_of: before)[:cents] : 0 })
       report = AgingReportGenerator.call(organization: organization, report_type: type, as_of_date: thru, party: party)
       @open_items = report[:details].values.first || []
       @aging = report[:totals]
       @closing = @aging[:total]
-      @lines = activity(items, reversals)
+      @lines = activity(items)
       self
     end
 
@@ -109,11 +107,11 @@ module TudlaAccounting
 
     # The run's charges, credits and reversals in date order, with the running balance,
     # and the adjustment that brings it to the closing balance.
-    def activity(items, reversals)
+    def activity(items)
       run = from.in_time_zone(TudlaAccounting.configuration.time_zone).beginning_of_day..end_of(thru)
       events = items.filter_map { |item| [ item.detail.entry.transacted_at, item, false ] if run.cover?(item.detail.entry.transacted_at) }
       events += items.filter_map do |item|
-        reversal = reversals[item.detail.entry.id]
+        reversal = item.detail.entry.reversal
         [ reversal.transacted_at, item, reversal ] if reversal && run.cover?(reversal.transacted_at)
       end
       balance = opening

@@ -26,6 +26,13 @@ module TudlaAccounting
       reversed_at.nil?
     end
 
+    # Whether it was in force at as_of (a time; nil for now), as the active scope has it.
+    def active_at?(as_of)
+      return active? unless as_of
+
+      allocated_at <= as_of && (reversed_at.nil? || reversed_at > as_of)
+    end
+
     def amount
       Money.new(amount_cents, from.detail.currency)
     end

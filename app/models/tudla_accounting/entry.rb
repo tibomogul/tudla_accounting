@@ -13,6 +13,11 @@ module TudlaAccounting
 
     REVERSAL_PREFIX = "Reversal of: ".freeze
 
+    # The posted entry that reverses this one; preload it to read many entries' reversals
+    # at once (see reversal).
+    has_one :posted_reversal, -> { where.not(posted_at: nil).where("particulars LIKE ?", "#{REVERSAL_PREFIX}%") },
+            as: :related, class_name: "TudlaAccounting::Entry", inverse_of: false
+
     accepts_nested_attributes_for :details, allow_destroy: true
 
     normalizes :reference, with: ->(reference) { reference.strip.presence }
@@ -45,9 +50,10 @@ module TudlaAccounting
       TudlaAccounting.configuration.entry_number_label(self)
     end
 
-    # The posted entry that reverses this one, if any.
+    # The posted entry that reverses this one, if any: as preloaded (posted_reversal), or
+    # else read afresh, so it is never out of date after a reversal.
     def reversal
-      self.class.where(related: self).where.not(posted_at: nil).where("particulars LIKE ?", "#{REVERSAL_PREFIX}%").first
+      association(:posted_reversal).loaded? ? posted_reversal : association(:posted_reversal).scope.first
     end
 
     # Opened a receivable or payable (an invoice or bill).

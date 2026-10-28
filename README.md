@@ -489,7 +489,7 @@ SimpleCov generates an HTML report in `coverage/` after each test run. Open `cov
 docker compose exec rails bash -lc 'ENTRIES=10000 bin/rails runner perf/benchmark.rb'
 ```
 
-With 10,000 entries and 2,500 invoices and bills (41,000 lines), posting takes about 27 ms an entry and approving a document or recording a payment about 80 ms. The financial reports and the general ledger, entries, banking, payments, budget and contacts pages answer in under a second, in queries that don't grow with the books: reports read balances for all accounts in a handful, and long lists come a page at a time. What works out open receivables and payables one by one still takes queries for each: at that size the dashboard takes 14 seconds (9,400 queries), the receivables aging and the statements for every customer 10 to 14 seconds, and the Sales and Purchases lists, the pay run and a contact's page over half a second.
+With 10,000 entries and 2,500 invoices and bills (41,000 lines), posting takes about 27 ms an entry and approving a document or recording a payment about 80 ms. The financial reports and the general ledger, entries, banking, payments, budget and contacts pages answer in under a second, in queries that don't grow with the books: reports read balances for all accounts in a handful, and long lists come a page at a time. The aging, the dashboard and a contact's page read what is owed on every open item in a few queries too (the dashboard answers in 0.6 seconds), and the statements for every customer take a few queries for each customer (1.6 seconds for 30). The Sales and Purchases lists and the pay run still take queries for each document, over a second at that size.
 
 ### Linting
 ```bash

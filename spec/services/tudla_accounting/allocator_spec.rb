@@ -89,6 +89,15 @@ RSpec.describe TudlaAccounting::Allocator, type: :service do
       expect(allocation.reload.reversed_at).to eq(on(3, 25))
       expect([ open_item(inv1).amount_cents, open_item(pay).amount_cents ]).to eq([ 300_00, -450_00 ])
       expect(owed(Date.new(2026, 3, 23))[:details].values.flatten.map { |line| line[:entry].particulars }).to eq([ "Invoice 2", "Payment 1" ])
+
+      # As it stood each day, read one at a time or preloaded as the reports read it.
+      [ [ on(3, 20), 300_00, -450_00 ], [ on(3, 23), 0, -150_00 ], [ on(3, 26), 300_00, -450_00 ] ].each do |at, invoice_cents, payment_cents|
+        [ [ inv1, invoice_cents ], [ pay, payment_cents ] ].each do |entry, cents|
+          [ open_item(entry), TudlaAccounting::CarryingAmount.with_outstanding.find(open_item(entry).id) ].each do |item|
+            expect(item.outstanding(as_of: at)[:cents]).to eq(cents)
+          end
+        end
+      end
       expect { described_class.unallocate!(allocation, at: on(3, 26)) }.to raise_error(ArgumentError, "This allocation has already been taken off")
     end
 

@@ -53,6 +53,27 @@ RSpec.describe TudlaAccounting::PartyStatement, type: :service do
     lines.map { |line| [ line.date.day, line.kind, line.entry&.particulars, line.charge, line.credit, line.balance ] }
   end
 
+  it "reads the same number of queries however many lines it has" do
+    queries = lambda do
+      count = 0
+      counter = ->(*, payload) { count += 1 unless payload[:name] == "SCHEMA" }
+      ActiveSupport::Notifications.subscribed(counter, "sql.active_record") { statement }
+      count
+    end
+    # Before the run, part paid in it, and reversed in it.
+    add = lambda do
+      payment("Payment", 100, at: on(3, 5), related: invoice("Invoice", 300, at: on(2, 10), due: on(3, 12)))
+      invoice("Invoice", 100, at: on(3, 15)).reverse!(on: Date.new(2026, 3, 20))
+    end
+
+    add.call
+    few = queries.call
+    2.times { add.call }
+
+    expect(statement.closing).to eq(aud(600))
+    expect(queries.call).to eq(few)
+  end
+
   it "runs from the opening balance through the charges, credits and reversals in the dates to the closing balance" do
     first = invoice("Invoice 1", 300, at: on(2, 10), due: on(3, 12))
     second = invoice("Invoice 2", 200, at: on(3, 1), due: on(3, 31))

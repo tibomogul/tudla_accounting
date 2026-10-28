@@ -64,7 +64,7 @@ module TudlaAccounting
         .where(carrying_amount_type: @report_type,
                tudla_accounting_details: { organization_type: @organization.class.name, organization_id: @organization.id })
         .where(tudla_accounting_entries: { transacted_at: ..as_of_end })
-        .includes(:related_party, :forex, detail: { entry: :source })
+        .with_outstanding.includes(:related_party)
         .order("tudla_accounting_entries.transacted_at")
         .then { |scope| @party ? scope.where(related_party: @party) : scope }
     end
