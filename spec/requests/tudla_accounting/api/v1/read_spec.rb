@@ -108,8 +108,8 @@ RSpec.describe "JSON API: reading the books", type: :request do
   it "lists the accounts, a page at a time, and finds one by id or code" do
     data = api_get(routes.api_v1_accounts_path, per_page: 2)
     expect(data["data"].map { |row| row["code"] }).to eq(%w[1000 1100])
-    expect(data["meta"]).to eq("page" => 1, "per_page" => 2, "total_count" => 6, "total_pages" => 3)
-    expect(api_get(routes.api_v1_accounts_path, page: 3, per_page: 2)["data"].map { |row| row["code"] }).to eq(%w[4000 4010])
+    expect(data["meta"]).to eq("page" => 1, "per_page" => 2, "total_count" => 7, "total_pages" => 4) # 1100-AUD made with the receivable role
+    expect(api_get(routes.api_v1_accounts_path, page: 3, per_page: 2)["data"].map { |row| row["code"] }).to eq(%w[3000 4000])
     expect(api_get(routes.api_v1_accounts_path, category: "income")["data"].map { |row| [ row["code"], row["parent_code"] ] }).to eq([ [ "4000", nil ], %w[4010 4000] ])
     expect(api_get(routes.api_v1_accounts_path, per_page: 1000)["meta"]["per_page"]).to eq(200)
     account("1000").update!(active: false)
@@ -211,7 +211,7 @@ RSpec.describe "JSON API: reading the books", type: :request do
       expect(trial["report"]).to eq("trial_balance")
       expect(trial["data"]["headings"]).to start_with("Code")
       expect(trial["data"]["rows"].last["total"]).to be(true)
-      expect(trial["data"]["rows"].map { |row| row["cells"].first }).to include("1100", "4010")
+      expect(trial["data"]["rows"].map { |row| row["cells"].first }).to include("1100-AUD", "4010")
 
       expect(api_get(routes.api_v1_report_path("profit_and_loss"), compare: "previous", period_id: april.id)["data"]["headings"].size).to be > 2
       expect(api_get(routes.api_v1_report_path("balance_sheet"))["data"]["rows"]).not_to be_empty

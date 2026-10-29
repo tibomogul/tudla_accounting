@@ -57,7 +57,7 @@ RSpec.describe "Dimensions on invoice and bill lines", type: :request do
     expect(css_select("[data-document]").text).not_to include("Engineering") # not on the printed document
 
     tags = invoice.entry.details.to_h { |detail| [ [ detail.account.code, detail.amount_cents ], detail.tags.map(&:dimension_value) ] }
-    expect(tags).to eq([ "1100", 165_00 ] => [], [ "4000", 100_00 ] => [ eng, apollo ], [ "4000", 50_00 ] => [ sales ], [ "2200", 10_00 ] => [], [ "2200", 5_00 ] => [])
+    expect(tags).to eq([ "1100-AUD", 165_00 ] => [], [ "4000", 100_00 ] => [ eng, apollo ], [ "4000", 50_00 ] => [ sales ], [ "2200", 10_00 ] => [], [ "2200", 5_00 ] => [])
     report = TudlaAccounting::DimensionReport.call(organization, department, from: Date.new(2026, 1, 1), thru: Date.new(2026, 12, 31))
     expect(report[:income].sole[:amounts].transform_keys { |value| value&.code }.transform_values(&:cents)).to include("SALES" => 50_00, "ENG" => 100_00)
   end

@@ -9,6 +9,11 @@ module TudlaAccounting
   # - Receivables and payables stay on an account once it, or one beneath it, has posted
   #   lines (its open items would be left behind), and can't be given to such an account,
   #   whose lines opened nothing owed. Opening balances and drafts don't count.
+  # - The receivable and payable accounts are totals of their sub-accounts: one in each
+  #   currency the organization deals in (see Account.for_role_in_currency!). Giving
+  #   either role makes the one in the organization's own currency (e.g. "1100-USD") when
+  #   the account has none, moving the account's own opening balance onto it, so the
+  #   account still adds up to what is beneath it.
   # - Retained earnings can't change while a period after the first year is closed, as the
   #   profit carried into it would be restated. Changing it on books with balances rebuilds
   #   them (BalanceRebuilder#rebuild!) in the same transaction, so they're never left behind.
@@ -114,10 +119,46 @@ module TudlaAccounting
       return false if account.errors.any?
 
       rebuild = rebuild_needed?(account)
-      return false unless release_role(account) && account.save
+      return false unless release_role(account) && account.save && ensure_home_sub_account(account)
 
       @rebuild_needed ||= rebuild
       true
+    end
+
+    # The receivable or payable account's sub-account in the organization's currency, made
+    # if it has none, with the account's own opening balance (what it holds beyond the
+    # accounts beneath it) in every period it has a balance for. Nothing is posted beneath
+    # it yet (check_locked_roles), so that is all its balances hold.
+    def ensure_home_sub_account(account)
+      return true unless LOCKED_ROLES.include?(account.role)
+
+      currency = @organization.currency
+      return true if account.children.exists?(currency: currency)
+
+      code = "#{account.code}-#{currency}"
+      if Account.exists?(organization: @organization, code: code)
+        account.errors.add(:role, "needs a sub-account in #{currency} for #{account.role_name.downcase} in #{currency}, made as #{code}, but #{code} is already taken; " \
+                                  "move that account beneath #{account.code}, or give it another code")
+        return false
+      end
+
+      home = Account.create!(organization: @organization, parent: account, code: code, name: "#{account.name} - #{currency}", category: account.category,
+                             currency: currency, contra_account_id: account.contra_account_id)
+      move_own_balances(account, home)
+      true
+    end
+
+    def move_own_balances(account, home)
+      others = account.children.where.not(id: home.id).to_a
+      Balance.where(account: account).find_each do |balance|
+        beneath = Balance.peek_all(others, balance.period).values
+        own = %i[starting_amount_cents current_amount_cents ending_amount_cents].to_h do |field|
+          [ field, balance.public_send(field) - beneath.sum { |child| (child.account.debit_balance? == account.debit_balance? ? 1 : -1) * child.public_send(field) } ]
+        end
+        next if own.values.all?(&:zero?)
+
+        Balance.create!(own.merge(organization: @organization, account: home, period: balance.period, currency: balance.currency))
+      end
     end
 
     def check_locked_roles(account)

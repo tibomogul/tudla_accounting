@@ -62,7 +62,7 @@ RSpec.describe "USAGE.md, in the UI", type: :system do
     expect(page).to have_unchecked_field("Replace accounts and opening balances that already exist")
     click_button "Load chart of accounts"
     expect(page).to have_current_path(accounts_path)
-    expect(page).to have_content("Chart of accounts loaded: 81 new accounts, with opening balances.")
+    expect(page).to have_content("Chart of accounts loaded: 83 new accounts, with opening balances.")
     expect(page).to have_content("Retained earnings") # the role's badge in the chart
 
     # 4. The Setup page shows the roles, and the account form sets one

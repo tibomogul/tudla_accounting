@@ -198,7 +198,7 @@ The engine finds certain accounts by their role, never by their code. Each organ
 | `unrealized_fx_gain` | income or expense | Revaluation raises when there are foreign-currency items to revalue |
 | `realized_fx_gain` | income or expense | Exchange differences on settlement stay on the receivable or payable account, and a warning is logged |
 
-Receivables and payables cover the marked account and every account beneath it, such as `1100-EUR`.
+Receivables and payables cover the marked account and every account beneath it. The marked account is the total of a sub-account for each currency, and holds nothing of its own: giving the role makes the sub-account in the organization's currency (`1100-USD`, given the account's own opening balance), and the first invoice, bill or payment in another currency makes that currency's (`1100-EUR`). `Account.for_role_in_currency!(org, :receivable, "USD")` finds the one to post to. An account already in the organization's currency beneath the marked account serves as its sub-account, and the role is refused when the code it would make is taken by an account elsewhere.
 
 The dashboard warns, and `balances:check` prints a warning, while no account is marked retained earnings, receivable or payable (when `carrying_amount_sources` records that side), or either exchange role once an account is held in another currency.
 

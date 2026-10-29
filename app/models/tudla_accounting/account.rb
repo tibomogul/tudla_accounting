@@ -48,16 +48,25 @@ module TudlaAccounting
       for_role(organization, role) or raise ArgumentError, missing_role_message(organization, role)
     end
 
-    # Where the role's amounts in a currency go: the role's account, or its sub-account in
-    # that currency (made as e.g. "1100-EUR" when there's none yet) for a foreign one. For
-    # the organization's own currency, a sub-account held in it if the role's account has one.
+    # Where the role's amounts in a currency go: the role's sub-account in that currency
+    # (made as e.g. "1100-EUR" when there's none yet), or the role's account itself for the
+    # organization's own currency when it has no sub-account in it (books set up before
+    # giving a receivable or payable role made one; see AccountRoleAssigner). A foreign
+    # sub-account isn't made beneath an account with postings of its own, which would then
+    # hold more than its sub-accounts add up to.
     def self.for_role_in_currency!(organization, role, currency)
       base = for_role!(organization, role)
       return base.children.find_by(currency: organization.currency) || base if currency.blank? || currency == organization.currency
 
-      base.children.find_by(currency: currency) ||
+      base.children.find_by(currency: currency) || begin
+        if base.details.joins(:entry).where.not(tudla_accounting_entries: { posted_at: nil }).exists?
+          raise ArgumentError, "#{base.code_with_name} has postings of its own, so it can't take a sub-account for #{currency}; " \
+                               "give it a sub-account in #{organization.currency} and move its balance there first"
+        end
+
         create!(organization: organization, parent: base, code: "#{base.code}-#{currency}", name: "#{base.name} - #{currency}", category: base.category,
                 currency: currency, contra_account_id: base.contra_account_id)
+      end
     end
 
     def self.missing_role_message(organization, role)

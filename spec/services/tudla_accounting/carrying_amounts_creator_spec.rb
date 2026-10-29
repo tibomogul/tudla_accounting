@@ -42,7 +42,7 @@ RSpec.describe TudlaAccounting::CarryingAmountsCreator, type: :service do
     entry = TudlaAccounting::Entry.find_by(particulars: "Invoice 1001")
 
     expect(entry).to have_attributes(transacted_at: date_prior.in_time_zone, posted_at: date_prior.in_time_zone)
-    expect(entry.details.map { |detail| [ detail.account.code, detail.tally ] }).to contain_exactly([ "1100", "debit" ], [ "4000", "credit" ])
+    expect(entry.details.map { |detail| [ detail.account.code, detail.tally ] }).to contain_exactly([ "1100-AUD", "debit" ], [ "4000", "credit" ])
     expect(TudlaAccounting::Balance.count).to eq(0)
     expect { entry.post(Time.zone.local(2026, 1, 1)) }.to raise_error(ArgumentError, "entry is already posted")
   end
@@ -72,11 +72,11 @@ RSpec.describe TudlaAccounting::CarryingAmountsCreator, type: :service do
     payment = build(:tudla_accounting_entry, organization: organization, transacted_at: Time.zone.local(2026, 1, 10),
                                              source_type: "Payment", related: invoice_entry)
     payment.details.build(account: account("1000"), tally: :debit, amount_cents: 400_00, currency: "AUD", organization: organization)
-    payment.details.build(account: account("1100"), tally: :credit, amount_cents: 400_00, currency: "AUD", organization: organization)
+    payment.details.build(account: account("1100-AUD"), tally: :credit, amount_cents: 400_00, currency: "AUD", organization: organization)
     payment.save!
     payment.post(payment.transacted_at)
 
-    expect(TudlaAccounting::CarryingAmount.find_by(detail: invoice_entry.details.find_by(account: account("1100"))).amount).to eq(aud(600))
+    expect(TudlaAccounting::CarryingAmount.find_by(detail: invoice_entry.details.find_by(account: account("1100-AUD"))).amount).to eq(aud(600))
   end
 
   it "links each row to a host record when given a source, taking the related party from it" do
@@ -119,7 +119,7 @@ RSpec.describe TudlaAccounting::CarryingAmountsCreator, type: :service do
     it "allows a row without a due date, and treats the organization's own currency as no foreign currency" do
       amount = import_rows([ "Invoice 1", "100", "receivable", "", "aud", "", "", "" ]).sole
       expect(amount).to have_attributes(due_date: nil, forex: nil)
-      expect(amount.detail.account).to eq(account("1100"))
+      expect(amount.detail.account).to eq(account("1100-AUD"))
     end
 
     it "needs an account marked receivable in the organization" do
@@ -140,8 +140,8 @@ RSpec.describe TudlaAccounting::CarryingAmountsCreator, type: :service do
     it "uses the account marked receivable, whatever its code" do
       account("1100").update!(code: "1199")
 
-      # The foreign-currency row goes on a sub-account of it.
-      expect(import.select(&:receivable?).map { |amount| amount.detail.account.code }.uniq).to contain_exactly("1199", "1199-EUR")
+      # Each row goes on its sub-account in the row's currency (the one in AUD keeps the code it was made with).
+      expect(import.select(&:receivable?).map { |amount| amount.detail.account.code }.uniq).to contain_exactly("1100-AUD", "1199-EUR")
     end
 
     it "needs sales and purchase account codes" do

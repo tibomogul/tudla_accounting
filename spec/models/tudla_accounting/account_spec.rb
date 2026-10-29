@@ -119,6 +119,26 @@ RSpec.describe TudlaAccounting::Account, type: :model do
           .to raise_error(ArgumentError, "No account is marked as the Payables account for Organization #{organization.id}; mark one in the chart of accounts")
       end
 
+      it "sends each currency's amounts to the role's sub-account in it, making a foreign one when first needed" do
+        receivables
+        expect(TudlaAccounting::Account.for_role_in_currency!(organization, :receivable, nil).code).to eq("1100-USD")
+        expect(TudlaAccounting::Account.for_role_in_currency!(organization, :receivable, "USD").code).to eq("1100-USD")
+        euros = TudlaAccounting::Account.for_role_in_currency!(organization, :receivable, "EUR")
+        expect(euros).to have_attributes(code: "1100-EUR", parent: receivables, currency: "EUR")
+        expect(TudlaAccounting::Account.for_role_in_currency!(organization, :receivable, "EUR")).to eq(euros)
+      end
+
+      # Books set up before giving the role made the sub-account in the organization's currency.
+      it "uses the role's account itself without one, but makes no foreign sub-account beneath its own postings" do
+        receivables.children.sole.destroy!
+        expect(TudlaAccounting::Account.for_role_in_currency!(organization, :receivable, "USD")).to eq(receivables)
+        post_to(receivables)
+
+        expect { TudlaAccounting::Account.for_role_in_currency!(organization, :receivable, "EUR") }
+          .to raise_error(ArgumentError, "1100 - #{receivables.name} has postings of its own, so it can't take a sub-account for EUR; " \
+                                         "give it a sub-account in USD and move its balance there first")
+      end
+
       it "knows only its roles, each on accounts of a suitable category" do
         role_errors = ->(account, role) { account.tap { TudlaAccounting::AccountRoleAssigner.save(account, role) }.errors[:role] }
 

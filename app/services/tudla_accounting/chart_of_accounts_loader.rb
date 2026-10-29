@@ -150,12 +150,19 @@ module TudlaAccounting
       end
     end
 
-    # Opening balances nested the way the file nests the accounts.
+    # Opening balances nested the way the file nests the accounts. The receivable or
+    # payable account's sub-account in the organization's currency, when the file doesn't
+    # have it (the role made it), takes what the account holds beyond its sub-accounts.
     def balance_nodes(rows, accounts)
       children = rows.group_by { |row| row[:parent_code] }
       build = ->(row) do
-        { account_id: accounts.fetch(row[:code]).id, amount_cents: row[:amount_cents],
-          children: children.fetch(row[:code], []).map(&build) }
+        account = accounts.fetch(row[:code])
+        nodes = children.fetch(row[:code], []).map(&build)
+        home = account.children.find_by(currency: organization.currency) if AccountRoleAssigner::LOCKED_ROLES.include?(account.role)
+        if home && !accounts.key?(home.code)
+          nodes << { account_id: home.id, amount_cents: row[:amount_cents] - nodes.sum { |node| node[:amount_cents] }, children: [] }
+        end
+        { account_id: account.id, amount_cents: row[:amount_cents], children: nodes }
       end
       children.fetch(nil, []).map(&build)
     end

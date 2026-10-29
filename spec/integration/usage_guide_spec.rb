@@ -120,8 +120,11 @@ RSpec.describe "USAGE.md" do
   it "loads the chart and opening balances from a spreadsheet" do
     run(ruby_blocks.select { |block| [ "Setting up the books", "2. Create a financial year", "From a spreadsheet (CSV or Excel)" ].include?(block.heading) })
 
-    expect(TudlaAccounting::Account.where(organization: organization).count).to eq(81)
+    expect(TudlaAccounting::Account.where(organization: organization).count).to eq(83) # the file's 81, and the receivable and payable accounts' in USD
     expect(%w[receivable payable retained_earnings].map { |role| TudlaAccounting::Account.for_role(organization, role).code }).to eq(%w[1020 2011 3030])
+    year = TudlaAccounting::Period.roots.find_by!(organization: organization)
+    # The receivable account's opening balance is on its sub-account in USD, beside the allowance.
+    expect(%w[1020 1020-USD 1025].map { |code| TudlaAccounting::Balance.peek(account(code), year).starting_amount.to_f }).to eq([ 20_000.0, 20_000.0, 1_000.0 ])
     expect(differences).to be_empty
   end
 

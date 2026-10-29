@@ -65,7 +65,7 @@ RSpec.describe "Dashboard", type: :request do
         expect([ stat("profit"), stat("receivables"), stat("payables"), stat("drafts") ]).to eq([ "580.00", "700.00", "120.00", "1" ])
         expect(response.body).to include("To 30 Apr 2026", "500.00 overdue", "0.00 overdue")
         expect(css_select("table tbody tr").size).to eq(4)
-        expect(response.body).to include("5 accounts · 1 financial year · current period Apr 2026")
+        expect(response.body).to include("7 accounts · 1 financial year · current period Apr 2026")
       end
 
       it "warns about the roles no account has" do

@@ -36,7 +36,7 @@ RSpec.describe TudlaAccounting::Payment do
     expect(payment).to have_attributes(status: "posted", kind_label: "Payment received", title: "Payment from Northwind", amount: aud(150))
     expect(payment.entry).to have_attributes(posted?: true, source: payment, reference: "EFT 991", particulars: "Payment from Northwind (INV-0001, INV-0002)")
     expect(payment.entry.transacted_at).to eq(Time.zone.local(2026, 3, 20))
-    expect(postings(payment.entry)).to contain_exactly([ "1000", "debit", 150_00 ], [ "1100", "credit", 150_00 ])
+    expect(postings(payment.entry)).to contain_exactly([ "1000", "debit", 150_00 ], [ "1100-AUD", "credit", 150_00 ])
     expect(payment.credit).to have_attributes(related_party: northwind, carrying_amount_type: "receivable")
     expect([ first.reload.payment_status, second.reload.amount_due ]).to eq([ "paid", aud(50) ])
     expect(payment.reload.unapplied).to eq(aud(20))
@@ -49,7 +49,7 @@ RSpec.describe TudlaAccounting::Payment do
     bill = document("bill", 40_00, contact: supplier)
     payment = record(kind: "paid", contact: supplier, amount_cents: 40_00, applications: [ { document: bill, amount_cents: 40_00 } ])
     expect(payment.title).to eq("Payment to Acme")
-    expect(postings(payment.entry)).to contain_exactly([ "2100", "debit", 40_00 ], [ "1000", "credit", 40_00 ])
+    expect(postings(payment.entry)).to contain_exactly([ "2100-AUD", "debit", 40_00 ], [ "1000", "credit", 40_00 ])
     expect(bill.reload.payment_status).to eq("paid")
 
     loose = record(kind: "paid", contact: supplier, amount_cents: 10_00)

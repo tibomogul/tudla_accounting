@@ -102,6 +102,41 @@ RSpec.describe TudlaAccounting::AccountRoleAssigner do
     expect(described_class.save(opened.reload, :payable)).to be(true)
   end
 
+  describe "the sub-account in the organization's currency" do
+    it "is made with the receivable or payable role, taking the account's own opening balance, so it adds up to what is beneath it" do
+      year = TudlaAccounting::PeriodCreator.call(organization, 2026)
+      debtors = create(:tudla_accounting_account, code: "1200", name: "Debtors", category: :asset, organization: organization)
+      staff = create(:tudla_accounting_account, code: "1201", category: :asset, currency: nil, organization: organization, parent: debtors)
+      TudlaAccounting::StartingBalanceCreator.call(organization, year.from_date.to_date,
+                                                   [ { account_id: debtors.id, amount_cents: 100, children: [ { account_id: staff.id, amount_cents: 100 } ] } ], "USD")
+      # Opening balances keep a parent equal to its children, so the account's own (from
+      # before that rule, or loaded with the role) goes straight into its balances.
+      TudlaAccounting::Balance.where(account: debtors).update_all("starting_amount_cents = starting_amount_cents + 400, ending_amount_cents = ending_amount_cents + 400")
+
+      expect(described_class.save(debtors, :receivable)).to be(true)
+      home = debtors.children.find_by!(code: "1200-USD")
+      expect(home).to have_attributes(name: "Debtors - USD", currency: "USD", category: "asset", role: nil)
+      expect(year.subtree.map { |period| TudlaAccounting::Balance.peek(home, period).ending_amount_cents }.uniq).to eq([ 400 ])
+      expect(TudlaAccounting::BalanceRebuilder.new(organization).differences).to be_empty
+
+      expect { described_class.save(debtors, nil) && described_class.save(debtors, :receivable) }.not_to(change { debtors.children.count })
+      payables = create(:tudla_accounting_account, code: "2100", category: :liability, organization: organization)
+      expect(described_class.save(payables, :payable)).to be(true)
+      expect(payables.children.pluck(:code)).to eq([ "2100-USD" ])
+      expect(described_class.save(create(:tudla_accounting_account, code: "3900", category: :equity, organization: organization), :retained_earnings)).to be(true)
+      expect(TudlaAccounting::Account.where(organization: organization, code: "3900-USD")).not_to exist
+    end
+
+    it "refuses the role when the sub-account's code is taken" do
+      create(:tudla_accounting_account, code: "1150-USD", category: :asset, organization: organization)
+
+      expect(described_class.save(other, :receivable)).to be(false)
+      expect(other.errors[:role]).to eq([ "needs a sub-account in USD for receivables in USD, made as 1150-USD, but 1150-USD is already taken; " \
+                                          "move that account beneath 1150, or give it another code" ])
+      expect(other.reload.role).to be_nil
+    end
+  end
+
   # The earlier years' profit carried into the closed periods would move.
   describe "retained earnings and closed periods" do
     let(:retained) { create(:tudla_accounting_account, code: "3900", category: :equity, organization: organization) }

@@ -65,7 +65,7 @@ RSpec.describe "Applying credits and refunding them", type: :request do
     expect(response).to redirect_to(routes.payment_path(refund))
     expect(flash[:notice]).to eq("Refund to Northwind of $20.00 recorded.")
     expect(refund).to have_attributes(title: "Refund to Northwind", refund_of: payment, unapplied: aud(0), applications: [])
-    expect(postings(refund.entry)).to eq([ [ "1000", :credit, 20_00 ], [ "1100", :debit, 20_00 ] ])
+    expect(postings(refund.entry)).to eq([ [ "1000", :credit, 20_00 ], [ "1100-AUD", :debit, 20_00 ] ])
     expect(payment.reload.unapplied).to eq(aud(0))
     expect(payment.applications.map { |target, amount, _allocation| [ target, amount.cents ] }).to eq([ [ first, 100_00 ], [ refund, 20_00 ], [ second, 30_00 ] ]) # by date
 
@@ -122,7 +122,7 @@ RSpec.describe "Applying credits and refunding them", type: :request do
     refund = TudlaAccounting::Payment.find_by!(kind: "supplier_refund")
     expect(refund).to have_attributes(title: "Refund from Northwind", refund_of: another)
     expect(refund.entry.particulars).to eq("Refund from Northwind (SC-0002)")
-    expect(postings(refund.entry)).to eq([ [ "1000", :debit, 10_00 ], [ "2100", :credit, 10_00 ] ])
+    expect(postings(refund.entry)).to eq([ [ "1000", :debit, 10_00 ], [ "2100-AUD", :credit, 10_00 ] ])
     expect(another.reload.amount_due).to eq(aud(0))
     get routes.document_path(another)
     expect(css_select("#applied").first.parent.text).to include("Refund from Northwind")

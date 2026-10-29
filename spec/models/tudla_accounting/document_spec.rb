@@ -44,7 +44,7 @@ RSpec.describe TudlaAccounting::Document do
     entry = invoice.entry
     expect(entry).to have_attributes(posted?: true, source: invoice, reference: "INV-0001", particulars: "Invoice INV-0001 – Northwind")
     expect(entry.transacted_at).to eq(Time.zone.local(2026, 3, 10))
-    expect(postings(entry)).to contain_exactly([ "1100", "debit", 330_00, nil ], [ "4000", "credit", 300_00, "base" ], [ "2200", "credit", 30_00, "tax" ])
+    expect(postings(entry)).to contain_exactly([ "1100-AUD", "debit", 330_00, nil ], [ "4000", "credit", 300_00, "base" ], [ "2200", "credit", 30_00, "tax" ])
     expect(entry.details.find { |detail| detail.account.code == "4000" }.description).to eq("Consulting")
     receivable = entry.details.filter_map(&:carrying_amount).sole
     expect(receivable).to have_attributes(carrying_amount_type: "receivable", amount_cents: 330_00, related_party: northwind)
@@ -58,7 +58,7 @@ RSpec.describe TudlaAccounting::Document do
     bill = document("bill", reference: "S-4471", due_on: nil).approve!
     expect(bill).to have_attributes(number_label: "BILL-0001", total: aud(330))
     expect(bill.entry.particulars).to eq("Bill BILL-0001 – Northwind (their S-4471)")
-    expect(postings(bill.entry)).to contain_exactly([ "2100", "credit", 330_00, nil ], [ "6000", "debit", 300_00, "base" ], [ "2200", "debit", 30_00, "tax" ])
+    expect(postings(bill.entry)).to contain_exactly([ "2100-AUD", "credit", 330_00, nil ], [ "6000", "debit", 300_00, "base" ], [ "2200", "debit", 30_00, "tax" ])
     payable = bill.entry.details.filter_map(&:carrying_amount).sole
     expect(payable).to have_attributes(carrying_amount_type: "payable", due_date: nil, related_party: northwind)
   end
@@ -67,7 +67,7 @@ RSpec.describe TudlaAccounting::Document do
     invoice = document.approve!
     credit = document("sales_credit", credited_document: invoice, lines: [ { description: "Refund of an hour", quantity: 1, unit_price_cents: 120_00, account: account("4000"), tax_code: gst } ]).approve!
     expect(credit).to have_attributes(number_label: "CN-0001", payment_status: "paid", amount_due: aud(0))
-    expect(postings(credit.entry)).to contain_exactly([ "1100", "credit", 132_00, nil ], [ "4000", "debit", 120_00, "base" ], [ "2200", "debit", 12_00, "tax" ])
+    expect(postings(credit.entry)).to contain_exactly([ "1100-AUD", "credit", 132_00, nil ], [ "4000", "debit", 120_00, "base" ], [ "2200", "debit", 12_00, "tax" ])
     expect(invoice.reload).to have_attributes(payment_status: "part_paid", amount_due: aud(198))
 
     big = document("sales_credit", credited_document: invoice, lines: [ { description: "Everything", quantity: 1, unit_price_cents: 200_00, account: account("4000"), tax_code: gst } ]).approve!
@@ -76,7 +76,7 @@ RSpec.describe TudlaAccounting::Document do
     expect(described_class.with_open_cents.find(big.id).amount_due).to eq(aud(22))
 
     supplier_credit = document("supplier_credit").approve!
-    expect(postings(supplier_credit.entry)).to include([ "2100", "debit", 330_00, nil ])
+    expect(postings(supplier_credit.entry)).to include([ "2100-AUD", "debit", 330_00, nil ])
     expect(supplier_credit.payment_status).to eq("unpaid")
   end
 
