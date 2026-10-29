@@ -25,6 +25,7 @@ module TudlaAccounting
       "bill" => { label: "Bill", side: :purchases, role: :payable },
       "supplier_credit" => { label: "Supplier credit", side: :purchases, role: :supplier_credit }
     }.freeze
+    CREDIT_KINDS = %w[sales_credit supplier_credit].freeze
     STATUSES = %w[draft approved void].freeze
     # The fields an approved document can still change: how it stands, not what it says.
     STANDING = %w[status number number_label entry_id approved_at voided_on void_reason updated_at].freeze
@@ -69,7 +70,8 @@ module TudlaAccounting
     scope :purchases, -> { where(kind: %w[bill supplier_credit]) }
     scope :approved, -> { where(status: "approved") }
     # What is still owed on it (or, on a credit note, left to apply), in cents, as
-    # open_cents (and open_base_cents): the receivable or payable its entry opened.
+    # open_cents (and open_base_cents): the receivable or payable its entry opened. Its
+    # organization comes too, since its currency (and so the amount) is read from there.
     scope :with_open_cents, lambda {
       # A foreign document's in its currency (open_base_cents in the organization's).
       open = <<~SQL.squish
@@ -78,8 +80,16 @@ module TudlaAccounting
       SQL
       select("#{table_name}.*",
              "(SELECT ABS(CASE WHEN #{table_name}.currency IS NULL THEN c.amount_cents ELSE COALESCE(f.other_currency_amount_cents, 0) END) #{open}) AS open_cents",
-             "(SELECT ABS(c.amount_cents) #{open}) AS open_base_cents")
+             "(SELECT ABS(c.amount_cents) #{open}) AS open_base_cents").includes(:organization)
     }
+
+    # What the documents in scope still have owed on them, in the organization's currency
+    # (cents), net of what is left to apply on credit notes: one query, loading none of them.
+    def self.open_base_cents_net
+      open = approved.with_open_cents
+      kinds = CREDIT_KINDS.map { |kind| connection.quote(kind) }.join(", ")
+      from(open, table_name).sum(Arel.sql("CASE WHEN kind IN (#{kinds}) THEN -open_base_cents ELSE open_base_cents END")).to_i
+    end
 
     def self.kinds_for(side) = KINDS.select { |_kind, about| about[:side] == side.to_sym }.keys
 
@@ -87,7 +97,7 @@ module TudlaAccounting
     def side = KINDS.fetch(kind)[:side]
     def sales? = side == :sales
     def purchases? = side == :purchases
-    def credit? = kind.in?(%w[sales_credit supplier_credit])
+    def credit? = kind.in?(CREDIT_KINDS)
     def draft? = status == "draft"
     def approved? = status == "approved"
     def void? = status == "void"

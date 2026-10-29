@@ -105,6 +105,29 @@ RSpec.describe "Invoices and bills", type: :request do
     expect(TudlaAccounting::Entry.count).to eq(0)
   end
 
+  it "totals what is owed less credits to apply, in the same queries however many documents are listed" do
+    issue = lambda do |kind, cents|
+      TudlaAccounting::Document.create!(organization: organization, kind: kind, contact: northwind, issued_on: Date.new(2026, 4, 1), due_on: Date.new(2026, 4, 10),
+                                        lines_attributes: [ { description: "Consulting", quantity: 1, unit_price_cents: cents, account: account("4000"), tax_code: gst } ]).approve!
+    end
+    queries = lambda do
+      count = 0
+      counter = ->(*, payload) { count += 1 unless payload[:name] == "SCHEMA" }
+      ActiveSupport::Notifications.subscribed(counter, "sql.active_record") { get routes.sales_documents_path }
+      count
+    end
+    owed = -> { css_select("tr.font-semibold").map { |row| row.text.squish }.find { |text| text.start_with?("Owed by customers") } }
+
+    issue.call("sales_invoice", 100_00)
+    issue.call("sales_credit", 20_00) # nothing to apply it to: a credit to apply
+    few = queries.call
+    expect(owed.call).to end_with(")88.00")
+
+    3.times { issue.call("sales_invoice", 100_00) }
+    expect(queries.call).to eq(few)
+    expect(owed.call).to end_with(")418.00")
+  end
+
   it "credits an invoice from its page, applying the credit note to it, and voids them" do
     invoice = TudlaAccounting::Document.create!(organization: organization, kind: "sales_invoice", contact: northwind, issued_on: Date.new(2026, 4, 1), due_on: Date.new(2026, 4, 30),
                                                 lines_attributes: [ { description: "Consulting", quantity: 1, unit_price_cents: 100_00, account: account("4000"), tax_code: gst } ]).approve!

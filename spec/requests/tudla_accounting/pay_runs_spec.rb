@@ -68,6 +68,22 @@ RSpec.describe "Pay runs", type: :request do
     expect(css_select("[data-no-bills]").first.text.squish).to eq("No AUD bills are owed that are due by 1 Apr 2026.")
   end
 
+  it "lists the bills in the same queries however many are due" do
+    queries = lambda do
+      count = 0
+      counter = ->(*, payload) { count += 1 unless payload[:name] == "SCHEMA" }
+      ActiveSupport::Notifications.subscribed(counter, "sql.active_record") { get routes.new_pay_run_path }
+      count
+    end
+    bill(cloudware, Date.new(2026, 4, 15), 100_00)
+    few = queries.call
+    2.times { bill(cloudware, Date.new(2026, 4, 15), 100_00) }
+    2.times { bill(stationers, Date.new(2026, 4, 18), 50_00) }
+
+    expect(queries.call).to eq(few)
+    expect(listed.values.map(&:size)).to eq([ 3, 2 ])
+  end
+
   it "pays the chosen bills, one payment per supplier, and emails the notices" do
     first = bill(cloudware, Date.new(2026, 4, 15), 100_00)
     second = bill(cloudware, Date.new(2026, 4, 25), 200_00)

@@ -21,8 +21,7 @@ module TudlaAccounting
           @documents = @page.records.with_open_cents.includes(:contact).to_a
           @reminders_due = ReminderRunner.due(organization: accounting_organization).size if side == "sales"
           @emailed = Delivery.sent.where(subject_type: Document.name, subject_id: @documents.map(&:id)).distinct.pluck(:subject_id).to_set
-          open = Document.where(id: documents.approved.select(:id)).with_open_cents
-          @due = Money.new(open.sum { |document| (document.credit? ? -1 : 1) * document.amount_due_in_base.cents }, accounting_organization.currency)
+          @due = Money.new(Document.where(id: documents.select(:id)).open_base_cents_net, accounting_organization.currency)
         end
         format.csv { send_data documents_table(documents).to_csv, filename: "#{side}.csv", type: "text/csv" }
       end

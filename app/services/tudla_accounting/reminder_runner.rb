@@ -37,7 +37,7 @@ module TudlaAccounting
       days = TudlaAccounting.configuration.reminder_days
       return [] if days.empty?
 
-      invoices = Document.approved.where(kind: "sales_invoice", due_on: ..(@as_of - days.first)).with_open_cents.includes(:contact, :organization).order(:due_on, :id)
+      invoices = Document.approved.where(kind: "sales_invoice", due_on: ..(@as_of - days.first)).with_open_cents.includes(:contact).order(:due_on, :id)
       invoices = invoices.where(organization: @organization) if @organization
       invoices = invoices.to_a.select { |invoice| invoice.amount_due.positive? }
       reached = sent_days(invoices)
