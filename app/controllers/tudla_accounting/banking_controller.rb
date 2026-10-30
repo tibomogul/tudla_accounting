@@ -26,7 +26,7 @@ module TudlaAccounting
       @rule_suggestions = @reconciler.rule_suggestions(ledger_suggested: @suggestions.keys)
       @unmatched_ledger = @reconciler.unmatched_ledger.to_a
       @ledger_page = Paginator.new(@unmatched_ledger, page: params[:ledger_page], per_page: LEDGER_PAGE)
-      @other_accounts = organization_scope(Account).active.where.not(id: @account.id).order(:code)
+      @other_accounts = organization_scope(Account).active.postable.where.not(id: @account.id).order(:code)
       @open_documents = @reconciler.foreign? ? [] : open_documents
     end
 

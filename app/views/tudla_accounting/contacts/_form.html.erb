@@ -15,7 +15,7 @@
     <legend class="tc-card-title px-1">Their documents</legend>
     <div><%= tc_field form, :payment_terms_days, as: :number_field, label: "Payment terms (days)", min: 0, hint: "Due this long after the date" %></div>
     <div class="sm:col-span-2"><%= tc_field form, :default_account_id, as: :select, label: "Default account",
-                                            choices: [ [ "None", "" ] ] + account_choices(contact_accounts, selected: contact.default_account_id) %></div>
+                                            choices: [ [ "None", "" ] ] + postable_account_choices(contact_accounts, selected: contact.default_account_id) %></div>
     <div><%= tc_field form, :default_tax_code_id, as: :select, label: "Default tax code",
                       choices: [ [ "None", "" ] ] + contact_tax_codes.select { |code| code.active? || code.id == contact.default_tax_code_id }.map { |code| [ code.label, code.id ] } %></div>
   </fieldset>

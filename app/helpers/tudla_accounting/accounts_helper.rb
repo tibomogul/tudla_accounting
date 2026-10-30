@@ -47,9 +47,20 @@ module TudlaAccounting
               .map { |account| [ account_option_label(account), account.id ] }
     end
 
-    # An account as a choice: "6050 - Printing", marked when inactive.
-    def account_option_label(account)
-      account.active? ? account.code_with_name : "#{account.code_with_name} (inactive)"
+    # Accounts a line can be posted to, as choices: the active ones without sub-accounts,
+    # and those chosen already (selected: ids), marked when inactive or with sub-accounts.
+    def postable_account_choices(accounts, selected: nil)
+      chosen = Array(selected).compact.map(&:to_i)
+      postable = accounts.postable.pluck(:id).to_set
+      accounts.select { |account| (account.active? && postable.include?(account.id)) || chosen.include?(account.id) }
+              .map { |account| [ account_option_label(account, parent: postable.exclude?(account.id)), account.id ] }
+    end
+
+    # An account as a choice: "6050 - Printing", marked when inactive (or, with parent:,
+    # as having sub-accounts).
+    def account_option_label(account, parent: false)
+      marks = [ ("inactive" unless account.active?), ("has sub-accounts" if parent) ].compact
+      marks.empty? ? account.code_with_name : "#{account.code_with_name} (#{marks.join(", ")})"
     end
 
     # Choices for filtering what's already recorded: every account, inactive ones marked.

@@ -62,7 +62,7 @@ RSpec.describe "Auto-reversing entries" do
         TudlaAccounting::Entry.create_from_ruby_hash(
           organization_type: "Organization", organization_id: organization.id, particulars: "Invoice", transacted_at: "2026-03-31T00:00:00Z",
           reverse_on: "2026-04-01", source_type: "Invoice", source_id: invoice.id,
-          details: [ { account_code: "1100", amount: "USD 10.00" }, { account_code: "4000", amount: "USD 10.00" } ]
+          details: [ { account_code: "1100-USD", amount: "USD 10.00" }, { account_code: "4000", amount: "USD 10.00" } ]
         )
       }.to raise_error(ActiveRecord::RecordInvalid, /can't be set on an invoice, bill, payment or credit/)
     end

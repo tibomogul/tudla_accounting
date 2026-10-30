@@ -3,7 +3,7 @@
 <% home = accounting_organization.currency %>
 <% sales = document.sales? %>
 <% lines = document.lines.to_a %>
-<% account_options = document_accounts(document).map { |account| [ account_option_label(account), account.id ] } %>
+<% account_options = postable_account_choices(document_accounts(document), selected: document.lines.map(&:account_id)) %>
 <% tax_options = document_tax_codes(document).map { |code| [ code.label, code.id, { data: { rate: code.rate.to_s } } ] } %>
 <% contacts = document_contacts(document) %>
 <% dimensions = entry_dimensions(lines) %>

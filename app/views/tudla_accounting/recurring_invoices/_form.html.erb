@@ -1,7 +1,7 @@
 <%# locals: (recurring_invoice:) %>
 <% currency = Money::Currency.new(accounting_organization.currency) %>
 <% lines = recurring_invoice.lines.to_a %>
-<% account_options = document_accounts(recurring_invoice).map { |account| [ account_option_label(account), account.id ] } %>
+<% account_options = postable_account_choices(document_accounts(recurring_invoice), selected: recurring_invoice.lines.map(&:account_id)) %>
 <% tax_options = document_tax_codes(recurring_invoice).map { |code| [ code.label, code.id, { data: { rate: code.rate.to_s } } ] } %>
 <% dimensions = entry_dimensions(lines) %>
 <% before_amount = 5 + dimensions.size %>

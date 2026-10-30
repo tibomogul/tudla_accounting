@@ -9,12 +9,10 @@ module TudlaAccounting
       [ entry.number_label, entry.particulars ].compact.join(" ")
     end
 
-    # The accounts a line can choose: the active ones, and any the lines have already.
-    # lines: an entry's details, or a recurring entry's lines.
+    # The accounts a line can choose: the active ones without sub-accounts, and any the
+    # lines have already. lines: an entry's details, or a recurring entry's lines.
     def entry_account_options(lines)
-      used = lines.filter_map(&:account_id)
-      TudlaAccounting::Account.where(organization: accounting_organization).active.or(TudlaAccounting::Account.where(id: used))
-        .order(:code).map { |account| [ account_option_label(account), account.id ] }
+      postable_account_choices(TudlaAccounting::Account.where(organization: accounting_organization).order(:code), selected: lines.filter_map(&:account_id))
     end
 
     # The tax codes a line can choose: the active ones, and any the lines have already. Each

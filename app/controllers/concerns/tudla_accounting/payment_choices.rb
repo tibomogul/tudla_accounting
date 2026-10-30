@@ -23,11 +23,11 @@ module TudlaAccounting
       [ accounting_organization.currency, *bank_accounts.where.not(currency: [ nil, accounting_organization.currency ]).reorder(nil).distinct.pluck(:currency).sort ]
     end
 
-    # Active asset and liability accounts other than receivables and payables (and their
-    # sub-accounts).
+    # Active asset and liability accounts without sub-accounts, other than receivables and
+    # payables (and their sub-accounts).
     def bank_accounts
       control = organization_scope(Account).where(role: %w[receivable payable]).flat_map(&:subtree_ids)
-      organization_scope(Account).active.where(category: [ Account::CATEGORY_ASSET, Account::CATEGORY_LIABILITY ]).where.not(id: control).order(:code)
+      organization_scope(Account).active.postable.where(category: [ Account::CATEGORY_ASSET, Account::CATEGORY_LIABILITY ]).where.not(id: control).order(:code)
     end
 
     # The account in the currency the last payment went through, or the first cash account

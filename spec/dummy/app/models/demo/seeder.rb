@@ -91,8 +91,8 @@ class Demo::Seeder
           { code: "1011", name: "Operating account", category: "asset" }, { code: "1012", name: "Savings account", category: "asset" } ] },
         { code: "1100", name: "Receivables", category: "asset", role: "receivable" }, { code: "1500", name: "Equipment", category: "asset" } ] },
       { code: "2000", name: "Liabilities", category: "liability", children: [
-        { code: "2100", name: "Payables", category: "liability", role: "payable" }, { code: "2200", name: "GST", category: "liability" },
-        { code: "2500", name: "Loan", category: "liability" } ] },
+        { code: "2100", name: "Payables", category: "liability", role: "payable" }, { code: "2150", name: "Accrued expenses", category: "liability" },
+        { code: "2200", name: "GST", category: "liability" }, { code: "2500", name: "Loan", category: "liability" } ] },
       { code: "3000", name: "Equity", category: "equity", children: [
         { code: "3100", name: "Owner's capital", category: "equity" }, { code: "3900", name: "Retained earnings", category: "equity", role: "retained_earnings" } ] },
       { code: "4000", name: "Income", category: "income", children: [
@@ -169,7 +169,7 @@ class Demo::Seeder
   def add_recurring_entries
     first = today.next_month.beginning_of_month
     [ [ "Software subscriptions", "Design and accounting software", 1, true, false, [ [ "6020", :debit, 249_00 ], [ "1011", :credit, 249_00 ] ] ],
-      [ "Rent accrual", "Rent for the month, not yet invoiced", nil, false, true, [ [ "6010", :debit, 1_800_00 ], [ "2100", :credit, 1_800_00 ] ] ] ]
+      [ "Rent accrual", "Rent for the month, not yet invoiced", nil, false, true, [ [ "6010", :debit, 1_800_00 ], [ "2150", :credit, 1_800_00 ] ] ] ]
       .each do |name, particulars, day, post, reverse, lines|
         template = TudlaAccounting::RecurringEntry.new(organization: organization, name: name, particulars: particulars, frequency: "monthly",
                                                        day_of_month: day, starts_on: first, post_automatically: post, reverse_next_month: reverse)

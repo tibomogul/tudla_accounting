@@ -184,6 +184,10 @@ RSpec.describe "Bank reconciliation", type: :service do
 
       expect { reconciler.create_entry!(line("Interest"), account: account("3000")) }.to raise_error(ArgumentError, "That statement line is matched already")
       expect { reconciler.create_entry!(line("Deposit"), account: bank) }.to raise_error(ArgumentError, "Choose another account than the bank account")
+      charges = create(:tudla_accounting_account, code: "6200", name: "Charges", category: :expense, organization: organization)
+      create(:tudla_accounting_account, code: "6210", category: :expense, organization: organization, parent: charges)
+      expect { reconciler.create_entry!(line("Deposit"), account: charges) }
+        .to raise_error(ArgumentError, "6200 - Charges has sub-accounts (6210), so it can't take postings; use one of them")
     end
 
     it "sums up where the books and the bank stand on a date" do

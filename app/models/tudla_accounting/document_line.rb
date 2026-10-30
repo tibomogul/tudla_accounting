@@ -59,6 +59,9 @@ module TudlaAccounting
       errors.add(:account, "is inactive") if account && !account.active? && will_save_change_to_account_id?
       if account&.role.in?(%w[receivable payable])
         errors.add(:account, "can't be the receivables or payables account; the document posts its total there")
+      elsif account && will_save_change_to_account_id?
+        blocker = account.posting_blocker
+        errors.add(:account, blocker) if blocker
       end
       dimensions_fit(organization)
       return unless tax_code

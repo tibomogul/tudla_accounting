@@ -123,6 +123,11 @@ module TudlaAccounting
 
     # Accounts offered for new entries; inactive ones keep their history.
     scope :active, -> { where(active: true) }
+    # Accounts that take postings: those without sub-accounts (a sub-account's ancestry
+    # is its parent's followed by the parent's id).
+    scope :postable, -> do
+      where("NOT EXISTS (SELECT 1 FROM tudla_accounting_accounts sub WHERE sub.ancestry = tudla_accounting_accounts.ancestry || tudla_accounting_accounts.id || '/')")
+    end
 
     before_destroy :ensure_deletable, prepend: true
     after_create { audit("account.created") }

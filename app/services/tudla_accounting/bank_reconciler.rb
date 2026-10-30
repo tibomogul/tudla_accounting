@@ -124,6 +124,8 @@ module TudlaAccounting
     def create_entry!(line, account:, particulars: nil, rate: nil, tax_code: nil, dimension_values: [])
       raise ArgumentError, "Choose another account than the bank account" if account == self.account
       raise ArgumentError, "#{account.code_with_name} is inactive" unless account.active?
+      blocker = account.posting_blocker
+      raise ArgumentError, blocker if blocker
       raise ArgumentError, "That statement line is matched already" if line.matched?
       raise ArgumentError, "Tax can't be split from a #{currency} statement line; record it without a tax code" if tax_code && foreign?
 

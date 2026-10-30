@@ -200,6 +200,8 @@ module TudlaAccounting
         account = Account.find_by(code: detail[:account_code], organization_type: hash[:organization_type], organization_id: hash[:organization_id])
         raise ArgumentError, "invalid account_code: #{detail[:account_code]}" unless account
         raise ArgumentError, "account #{detail[:account_code]} is inactive" unless account.active?
+        blocker = account.posting_blocker
+        raise ArgumentError, blocker if blocker
 
         money = parse_money(detail[:amount], default_currency, "line #{line}")
 

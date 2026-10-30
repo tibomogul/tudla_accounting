@@ -17,7 +17,7 @@
     <legend class="tc-card-title px-1">A statement line</legend>
     <div class="sm:col-span-2"><%= tc_field form, :description_contains, label: "Whose description contains", required: true, placeholder: "ADOBE", hint: "Upper or lower case alike" %></div>
     <div class="sm:col-span-2"><%= tc_field form, :account_id, as: :select, label: "On the bank account",
-                                            choices: [ [ "Any", "" ] ] + account_choices(bank_accounts, selected: bank_rule.account_id) %></div>
+                                            choices: [ [ "Any", "" ] ] + postable_account_choices(bank_accounts, selected: bank_rule.account_id) %></div>
     <div class="sm:col-span-2"><%= tc_field form, :direction, as: :select, label: "That is", choices: [ [ "Money in or out", "" ], [ "Money in", "in" ], [ "Money out", "out" ] ] %></div>
     <div class="space-y-1">
       <%= form.label :amount_min, "Of at least (#{currency})", class: "tc-label" %>
@@ -32,7 +32,7 @@
   <fieldset class="tc-card tc-card-body grid gap-4 sm:grid-cols-4">
     <legend class="tc-card-title px-1">Is recorded</legend>
     <div class="sm:col-span-2"><%= tc_field form, :counter_account_id, as: :select, label: "Against the account", required: true,
-                                            choices: [ [ "Choose an account", "" ] ] + account_choices(rule_accounts, selected: bank_rule.counter_account_id) %></div>
+                                            choices: [ [ "Choose an account", "" ] ] + postable_account_choices(rule_accounts, selected: bank_rule.counter_account_id) %></div>
     <% if (tax_options = entry_tax_options([ bank_rule ])).any? %>
       <div class="sm:col-span-2">
         <%= form.label :tax_code_id, "Taxed under", class: "tc-label" %>
