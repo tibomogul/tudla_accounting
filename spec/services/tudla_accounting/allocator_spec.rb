@@ -43,12 +43,12 @@ RSpec.describe TudlaAccounting::Allocator, type: :service do
   end
 
   def invoice(name, amount, due:, customer: globex, at: on(3, 1))
-    post([ [ "1100", :debit, amount ], [ "4000", :credit, amount ] ], at: at, particulars: name,
+    post([ [ "1100-AUD", :debit, amount ], [ "4000", :credit, amount ] ], at: at, particulars: name,
          source: Invoice.create!(due_date: due, customer: customer))
   end
 
   def payment(name, amount, at:, customer: globex, related: nil)
-    post([ [ "1000", :debit, amount ], [ "1100", :credit, amount ] ], at: at, particulars: name,
+    post([ [ "1000", :debit, amount ], [ "1100-AUD", :credit, amount ] ], at: at, particulars: name,
          source: Payment.create!(customer: customer), related: related)
   end
 
@@ -128,7 +128,7 @@ RSpec.describe TudlaAccounting::Allocator, type: :service do
 
     it "refuses what can't be applied" do
       other_customers = invoice("Invoice 3", 50, due: on(3, 31), customer: initech)
-      bill = post([ [ "5000", :debit, 10 ], [ "2100", :credit, 10 ] ], at: on(3, 1), source: Bill.create!(customer: globex))
+      bill = post([ [ "5000", :debit, 10 ], [ "2100-AUD", :credit, 10 ] ], at: on(3, 1), source: Bill.create!(customer: globex))
       settled = invoice("Invoice 4", 10, due: on(3, 31))
       described_class.allocate!(pay, settled, at: on(3, 21))
       draft = build(:tudla_accounting_entry, organization: organization, particulars: "No receivable", transacted_at: on(3, 1))
@@ -184,7 +184,7 @@ RSpec.describe TudlaAccounting::Allocator, type: :service do
 
   it "applies a credit note like a payment, without cash" do
     inv = invoice("Invoice 1", 300, due: on(3, 31))
-    note = post([ [ "4100", :debit, 120 ], [ "1100", :credit, 120 ] ], at: on(3, 12), particulars: "Credit note 1",
+    note = post([ [ "4100", :debit, 120 ], [ "1100-AUD", :credit, 120 ] ], at: on(3, 12), particulars: "Credit note 1",
                 source: CreditNote.create!(customer: globex), related: inv)
 
     expect(open_item(inv).amount_cents).to eq(180_00)
@@ -193,8 +193,8 @@ RSpec.describe TudlaAccounting::Allocator, type: :service do
   end
 
   it "applies a supplier credit to a bill" do
-    bill = post([ [ "5000", :debit, 300 ], [ "2100", :credit, 300 ] ], at: on(3, 1), particulars: "Bill 1", source: Bill.create!(customer: globex))
-    credit = post([ [ "2100", :debit, 80 ], [ "5000", :credit, 80 ] ], at: on(3, 5), particulars: "Supplier credit 1",
+    bill = post([ [ "5000", :debit, 300 ], [ "2100-AUD", :credit, 300 ] ], at: on(3, 1), particulars: "Bill 1", source: Bill.create!(customer: globex))
+    credit = post([ [ "2100-AUD", :debit, 80 ], [ "5000", :credit, 80 ] ], at: on(3, 5), particulars: "Supplier credit 1",
                   source: SupplierCredit.create!(customer: globex))
 
     expect(open_item(credit)).to have_attributes(amount_cents: -80_00, credit?: true, payable?: true)
@@ -203,13 +203,13 @@ RSpec.describe TudlaAccounting::Allocator, type: :service do
   end
 
   it "ignores a payment line on the wrong side (a refund), which it can't treat as a credit" do
-    refund = post([ [ "1100", :debit, 20 ], [ "1000", :credit, 20 ] ], at: on(3, 5), source: Payment.create!(customer: globex))
+    refund = post([ [ "1100-AUD", :debit, 20 ], [ "1000", :credit, 20 ] ], at: on(3, 5), source: Payment.create!(customer: globex))
     expect(refund.details.filter_map(&:carrying_amount)).to be_empty
   end
 
   describe "refunds" do
     def refund(name, amount, at:, related: nil, customer: globex)
-      post([ [ "1100", :debit, amount ], [ "1000", :credit, amount ] ], at: at, particulars: name,
+      post([ [ "1100-AUD", :debit, amount ], [ "1000", :credit, amount ] ], at: at, particulars: name,
            source: Refund.create!(customer: customer), related: related)
     end
 
@@ -247,8 +247,8 @@ RSpec.describe TudlaAccounting::Allocator, type: :service do
     end
 
     it "is taken by a supplier refund of a supplier's credit too" do
-      credit = post([ [ "2100", :debit, 80 ], [ "5000", :credit, 80 ] ], at: on(3, 5), particulars: "Supplier credit 1", source: SupplierCredit.create!(customer: globex))
-      back = post([ [ "1000", :debit, 80 ], [ "2100", :credit, 80 ] ], at: on(3, 6), particulars: "Supplier refund 1",
+      credit = post([ [ "2100-AUD", :debit, 80 ], [ "5000", :credit, 80 ] ], at: on(3, 5), particulars: "Supplier credit 1", source: SupplierCredit.create!(customer: globex))
+      back = post([ [ "1000", :debit, 80 ], [ "2100-AUD", :credit, 80 ] ], at: on(3, 6), particulars: "Supplier refund 1",
                   source: SupplierRefund.create!(customer: globex), related: credit)
 
       expect([ open_item(credit).amount_cents, open_item(back).amount_cents ]).to eq([ 0, 0 ])
@@ -256,7 +256,7 @@ RSpec.describe TudlaAccounting::Allocator, type: :service do
     end
 
     it "ignores a refund line on the wrong side" do
-      odd = post([ [ "1000", :debit, 5 ], [ "1100", :credit, 5 ] ], at: on(3, 15), source: Refund.create!(customer: globex))
+      odd = post([ [ "1000", :debit, 5 ], [ "1100-AUD", :credit, 5 ] ], at: on(3, 15), source: Refund.create!(customer: globex))
       expect(odd.details.filter_map(&:carrying_amount)).to be_empty
     end
 

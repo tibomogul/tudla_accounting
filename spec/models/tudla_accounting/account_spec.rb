@@ -197,7 +197,7 @@ RSpec.describe TudlaAccounting::Account, type: :model do
       end
 
       it "lets an account with postings be renumbered, roles included" do
-        post_to(receivables)
+        post_to(receivables.children.sole)
         expect(receivables.reload.update(code: "1199")).to be(true)
         expect(TudlaAccounting::Account.for_role(organization, :receivable).code).to eq("1199")
       end

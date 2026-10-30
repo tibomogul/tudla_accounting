@@ -111,6 +111,7 @@ module TudlaAccounting
     validates :code, uniqueness: { scope: [ :organization_type, :organization_id ] }
 
     validate :validate_parent
+    validate :validate_parent_takes_sub_accounts, if: -> { parent && (new_record? || will_save_change_to_ancestry?) }
     validate :validate_known_currency
     validate :validate_structure_unchanged_once_used, on: :update
     validate :validate_category_unchanged_in_budgets, on: :update
@@ -161,6 +162,36 @@ module TudlaAccounting
 
     def contra?
       contra_account_id.present?
+    end
+
+    # Set by AccountRoleAssigner on the sub-account it makes beneath the receivable or
+    # payable account, which then takes that account's opening balance.
+    attr_writer :taking_parent_balance
+
+    # Why a line can't be posted to the account, or nil. An account with sub-accounts
+    # holds what they add up to, so lines go to one of them.
+    def posting_blocker
+      return if new_record?
+
+      codes = children.order(:code).pluck(:code)
+      "#{code_with_name} has sub-accounts (#{codes.join(", ")}), so it can't take postings; use one of them" if codes.any?
+    end
+
+    # Why an account can't go beneath this one, or nil: this one would then hold amounts
+    # of its own besides what its sub-accounts add up to. A role other than receivables
+    # and payables (which are totals of their sub-accounts in each currency) puts amounts
+    # on the account itself: lines, or each year's profit.
+    def sub_account_blocker
+      return if new_record?
+
+      problem, fix = if role && !AccountRoleAssigner::LOCKED_ROLES.include?(role)
+        [ "is the #{role_name} account", "move the role to another account first" ]
+      elsif details.joins(:entry).where.not(tudla_accounting_entries: { posted_at: nil }).exists?
+        [ "has postings of its own", "add the account beside it, or beneath a new account" ]
+      elsif own_opening_balance?
+        [ "has an opening balance of its own", "put the opening balance on another account first" ]
+      end
+      "#{code_with_name} #{problem}, so it can't take sub-accounts; #{fix}" if problem
     end
 
     # Category, parent and contra account decide how balances add up, so they are fixed
@@ -272,6 +303,17 @@ module TudlaAccounting
       AuditEvent.record!(action, organization: organization, subject: self, details: details)
     end
 
+    # Whether its opening balance (its starting amount in the first year) is more than
+    # its sub-accounts' add up to.
+    def own_opening_balance?
+      year = Period.where(organization: organization).roots.order(:from_date).first or return false
+      opening = balances.find_by(period: year)&.starting_amount_cents.to_i
+      beneath = Balance.where(account: children, period: year).includes(:account).sum do |balance|
+        (balance.account.debit_balance? == debit_balance? ? 1 : -1) * balance.starting_amount_cents
+      end
+      opening != beneath
+    end
+
     def open_items?
       CarryingAmount.joins(:detail).where(tudla_accounting_details: { account_id: id }).includes(:detail, :forex).any? do |carrying_amount|
         carrying_amount.outstanding.values.any?(&:nonzero?)
@@ -332,6 +374,13 @@ module TudlaAccounting
 
       errors.add(:base, "Only an account with no postings, sub-accounts, contra accounts, recurring entries, bank rules, budgets, tax returns, contacts or invoices and bills using it can be deleted")
       throw :abort
+    end
+
+    def validate_parent_takes_sub_accounts
+      return if @taking_parent_balance
+
+      blocker = parent.sub_account_blocker
+      errors.add(:base, blocker) if blocker
     end
 
     def validate_parent

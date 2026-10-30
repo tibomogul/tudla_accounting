@@ -14,6 +14,9 @@ module TudlaAccounting
   #   either role makes the one in the organization's own currency (e.g. "1100-USD") when
   #   the account has none, moving the account's own opening balance onto it, so the
   #   account still adds up to what is beneath it.
+  # - The other roles put amounts on the account itself (lines, or each year's profit),
+  #   so they go only to an account without sub-accounts (and such an account can't take
+  #   any while it holds one: Account#sub_account_blocker).
   # - Retained earnings can't change while a period after the first year is closed, as the
   #   profit carried into it would be restated. Changing it on books with balances rebuilds
   #   them (BalanceRebuilder#rebuild!) in the same transaction, so they're never left behind.
@@ -115,6 +118,7 @@ module TudlaAccounting
     def assign(account)
       account.valid?
       check_locked_roles(account)
+      check_without_sub_accounts(account)
       check_periods_open(account)
       return false if account.errors.any?
 
@@ -142,8 +146,10 @@ module TudlaAccounting
         return false
       end
 
-      home = Account.create!(organization: @organization, parent: account, code: code, name: "#{account.name} - #{currency}", category: account.category,
-                             currency: currency, contra_account_id: account.contra_account_id)
+      home = Account.new(organization: @organization, parent: account, code: code, name: "#{account.name} - #{currency}", category: account.category,
+                         currency: currency, contra_account_id: account.contra_account_id)
+      home.taking_parent_balance = true
+      home.save!
       move_own_balances(account, home)
       true
     end
@@ -170,6 +176,12 @@ module TudlaAccounting
         account.errors.add(:role, "#{account.role_name} can't be given to an account with posted lines, which opened nothing owed; " \
                                   "mark it before posting, or use a new account")
       end
+    end
+
+    def check_without_sub_accounts(account)
+      return if account.role.nil? || LOCKED_ROLES.include?(account.role) || !account.persisted? || account.children.none?
+
+      account.errors.add(:role, "#{account.role_name} needs an account without sub-accounts, as it puts amounts on the account itself")
     end
 
     # Each later year adds the profit of the years before it to retained earnings, so

@@ -35,7 +35,7 @@ RSpec.describe TudlaAccounting::AllocationBackfill, type: :service do
   end
 
   def payment(name, cents, at:, related: nil)
-    post([ [ "1000", :debit, cents ], [ "1100", :credit, cents ] ], at: at, particulars: name, source: Payment.create!, related: related)
+    post([ [ "1000", :debit, cents ], [ "1100-AUD", :credit, cents ] ], at: at, particulars: name, source: Payment.create!, related: related)
   end
 
   # Back to how the books looked before allocations: no credits or allocations, and each
@@ -49,7 +49,7 @@ RSpec.describe TudlaAccounting::AllocationBackfill, type: :service do
   end
 
   it "gives each payment its credit, applied to its invoice as far as that was owed" do
-    inv = post([ [ "1100", :debit, 300_00 ], [ "4000", :credit, 300_00 ] ], at: on(3, 1), particulars: "Invoice 1", source: Invoice.create!)
+    inv = post([ [ "1100-AUD", :debit, 300_00 ], [ "4000", :credit, 300_00 ] ], at: on(3, 1), particulars: "Invoice 1", source: Invoice.create!)
     bounced = payment("Bounced", 50_00, at: on(3, 4), related: inv)
     part = payment("Part", 100_00, at: on(3, 5), related: inv)
     overpaid = payment("Overpaid", 250_00, at: on(3, 6), related: inv)

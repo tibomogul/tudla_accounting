@@ -38,11 +38,11 @@ RSpec.describe TudlaAccounting::PartyStatement, type: :service do
   end
 
   def invoice(name, amount, at:, due: nil, customer: globex)
-    post([ [ "1100", :debit, amount ], [ "4000", :credit, amount ] ], at: at, particulars: name, source: Invoice.create!(due_date: due, customer: customer))
+    post([ [ "1100-AUD", :debit, amount ], [ "4000", :credit, amount ] ], at: at, particulars: name, source: Invoice.create!(due_date: due, customer: customer))
   end
 
   def payment(name, amount, at:, related: nil)
-    post([ [ "1000", :debit, amount ], [ "1100", :credit, amount ] ], at: at, particulars: name, source: Payment.create!(customer: globex), related: related)
+    post([ [ "1000", :debit, amount ], [ "1100-AUD", :credit, amount ] ], at: at, particulars: name, source: Payment.create!(customer: globex), related: related)
   end
 
   def statement(from: Date.new(2026, 3, 1), thru: Date.new(2026, 3, 31), party: globex, type: :receivable)
@@ -78,7 +78,7 @@ RSpec.describe TudlaAccounting::PartyStatement, type: :service do
     first = invoice("Invoice 1", 300, at: on(2, 10), due: on(3, 12))
     second = invoice("Invoice 2", 200, at: on(3, 1), due: on(3, 31))
     payment("Payment 1", 250, at: on(3, 5), related: first)
-    post([ [ "4100", :debit, 50 ], [ "1100", :credit, 50 ] ], at: on(3, 8), particulars: "Credit note 1", source: CreditNote.create!(customer: globex), related: second)
+    post([ [ "4100", :debit, 50 ], [ "1100-AUD", :credit, 50 ] ], at: on(3, 8), particulars: "Credit note 1", source: CreditNote.create!(customer: globex), related: second)
     invoice("Invoice 3", 100, at: on(3, 15)).reverse!(on: Date.new(2026, 3, 20))
     invoice("Invoice 4", 999, at: on(4, 2))
     invoice("Initech's", 70, at: on(3, 3), customer: initech)
@@ -113,8 +113,8 @@ RSpec.describe TudlaAccounting::PartyStatement, type: :service do
   end
 
   it "makes a supplier's from their bills and payments, with only an opening balance when nothing happened" do
-    bill = post([ [ "5000", :debit, 80 ], [ "2100", :credit, 80 ] ], at: on(1, 5), particulars: "Bill 1", source: Bill.create!(customer: globex))
-    post([ [ "2100", :debit, 30 ], [ "1000", :credit, 30 ] ], at: on(1, 20), particulars: "Paid", source: Disbursement.create!(customer: globex), related: bill)
+    bill = post([ [ "5000", :debit, 80 ], [ "2100-AUD", :credit, 80 ] ], at: on(1, 5), particulars: "Bill 1", source: Bill.create!(customer: globex))
+    post([ [ "2100-AUD", :debit, 30 ], [ "1000", :credit, 30 ] ], at: on(1, 20), particulars: "Paid", source: Disbursement.create!(customer: globex), related: bill)
 
     expect(read(statement(type: :payable, from: Date.new(2026, 1, 1), thru: Date.new(2026, 1, 31)).lines))
       .to eq([ [ 5, "Bill", "Bill 1", aud(80), nil, aud(80) ], [ 20, "Payment", "Paid", nil, aud(30), aud(50) ] ])

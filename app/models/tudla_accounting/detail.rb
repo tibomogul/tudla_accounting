@@ -36,6 +36,9 @@ module TudlaAccounting
     validates :description, length: { maximum: 255 }
     validates :tax_role, presence: true, if: :tax_code
     validate :tax_code_fits
+    # A draft line written before its account took sub-accounts can still be saved, but
+    # not posted (BalancePoster refuses it).
+    validate :account_takes_postings, if: -> { account && (new_record? || will_save_change_to_account_id?) }
     validate :one_value_per_dimension
 
     scope :debits, -> { where(tally: TALLY_DEBIT) }
@@ -81,6 +84,11 @@ module TudlaAccounting
     def one_value_per_dimension
       dimensions = tags.reject(&:marked_for_destruction?).map { |tag| tag.dimension_value&.dimension_id }
       errors.add(:tags, "can only have one value of each dimension") if dimensions.uniq.size < dimensions.size
+    end
+
+    def account_takes_postings
+      blocker = account.posting_blocker
+      errors.add(:account, blocker) if blocker
     end
 
     def tax_code_fits

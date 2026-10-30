@@ -76,8 +76,8 @@ module TudlaAccounting
 
     # The amounts the active accounts had in a year's months (actual, from the balances),
     # month for month (the first month's in the first month), changed by percent and
-    # rounded to whole units. An account with sub-accounts takes only what was posted to
-    # it directly.
+    # rounded to whole units. An account with sub-accounts takes only what it holds of its
+    # own (which only books from before such accounts were refused postings have).
     def fill_from_actuals!(year, percent: 0)
       accounts = self.class.accounts(organization).to_a
       children = accounts.group_by(&:parent_id)

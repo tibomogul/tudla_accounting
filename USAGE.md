@@ -171,7 +171,8 @@ TudlaAccounting::AccountsCreator.call([
 `currency` defaults to the organization's. `contra_account` names the code of the account it offsets. Pass a parent account's id as the third argument to add accounts beneath an existing one:
 
 ```ruby
-TudlaAccounting::AccountsCreator.call([ { code: "6010", name: "Rent", category: "expense" } ], org, TudlaAccounting::Account.find_by(organization: org, code: "6000").id)
+TudlaAccounting::AccountsCreator.call([ { code: "6010", name: "Rent", category: "expense" }, { code: "6030", name: "Bank fees", category: "expense" } ],
+                                     org, TudlaAccounting::Account.find_by(organization: org, code: "6000").id)
 ```
 
 ### One at a time
@@ -185,6 +186,8 @@ TudlaAccounting::Account.create!(organization: org, code: "6020", name: "Softwar
 ```
 
 A child must have its parent's category. Category, parent and contra account are fixed once the account has postings. Only an account with no postings, sub-accounts or contra accounts can be deleted.
+
+Only an account without sub-accounts takes postings: a parent holds what its sub-accounts add up to, in every period. So lines go to the sub-accounts (here 6010, 6020 and 6030 rather than 6000), and an account with postings or an opening balance of its own, or holding a role other than receivables or payables, can't take sub-accounts. A draft written before its account took sub-accounts can still be saved, but must move to one of them before it posts.
 
 ## 4. Mark the accounts the books treat specially
 
@@ -373,7 +376,7 @@ Invoice 1002 (EUR),154.00,receivable,2026-01-25,EUR,100.00,1.54,2025-12-20
 ```ruby
 TudlaAccounting::CarryingAmountsCreator.call(
   organization: org, csv_file: "open_items.csv", date_prior: Date.new(2025, 12, 31),
-  sales_account_code: "4010", purchase_account_code: "6000"
+  sales_account_code: "4010", purchase_account_code: "6010"
 )
 ```
 
@@ -558,10 +561,10 @@ Importing the bank's statement and matching its lines to the books shows what th
 ```ruby
 TudlaAccounting::BankStatementImporter.call(bank, "statement.csv", date_order: :dmy, decimal_mark: ".") # => { imported: 4, skipped: 0, format: :csv }
 TudlaAccounting::BankRule.create!(organization: org, name: "Bank fees", description_contains: "account fee", direction: "out",
-                                  counter_account: TudlaAccounting::Account.find_by!(organization: org, code: "6000"))
+                                  counter_account: TudlaAccounting::Account.find_by!(organization: org, code: "6030"))
 reconciler = TudlaAccounting::BankReconciler.new(bank)
 reconciler.match_suggestions! # the payments, the refund and the pay run, matched to their entries
-reconciler.record_by_rules!   # the fee, posted against 6000
+reconciler.record_by_rules!   # the fee, posted against 6030
 reconciler.summary(as_of: Date.new(2026, 6, 30))[:difference] # $0.00: the books agree with the bank's balance
 ```
 

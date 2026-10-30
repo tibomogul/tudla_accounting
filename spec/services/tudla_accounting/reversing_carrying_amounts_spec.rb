@@ -37,9 +37,9 @@ RSpec.describe "Reversing receivables and payables", type: :service do
     entry
   end
 
-  def invoice(amount, at: on(3, 1)) = post([ [ "1100", :debit, amount ], [ "4000", :credit, amount ] ], at: at, particulars: "Invoice",
+  def invoice(amount, at: on(3, 1)) = post([ [ "1100-AUD", :debit, amount ], [ "4000", :credit, amount ] ], at: at, particulars: "Invoice",
                                            source: Invoice.create!(due_date: at + 30.days))
-  def receive(invoice, amount, at:) = post([ [ "1000", :debit, amount ], [ "1100", :credit, amount ] ], at: at, particulars: "Payment",
+  def receive(invoice, amount, at:) = post([ [ "1000", :debit, amount ], [ "1100-AUD", :credit, amount ] ], at: at, particulars: "Payment",
                                            source: Payment.create!, related: invoice)
   def carrying_amount(entry) = entry.details.filter_map(&:carrying_amount).first.reload
   def owed(as_of) = TudlaAccounting::AgingReportGenerator.call(organization: organization, report_type: :receivable, as_of_date: as_of)[:totals][:total]
@@ -124,8 +124,8 @@ RSpec.describe "Reversing receivables and payables", type: :service do
   end
 
   it "works the same way for bills and disbursements" do
-    bill = post([ [ "5000", :debit, 300 ], [ "2100", :credit, 300 ] ], at: on(3, 1), particulars: "Bill", source: Bill.create!(due_date: on(4, 1)))
-    disbursement = post([ [ "2100", :debit, 300 ], [ "1000", :credit, 300 ] ], at: on(3, 10), source: Disbursement.create!, related: bill)
+    bill = post([ [ "5000", :debit, 300 ], [ "2100-AUD", :credit, 300 ] ], at: on(3, 1), particulars: "Bill", source: Bill.create!(due_date: on(4, 1)))
+    disbursement = post([ [ "2100-AUD", :debit, 300 ], [ "1000", :credit, 300 ] ], at: on(3, 10), source: Disbursement.create!, related: bill)
     expect(carrying_amount(bill).amount_cents).to eq(0)
 
     expect(bill.reversal_blocker).to eq("Reverse the payments against it first")

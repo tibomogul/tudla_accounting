@@ -72,16 +72,16 @@ RSpec.describe "USAGE.md, in the UI", type: :system do
     expect(page).to have_text(/· Realized gains and losses account:\s*none marked/)
 
     nav "Accounts"
-    click_link "Other Income"
-    expect(page).to have_current_path(account_path(account("4090")))
+    click_link "Interest Income"
+    expect(page).to have_current_path(account_path(account("4091")))
     click_link "Edit"
-    expect(page).to have_current_path(edit_account_path(account("4090")))
+    expect(page).to have_current_path(edit_account_path(account("4091")))
     select "Realized exchange gains and losses", from: "Role"
     click_button "Save account"
-    expect(page).to have_current_path(account_path(account("4090")))
-    expect(page).to have_content("Account 4090 - Other Income was updated.")
+    expect(page).to have_current_path(account_path(account("4091")))
+    expect(page).to have_content("Account 4091 - Interest Income was updated.")
     nav "Setup"
-    expect(page).to have_content("Realized gains and losses account: 4090 - Other Income")
+    expect(page).to have_content("Realized gains and losses account: 4091 - Interest Income")
 
     # 5. Setup → Enter opening balances
     click_link "Enter opening balances"
@@ -194,7 +194,8 @@ RSpec.describe "USAGE.md, in the UI", type: :system do
       TudlaAccounting::AccountsCreator.call([
         { code: "1010", name: "Cash at bank", category: "asset" }, { code: "1100", name: "Accounts receivable", category: "asset", role: "receivable" },
         { code: "2100", name: "Accounts payable", category: "liability", role: "payable" }, { code: "2200", name: "GST", category: "liability" },
-        { code: "4010", name: "Sales", category: "income" }, { code: "6000", name: "Expenses", category: "expense" }, { code: "6020", name: "Software", category: "expense" }
+        { code: "4010", name: "Sales", category: "income" }, { code: "6000", name: "Expenses", category: "expense" }, { code: "6020", name: "Software", category: "expense" },
+        { code: "6030", name: "Bank fees", category: "expense" }
       ], organization)
       gst = TudlaAccounting::TaxCode.create!(organization: organization, code: "GST", name: "GST on sales", rate: "0.1", kind: :sales, account: account("2200"))
       gst_paid = TudlaAccounting::TaxCode.create!(organization: organization, code: "GST-P", name: "GST on purchases", rate: "0.1", kind: :purchases, account: account("2200"))
@@ -328,7 +329,7 @@ RSpec.describe "USAGE.md, in the UI", type: :system do
       expect(page).to have_current_path(new_bank_rule_path, ignore_query: true)
       fill_in "Name", with: "Bank fees"
       fill_in "Whose description contains", with: "account fee"
-      select "6000 - Expenses", from: "Against the account"
+      select "6030 - Bank fees", from: "Against the account"
       click_button "Save rule"
       expect(page).to have_current_path(bank_rules_path)
       expect(page).to have_content("Bank rule Bank fees saved.")

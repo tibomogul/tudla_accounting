@@ -11,7 +11,7 @@ RSpec.describe "Idempotent entry creation" do
 
   def entry_hash(org = organization, **overrides)
     { organization_type: "Organization", organization_id: org.id, particulars: "Invoice 7", transacted_at: "2026-03-10T09:00:00Z",
-      details: [ { account_code: "1100", amount: "USD 100.00" }, { account_code: "4000", amount: "USD 100.00" } ] }.merge(overrides)
+      details: [ { account_code: "1100-USD", amount: "USD 100.00" }, { account_code: "4000", amount: "USD 100.00" } ] }.merge(overrides)
   end
 
   it "returns the entry already created with the same key, instead of a second one" do

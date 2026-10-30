@@ -35,9 +35,9 @@ RSpec.describe "Cash-basis tax", type: :service do
     entry
   end
 
-  def invoice(at, net) = book("Invoice", at, [ { account_code: "1100", amount: "AUD #{net * 1.1}" }, { account_code: "4000", amount: "AUD #{net}", tax_code: "GST" } ],
+  def invoice(at, net) = book("Invoice", at, [ { account_code: "1100-AUD", amount: "AUD #{net * 1.1}" }, { account_code: "4000", amount: "AUD #{net}", tax_code: "GST" } ],
                               source: Invoice.create!(customer: globex))
-  def payment(at, amount, related: nil) = book("Payment", at, [ { account_code: "1000", amount: "AUD #{amount}" }, { account_code: "1100", amount: "AUD -#{amount}" } ],
+  def payment(at, amount, related: nil) = book("Payment", at, [ { account_code: "1000", amount: "AUD #{amount}" }, { account_code: "1100-AUD", amount: "AUD -#{amount}" } ],
                                                source: Payment.create!(customer: globex), related: related)
 
   def report(month, basis: :cash) = TudlaAccounting::TaxReport.call(organization, from: on(month, 1), thru: on(month, 1).end_of_month, basis: basis)
@@ -73,7 +73,7 @@ RSpec.describe "Cash-basis tax", type: :service do
 
   it "nets the tax on the part of an invoice settled by a taxed credit note" do
     inv = invoice(on(3, 1), 1_000)
-    book("Credit note", on(3, 5), [ { account_code: "4100", amount: "AUD -200.00", tax_code: "GST" }, { account_code: "1100", amount: "AUD -220.00" } ],
+    book("Credit note", on(3, 5), [ { account_code: "4100", amount: "AUD -200.00", tax_code: "GST" }, { account_code: "1100-AUD", amount: "AUD -220.00" } ],
          source: CreditNote.create!(customer: globex), related: inv)
     expect(gst(3)).to eq([ aud(0), aud(0) ]) # 20% of the invoice settled, by a credit note for that 20%
     expect(gst(3, basis: :accrual)).to eq([ aud(800), aud(80) ])
@@ -83,9 +83,9 @@ RSpec.describe "Cash-basis tax", type: :service do
   end
 
   it "counts a bill's tax on the purchases side as it is paid" do
-    bill = book("Bill", on(3, 1), [ { account_code: "6000", amount: "AUD 330.00", tax_code: "GSTP" }, { account_code: "2100", amount: "AUD 330.00" } ],
+    bill = book("Bill", on(3, 1), [ { account_code: "6000", amount: "AUD 330.00", tax_code: "GSTP" }, { account_code: "2100-AUD", amount: "AUD 330.00" } ],
                 tax_inclusive: true, source: Bill.create!(customer: globex))
-    book("Paid", on(4, 2), [ { account_code: "2100", amount: "AUD -330.00" }, { account_code: "1000", amount: "AUD -330.00" } ],
+    book("Paid", on(4, 2), [ { account_code: "2100-AUD", amount: "AUD -330.00" }, { account_code: "1000", amount: "AUD -330.00" } ],
          source: Disbursement.create!(customer: globex), related: bill)
     expect(report(3)[:purchases]).to eq(base: aud(0), tax: aud(0))
     expect(report(4)[:purchases]).to eq(base: aud(300), tax: aud(30))

@@ -93,6 +93,44 @@ RSpec.describe "Database integrity" do
     def described_class_allowing(&block) = TudlaAccounting::DatabaseProtection.allowing_posted_changes(&block)
   end
 
+  describe "accounts with sub-accounts" do
+    let(:sub_account) { create(:tudla_accounting_account, code: "1010", category: :asset, organization: organization, parent: cash) }
+
+    it "take no postings, even with raw SQL" do
+      draft = entry(posted: false)
+      sub_account
+      rejected(ActiveRecord::StatementInvalid, /Entry #{draft.id} has a line on account 1000, which has sub-accounts, and cannot be posted/) do
+        draft.update_columns(posted_at: draft.transacted_at)
+      end
+
+      posted = TudlaAccounting::Entry.new(organization: organization, particulars: "Raw", transacted_at: Time.zone.local(2026, 2, 1), posted_at: Time.zone.local(2026, 2, 1))
+      posted.save(validate: false)
+      rejected(ActiveRecord::StatementInvalid, /A line of a posted entry cannot go to account #{cash.id}, which has sub-accounts/) do
+        TudlaAccounting::Detail.new(organization: organization, entry: posted, account: cash, tally: :debit, amount_cents: 1, currency: "USD").save(validate: false)
+      end
+      # A draft's lines, and the sub-account's postings, are fine.
+      expect { draft.details.first.update_columns(description: "Still a draft") }.not_to raise_error
+      expect { TudlaAccounting::Detail.where(entry_id: draft.id, account_id: cash.id).update_all(account_id: sub_account.id) && draft.reload.post(draft.transacted_at) }
+        .not_to raise_error
+    end
+
+    it "aren't made beneath an account with posted lines of its own, even with raw SQL" do
+      entry
+      rejected(ActiveRecord::StatementInvalid, /Account #{cash.id} has posted lines of its own and cannot take sub-accounts/) do
+        build(:tudla_accounting_account, code: "1010", category: :asset, organization: organization, parent: cash).save(validate: false)
+      end
+      loose = create(:tudla_accounting_account, code: "1900", category: :asset, organization: organization)
+      rejected(ActiveRecord::StatementInvalid, /cannot take sub-accounts/) { loose.update_columns(ancestry: "/#{cash.id}/") }
+      expect { create(:tudla_accounting_account, code: "1020", category: :asset, organization: organization, parent: loose) }.not_to raise_error
+    end
+
+    it "can be changed inside allowing_posted_changes" do
+      entry
+      child = build(:tudla_accounting_account, code: "1030", category: :asset, organization: organization, parent: cash)
+      expect { TudlaAccounting::DatabaseProtection.allowing_posted_changes { child.save(validate: false) } }.not_to raise_error
+    end
+  end
+
   describe TudlaAccounting::DatabaseProtection do
     it "installs and uninstalls its triggers" do
       expect(described_class.installed?).to be(true)

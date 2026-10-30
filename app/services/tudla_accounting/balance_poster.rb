@@ -18,6 +18,7 @@ module TudlaAccounting
     def initialize(organization)
       @organization = organization
       @leaf_periods = {}
+      @posting_blockers = {}
       @account_chains = {}
       @period_chains = {}
       @later_period_ids = {}
@@ -38,7 +39,11 @@ module TudlaAccounting
     end
 
     # Posts cents on tally to account in period. Returns the account's balance for period.
+    # ArgumentError for an account with sub-accounts, which holds only what they add up to.
     def post(account, period, cents, tally)
+      blocker = @posting_blockers.fetch(account.id) { @posting_blockers[account.id] = account.posting_blocker }
+      raise ArgumentError, blocker if blocker
+
       accounts = account_chain(account)
       periods = period_chain(period)
       balance = ensure_balances(accounts, periods, account, period)

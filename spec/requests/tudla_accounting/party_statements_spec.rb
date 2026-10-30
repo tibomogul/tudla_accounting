@@ -22,9 +22,9 @@ RSpec.describe "Customer and supplier statements", type: :request do
       { code: "2100", name: "Accounts Payable", category: "liability", role: "payable" },
       { code: "4000", name: "Sales", category: "income" }, { code: "5000", name: "Purchases", category: "expense" }
     ], organization)
-    @first = post_entry([ [ "1100", :debit, 300 ], [ "4000", :credit, 300 ] ], at: Time.zone.local(2026, 2, 10), particulars: "Invoice 1",
+    @first = post_entry([ [ "1100-AUD", :debit, 300 ], [ "4000", :credit, 300 ] ], at: Time.zone.local(2026, 2, 10), particulars: "Invoice 1",
                   source: Invoice.create!(customer: globex, due_date: Time.zone.local(2026, 3, 12)), reference: "INV-1")
-    post_entry([ [ "1000", :debit, 250 ], [ "1100", :credit, 250 ] ], at: Time.zone.local(2026, 3, 5), particulars: "Payment 1", source: Payment.create!(customer: globex), related: @first)
+    post_entry([ [ "1000", :debit, 250 ], [ "1100-AUD", :credit, 250 ] ], at: Time.zone.local(2026, 3, 5), particulars: "Payment 1", source: Payment.create!(customer: globex), related: @first)
   end
 
   after { travel_back }
@@ -79,7 +79,7 @@ RSpec.describe "Customer and supplier statements", type: :request do
   it "makes a supplier's, says when there are none, and asks again when the type changes" do
     get routes.reports_statement_path(type: "payable")
     expect(response.body).to include("No suppliers have bills yet.")
-    post_entry([ [ "5000", :debit, 80 ], [ "2100", :credit, 80 ] ], at: Time.zone.local(2026, 3, 2), particulars: "Bill 1", source: Bill.create!(customer: globex))
+    post_entry([ [ "5000", :debit, 80 ], [ "2100-AUD", :credit, 80 ] ], at: Time.zone.local(2026, 3, 2), particulars: "Bill 1", source: Bill.create!(customer: globex))
     get routes.reports_statement_path(type: "payable", party: key)
     expect(css_select("[data-activity] thead th").map(&:text)).to include("Billed")
     expect(css_select("[data-amount-due]").first.text.squish).to start_with("Balance owing")
@@ -89,7 +89,7 @@ RSpec.describe "Customer and supplier statements", type: :request do
   end
 
   it "says when the customer is in credit, and reads dates it can't as last month" do
-    post_entry([ [ "1000", :debit, 100 ], [ "1100", :credit, 100 ] ], at: Time.zone.local(2026, 3, 6), particulars: "Payment 2", source: Payment.create!(customer: globex))
+    post_entry([ [ "1000", :debit, 100 ], [ "1100-AUD", :credit, 100 ] ], at: Time.zone.local(2026, 3, 6), particulars: "Payment 2", source: Payment.create!(customer: globex))
     get routes.reports_statement_path(party: key, from: "soon")
     expect(css_select("input[name=from]").first["value"]).to eq("2026-03-01")
     expect(css_select("[data-amount-due]").first.text.squish).to eq("In credit at 31 Mar 2026 AUD 50.00")
@@ -121,9 +121,9 @@ RSpec.describe "Customer and supplier statements", type: :request do
   it "shows every customer's statement with something to send, one to a page, and downloads them together" do
     initech = create(:organization, name: "Initech")
     umbrella = create(:organization, name: "Umbrella")
-    paid = post_entry([ [ "1100", :debit, 40 ], [ "4000", :credit, 40 ] ], at: Time.zone.local(2026, 1, 5), particulars: "Initech invoice", source: Invoice.create!(customer: initech))
-    post_entry([ [ "1000", :debit, 40 ], [ "1100", :credit, 40 ] ], at: Time.zone.local(2026, 1, 9), particulars: "Initech pays", source: Payment.create!(customer: initech), related: paid)
-    post_entry([ [ "1100", :debit, 70 ], [ "4000", :credit, 70 ] ], at: Time.zone.local(2026, 3, 9), particulars: "Umbrella invoice", source: Invoice.create!(customer: umbrella))
+    paid = post_entry([ [ "1100-AUD", :debit, 40 ], [ "4000", :credit, 40 ] ], at: Time.zone.local(2026, 1, 5), particulars: "Initech invoice", source: Invoice.create!(customer: initech))
+    post_entry([ [ "1000", :debit, 40 ], [ "1100-AUD", :credit, 40 ] ], at: Time.zone.local(2026, 1, 9), particulars: "Initech pays", source: Payment.create!(customer: initech), related: paid)
+    post_entry([ [ "1100-AUD", :debit, 70 ], [ "4000", :credit, 70 ] ], at: Time.zone.local(2026, 3, 9), particulars: "Umbrella invoice", source: Invoice.create!(customer: umbrella))
 
     get routes.reports_statement_path
     expect(css_select("a").map { |link| link["href"] }).to include(routes.reports_statements_path(type: :receivable, from: "2026-03-01", thru: "2026-03-31"))

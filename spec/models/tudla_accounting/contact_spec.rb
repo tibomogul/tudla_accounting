@@ -55,7 +55,7 @@ RSpec.describe TudlaAccounting::Contact do
     expect(gst.errors[:base]).to eq([ "Recurring entries, bank rules, tax returns, contacts or invoices and bills use GST; change them first" ])
 
     entry = build(:tudla_accounting_entry, organization: organization, transacted_at: Time.zone.local(2026, 3, 1))
-    receivable = entry.details.build(account: account("1100"), tally: :debit, amount_cents: 100_00, currency: "AUD", organization: organization)
+    receivable = entry.details.build(account: account("1100-AUD"), tally: :debit, amount_cents: 100_00, currency: "AUD", organization: organization)
     entry.details.build(account: account("4000"), tally: :credit, amount_cents: 100_00, currency: "AUD", organization: organization)
     entry.save!
     TudlaAccounting::CarryingAmount.create!(detail: receivable, amount_cents: 100_00, carrying_amount_type: :receivable, related_party: northwind)

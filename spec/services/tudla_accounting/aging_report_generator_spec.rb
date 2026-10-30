@@ -35,12 +35,12 @@ RSpec.describe TudlaAccounting::AgingReportGenerator, type: :service do
   end
 
   def invoice(amount, customer:, due:, on: Time.zone.local(2026, 1, 10))
-    post_entry([ [ "1100", :debit, amount ], [ "4000", :credit, amount ] ], on: on,
+    post_entry([ [ "1100-USD", :debit, amount ], [ "4000", :credit, amount ] ], on: on,
                source: Invoice.create!(due_date: due && Time.zone.local(due.year, due.month, due.day), customer: customer))
   end
 
   def payment(invoice_entry, amount, on:)
-    post_entry([ [ "1000", :debit, amount ], [ "1100", :credit, amount ] ], on: on, source: Payment.create!, related: invoice_entry)
+    post_entry([ [ "1000", :debit, amount ], [ "1100-USD", :credit, amount ] ], on: on, source: Payment.create!, related: invoice_entry)
   end
 
   def report(type = :receivable, date = as_of)
@@ -119,9 +119,9 @@ RSpec.describe TudlaAccounting::AgingReportGenerator, type: :service do
   end
 
   it "reports payables from bills, reduced by disbursements" do
-    bill = post_entry([ [ "5000", :debit, 400 ], [ "2100", :credit, 400 ] ], on: Time.zone.local(2026, 2, 1),
+    bill = post_entry([ [ "5000", :debit, 400 ], [ "2100-USD", :credit, 400 ] ], on: Time.zone.local(2026, 2, 1),
                       source: Bill.create!(due_date: Time.zone.local(2026, 5, 1), customer: globex))
-    post_entry([ [ "2100", :debit, 150 ], [ "1000", :credit, 150 ] ], on: Time.zone.local(2026, 3, 1), source: Disbursement.create!, related: bill)
+    post_entry([ [ "2100-USD", :debit, 150 ], [ "1000", :credit, 150 ] ], on: Time.zone.local(2026, 3, 1), source: Disbursement.create!, related: bill)
     invoice(999, customer: acme, due: Date.new(2026, 5, 1))
 
     payables = report(:payable)

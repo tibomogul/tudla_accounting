@@ -33,7 +33,7 @@ RSpec.describe "TudlaAccounting entry sources" do
       {
         organization_type: "Organization", organization_id: organization.id,
         particulars: "Invoice ##{invoice.id}", transacted_at: "2026-03-10T09:00:00Z",
-        details: [ { account_code: "1100", amount: "USD 1100.00" }, { account_code: "4000", amount: "USD 1100.00" } ]
+        details: [ { account_code: "1100-USD", amount: "USD 1100.00" }, { account_code: "4000", amount: "USD 1100.00" } ]
       }.merge(overrides)
     end
 
@@ -44,7 +44,7 @@ RSpec.describe "TudlaAccounting entry sources" do
 
       expect(entry).to be_persisted
       expect(entry).to have_attributes(source: invoice, particulars: "Invoice ##{invoice.id}", posted_at: nil)
-      expect(entry.details.map(&:account)).to contain_exactly(receivable, sales)
+      expect(entry.details.map(&:account)).to contain_exactly(receivable.children.sole, sales)
     end
 
     it "lets the callable set source_type and source_id itself" do

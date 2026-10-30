@@ -65,16 +65,15 @@ RSpec.describe TudlaAccounting::Budget do
   end
 
   describe "#fill_from_actuals!" do
-    it "takes each month's actual results, changed and rounded, what the parent had directly, and no inactive accounts" do
-      post(Time.zone.local(2025, 1, 10), [ { account_code: "4010", amount: "AUD 1000.00" }, { account_code: "4000", amount: "AUD 200.00" },
-                                           { account_code: "6200", amount: "AUD 50.40" }, { account_code: "1000", amount: "AUD 1149.60" } ])
+    it "takes each month's actual results, changed and rounded, and no inactive accounts" do
+      post(Time.zone.local(2025, 1, 10), [ { account_code: "4010", amount: "AUD 1000.00" },
+                                           { account_code: "6200", amount: "AUD 50.40" }, { account_code: "1000", amount: "AUD 949.60" } ])
       post(Time.zone.local(2025, 3, 10), [ { account_code: "6100", amount: "AUD 100.00" }, { account_code: "1000", amount: "AUD -100.00" } ])
       account("6200").deactivate!
 
       plan = budget
       plan.fill_from_actuals!(last_year, percent: 10)
-      expect(plan.amounts).to eq(account("4010").id => { month(year, 1).id => 1_100_00 }, account("4000").id => { month(year, 1).id => 220_00 },
-                                 account("6100").id => { month(year, 3).id => 110_00 })
+      expect(plan.amounts).to eq(account("4010").id => { month(year, 1).id => 1_100_00 }, account("6100").id => { month(year, 3).id => 110_00 })
     end
   end
 

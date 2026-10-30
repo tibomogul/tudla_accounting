@@ -128,14 +128,6 @@ RSpec.describe "Reports", type: :service do
       expect(report).to be_balanced
     end
 
-    it "counts postings made directly to a parent account once" do
-      post("1000", "3100", 50, Time.zone.local(2026, 4, 2)) # straight to the Assets parent
-      report = described_class.new(organization, month(y2026, 4))
-
-      expect(tb_rows(report)).to include([ "1000", aud(50), nil ])
-      expect(report).to be_balanced
-    end
-
     it "balances in a later year with retained earnings carried" do
       report = described_class.new(organization, month(y2027, 2))
       expect(tb_rows(report)).to include([ "3900", nil, aud(750) ], [ "4000", nil, aud(600) ])

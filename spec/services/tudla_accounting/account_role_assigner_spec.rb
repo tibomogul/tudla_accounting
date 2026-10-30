@@ -44,17 +44,10 @@ RSpec.describe TudlaAccounting::AccountRoleAssigner do
   end
 
   it "leaves receivables and payables on an account with postings" do
-    post_to(receivables)
+    post_to(receivables.children.sole)
 
     expect(described_class.save(other, :receivable)).to be(false)
     expect(other.errors[:role]).to eq([ "Receivables is held by 1100 - #{receivables.name}, which keeps it now that it, or an account beneath it, has posted lines" ])
-    expect([ other, receivables ].map { |account| account.reload.role }).to eq([ nil, "receivable" ])
-  end
-
-  it "leaves receivables on an account whose sub-account has posted lines" do
-    post_to(create(:tudla_accounting_account, code: "1101", category: :asset, organization: organization, parent: receivables))
-
-    expect(described_class.save(other, :receivable)).to be(false)
     expect([ other, receivables ].map { |account| account.reload.role }).to eq([ nil, "receivable" ])
   end
 
@@ -67,7 +60,7 @@ RSpec.describe TudlaAccounting::AccountRoleAssigner do
   end
 
   it "keeps receivables on an account once it has posted lines" do
-    post_to(receivables)
+    post_to(receivables.children.sole)
 
     expect(described_class.save(receivables, nil)).to be(false)
     expect(receivables.errors[:role]).to eq([ "stays Receivables now that it, or an account beneath it, has posted lines" ])
@@ -213,7 +206,7 @@ RSpec.describe TudlaAccounting::AccountRoleAssigner do
   end
 
   it "raises with save! when the role can't change" do
-    post_to(receivables)
+    post_to(receivables.children.sole)
     expect { described_class.save!(other, :receivable) }.to raise_error(ActiveRecord::RecordInvalid, /held by 1100/)
   end
 

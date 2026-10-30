@@ -39,12 +39,12 @@ RSpec.describe "Applying payments", type: :request do
     entry
   end
 
-  def invoice(name, cents, due:) = post_entry([ [ "1100", :debit, cents ], [ "4000", :credit, cents ] ], at: on(3, 1), particulars: name,
+  def invoice(name, cents, due:) = post_entry([ [ "1100-AUD", :debit, cents ], [ "4000", :credit, cents ] ], at: on(3, 1), particulars: name,
                                               source: Invoice.create!(due_date: due, customer: globex))
 
   let!(:inv1) { invoice("Invoice 1", 300_00, due: on(3, 31)) }
   let!(:inv2) { invoice("Invoice 2", 200_00, due: on(3, 15)) }
-  let!(:pay) { post_entry([ [ "1000", :debit, 450_00 ], [ "1100", :credit, 450_00 ] ], at: on(3, 20), particulars: "Payment 1", source: Payment.create!(customer: globex)) }
+  let!(:pay) { post_entry([ [ "1000", :debit, 450_00 ], [ "1100-AUD", :credit, 450_00 ] ], at: on(3, 20), particulars: "Payment 1", source: Payment.create!(customer: globex)) }
 
   it "shows a payment's credit and the invoices it could go to, oldest due first" do
     get routes.entry_path(pay)
@@ -107,7 +107,7 @@ RSpec.describe "Applying payments", type: :request do
   end
 
   it "says when nothing is owed that it could go to" do
-    late = post_entry([ [ "1000", :debit, 5_00 ], [ "1100", :credit, 5_00 ] ], at: on(3, 22), particulars: "Payment 2",
+    late = post_entry([ [ "1000", :debit, 5_00 ], [ "1100-AUD", :credit, 5_00 ] ], at: on(3, 22), particulars: "Payment 2",
                       source: Payment.create!(customer: create(:organization, name: "Initech"))) # owes nothing
 
     get routes.entry_path(late)
@@ -133,7 +133,7 @@ RSpec.describe "Applying payments", type: :request do
   end
 
   it "shows what a refund paid back" do
-    back = post_entry([ [ "1100", :debit, 450_00 ], [ "1000", :credit, 450_00 ] ], at: on(3, 25), particulars: "Refund 1",
+    back = post_entry([ [ "1100-AUD", :debit, 450_00 ], [ "1000", :credit, 450_00 ] ], at: on(3, 25), particulars: "Refund 1",
                       source: Refund.create!(customer: globex), related: pay)
 
     get routes.entry_path(back)

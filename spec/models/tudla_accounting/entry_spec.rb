@@ -65,8 +65,11 @@ RSpec.describe TudlaAccounting::Entry, type: :model do
 
     let(:organization) { create(:organization) }
     let(:cash) { create(:tudla_accounting_account, code: "1000", category: :asset, organization: organization) }
-    let(:receivable) { create(:tudla_accounting_account, code: "1100", category: :asset, organization: organization, role: :receivable) }
-    let(:payable) { create(:tudla_accounting_account, code: "2100", category: :liability, organization: organization, role: :payable) }
+    let(:receivable) do
+      create(:tudla_accounting_account, code: "1100", category: :asset, organization: organization, role: :receivable)
+      TudlaAccounting::Account.for_role_in_currency!(organization, :receivable, "EUR")
+    end
+    let(:payable) { create(:tudla_accounting_account, code: "2100", category: :liability, organization: organization, role: :payable).children.sole }
     let(:capital) { create(:tudla_accounting_account, code: "3000", category: :equity, organization: organization) }
     let(:sales) { create(:tudla_accounting_account, code: "4000", category: :income, organization: organization) }
     let!(:period) { create(:tudla_accounting_period, organization: organization, from_date: Date.new(2026, 1, 1), thru_date: Date.new(2026, 12, 31).end_of_day) }
@@ -164,11 +167,12 @@ RSpec.describe TudlaAccounting::Entry, type: :model do
   describe ".create_from_ruby_hash" do
     let(:organization) { create(:organization, currency: "USD") }
     let!(:cash) { create(:tudla_accounting_account, code: "1000", category: :asset, organization: organization) }
-    let!(:receivable) { create(:tudla_accounting_account, code: "1100", category: :asset, organization: organization, role: :receivable) }
+    let!(:receivables) { create(:tudla_accounting_account, code: "1100", category: :asset, organization: organization, role: :receivable) }
+    let(:receivable) { receivables.children.find_by!(currency: "USD") }
     let!(:receivable_eur) do
-      create(:tudla_accounting_account, code: "1100-EUR", category: :asset, currency: "EUR", organization: organization, parent: receivable)
+      create(:tudla_accounting_account, code: "1100-EUR", category: :asset, currency: "EUR", organization: organization, parent: receivables)
     end
-    let!(:tax_payable) { create(:tudla_accounting_account, code: "2100", category: :liability, organization: organization, role: :payable) }
+    let!(:tax_payable) { create(:tudla_accounting_account, code: "2100", category: :liability, organization: organization, role: :payable).children.sole }
     let!(:sales) { create(:tudla_accounting_account, code: "4100", category: :income, organization: organization) }
 
     let(:invoice_hash) do
@@ -180,9 +184,9 @@ RSpec.describe TudlaAccounting::Entry, type: :model do
         particulars: "Invoice for landlord",
         transacted_at: "2026-04-27T09:12:36+10:00",
         details: [
-          { account_code: "1100", amount: "USD 2750.00" },
+          { account_code: "1100-USD", amount: "USD 2750.00" },
           { account_code: "4100", amount: "USD 2500.00" },
-          { account_code: "2100", amount: "USD 250.00" }
+          { account_code: "2100-USD", amount: "USD 250.00" }
         ]
       }
     end
@@ -209,7 +213,7 @@ RSpec.describe TudlaAccounting::Entry, type: :model do
     it "treats a negative amount as a decrease to the account" do
       entry = described_class.create_from_ruby_hash(invoice_hash.merge(
         source_type: "Payment", particulars: "Payment from landlord",
-        details: [ { account_code: "1100", amount: "USD -2750.00" }, { account_code: "1000", amount: "USD 2750.00" } ]
+        details: [ { account_code: "1100-USD", amount: "USD -2750.00" }, { account_code: "1000", amount: "USD 2750.00" } ]
       ))
 
       expect(detail_for(entry, receivable)).to have_attributes(tally: "credit", amount: Money.new(2750_00, "USD"))
@@ -244,7 +248,7 @@ RSpec.describe TudlaAccounting::Entry, type: :model do
         expect { described_class.create_from_ruby_hash(with_first_detail(amount: amount)) }.to raise_error(ArgumentError, message), amount
       end
       receipt = { account_code: "1000", amount: "USD (2,750.00)" }
-      entry = described_class.create_from_ruby_hash(invoice_hash.merge(details: [ receipt, { account_code: "1100", amount: "2750" } ]))
+      entry = described_class.create_from_ruby_hash(invoice_hash.merge(details: [ receipt, { account_code: "1100-USD", amount: "2750" } ]))
       expect(detail_for(entry, cash)).to have_attributes(tally: "credit", amount: Money.new(2750_00, "USD"))
       expect(detail_for(entry, receivable)).to have_attributes(tally: "debit", amount: Money.new(2750_00, "USD"))
     end

@@ -52,9 +52,9 @@ RSpec.describe "Dashboard", type: :request do
           { code: "2100", name: "Payables", category: "liability", role: "payable" }, { code: "4000", name: "Sales", category: "income" },
           { code: "6000", name: "Rent", category: "expense" }
         ], organization)
-        post_entry("1100", "4000", 500_00, Time.zone.local(2026, 2, 1), source: Invoice.create!(due_date: Time.zone.local(2026, 3, 1)))
-        post_entry("1100", "4000", 200_00, Time.zone.local(2026, 4, 1), source: Invoice.create!(due_date: Time.zone.local(2026, 5, 1)))
-        post_entry("6000", "2100", 120_00, Time.zone.local(2026, 4, 2), source: Bill.create!(due_date: Time.zone.local(2026, 5, 2)))
+        post_entry("1100-AUD", "4000", 500_00, Time.zone.local(2026, 2, 1), source: Invoice.create!(due_date: Time.zone.local(2026, 3, 1)))
+        post_entry("1100-AUD", "4000", 200_00, Time.zone.local(2026, 4, 1), source: Invoice.create!(due_date: Time.zone.local(2026, 5, 1)))
+        post_entry("6000", "2100-AUD", 120_00, Time.zone.local(2026, 4, 2), source: Bill.create!(due_date: Time.zone.local(2026, 5, 2)))
         post_entry("6000", "1010", 30_00, Time.zone.local(2026, 4, 3), draft: true)
       end
 

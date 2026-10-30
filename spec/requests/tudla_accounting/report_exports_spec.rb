@@ -25,7 +25,7 @@ RSpec.describe "Report exports", type: :request do
     team = TudlaAccounting::Dimension.create!(organization: organization, code: "DEPT", name: "Department").dimension_values.create!(code: "OPS", name: "Ops")
 
     post_entry([ "1010", 1_000 ], [ "3100", 1_000 ], on: Time.zone.local(2026, 1, 5))
-    post_entry([ "1100", 330 ], [ "4000", 300, { tax_code: @gst, tax_role: :base, tags: [ team ] } ], [ "2200", 30, { tax_code: @gst, tax_role: :tax } ],
+    post_entry([ "1100-AUD", 330 ], [ "4000", 300, { tax_code: @gst, tax_role: :base, tags: [ team ] } ], [ "2200", 30, { tax_code: @gst, tax_role: :tax } ],
                on: Time.zone.local(2026, 3, 1), source: Invoice.create!(due_date: Time.zone.local(2026, 3, 31), customer: customer))
     post_entry([ "6100", 200 ], [ "1010", 200 ], on: Time.zone.local(2026, 4, 5))
   end
