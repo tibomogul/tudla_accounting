@@ -54,7 +54,7 @@ RSpec.describe "Emailing invoices", type: :request do
     get routes.document_path(invoice)
     expect(css_select("[data-delivery=queued]").first.text.squish).to include("ap@northwind.test cc boss@northwind.test", "Your invoice", "Sending", "by Demo user")
 
-    perform_enqueued_jobs
+    send_queued_emails
     expect(ActionMailer::Base.deliveries.sole).to have_attributes(subject: "Your invoice", from: [ "accounts@acme.test" ])
     get routes.document_path(invoice)
     expect(css_select("[data-delivery=sent]").first.text.squish).to include("Sent 15 Apr 09:00", "Send again")
@@ -172,7 +172,7 @@ RSpec.describe "Emailing statements, receipts and payment notices", type: :reque
 
     post routes.emails_path(payment_id: payment.id), params: { delivery: { to: "ap@northwind.test", subject_line: "Receipt", message: "Thanks" } }
     expect(response).to redirect_to(routes.payment_path(payment))
-    perform_enqueued_jobs
+    send_queued_emails
     expect(ActionMailer::Base.deliveries.sole.attachments.sole.filename).to eq("receipt-2026-04-10.pdf")
     get routes.payment_path(payment)
     expect(css_select("[data-delivery=sent]").size).to eq(1)
@@ -199,7 +199,7 @@ RSpec.describe "Emailing statements, receipts and payment notices", type: :reque
     get routes.payment_path(payment)
     expect(response.body).to include("Email payment notice")
     post routes.emails_path(payment_id: payment.id), params: { delivery: { to: "ap@northwind.test", subject_line: "Paid", message: "Paid" } }
-    perform_enqueued_jobs
+    send_queued_emails
     expect(ActionMailer::Base.deliveries.sole.attachments.sole.filename).to eq("payment-notice-2026-04-10.pdf")
     get routes.activity_path(kind: "email")
     expect(response.body).to include("the payment notice for")
@@ -225,7 +225,7 @@ RSpec.describe "Emailing statements, receipts and payment notices", type: :reque
     expect(flash[:notice]).to eq("Emailing Northwind's statement to ap@northwind.test.")
     expect(TudlaAccounting::Delivery.sole).to have_attributes(kind: "statement", subject: northwind,
                                                               details: { "type" => "receivable", "from" => "2026-04-01", "thru" => "2026-04-30", "open_items" => true })
-    perform_enqueued_jobs
+    send_queued_emails
     attachment = ActionMailer::Base.deliveries.sole.attachments.sole
     expect(attachment.filename).to eq("statement-2026-04-30.pdf")
     expect(PDF::Reader.new(StringIO.new(attachment.decoded)).pages.first.text).to include("Open items at 30 Apr 2026", "Northwind")

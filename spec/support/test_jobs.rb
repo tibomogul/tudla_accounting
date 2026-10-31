@@ -3,6 +3,14 @@
 RSpec.shared_context "with the test job adapter" do
   include ActiveJob::TestHelper
 
+  # Runs the queued jobs, failing with the error of any email that couldn't be sent:
+  # Delivery#deliver! keeps it rather than raising, so a PDF Chrome couldn't make would
+  # otherwise only show as no mail.
+  def send_queued_emails
+    perform_enqueued_jobs
+    expect(TudlaAccounting::Delivery.where(status: "failed").pluck(:error)).to eq([]) # prints their errors
+  end
+
   around do |example|
     original = ActiveJob::Base.queue_adapter
     ActiveJob::Base.queue_adapter = :test

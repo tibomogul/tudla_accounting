@@ -42,7 +42,7 @@ RSpec.describe TudlaAccounting::Delivery do
     TudlaAccounting.configuration.document_mail_from = ->(org) { "#{org.name} <accounts@acme.test>" }
     TudlaAccounting.configuration.document_mail_reply_to = "billing@acme.test"
     delivery = request!(cc: "boss@northwind.test", message: "Please pay.\n\nThanks")
-    perform_enqueued_jobs
+    send_queued_emails
 
     mail = ActionMailer::Base.deliveries.sole
     expect(mail).to have_attributes(to: [ "ap@northwind.test" ], cc: [ "boss@northwind.test" ], from: [ "accounts@acme.test" ], reply_to: [ "billing@acme.test" ], subject: "Invoice INV-0001")

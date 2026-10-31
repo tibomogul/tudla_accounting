@@ -65,7 +65,7 @@ RSpec.describe TudlaAccounting::ReminderRunner, type: :service do
     expect(delivery.message).to include("Invoice INV-0001, due on 1 Apr 2026, still has $100.00 owing.")
 
     expect(described_class.call(organization: organization, as_of: Date.new(2026, 4, 10)).sent).to eq([]) # queued: not again
-    perform_enqueued_jobs
+    send_queued_emails
     expect(ActionMailer::Base.deliveries.last.attachments.sole.filename).to eq("INV-0001.pdf")
     expect(described_class.call(organization: organization, as_of: Date.new(2026, 4, 10)).sent).to eq([]) # sent: not again
     expect(described_class.call(organization: organization, as_of: Date.new(2026, 4, 15)).sent.map(&:days)).to eq([ 14 ])
