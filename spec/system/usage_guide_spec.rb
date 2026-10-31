@@ -128,7 +128,7 @@ RSpec.describe "USAGE.md, in the UI", type: :system do
     # 7. Contacts → Import contacts (CSV or Excel)
     nav "Contacts"
     attach_file "Import contacts (CSV or Excel)", fixtures.join("contacts.csv")
-    click_button "Import"
+    click_button_and_reload "Import"
     expect(page).to have_current_path(contacts_path)
     expect(page).to have_content("3 contacts added and 0 updated from contacts.csv.")
     expect(page).to have_link("Northwind Traders").and have_link("Initech Supplies")
@@ -318,7 +318,7 @@ RSpec.describe "USAGE.md, in the UI", type: :system do
       click_link "1010 - Cash at bank"
       expect(page).to have_current_path(banking_account_path(account("1010")))
       attach_file "Statement (CSV, OFX, QFX or CAMT.053)", statement
-      click_button "Import statement"
+      click_button_and_reload "Import statement"
       expect(page).to have_current_path(banking_account_path(account("1010")))
       expect(page).to have_content("Imported 4 statement lines from the CSV file")
       click_button_and_reload "Match 3 suggestions"
