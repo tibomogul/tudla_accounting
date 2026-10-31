@@ -54,7 +54,7 @@ module TudlaAccounting
 
       credit = Allocator.carrying_amount(@credit_entry)
       currency = credit.forex && charge.forex ? charge.forex.other_currency : accounting_organization.currency
-      cents = AmountParser.cents(params[:amount], currency)
+      cents = AmountParser.cents(params[:amount], currency, format: number_format)
       credit.forex && charge.forex ? { other_currency_cents: cents } : { amount_cents: cents }
     end
   end

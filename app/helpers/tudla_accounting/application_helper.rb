@@ -32,11 +32,23 @@ module TudlaAccounting
       (accounting_organization if respond_to?(:accounting_organization)) || money.currency
     end
 
-    # An amount as a form field holds it: "1234.50", with "." for decimals and no thousands
-    # separators whatever the currency's own style, as the forms read amounts back ("" for
-    # none). Every amount field is filled with it, so saving a form unchanged keeps it.
+    # An amount as a form field holds it: "1234.50" ("1234,50" in comma books), with the
+    # organization's decimal mark and no thousands separators whatever the currency's own
+    # style, as the forms read amounts back ("" for none). Every amount field is filled
+    # with it, so saving a form unchanged keeps it.
     def tc_amount_field(money)
-      money ? AmountParser.text(money) : ""
+      money ? AmountParser.text(money, format: tc_number_format) : ""
+    end
+
+    # Any other number (a quantity, a rate, a percentage) as the pages write it and its
+    # fields hold it: "2.5", or "2,5" in comma books ("" for none).
+    def tc_number(value)
+      value.nil? ? "" : AmountParser.number_text(value, format: tc_number_format)
+    end
+
+    # How the organization's pages write numbers (NumberFormat).
+    def tc_number_format
+      @tc_number_format ||= NumberFormat.for((accounting_organization if respond_to?(:accounting_organization)) || TudlaAccounting.configuration.base_currency)
     end
 
     def tc_date(value)

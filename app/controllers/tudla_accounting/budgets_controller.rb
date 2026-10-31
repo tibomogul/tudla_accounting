@@ -121,7 +121,7 @@ module TudlaAccounting
 
     # The percentage to change actual results by ("5", "-2.5", "+10%").
     def percent
-      AmountParser.decimal(params[:percent].to_s.strip.delete_suffix("%")) || 0
+      AmountParser.decimal(params[:percent].to_s.strip.delete_suffix("%"), format: number_format) || 0
     rescue ArgumentError
       raise ArgumentError, "#{params[:percent]} isn't a percentage"
     end

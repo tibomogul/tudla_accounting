@@ -20,7 +20,7 @@ module TudlaAccounting
       base = amounts[1]
       return "—" if base.zero?
 
-      "#{number_with_precision((amounts[0] - base).cents.to_f / base.cents.abs * 100, precision: 1)}%"
+      "#{number_with_precision((amounts[0] - base).cents.to_f / base.cents.abs * 100, precision: 1, separator: tc_number_format.decimal_mark)}%"
     end
 
     # The column groups of budget vs actual: the period ("Mar 2026", "Year 2026"), then

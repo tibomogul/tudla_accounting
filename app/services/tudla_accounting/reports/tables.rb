@@ -49,7 +49,7 @@ module TudlaAccounting
       def tax(report)
         rows = report[:codes].map do |row|
           code = row[:tax_code]
-          [ code.code, code.name, code.kind.capitalize, BigDecimal(code.rate_percent), row[:base], row[:tax] ]
+          [ code.code, code.name, code.kind.capitalize, code.rate * 100, row[:base], row[:tax] ]
         end
         Table.new([ [ "Code", "Name", "Kind", "Rate %", "Taxed amount", "Tax" ], *rows,
                     Table.total([ nil, "Total sales", nil, nil, report[:sales][:base], report[:sales][:tax] ]),

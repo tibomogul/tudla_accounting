@@ -32,7 +32,7 @@
   <% if @document.entry %><span class="tc-muted">Posted as <%= link_to entry_title(@document.entry), entry_path(@document.entry), class: "underline" %></span><% end %>
   <% if @document.recurring_invoice %><span class="tc-muted">Made from <%= link_to @document.recurring_invoice.name, recurring_invoice_path(@document.recurring_invoice), class: "underline" %></span><% end %>
   <% if @document.credited_document %><span class="tc-muted">Credits <%= link_to @document.credited_document.title, document_path(@document.credited_document), class: "underline" %></span><% end %>
-  <% if @document.foreign? %><span class="tc-muted" data-exchange-rate>In <%= @document.currency %> at <%= @document.exchange_rate.to_s("F") %> <%= accounting_organization.currency %>: <%= tc_money(@document.total_in_base) %> <%= accounting_organization.currency %><%= " posted" if @document.entry %></span><% end %>
+  <% if @document.foreign? %><span class="tc-muted" data-exchange-rate>In <%= @document.currency %> at <%= tc_number(@document.exchange_rate) %> <%= accounting_organization.currency %>: <%= tc_money(@document.total_in_base) %> <%= accounting_organization.currency %><%= " posted" if @document.entry %></span><% end %>
   <% if @document.void? %><span class="tc-muted">Voided <%= tc_date(@document.voided_on) %><%= ": “#{@document.void_reason}”" if @document.void_reason %></span><% end %>
 </div>
 

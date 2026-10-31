@@ -3,7 +3,7 @@
 <% if currency != accounting_organization.currency %>
   <div>
     <%= form.label :exchange_rate, "Rate: 1 #{currency} in #{accounting_organization.currency}", class: "tc-label" %>
-    <%= form.text_field :exchange_rate, value: payment.exchange_rate&.to_s("F"), inputmode: "decimal", class: "tc-input tc-num", placeholder: "The day's rate" %>
+    <%= form.text_field :exchange_rate, value: tc_number(payment.exchange_rate), inputmode: "decimal", class: "tc-input tc-num", placeholder: "The day's rate" %>
     <p class="tc-hint">Left blank, the date's rate is looked up, if there is one.</p>
   </div>
 <% end %>

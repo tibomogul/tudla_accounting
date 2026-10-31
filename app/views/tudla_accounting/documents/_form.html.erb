@@ -36,7 +36,7 @@
     </div>
     <div class="sm:col-span-2 space-y-1" data-document-lines-target="rate" <%= "hidden" unless document.foreign? %>>
       <%= form.label :exchange_rate, safe_join([ "Rate: 1 ", tag.span(document.currency, data: { document_lines_target: "rateCurrency" }), " in #{home}" ]), class: "tc-label" %>
-      <%= form.text_field :exchange_rate, value: document.exchange_rate&.to_s("F"), inputmode: "decimal", class: "tc-input tc-num", placeholder: "The day's rate" %>
+      <%= form.text_field :exchange_rate, value: tc_number(document.exchange_rate), inputmode: "decimal", class: "tc-input tc-num", placeholder: "The day's rate" %>
       <p class="tc-hint">Left blank, the date's rate is looked up, if there is one.</p>
     </div>
     <% if document.credit? %>

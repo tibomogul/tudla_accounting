@@ -29,9 +29,9 @@ module TudlaAccounting
       link_to(record.title, record.is_a?(Document) ? document_path(record) : payment_path(record), class: "underline")
     end
 
-    # "1" for 1.0000, "2.5" for 2.5000.
+    # "1" for 1.0000, "2.5" for 2.5000 ("2,5" in comma books).
     def document_quantity(quantity)
-      quantity.to_d.to_s("F").sub(/\.?0+\z/, "")
+      tc_number(quantity)
     end
 
     # An amount, marked with its currency when that isn't the organization's.

@@ -40,4 +40,32 @@ RSpec.describe TudlaAccounting::AmountParser do
         .to eq([ "-1234567.89", "1234.50", "1234", "1.234" ])
     end
   end
+
+  # As a page in comma books (or a currency with other marks) reads and fills its fields.
+  describe "in another number format" do
+    let(:comma) { TudlaAccounting::NumberFormat::STYLES.fetch(:comma) }
+
+    it "reads that format's marks only, saying how to write a number it can't read" do
+      { "1.234.567,89" => "1234567.89", "1234,5" => "1234.5", "(5,00)" => "-5", "-,5" => "-0.5", "1.000" => "1000" }.each do |typed, number|
+        expect(described_class.decimal(typed, format: comma)).to eq(BigDecimal(number)), typed
+      end
+      %w[1,234.50 1.5 12.34,5].each do |typed|
+        expect { described_class.decimal(typed, format: comma) }.to raise_error(ArgumentError, "#{typed} isn't a number, written like 1.234,56"), typed
+      end
+      expect(described_class.cents("1.234,50", "EUR", format: comma)).to eq(1_234_50)
+      expect { described_class.cents("1234.50", "EUR", format: comma) }.to raise_error(ArgumentError, "1234.50 isn't an amount, written like 1.234,56")
+
+      swiss = TudlaAccounting::NumberFormat.of_currency("CHF")
+      expect(described_class.decimal("1'234.5", format: swiss)).to eq(BigDecimal("1234.5"))
+      plain = TudlaAccounting::NumberFormat.new(decimal_mark: ",", thousands_separator: "")
+      expect(described_class.decimal("1234,5", format: plain)).to eq(BigDecimal("1234.5"))
+      expect { described_class.decimal("1.234,5", format: plain) }.to raise_error(ArgumentError)
+    end
+
+    it "writes amounts and other numbers as it reads them back" do
+      expect(described_class.text(Money.new(-1_234_567_89, "EUR"), format: comma)).to eq("-1234567,89")
+      expect([ BigDecimal("2.5000"), BigDecimal("10"), BigDecimal("0.6125") ].map { |number| described_class.number_text(number, format: comma) }).to eq(%w[2,5 10 0,6125])
+      expect(described_class.number_text(BigDecimal("100"))).to eq("100")
+    end
+  end
 end

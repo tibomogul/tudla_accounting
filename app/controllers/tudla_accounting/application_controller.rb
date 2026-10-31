@@ -76,10 +76,11 @@ module TudlaAccounting
       redirect_to fallback, alert: "#{e.message}."
     end
 
-    # Cents for a typed amount ("1,234.50"; see AmountParser), nil when blank; yields what
-    # is wrong with it ("lots isn't an amount", too many decimal places) when it can't be read.
+    # Cents for a typed amount ("1,234.50", or "1.234,50" in comma books; see AmountParser),
+    # nil when blank; yields what is wrong with it ("lots isn't an amount", too many decimal
+    # places) when it can't be read.
     def amount_cents(text, currency)
-      AmountParser.cents(text, currency)
+      AmountParser.cents(text, currency, format: number_format)
     rescue ArgumentError => e
       yield e.message
       nil
@@ -88,10 +89,15 @@ module TudlaAccounting
     # A typed number that isn't an amount (a quantity, an exchange rate: "1,000", "1.65"),
     # nil when blank; yields when it isn't a number.
     def typed_decimal(text)
-      AmountParser.decimal(text)
+      AmountParser.decimal(text, format: number_format)
     rescue ArgumentError => e
       yield e.message
       nil
+    end
+
+    # How the organization's pages write numbers, and so read them (NumberFormat).
+    def number_format
+      @number_format ||= NumberFormat.for(accounting_organization || TudlaAccounting.configuration.base_currency)
     end
 
     # The dimension values chosen on a form's line (dimensions: dimension id => value id),

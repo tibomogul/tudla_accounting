@@ -25,13 +25,14 @@ module TudlaAccounting
 
     scope :active, -> { where(active: true) }
 
-    # The rate as a percentage, for forms: 10 for 0.1.
+    # The rate as a percentage, for forms and labels, in the organization's number format:
+    # "10" for 0.1, "12.5" (or "12,5") for 0.125.
     def rate_percent
-      rate && (rate * 100).to_s("F").sub(/\.0\z/, "")
+      rate && AmountParser.number_text(rate * 100, format: number_format)
     end
 
     def rate_percent=(percent)
-      self.rate = AmountParser.decimal(percent)&./(100)
+      self.rate = AmountParser.decimal(percent, format: number_format)&./(100)
     rescue ArgumentError
       self.rate = nil
       @unreadable_rate = percent
@@ -44,6 +45,8 @@ module TudlaAccounting
       tax = inclusive ? amount * rate / (1 + rate) : amount * rate
       tax.round(0, TudlaAccounting.configuration.rounding).to_i
     end
+
+    def number_format = organization ? NumberFormat.for(organization) : AmountParser::POINT
 
     # "GST (10%)"
     def label

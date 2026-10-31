@@ -18,7 +18,7 @@
 <div class="mb-4 flex flex-wrap items-center gap-3 text-sm">
   <%= payment_status_badge(@payment) %>
   <% if @payment.entry %><span class="tc-muted">Posted as <%= link_to entry_title(@payment.entry), entry_path(@payment.entry), class: "underline" %></span><% end %>
-  <% if @payment.foreign? %><span class="tc-muted" data-exchange-rate>In <%= @payment.currency %> at <%= @payment.exchange_rate.to_s("F") %> <%= accounting_organization.currency %>: <%= tc_money(Money.new(@payment.in_base_cents(@payment.amount_cents), accounting_organization.currency)) %> <%= accounting_organization.currency %> posted</span><% end %>
+  <% if @payment.foreign? %><span class="tc-muted" data-exchange-rate>In <%= @payment.currency %> at <%= tc_number(@payment.exchange_rate) %> <%= accounting_organization.currency %>: <%= tc_money(Money.new(@payment.in_base_cents(@payment.amount_cents), accounting_organization.currency)) %> <%= accounting_organization.currency %> posted</span><% end %>
   <% if @payment.void? %><span class="tc-muted">Voided <%= tc_date(@payment.voided_on) %><%= ": “#{@payment.void_reason}”" if @payment.void_reason %></span><% end %>
 </div>
 
