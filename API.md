@@ -136,6 +136,24 @@ end
 
 `unapplied` is the credit the contact still has from it. An application taken off again (the payment voided, say) has `"active": false`. What was refunded of it is listed in `applied` with the refund's `payment_id`. A refund has `refund_of`, `{ "payment_id": 5 }` or `{ "document_id": 9 }` (a credit note), and nothing `applied` or `unapplied`.
 
+### Recurring invoices
+
+`GET /recurring_invoices`: by name. Filters: `contact_id`, `active`, `updated_since`.
+
+`GET /recurring_invoices/:id`
+
+```json
+{ "id": 2, "name": "Retainer", "contact": { "id": 3, "name": "Northwind" }, "reference": "PO 9", "notes": null, "tax_inclusive": false,
+  "due_days": null, "issue": "draft", "frequency": "monthly", "interval": 1, "day_of_month": 1, "schedule": "Every month on the 1st",
+  "starts_on": "2026-05-01", "ends_on": null, "occurrences_limit": null, "occurrences_count": 0, "next_on": "2026-05-01", "active": true,
+  "last_problem": null, "currency": "AUD", "total": "220.00",
+  "lines": [ { "description": "Support", "quantity": "2.0", "unit_price": "100.00", "amount": "200.00", "account_code": "4000", "tax_code": "GST",
+               "dimensions": { "DEPT": "SYD" } } ],
+  "created_at": "...", "updated_at": "..." }
+```
+
+`issue` is what it does with each invoice it makes: `draft` (to check and approve), `approve`, or `email` (approve and email it to the customer). `day_of_month` is null for the month's last day. `next_on` is when it next makes one, null once its schedule has run out. `total` is each invoice's, tax included, in the organization's currency (recurring invoices are in it). `last_problem` is why its last invoice couldn't be approved or emailed, if it couldn't.
+
 ### Tax codes and periods
 
 `GET /tax_codes`: `{ "id", "code", "name", "kind" (sales or purchases), "rate" ("0.1" for 10%), "account_code", "active" }`.
@@ -146,7 +164,7 @@ end
 
 ### Idempotency
 
-`POST /entries`, `POST /documents` and `POST /payments` take an `Idempotency-Key` header (up to 200 characters; an order number, a UUID): a request with a key an earlier one used gets what that one made, `200` with `Idempotent-Replayed: true`, instead of making it again, so a request can be retried safely after a timeout. The key is kept with what was made, for good, and it is the key that counts, not the body: use a new key for a new thing.
+`POST /entries`, `POST /documents`, `POST /payments` and `POST /recurring_invoices/:id/make` take an `Idempotency-Key` header (up to 200 characters; an order number, a UUID): a request with a key an earlier one used gets what that one made, `200` with `Idempotent-Replayed: true`, instead of making it again, so a request can be retried safely after a timeout. The key is kept with what was made, for good, and it is the key that counts, not the body: use a new key for a new thing.
 
 ```
 POST /tudla_accounting/api/v1/entries
@@ -212,6 +230,12 @@ A refund pays a credit back: `kind` `refund` (money back to a customer) or `supp
 ```
 
 `POST /payments/:id/apply` and `POST /documents/:id/apply` (a credit note; `post`) apply what is left of a payment or credit note to one of the contact's open invoices or bills, `document_id`, all it can or `amount` (in the invoice's currency), on `on` (today by default). They answer with the payment or credit note.
+
+### Recurring invoices
+
+`POST /recurring_invoices` and `PATCH /recurring_invoices/:id` (`record`) take `name`, `contact_id`, `reference`, `notes`, `tax_inclusive`, `due_days` (days after its date it falls due; the customer's payment terms when null), `issue`, the schedule (`frequency`: weekly, monthly or yearly; `interval`, every so many of them, 1 by default; `day_of_month`, 1 to 31, or `"last"` or null for the month's last day; `starts_on`; `ends_on` and `occurrences_limit`, when it stops, both optional) and `active`, and `lines` as an invoice's. A `PATCH` changes only the fields sent, and with `lines`, all its lines. One whose `issue` is set to `approve` or `email` needs `post` too. `DELETE /recurring_invoices/:id` (`record`) deletes one (`204`); the invoices it made stay.
+
+`POST /recurring_invoices/run` (`post`) makes the invoices due by today, as the scheduled job does, approving and emailing them as each says: `{ "data": { "invoices": [ ... ], "emailed_ids": [ 7 ], "problems": [ "Retainer: 1 May 2026: ..." ] } }`, the invoices as `GET /documents/:id` gives them. `POST /recurring_invoices/:id/make` (`record`) makes a draft from one for `on` (a date; today by default), apart from its schedule, and answers with it.
 
 ## Reports
 

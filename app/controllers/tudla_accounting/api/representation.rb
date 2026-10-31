@@ -70,6 +70,25 @@ module TudlaAccounting
         end
       end
 
+      # Its schedule (day_of_month null for the month's last day), what it makes (issue:
+      # draft, approve or email) and when it next does (next_on, null once it has run out).
+      def recurring_invoice_json(template)
+        values = DimensionValue.where(id: template.lines.flat_map(&:dimension_value_ids)).includes(:dimension).index_by(&:id)
+        currency = template.organization.currency
+        { id: template.id, name: template.name, contact: { id: template.contact_id, name: template.contact.name }, reference: template.reference,
+          notes: template.notes, tax_inclusive: template.tax_inclusive?, due_days: template.due_days, issue: template.issue,
+          frequency: template.frequency, interval: template.interval, day_of_month: template.day_of_month, schedule: template.schedule_label,
+          starts_on: date(template.starts_on), ends_on: date(template.ends_on), occurrences_limit: template.occurrences_limit,
+          occurrences_count: template.occurrences_count, next_on: date(template.next_on), active: template.active?, last_problem: template.last_problem,
+          currency: currency, total: amount(template.total),
+          lines: template.lines.map do |line|
+            { description: line.description, quantity: line.quantity.to_s("F"), unit_price: amount(line.unit_price), amount: amount(line.amount),
+              account_code: line.account.code, tax_code: line.tax_code&.code,
+              dimensions: line.dimension_value_ids.filter_map { |id| values[id] }.to_h { |value| [ value.dimension.code, value.code ] } }
+          end,
+          created_at: time(template.created_at), updated_at: time(template.updated_at) }
+      end
+
       def payment_json(payment)
         { id: payment.id, kind: payment.kind, status: payment.status, contact: { id: payment.contact_id, name: payment.contact.name },
           account_code: payment.account.code, paid_on: date(payment.paid_on), currency: payment.currency,

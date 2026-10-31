@@ -26,6 +26,10 @@ TudlaAccounting::Engine.routes.draw do
         member { post :void }
         post :apply, on: :member, to: "applications#create", defaults: { credit: "payment" }
       end
+      resources :recurring_invoices, only: %i[index show create update destroy] do
+        post :run, on: :collection
+        post :make, on: :member
+      end
       resources :tax_codes, only: :index
       resources :periods, only: :index
       get "reports/:report", to: "reports#show", as: :report

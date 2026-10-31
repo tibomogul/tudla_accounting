@@ -59,7 +59,7 @@ module TudlaAccounting
         # Reverses a posted entry on `on` (a date; today by default), returning the reversal.
         def reverse
           entry = organization_scope(Entry).find(params[:id])
-          reversal = entry.reverse!(on: date_param(:on) || ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].today)
+          reversal = entry.reverse!(on: date_param(:on) || today)
           render json: { data: entry_json(reversal.reload) }, status: :created
         end
 

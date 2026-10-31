@@ -188,6 +188,11 @@ module TudlaAccounting
           raise ArgumentError, "#{name} must be an ISO 8601 time"
         end
 
+        # Today in the books' time zone.
+        def today
+          ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].today
+        end
+
         def day_start(date)
           ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].local(date.year, date.month, date.day)
         end
