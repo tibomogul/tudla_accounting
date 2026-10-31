@@ -30,6 +30,8 @@ TudlaAccounting::Engine.routes.draw do
         post :run, on: :collection
         post :make, on: :member
       end
+      get "pay_run", to: "pay_runs#show"
+      resources :pay_runs, only: :create
       resources :tax_codes, only: :index
       resources :periods, only: :index
       get "reports/:report", to: "reports#show", as: :report

@@ -11,8 +11,10 @@ module TudlaAccounting
   #   # => #<Result payments=[...] emailed=[...] no_address=[...]>
   #
   # Amounts are in the account's currency, and so must the bills be; a foreign account's
-  # payments are at exchange_rate (the date's when not given). PayRun.due lists the bills
-  # it could pay: approved, with something still owed, in a currency, due by a date.
+  # payments are at exchange_rate (the date's when not given). With an idempotency_key,
+  # each supplier's payment is keyed "<key>:<supplier id>", so the run is made only once.
+  # PayRun.due lists the bills it could pay: approved, with something still owed, in a
+  # currency, due by a date.
   class PayRun
     Result = Struct.new(:payments, :emailed, :no_address, keyword_init: true)
 
@@ -28,7 +30,7 @@ module TudlaAccounting
            .sort_by { |bill| [ bill.contact.name.downcase, bill.contact_id, bill.due_on || Date::Infinity.new, bill.id ] }
     end
 
-    def initialize(organization:, account:, paid_on:, bills:, reference: nil, exchange_rate: nil, email: false)
+    def initialize(organization:, account:, paid_on:, bills:, reference: nil, exchange_rate: nil, email: false, idempotency_key: nil)
       @organization = organization
       @account = account
       @paid_on = paid_on
@@ -36,6 +38,7 @@ module TudlaAccounting
       @reference = reference
       @exchange_rate = exchange_rate
       @email = email
+      @idempotency_key = idempotency_key
     end
 
     def call
@@ -53,7 +56,8 @@ module TudlaAccounting
 
     def pay(supplier, bills)
       Payment.record!(organization: @organization, kind: "paid", contact: supplier, account: @account, paid_on: @paid_on, reference: @reference,
-                      exchange_rate: @exchange_rate, amount_cents: bills.sum { |bill| bill.fetch(:amount_cents) }, applications: bills)
+                      exchange_rate: @exchange_rate, amount_cents: bills.sum { |bill| bill.fetch(:amount_cents) }, applications: bills,
+                      idempotency_key: (@idempotency_key && "#{@idempotency_key}:#{supplier.id}"))
     rescue ArgumentError => e
       raise ArgumentError, "#{supplier.name}: #{e.message.downcase_first}"
     end

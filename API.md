@@ -154,6 +154,16 @@ end
 
 `issue` is what it does with each invoice it makes: `draft` (to check and approve), `approve`, or `email` (approve and email it to the customer). `day_of_month` is null for the month's last day. `next_on` is when it next makes one, null once its schedule has run out. `total` is each invoice's, tax included, in the organization's currency (recurring invoices are in it). `last_problem` is why its last invoice couldn't be approved or emailed, if it couldn't.
 
+### The pay run
+
+`GET /pay_run?account_code=1000`: the approved bills with something owed that a pay run from that bank account could pay, in its currency, by supplier then due date. Filters: `due_by` (a date; all of them without it) and `contact_id` (one supplier's).
+
+```json
+{ "data": { "account_code": "1000", "currency": "AUD",
+            "bills": [ { "document_id": 12, "number": "BILL-0004", "reference": "INV 881", "contact": { "id": 5, "name": "Cloudware" },
+                         "issued_on": "2026-04-01", "due_on": "2026-04-20", "total": "110.00", "amount_due": "110.00" } ] } }
+```
+
 ### Tax codes and periods
 
 `GET /tax_codes`: `{ "id", "code", "name", "kind" (sales or purchases), "rate" ("0.1" for 10%), "account_code", "active" }`.
@@ -164,7 +174,7 @@ end
 
 ### Idempotency
 
-`POST /entries`, `POST /documents`, `POST /payments` and `POST /recurring_invoices/:id/make` take an `Idempotency-Key` header (up to 200 characters; an order number, a UUID): a request with a key an earlier one used gets what that one made, `200` with `Idempotent-Replayed: true`, instead of making it again, so a request can be retried safely after a timeout. The key is kept with what was made, for good, and it is the key that counts, not the body: use a new key for a new thing.
+`POST /entries`, `POST /documents`, `POST /payments`, `POST /pay_runs` and `POST /recurring_invoices/:id/make` take an `Idempotency-Key` header (up to 200 characters; an order number, a UUID): a request with a key an earlier one used gets what that one made, `200` with `Idempotent-Replayed: true`, instead of making it again, so a request can be retried safely after a timeout. The key is kept with what was made, for good, and it is the key that counts, not the body: use a new key for a new thing.
 
 ```
 POST /tudla_accounting/api/v1/entries
@@ -230,6 +240,17 @@ A refund pays a credit back: `kind` `refund` (money back to a customer) or `supp
 ```
 
 `POST /payments/:id/apply` and `POST /documents/:id/apply` (a credit note; `post`) apply what is left of a payment or credit note to one of the contact's open invoices or bills, `document_id`, all it can or `amount` (in the invoice's currency), on `on` (today by default). They answer with the payment or credit note.
+
+### The pay run
+
+`POST /pay_runs` (`post`) pays a batch of bills from one bank account, one payment per supplier for what is paid of each of its bills, all or none:
+
+```json
+{ "account_code": "1000", "paid_on": "2026-04-15", "reference": "Pay run 15 Apr", "email": true,
+  "bills": [ { "document_id": 12 }, { "document_id": 13, "amount": "20.00" } ] }
+```
+
+A bill's `amount` is what is paid of it, all that is owed when not given, in the account's currency (the bills must be in it too); for an account held in another currency than the organization's, `exchange_rate` gives the rate (the day's when not given). With `"email": true` each supplier's payment notice is emailed. It answers `{ "data": { "payments": [ ... ], "emailed_ids": [ 31 ], "no_address_ids": [ 32 ] } }`: the payments as `GET /payments/:id` gives them, and which notices were emailed or not for want of an address. With an `Idempotency-Key`, a retry answers with the payments the first made and the notices emailed (`no_address_ids` empty).
 
 ### Recurring invoices
 
