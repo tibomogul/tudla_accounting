@@ -80,7 +80,7 @@
     </div>
     <div class="rounded-lg border border-[var(--tc-border)] px-4 py-3 sm:text-right" data-amount-due>
       <p class="tc-muted text-sm"><%= statement.closing.negative? ? "In credit" : (statement.type == :receivable ? "Amount due" : "Balance owing") %> at <span class="whitespace-nowrap"><%= tc_date(statement.thru) %></span></p>
-      <p class="text-2xl font-semibold tc-num"><%= currency %> <%= TudlaAccounting::MoneyFormatter.number(statement.closing.abs, currency) %></p>
+      <p class="text-2xl font-semibold tc-num"><%= currency %> <%= TudlaAccounting::MoneyFormatter.number(statement.closing.abs, statement.organization) %></p>
     </div>
   </footer>
 </article>

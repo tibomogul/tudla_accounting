@@ -250,7 +250,7 @@ module TudlaAccounting
     end
 
     def plain(cents)
-      MoneyFormatter.labelled(money(cents), @organization.currency)
+      MoneyFormatter.labelled(money(cents), @organization)
     end
 
     def money(cents)

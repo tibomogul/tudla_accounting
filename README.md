@@ -239,7 +239,7 @@ TudlaAccounting::AmountParser.decimal("1.65")                       # => 1.65, f
 ```
 
 ### Showing amounts
-Amounts are written for people one way (`MoneyFormatter`), in the organization's style: its currency's decimal mark and thousands separator, for amounts in any currency, so a euro amount in Australian books reads `1,234.56` and an Australian dollar amount in euro books `1.234,56`. Tables give the number alone (the currency is in the column heading), with negatives in parentheses. An amount standing alone, in a heading, a message, an error, an email or a document, carries the organization's currency symbol (`$1,234.56`), or for any other currency its code (`USD 1,234.56`), since symbols such as `$` are shared. The PDFs and the forms' live totals follow the same style; CSV, Excel, the JSON API and form fields have plain numbers (`1234.56`, `AmountParser.text`). Views use `tc_money` (in a table) and `tc_money_text` (standing alone).
+Amounts are written for people one way (`MoneyFormatter`), in the organization's style (`NumberFormat.for(organization)`): the `number_format` setting's decimal mark and thousands separator (`:point` for `1,234.56`, `:comma` for `1.234,56`, or a callable choosing per organization), or without it its currency's, for amounts in any currency, so a euro amount in Australian books reads `1,234.56` and an Australian dollar amount in euro books `1.234,56`. Tables give the number alone (the currency is in the column heading), with negatives in parentheses. An amount standing alone, in a heading, a message, an error, an email or a document, carries the organization's currency symbol (`$1,234.56`), or for any other currency its code (`USD 1,234.56`), since symbols such as `$` are shared. The PDFs and the forms' live totals follow the same style; CSV, Excel, the JSON API and form fields have plain numbers (`1234.56`, `AmountParser.text`). Views use `tc_money` (in a table) and `tc_money_text` (standing alone).
 
 ```ruby
 TudlaAccounting::MoneyFormatter.labelled(Money.new(123456, "AUD"), "AUD") # => "$1,234.56"
@@ -565,6 +565,8 @@ TudlaAccounting.configure do |config|
 
   config.base_currency = "USD"
   config.time_zone = "UTC"                # zone PeriodCreator builds periods in; plain Dates are read in it
+  config.number_format = nil              # how pages write numbers: :point (1,234.56), :comma (1.234,56), or
+                                          # ->(organization) { ... } giving either; nil for the currency's own marks
   # Retained earnings, receivables, payables and exchange gains are accounts marked by
   # role in each organization's chart (see account roles), not settings.
   config.cash_account_codes = %w[1010]    # the cash flow statement's default cash, with sub-accounts;

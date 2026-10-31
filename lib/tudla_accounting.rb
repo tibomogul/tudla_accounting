@@ -75,6 +75,7 @@ module TudlaAccounting
                   :attachment_content_types, :attachment_max_size, :document_header,
                   :api_rate_limit, :api_rate_limit_store, :pdf_browser_options, :pdf_paper, :pdf_stylesheet,
                   :document_mailer, :document_mail_from, :document_mail_reply_to
+    attr_reader :number_format
     attr_reader :carrying_amount_sources, :entry_sources, :entry_number_series, :document_number_format, :document_email_templates, :reminder_days
 
     def initialize
@@ -154,6 +155,30 @@ module TudlaAccounting
       # When overdue invoices' customers are reminded: days after the due date (see
       # reminder_days=). None by default.
       @reminder_days = []
+      # How the pages write and read numbers; see number_format=.
+      @number_format = nil
+    end
+
+    NUMBER_FORMATS = %i[point comma].freeze
+
+    # How the pages write numbers, and read those typed into them: :point ("1,234.56") or
+    # :comma ("1.234,56"), or a callable given the organization returning either (or nil).
+    # nil (the default) is the organization's currency's own marks. The JSON API, files and
+    # imports keep "." for decimals whatever it is.
+    def number_format=(format)
+      unless format.nil? || format.respond_to?(:call) || NUMBER_FORMATS.include?(format.to_s.to_sym)
+        raise ArgumentError, "number_format must be :point, :comma, nil or a callable given the organization"
+      end
+
+      @number_format = format.respond_to?(:call) || format.nil? ? format : format.to_sym
+    end
+
+    # An organization's number format: :point, :comma, or nil for its currency's marks.
+    def number_format_for(organization)
+      format = number_format.respond_to?(:call) ? number_format.call(organization) : number_format
+      return if format.blank?
+
+      format.to_s.to_sym.presence_in(NUMBER_FORMATS) or raise ArgumentError, "number_format gave #{format.inspect} for #{organization_label.call(organization)}; expected :point, :comma or nil"
     end
 
     # The days after an invoice's due date at which its customer is emailed a reminder,

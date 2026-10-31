@@ -65,7 +65,7 @@ module TudlaAccounting
         @errors << "#{account.code_with_name}: #{e.message}"
       end
       if @errors.empty? && !balanced?
-        @errors << "Debits (#{MoneyFormatter.number(total(:debit), currency)}) and credits (#{MoneyFormatter.number(total(:credit), currency)}) don't balance, in #{currency}"
+        @errors << "Debits (#{MoneyFormatter.number(total(:debit), organization)}) and credits (#{MoneyFormatter.number(total(:credit), organization)}) don't balance, in #{currency}"
       end
       return false if @errors.any?
 

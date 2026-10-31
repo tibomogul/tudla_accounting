@@ -26,6 +26,23 @@ RSpec.describe TudlaAccounting::Configuration do
     end
   end
 
+  describe "#number_format" do
+    it "is a style, a callable giving one for the organization, or nil for its currency's marks" do
+      expect(config.number_format_for(:any)).to be_nil
+      config.number_format = "comma"
+      expect(config.number_format_for(:any)).to eq(:comma)
+      config.number_format = ->(org) { org == :acme ? "point" : nil }
+      expect([ config.number_format_for(:acme), config.number_format_for(:other) ]).to eq([ :point, nil ])
+    end
+
+    it "refuses any other" do
+      expect { config.number_format = :space }.to raise_error(ArgumentError, "number_format must be :point, :comma, nil or a callable given the organization")
+      config.number_format = ->(_org) { :space }
+      config.organization_label = ->(org) { org.to_s.capitalize }
+      expect { config.number_format_for(:acme) }.to raise_error(ArgumentError, "number_format gave :space for Acme; expected :point, :comma or nil")
+    end
+  end
+
   describe "#cash_account_codes_for" do
     it "gives the list, or what a callable returns for the organization" do
       config.cash_account_codes = "1010"

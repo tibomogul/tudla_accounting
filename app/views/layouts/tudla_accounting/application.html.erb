@@ -25,8 +25,8 @@
     })();
   </script>
 </head>
-<% home = Money::Currency.wrap(accounting_organization&.currency || TudlaAccounting.configuration.base_currency) %>
-<body class="tc-app" data-tc-decimal-mark="<%= home.decimal_mark %>" data-tc-thousands-separator="<%= home.thousands_separator %>">
+<% marks = TudlaAccounting::NumberFormat.for(accounting_organization || TudlaAccounting.configuration.base_currency) %>
+<body class="tc-app" data-tc-decimal-mark="<%= marks.decimal_mark %>" data-tc-thousands-separator="<%= marks.thousands_separator %>">
   <header class="border-b border-[var(--tc-border)] bg-[var(--tc-surface)] print:hidden">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-3">
       <div class="flex items-center gap-3">

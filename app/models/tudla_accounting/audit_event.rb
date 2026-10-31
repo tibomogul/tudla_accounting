@@ -36,7 +36,7 @@ module TudlaAccounting
       when Account then object.code_with_name
       when RecurringEntry, RecurringInvoice, BankRule, TaxReturnForm then object.name
       when Document then object.label
-      when Payment then "#{object.title} of #{MoneyFormatter.labelled(object.amount, object.organization.currency)}"
+      when Payment then "#{object.title} of #{MoneyFormatter.labelled(object.amount, object.organization)}"
       when ApiToken then "API token #{object.name}"
       when Period, Budget, FiledTaxReturn, Allocation, TaxCode, BankStatementLine, Dimension, DimensionValue then object.label
       else

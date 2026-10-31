@@ -16,19 +16,20 @@ module TudlaAccounting
     def tc_money(money)
       return "" if money.nil?
 
-      text = MoneyFormatter.number(money.abs, tc_home_currency(money))
+      text = MoneyFormatter.number(money.abs, tc_money_style(money))
       money.negative? ? tag.span("(#{text})", class: "tc-negative") : text
     end
 
     # An amount standing alone, in a heading, a badge or a message: "$1,234.56" in the
     # organization's currency, "EUR 1,234.56" in another (MoneyFormatter.labelled).
     def tc_money_text(money)
-      money && MoneyFormatter.labelled(money, tc_home_currency(money))
+      money && MoneyFormatter.labelled(money, tc_money_style(money))
     end
 
-    # The currency whose style amounts are written in: the organization's.
-    def tc_home_currency(money)
-      respond_to?(:accounting_organization) ? accounting_organization.currency : money.currency
+    # Whose style amounts are written in: the organization's (its number format), or
+    # without one the amount's currency's.
+    def tc_money_style(money)
+      (accounting_organization if respond_to?(:accounting_organization)) || money.currency
     end
 
     # An amount as a form field holds it: "1234.50", with "." for decimals and no thousands

@@ -183,7 +183,7 @@ module TudlaAccounting
     private
 
     def money(cents) = Money.new(cents, currency)
-    def text(money) = MoneyFormatter.labelled(money, organization.currency)
+    def text(money) = MoneyFormatter.labelled(money, organization)
 
     def check_applications(applications)
       wanted = sales? ? "sales_invoice" : "bill"
