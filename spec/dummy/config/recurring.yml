@@ -25,6 +25,10 @@ production:
   tudla_accounting_reminders:
     class: TudlaAccounting::SendRemindersJob
     schedule: every day at 9am
+  # Books in pesos with BspForexRateProvider: stores the day's BSP bulletin (see TudlaAccounting::BspRatesJob).
+  # tudla_accounting_bsp_rates:
+  #   class: TudlaAccounting::BspRatesJob
+  #   schedule: every weekday at 11am Asia/Manila
 
 development:
   tudla_accounting_recurring_entries:

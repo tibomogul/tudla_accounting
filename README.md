@@ -389,6 +389,7 @@ Each line's `amount` is a currency code and a number (`"USD 1100.00"`, `"USD -1,
 ### Foreign exchange
 - **`ForexRateRetriever.call(from:, to:, date:)`** returns how many `to` one `from` was worth on a date. Rates are cached in `ForexRate`, and missing ones come from `forex_rate_provider`.
 - **`RbaForexRateProvider`** reads the Reserve Bank of Australia's published rates. It needs the `spreadsheet` gem in the host app and network access. A weekend or holiday uses the latest earlier business day.
+- **`BspForexRateProvider`** reads the Bangko Sentral ng Pilipinas' rates, for books in pesos (any two currencies it quotes cross through the peso). It reads the day's Reference Exchange Rate Bulletin (32 currencies), the daily peso–dollar rates and the daily cross rates (31 currencies since 1978, which the BSP updates about monthly), with network access to bsp.gov.ph and no extra gem. A weekend or holiday uses the latest earlier business day; a file it can't download is logged and gives no rate, so the forms ask for one. Schedule **`BspRatesJob`** each business day after the bulletin is out (mid-morning, Manila time) to keep every currency's rate for the weeks before the cross rates catch up; without it, only the dollar has those days.
 - **`ForexGainOrLossCalculator`** gives the gain or loss on a foreign amount of a receivable or payable between its booked rate and a date's rate.
 - **Settlement at a different rate.** When a foreign-currency payment or credit is applied to a foreign-currency invoice or bill, its carrying amount goes down by the book value of the foreign amount, at the rate it was booked at. The difference from the credit's own value for that foreign amount is posted as a realized exchange gain or loss to the account marked `realized_fx_gain`, dated with the allocation (and reversed if the allocation is taken off). Each part payment books its own share, and the final one books what remains, so the receivable or payable ends at zero. An overpayment books a gain or loss only on what was owed, and leaves the extra as a credit in the foreign currency. Without that account, the carrying amount is still correct, but the difference stays on the receivable or payable account and a warning is logged.
 - **`RevaluationEntryGenerator.call(organization, period_end, next_period_start)`** revalues open foreign-currency receivables and payables at the period-end rate. It posts the unrealized gain or loss to the account marked `unrealized_fx_gain` (needed only when there's something to revalue), then posts a reversal on the next period's start, so the later settlement isn't double-counted. Running it twice for the same date does nothing more.
@@ -620,7 +621,7 @@ TudlaAccounting.configure do |config|
 
   # Foreign exchange: where missing rates come from (gains and losses go to the accounts
   # marked unrealized_fx_gain and realized_fx_gain)
-  config.forex_rate_provider = TudlaAccounting::RbaForexRateProvider.new # or any ->(from:, to:, date:) { rate }
+  config.forex_rate_provider = TudlaAccounting::RbaForexRateProvider.new # BspForexRateProvider.new for pesos, or any ->(from:, to:, date:) { rate }
 end
 ```
 
