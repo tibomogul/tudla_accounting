@@ -23,6 +23,10 @@ docker compose exec -d rails bash -lc 'bin/dev'                                 
 
 > **Note:** Always prefix `bundle exec rspec` with `RAILS_ENV=test`. The container has `RAILS_ENV=development` set in its environment, which overrides the `||=` default in `rails_helper.rb`.
 
+- **Restart the dev server after editing `lib/`** (e.g. `lib/tudla_accounting.rb`, where the configuration lives): it isn't reloaded, so pages fail with `undefined method` for a new setting. Stop it by PID (`docker compose exec -T rails ps -eo pid,args`, then `kill -TERM` puma, the solid-queue supervisor and the tailwind watcher); `pkill -f <pattern>` inside `bash -lc '...'` matches and kills its own shell. Then `rm -f spec/dummy/tmp/pids/server.pid` and start `bin/dev` again.
+- `bin/setup --reset` fails while the dev server runs (it holds the queue DB); stop the server first.
+- After a migration, `db:migrate` rewrites every `check_constraint` string in `spec/dummy/db/schema.rb` (PostgreSQL's canonical form). Revert the file and hand-edit only the version and the new column/table, then rebuild the test DB (see Testing Gotchas).
+
 ## Architecture
 
 This is a **Rails engine gem** (not a standalone app). All application code lives under the `TudlaAccounting::` namespace via `isolate_namespace TudlaAccounting` in `lib/tudla_accounting/engine.rb`.
@@ -64,14 +68,33 @@ docker compose exec rails bash -lc 'RAILS_ENV=test bin/rails db:migrate'        
 
 Why: Rails 8.1 does **not** auto-append engine migration paths to the host app's paths. The engine root's `bin/rails` (with `ENGINE_PATH` set) is the only context where both `db/migrate/` and `spec/dummy/db/migrate/` are visible together. Running `bin/rails db:migrate` from `spec/dummy/` will silently skip the engine migrations.
 
+### Money: one way in, one way out
+
+- **Reading:** every typed or given amount goes through `AmountParser` (`cents`, `decimal`); never `to_f`, `BigDecimal()` or `Money.from_amount` on raw input. Controllers use `amount_cents`/`typed_decimal` (`ApplicationController`), the API `cents`/`decimal` (`Api::V1::BaseController`); imports pass `round: true`.
+- **Number format:** the pages read and write numbers in the organization's `NumberFormat` (`config.number_format`: `:point`, `:comma`, or nil for the home currency's marks), one style only. The JSON API, CSV/Excel files and imports always use `.`.
+- **Writing:** views use `tc_money` (table columns) / `tc_money_text` (standalone, with symbol or code); services use `MoneyFormatter.number`/`labelled` with the organization. Form fields are filled with `tc_amount_field` (amounts) and `tc_number` (quantities, rates, percentages), with no thousands separators, so a form saved unchanged reads back the same. `AmountParser.text` writes amounts for files and `Entry.create_from_ruby_hash`.
+- The forms' live totals (`app/javascript/tudla_accounting/amounts.js`) read the marks from `<body data-tc-decimal-mark data-tc-thousands-separator>`.
+
+### Accounts and posting
+
+- Only leaf accounts take postings: an account with sub-accounts is refused by the model (`Account#posting_blocker`) and by DB triggers (`DatabaseProtection`). Forms offer only postable accounts. `OwnPostingsMover` moves an old parent's own lines down; `bin/rails tudla_accounting:balances:check` warns about them.
+- Balances roll up through the account tree and the period tree (`BalancePoster`, `BalanceRebuilder`); a parent's balance must always equal the sum beneath it.
+- Giving an account the receivable or payable role creates a home-currency sub-account `"<code>-<currency>"` (e.g. `1100-USD`), and foreign currencies get their own; postings go to these via `Account.for_role_in_currency!`, never to the role account itself.
+
+### JSON API
+
+Controllers in `app/controllers/tudla_accounting/api/v1/` build on `BaseController` (`body`, `cents`, `decimal`, `account_by_code`, `contact_by_id`, `date_param`, `render_page`, `require_permission!`, the `permits` DSL) and `Representation` (`*_json`). Creating endpoints honour an `Idempotency-Key` header (`replay` / `render_made`; the key is stored on the record). Document every endpoint in `API.md`.
+
 ### Ancestry
 
 `has_ancestry` must specify `ancestry_format: :materialized_path2` whenever the migration declares `null: false, default: "/"` on the ancestry column. The ancestry 5.x default format is `:materialized_path`, which uses `nil` for the root and crashes against a NOT NULL column.
 
 ## Testing Gotchas
 
-- The accounts the engine treats specially are marked by `role` on the account (`Account::ROLES`), not by settings. Specs using `"with entry source models"` must mark their receivable and payable accounts themselves (`role: "receivable"` on 1100, `role: "payable"` on 2100, by convention), and give the retained earnings or exchange gain accounts their roles when they need them. Roles change only through `AccountRoleAssigner` (`save`, or `save!` to raise); a plain `update(role:)` is refused. The account factory's `role:` goes through it after create, and `Account.create!(role:)` doesn't work. Changing retained earnings on books with balances rebuilds them (`BalanceRebuilder#rebuild!`) in the same transaction
+- The accounts the engine treats specially are marked by `role` on the account (`Account::ROLES`), not by settings. Specs using `"with entry source models"` must mark their receivable and payable accounts themselves (`role: "receivable"` on 1100, `role: "payable"` on 2100, by convention; each then gets a home-currency sub-account such as `1100-USD`, which is where lines post), and give the retained earnings or exchange gain accounts their roles when they need them. Roles change only through `AccountRoleAssigner` (`save`, or `save!` to raise); a plain `update(role:)` is refused. The account factory's `role:` goes through it after create, and `Account.create!(role:)` doesn't work. Changing retained earnings on books with balances rebuilds them (`BalanceRebuilder#rebuild!`) in the same transaction
 - `USAGE.md` is tested: `spec/integration/usage_guide_spec.rb` runs its ```ruby blocks in order as one console session (picking them by the heading they're under, and running its `bin/rails tudla_accounting:*` lines as rake tasks), and `spec/system/usage_guide_spec.rb` follows its UI steps by the labels it names. Keep every Ruby block runnable after the ones before it (write alternatives as comments), and update both specs when a heading or a UI label changes
+- Specs that change `TudlaAccounting.configuration` must `include_context "with isolated TudlaAccounting configuration"` (`spec/support/configuration.rb`), which restores it afterwards
+- In API request specs, send no JSON body with a GET (`params: (body.to_json unless method == :get)`): a body replaces the query string
 - Use `stub_const` for inline job classes in specs (Solid Queue requires named classes)
 - SolidCache hashes keys internally — don't query the DB by raw key name
 - Use `TudlaAccounting::Engine.routes.url_helpers` for engine route helpers in specs
@@ -83,7 +106,7 @@ Why: Rails 8.1 does **not** auto-append engine migration paths to the host app's
 
 ## Performance
 
-`perf/benchmark.rb` (run with `bin/rails runner`, `ENTRIES=` to size it) times posting and every report/page with SQL query counts against a generated organization in the dev database, and verifies balances with `BalanceRebuilder`. Rerun it after changing posting (`BalancePoster`), balance reads (`Balance.peek_all`) or report queries; a page's query count shouldn't grow with the number of accounts or rows.
+`perf/benchmark.rb` (run with `bin/rails runner`, `ENTRIES=` to size it) times posting and every report/page with SQL query counts against a generated organization in the dev database, and verifies balances with `BalanceRebuilder`. Rerun it after changing posting (`BalancePoster`), balance reads (`Balance.peek_all`) or report queries; a page's query count shouldn't grow with the number of accounts or rows. `ENTRIES=10000` takes about 13 minutes, so run it in the background.
 
 ## UI Development
 
