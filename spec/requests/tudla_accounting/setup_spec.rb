@@ -114,9 +114,11 @@ RSpec.describe "Setup", type: :request do
         invoice.post(invoice.transacted_at)
       end
 
+      # A month ending today counts, so it can be revalued on its last day.
       it "lists the months that have ended" do
+        latest = Date.current == Date.current.end_of_month ? Date.current : Date.current.prev_month
         get routes.setup_path
-        expect(css_select("#period_id option").first.text).to start_with("#{Date.current.prev_month.strftime('%b %Y')} (")
+        expect(css_select("#period_id option").first.text).to start_with("#{latest.strftime('%b %Y')} (")
       end
 
       it "posts revaluation entries for a month end" do
