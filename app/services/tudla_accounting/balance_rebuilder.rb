@@ -23,6 +23,10 @@ module TudlaAccounting
       def missing? = field == :missing
     end
 
+    # An account with sub-accounts holding amounts of its own: posted lines, or an opening
+    # balance beyond what its sub-accounts' add up to (in cents, on its own side).
+    OwnAmount = Struct.new(:account, :lines, :opening_cents, keyword_init: true)
+
     attr_reader :organization
 
     def initialize(organization)
@@ -54,6 +58,21 @@ module TudlaAccounting
         corrected = fixes.keys.map { |account, _period| account.code }.uniq.sort
         TudlaAccounting::AuditEvent.record!("balances.rebuilt", organization: organization, details: { corrected: fixes.size, accounts: corrected })
         fixes.size
+      end
+    end
+
+    # Accounts with sub-accounts that hold amounts of their own, from books posted before
+    # only accounts without sub-accounts took postings. Their balances still add up, but
+    # what is the parent's own shows on none of its sub-accounts. OwnPostingsMover moves
+    # the lines down; StartingBalanceCreator (overwriting) puts the opening balance there.
+    def own_amounts
+      sub_accounts = @accounts.group_by(&:parent_id)
+      parents = @accounts.select { |account| sub_accounts.key?(account.id) }
+      lines = TudlaAccounting::Detail.joins(:entry).where(account_id: parents.map(&:id)).where.not(tudla_accounting_entries: { posted_at: nil }).group(:account_id).count
+      parents.sort_by(&:code).filter_map do |account|
+        children = sub_accounts.fetch(account.id)
+        opening = openings.fetch(account.id, 0) - children.sum { |child| (child.debit_balance? == account.debit_balance? ? 1 : -1) * openings.fetch(child.id, 0) }
+        OwnAmount.new(account: account, lines: lines.fetch(account.id, 0), opening_cents: opening) if lines.key?(account.id) || opening.nonzero?
       end
     end
 

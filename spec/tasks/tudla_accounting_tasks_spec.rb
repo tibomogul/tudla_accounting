@@ -42,6 +42,22 @@ RSpec.describe "tudla_accounting:balances rake tasks" do
     expect { run(:check) }.to output(/^Balances agree with the posted entries.\n\z/).to_stdout
   end
 
+  # Posted before only accounts without sub-accounts took postings: the balances add up,
+  # so a warning.
+  it "warns about accounts with sub-accounts holding amounts of their own" do
+    ENV["ORGANIZATION"] = "Organization:#{other.id}"
+    cash, capital = %w[1000 3100].map { |code| TudlaAccounting::Account.find_by!(organization: other, code: code) }
+    TudlaAccounting::StartingBalanceCreator.call(other, Date.new(2026, 1, 1), [ { account_id: cash.id, amount_cents: 5_00 }, { account_id: capital.id, amount_cents: 5_00 } ], "USD", true)
+    till = build(:tudla_accounting_account, code: "1010", category: :asset, organization: other, parent: cash)
+    TudlaAccounting::DatabaseProtection.allowing_posted_changes { till.save!(validate: false) }
+
+    expect { run(:check) }.to output(<<~OUTPUT).to_stdout
+      Organization:#{other.id}  warning: no account is marked as the Retained earnings account
+      Organization:#{other.id}  warning: 1000 has sub-accounts but holds 1 posted line(s) and an opening balance of 500 of its own
+      Balances agree with the posted entries.
+    OUTPUT
+  end
+
   # Books without them are allowed, so these are warnings, not failures. Receivables and
   # payables are only expected once a carrying amount source records them.
   context "with invoices recorded as receivables" do

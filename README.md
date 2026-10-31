@@ -269,6 +269,11 @@ bin/rails tudla_accounting:balances:check     # lists differences; exits 1 if th
 bin/rails tudla_accounting:balances:rebuild   # ORGANIZATION=Organization:42 limits either task to one organization
 ```
 
+**Books posted to accounts with sub-accounts.** Before only accounts without sub-accounts took postings, a parent could hold posted lines or an opening balance of its own. Its balances still add up, but that part shows on none of its sub-accounts, and the account can't take postings now. `BalanceRebuilder#own_amounts` lists such accounts (`OwnAmount` with the `account`, its own posted `lines` and its own `opening_cents`), and `balances:check` warns about each without failing. A correcting entry can't fix them, since it would need a line on the parent, so:
+
+- `TudlaAccounting::OwnPostingsMover.call(account, to: sub_account)` moves the account's own posted lines onto one of its sub-accounts (one without sub-accounts of its own, and in the lines' currency when it is held in one), under the posting lock. The account's balances stay as they are, the sub-account's are rebuilt, and `account.postings_moved` goes on the audit trail. Lines in a closed period are refused; reopen it first. Add a sub-account such as "6090 Other expenses" for lines that belong to none of the existing ones.
+- For an opening balance, set it again with `StartingBalanceCreator` in overwrite mode, giving the parent its sub-accounts as `children` that add up to its amount.
+
 ### Database integrity
 The engine's migrations add unique keys (one balance per account and period, account codes per organization, one carrying amount per line, one exchange rate per currency pair and day) and checks (positive line amounts, known tallies, categories and carrying-amount types). On PostgreSQL, triggers also refuse any change to a posted entry or its lines, or their deletion, from anywhere (a console, a job, raw SQL): correct posted entries by reversing them. Touching `updated_at` is allowed. Triggers likewise refuse posting into a closed period or to an account with sub-accounts, a sub-account beneath an account with posted lines of its own, and any change to audit events. Data maintenance that really must change posted rows can run inside `TudlaAccounting::DatabaseProtection.allowing_posted_changes { ... }`, which lifts the protection for that block's transaction only.
 

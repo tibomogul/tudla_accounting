@@ -74,7 +74,7 @@ RSpec.describe "Accounts that take postings", type: :request do
     draft.details.build(account: account("1010"), tally: :credit, amount_cents: 500, currency: "AUD", organization: organization)
     draft.save!
     contact = TudlaAccounting::Contact.create!(organization: organization, name: "Cabs", kind: "supplier", default_account: travel)
-    TudlaAccounting::Account.create!(organization: organization, code: "6510", name: "Taxis", category: :expense, parent: travel)
+    TudlaAccounting::Account.create!(organization: organization, code: "6510", name: "Taxis", category: :expense, currency: nil, parent: travel)
 
     get routes.edit_entry_path(draft)
     expect(options("tbody[data-entry-lines-target=lines] select[name$='[account_id]']")).to include("6500 - Travel (has sub-accounts)", "6510 - Taxis")
@@ -83,6 +83,20 @@ RSpec.describe "Accounts that take postings", type: :request do
 
     post routes.post_entry_path(draft)
     expect(flash[:alert]).to start_with("The entry could not be posted: 6500 - Travel has sub-accounts (6510), so it can't take postings; use one of them")
+  end
+
+  it "shows lines moved off an account with sub-accounts in the activity" do
+    travel = TudlaAccounting::Account.create!(organization: organization, code: "6500", name: "Travel", category: :expense)
+    entry = build(:tudla_accounting_entry, organization: organization, particulars: "Taxi", transacted_at: Time.zone.local(2026, 2, 10))
+    entry.details.build(account: travel, tally: :debit, amount_cents: 500, currency: "AUD", organization: organization)
+    entry.details.build(account: account("1010"), tally: :credit, amount_cents: 500, currency: "AUD", organization: organization)
+    entry.tap(&:save!).post(entry.transacted_at)
+    taxis = build(:tudla_accounting_account, organization: organization, code: "6510", name: "Taxis", category: :expense, currency: nil, parent: travel)
+    TudlaAccounting::DatabaseProtection.allowing_posted_changes { taxis.save!(validate: false) }
+    TudlaAccounting::OwnPostingsMover.call(travel, to: taxis)
+
+    get routes.activity_path
+    expect(response.body).to include("Moved 1 posted line from <a class=\"underline\" href=\"#{routes.account_path(travel)}\">6500 - Travel</a> to 6510")
   end
 
   it "refuses an invoice line on an account with sub-accounts" do

@@ -26,6 +26,7 @@ module TudlaAccounting
       when "account.deactivated"
         safe_join([ "Made ", subject, " inactive", (" with #{details['sub_accounts'].to_sentence}" if details["sub_accounts"].present?) ].compact)
       when "account.reactivated" then safe_join([ "Reactivated ", subject ])
+      when "account.postings_moved" then safe_join([ "Moved #{pluralize(details['lines'], 'posted line')} from ", subject, " to #{details['to']}" ])
       when "period.created" then safe_join([ "Created the financial year ", subject ])
       when "period.deleted" then safe_join([ "Deleted the financial year ", subject ])
       when "period.closed" then safe_join([ "Closed ", subject ])

@@ -407,7 +407,7 @@ bin/rails tudla_accounting:balances:check                              # lists d
 bin/rails tudla_accounting:balances:rebuild ORGANIZATION=Organization:42
 ```
 
-`balances:check` suits a nightly job or CI. A rebuild never touches entries.
+`balances:check` suits a nightly job or CI. A rebuild never touches entries. `balances:check` also warns, without failing, about an account with sub-accounts holding posted lines or an opening balance of its own, as books posted before that was refused can; the [README](README.md#posting-and-balances) says how to move them onto a sub-account.
 
 The books are now ready. Record entries under Entries, or from host records with `TudlaAccounting.create_entry_from_source!` (see the [README](README.md#entries-from-host-app-records)).
 
