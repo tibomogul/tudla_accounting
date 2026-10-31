@@ -20,3 +20,9 @@ TudlaAccounting.configure do |config|
     end
   end
 end
+
+# Made-up USD/EUR rates for any date, for the foreign invoices and payments in both books
+# (set on each reload, as the provider is reloadable demo code).
+Rails.application.config.to_prepare do
+  TudlaAccounting.configuration.forex_rate_provider = Demo::ForexRateProvider.new
+end
