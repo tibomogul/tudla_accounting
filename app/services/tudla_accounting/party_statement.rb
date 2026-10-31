@@ -46,10 +46,23 @@ module TudlaAccounting
     end
 
     # Every party's statement with something to send: a balance at either end or activity in
-    # between, or (open_items) anything open at the end.
+    # between, or (open_items) anything open at the end. Reads every party's items and ages
+    # them in one go, so the queries don't grow with the number of parties.
     def self.to_send(organization, type:, from:, thru:, open_items:)
-      parties(organization, type).map { |party| call(organization: organization, type: type, party: party, from: from, thru: thru) }
-                                 .reject { |statement| open_items ? statement.open_items.empty? : statement.empty? }
+      items = items(organization, type, thru).to_a.group_by { |item| [ item.related_party_type, item.related_party_id ] }
+      report = AgingReportGenerator.call(organization: organization, report_type: type, as_of_date: thru)
+      no_aging = AgingReportGenerator::BUCKETS.index_with { Money.new(0, organization.currency) }.merge(total: Money.new(0, organization.currency))
+      parties(organization, type).map do |party|
+        loaded = [ items.fetch([ party.class.polymorphic_name, party.id ], []), report[:details].fetch(key(party), []), report[:summary].dig(key(party), :aging_buckets) || no_aging ]
+        new(organization: organization, type: type, party: party, from: from, thru: thru).call(loaded)
+      end.reject { |statement| open_items ? statement.open_items.empty? : statement.empty? }
+    end
+
+    # The charges and credits transacted by the end of thru, with what is needed to work out
+    # what is outstanding, oldest first.
+    def self.items(organization, type, thru)
+      carrying_amounts(organization, type).where(tudla_accounting_entries: { transacted_at: ..thru.in_time_zone(TudlaAccounting.configuration.time_zone).end_of_day })
+                                          .with_outstanding.order("tudla_accounting_entries.transacted_at", :id)
     end
 
     # "Customer_12", for a URL.
@@ -77,14 +90,12 @@ module TudlaAccounting
       @thru = thru
     end
 
-    def call
-      items = self.class.carrying_amounts(organization, type).where(related_party: party).where(tudla_accounting_entries: { transacted_at: ..end_of(thru) })
-                  .with_outstanding.order("tudla_accounting_entries.transacted_at", :id).to_a
+    # loaded: the party's [items, open items, aging], when to_send has read them for every
+    # party at once; read here otherwise.
+    def call(loaded = nil)
+      items, @open_items, @aging = loaded || [ self.class.items(organization, type, thru).where(related_party: party).to_a, *aging_report ]
       before = end_of(from - 1)
       @opening = money(items.sum { |item| item.detail.entry.transacted_at <= before ? item.outstanding(as_of: before)[:cents] : 0 })
-      report = AgingReportGenerator.call(organization: organization, report_type: type, as_of_date: thru, party: party)
-      @open_items = report[:details].values.first || []
-      @aging = report[:totals]
       @closing = @aging[:total]
       @lines = activity(items)
       self
@@ -104,6 +115,12 @@ module TudlaAccounting
     end
 
     private
+
+    # The party's open items and aging at the end of thru.
+    def aging_report
+      report = AgingReportGenerator.call(organization: organization, report_type: type, as_of_date: thru, party: party)
+      [ report[:details].values.first || [], report[:totals] ]
+    end
 
     # The run's charges, credits and reversals in date order, with the running balance,
     # and the adjustment that brings it to the closing balance.

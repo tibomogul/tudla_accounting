@@ -74,6 +74,33 @@ RSpec.describe TudlaAccounting::PartyStatement, type: :service do
     expect(queries.call).to eq(few)
   end
 
+  it "makes every party's statement to send as it makes each alone, in the same number of queries however many parties there are" do
+    sent = ->(**options) { described_class.to_send(organization, type: :receivable, from: Date.new(2026, 3, 1), thru: Date.new(2026, 3, 31), open_items: false, **options) }
+    queries = lambda do
+      count = 0
+      counter = ->(*, payload) { count += 1 unless payload[:name] == "SCHEMA" }
+      ActiveSupport::Notifications.subscribed(counter, "sql.active_record") { sent.call }
+      count
+    end
+    payment("Payment", 100, at: on(3, 5), related: invoice("Invoice 1", 300, at: on(2, 10), due: on(3, 12)))
+    invoice("Invoice 2", 50, at: on(1, 10), customer: initech) # only owed from before
+    few = queries.call
+    hooli = create(:organization, name: "Hooli")
+    invoice("Invoice 3", 70, at: on(3, 20), due: on(5, 1), customer: hooli)
+    invoice("Invoice 4", 40, at: on(1, 5), customer: create(:organization, name: "Reversed")).reverse!(on: Date.new(2026, 1, 6))
+
+    statements = sent.call
+    expect(statements.map(&:party)).to eq([ globex, hooli, initech ]) # nothing to send Reversed
+    statements.each do |batched|
+      alone = statement(party: batched.party)
+      expect([ batched.opening, read(batched.lines), batched.closing, batched.aging, batched.open_items.map { |line| line[:outstanding] } ])
+        .to eq([ alone.opening, read(alone.lines), alone.closing, alone.aging, alone.open_items.map { |line| line[:outstanding] } ])
+    end
+    expect(statements.last).to have_attributes(opening: aud(50), lines: [], closing: aud(50))
+    expect(sent.call(open_items: true).map(&:party)).to eq([ globex, hooli, initech ])
+    expect(queries.call).to eq(few)
+  end
+
   it "runs from the opening balance through the charges, credits and reversals in the dates to the closing balance" do
     first = invoice("Invoice 1", 300, at: on(2, 10), due: on(3, 12))
     second = invoice("Invoice 2", 200, at: on(3, 1), due: on(3, 31))
