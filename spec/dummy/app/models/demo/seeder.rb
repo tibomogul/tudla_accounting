@@ -118,9 +118,9 @@ class Demo::Seeder
     bank = accounts[%w[1011 1012].sample(random: random)]
     month = entry.transacted_at.strftime("%B")
     case index % 10
-    when 0..4 # a sale with GST, tagged
+    when 0..4 # a sale with GST (or VAT), tagged
       net = random.rand(100_00..5_000_00)
-      tax = net / 10
+      tax = (net * @gst.rate).floor
       income = %w[4010 4020].sample(random: random)
       entry.particulars = "Invoice #{@invoice_number += 1} – #{self.class::CUSTOMERS.sample(random: random)} (#{accounts[income].name.downcase})"
       entry.reference = "INV-#{@invoice_number}"

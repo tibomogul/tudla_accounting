@@ -8,8 +8,19 @@ RSpec.describe Demo::ForexRateProvider do
     expect(rates).to all(be_between(BigDecimal("0.90"), BigDecimal("0.94")))
     expect(rates.uniq.size).to be > 10
     date = Date.new(2026, 11, 2)
-    expect(provider.call(from: "EUR", to: "USD", date: date)).to eq((1 / provider.call(from: "USD", to: "EUR", date: date)).round(4))
+    expect(provider.call(from: "EUR", to: "USD", date: date)).to eq((1 / provider.call(from: "USD", to: "EUR", date: date)).round(5)) # 1.10473
     expect(provider.call(from: "GBP", to: "EUR", date: date)).to be_nil
+  end
+
+  it "gives a dollar–peso rate near 62.50 for any date, and crosses the euro through the dollar" do
+    rates = (Date.new(2020, 1, 1)..Date.new(2030, 12, 31)).step(37).map { |date| provider.call(from: "USD", to: "PHP", date: date) }
+    expect(rates).to all(be_between(BigDecimal("61.2"), BigDecimal("63.8")))
+    expect(rates.uniq.size).to be > 10
+    date = Date.new(2026, 11, 2)
+    usd, eur = %w[USD EUR].map { |currency| provider.call(from: currency, to: "PHP", date: date) }
+    expect(provider.call(from: "EUR", to: "PHP", date: date)).to eq((usd / provider.call(from: "USD", to: "EUR", date: date)).round(4)).and eq(eur)
+    expect(provider.call(from: "PHP", to: "USD", date: date)).to eq((1 / usd).round(7)) # 0.0156878: six figures
+    expect(provider.call(from: "PHP", to: "PHP", date: date)).to be_nil
   end
 
   it "is the demo's provider, so a dollar invoice left without a rate gets the day's" do

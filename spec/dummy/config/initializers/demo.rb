@@ -4,7 +4,7 @@ return unless Rails.configuration.x.demo
 
 # The stand-in login shows the demo's buttons instead of listing its books with the rest.
 Rails.configuration.x.sign_in_partial = "demo/sessions/button"
-Rails.configuration.x.sign_in_organizations = ->(organizations) { organizations.where.not(name: [ Demo::Seeder::NAME, Demo::EuroSeeder::NAME ]) }
+Rails.configuration.x.sign_in_organizations = ->(organizations) { organizations.where.not(name: [ Demo::Seeder::NAME, Demo::EuroSeeder::NAME, Demo::PesoSeeder::NAME ]) }
 
 # Who the demo's invoices are from, when printed and emailed (to files in tmp/mails).
 TudlaAccounting.configure do |config|
@@ -13,15 +13,15 @@ TudlaAccounting.configure do |config|
   # (by SendRemindersJob, in config/recurring.yml, or from Sales > Reminders due).
   config.reminder_days = [ 7, 14, 30 ]
   config.document_header = lambda do |organization|
-    if organization.name == Demo::EuroSeeder::NAME
-      "#{organization.name}\nDemostraße 1, 10115 Berlin\nUSt-IdNr. DE123456789"
-    else
-      "#{organization.name}\n1 Demo Street, Sydney NSW 2000\nABN 12 345 678 901"
+    case organization.name
+    when Demo::EuroSeeder::NAME then "#{organization.name}\nDemostraße 1, 10115 Berlin\nUSt-IdNr. DE123456789"
+    when Demo::PesoSeeder::NAME then "#{organization.name}\n1 Ayala Avenue, Makati City 1226\nTIN 000-123-456-000"
+    else "#{organization.name}\n1 Demo Street, Sydney NSW 2000\nABN 12 345 678 901"
     end
   end
 end
 
-# Made-up USD/EUR rates for any date, for the foreign invoices and payments in both books
+# Made-up USD/EUR/PHP rates for any date, for the foreign invoices and payments in the books
 # (set on each reload, as the provider is reloadable demo code).
 Rails.application.config.to_prepare do
   TudlaAccounting.configuration.forex_rate_provider = Demo::ForexRateProvider.new

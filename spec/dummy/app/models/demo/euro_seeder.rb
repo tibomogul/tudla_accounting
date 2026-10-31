@@ -10,6 +10,9 @@ class Demo::EuroSeeder < Demo::Seeder
   NAME = "Demo GmbH"
   CURRENCY = "EUR"
   CUSTOMERS = [ "Müller AG", "Rossi S.p.A.", "Acme Inc.", "Dupont SA" ].freeze
+  PAYMENT_NOTE = "Bitte überweisen Sie innerhalb von 30 Tagen auf DE89 3704 0044 0532 0130 00."
+  # Who sends this month's hosting bill, its reference's prefix, and its amount before tax.
+  SUPPLIER = [ "Cloudhaus GmbH", "CH", 1_480_00 ].freeze
 
   def initialize(entries: 80)
     super
@@ -18,12 +21,10 @@ class Demo::EuroSeeder < Demo::Seeder
   private
 
   def seed
-    @organization = Organization.create!(name: NAME, currency: CURRENCY)
+    @organization = Organization.create!(name: self.class::NAME, currency: self.class::CURRENCY)
     create_periods
     create_accounts
-    @gst = TudlaAccounting::TaxCode.create!(organization: organization, code: "VAT19", name: "VAT", rate: "0.19", kind: :sales, account: accounts["2200"])
-    @reduced = TudlaAccounting::TaxCode.create!(organization: organization, code: "VAT7", name: "VAT reduced", rate: "0.07", kind: :sales, account: accounts["2200"])
-    @input = TudlaAccounting::TaxCode.create!(organization: organization, code: "IN19", name: "Input VAT", rate: "0.19", kind: :purchases, account: accounts["2200"])
+    create_tax_codes
     department = TudlaAccounting::Dimension.create!(organization: organization, code: "DEPT", name: "Department")
     @teams = %w[SALES ENG OPS ADMIN].map { |code| department.dimension_values.create!(code: code, name: code.capitalize) }
 
@@ -46,17 +47,20 @@ class Demo::EuroSeeder < Demo::Seeder
     TudlaAccounting::AccountRoleAssigner.save!(accounts["4900"], "realized_fx_gain")
   end
 
+  # @gst is the code the posted sales use, @input the supplier's.
+  def create_tax_codes
+    @gst = TudlaAccounting::TaxCode.create!(organization: organization, code: "VAT19", name: "VAT", rate: "0.19", kind: :sales, account: accounts["2200"])
+    @reduced = TudlaAccounting::TaxCode.create!(organization: organization, code: "VAT7", name: "VAT reduced", rate: "0.07", kind: :sales, account: accounts["2200"])
+    @input = TudlaAccounting::TaxCode.create!(organization: organization, code: "IN19", name: "Input VAT", rate: "0.19", kind: :purchases, account: accounts["2200"])
+  end
+
   # Over the last three months: Müller's consulting, by the hour and in part hours, each
   # paid three weeks later; Rossi's books, at the reduced rate, not paid; and Acme's in
   # dollars, without VAT (an export), the first paid into the dollar account at a better
   # rate than it was invoiced at, the second not yet.
   def add_customer_accounts
-    mueller, rossi, acme = CUSTOMERS.first(3).map do |name|
-      TudlaAccounting::Contact.create!(organization: organization, name: name, kind: "customer", payment_terms_days: 30, email: "accounts@#{name.parameterize}.example",
-                                       currency: (name == "Acme Inc." ? "USD" : CURRENCY), default_account: accounts["4010"])
-    end
+    mueller, rossi, acme = customers
     start = today.prev_month(3).beginning_of_month
-    # [ date, customer, lines, currency and rate, when paid: [ days later, into, at rate ] ]
     invoices = [ 7.5, 12.5, 2.5 ].each_with_index.map do |hours, month|
       date = start.next_month(month) + 4
       [ date, mueller, [ invoice_line("Consulting – #{date.strftime('%B %Y')}", hours, 125_00, @gst) ], {}, [ 21, accounts["1011"], nil ] ]
@@ -64,8 +68,21 @@ class Demo::EuroSeeder < Demo::Seeder
     invoices << [ start + 10, rossi, [ invoice_line("Reference books", 3, 49_90, @reduced), invoice_line("Workshop", 1, 1_250_00, @gst) ], {}, nil ]
     invoices << [ start + 15, acme, [ invoice_line("Integration work", 20, 140_00, nil) ], { currency: "USD", exchange_rate: BigDecimal("0.9150") }, [ 30, accounts["1020"], BigDecimal("0.9310") ] ]
     invoices << [ start.next_month + 15, acme, [ invoice_line("Integration work", 20, 140_00, nil) ], { currency: "USD", exchange_rate: BigDecimal("0.9230") }, nil ]
+    approve_and_pay(invoices)
+  end
 
-    # Approved in date order, so they are numbered in it; then paid.
+  # The first three customers, the third (Acme) billed in dollars.
+  def customers
+    self.class::CUSTOMERS.first(3).map do |name|
+      TudlaAccounting::Contact.create!(organization: organization, name: name, kind: "customer", payment_terms_days: 30, email: "accounts@#{name.parameterize}.example",
+                                       currency: (name == "Acme Inc." ? "USD" : self.class::CURRENCY), default_account: accounts["4010"])
+    end
+  end
+
+  # invoices: [ date, customer, lines, currency and rate, when paid: [ days later, into,
+  # at rate ] ]; those dated up to today, approved in date order, so they are numbered in
+  # it, then paid when the day has come.
+  def approve_and_pay(invoices)
     approved = invoices.select { |date, *| date <= today }.sort_by(&:first).map do |date, customer, lines, foreign, paid|
       [ sales_invoice(customer, date, lines, **foreign).approve!, paid ]
     end
@@ -79,16 +96,17 @@ class Demo::EuroSeeder < Demo::Seeder
 
   # A hosting company's bill from the first of this month, not yet paid.
   def add_supplier_bill
-    supplier = TudlaAccounting::Contact.create!(organization: organization, name: "Cloudhaus GmbH", kind: "supplier", payment_terms_days: 14,
+    name, prefix, cents = self.class::SUPPLIER
+    supplier = TudlaAccounting::Contact.create!(organization: organization, name: name, kind: "supplier", payment_terms_days: 14,
                                                 default_account: accounts["6020"], default_tax_code: @input)
     date = today.beginning_of_month
-    TudlaAccounting::Document.create!(organization: organization, kind: "bill", contact: supplier, issued_on: date, due_on: supplier.due_on(date), reference: "CH-#{date.strftime('%y%m')}",
-                                      lines_attributes: [ invoice_line("Hosting, #{date.strftime('%B')}", 1, 1_480_00, @input, account: accounts["6020"]) ]).approve!
+    TudlaAccounting::Document.create!(organization: organization, kind: "bill", contact: supplier, issued_on: date, due_on: supplier.due_on(date), reference: "#{prefix}-#{date.strftime('%y%m')}",
+                                      lines_attributes: [ invoice_line("Hosting, #{date.strftime('%B')}", 1, cents, @input, account: accounts["6020"]) ]).approve!
   end
 
   def sales_invoice(customer, date, lines, **foreign)
     TudlaAccounting::Document.create!(organization: organization, kind: "sales_invoice", contact: customer, issued_on: date, due_on: customer.due_on(date),
-                                      notes: "Bitte überweisen Sie innerhalb von 30 Tagen auf DE89 3704 0044 0532 0130 00.", lines_attributes: lines, **foreign)
+                                      notes: self.class::PAYMENT_NOTE, lines_attributes: lines, **foreign)
   end
 
   def invoice_line(description, quantity, unit_price_cents, tax_code, account: accounts["4010"])

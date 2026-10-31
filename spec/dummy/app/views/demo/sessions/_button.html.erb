@@ -1,4 +1,5 @@
 <div class="mt-4 flex flex-wrap gap-2">
   <%= button_to "Open the demo books (#{Demo::Seeder::NAME})", demo_session_path, class: "btn btn-primary" %>
   <%= button_to "Open the euro demo books (#{Demo::EuroSeeder::NAME})", demo_session_path(books: "euro"), class: "btn btn-outline" %>
+  <%= button_to "Open the peso demo books (#{Demo::PesoSeeder::NAME})", demo_session_path(books: "peso"), class: "btn btn-outline" %>
 </div>
