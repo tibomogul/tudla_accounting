@@ -75,7 +75,7 @@ RSpec.describe "Payments in another currency", type: :request do
   it "offers payments in each bank account's currency, with only what is owed in it" do
     document
     get routes.new_payment_path(kind: "received", contact_id: northwind.id)
-    expect(options("currency")).to eq(%w[AUD EUR])
+    expect(options("currency")).to eq([ "Their currency", "AUD", "EUR" ])
     expect(options("payment[account_id]")).to eq([ "Choose an account", "1000 - Bank" ])
     expect(css_select("tr[data-open-document]")).to be_empty
     expect(css_select("input[name='payment[exchange_rate]']")).to be_empty
@@ -91,6 +91,21 @@ RSpec.describe "Payments in another currency", type: :request do
     expect { record(account: account("1100-EUR"), amount_cents: 1_00, exchange_rate: 1) }.to raise_error(ArgumentError, "Account must be a bank or cash account")
     expect { record(account: account("1000"), amount_cents: 1_00, applications: [ { document: TudlaAccounting::Document.sole, amount_cents: 1_00 } ]) }
       .to raise_error(ArgumentError, "#{TudlaAccounting::Document.sole.number_label} is in EUR, and the payment is in AUD")
+  end
+
+  it "starts a payment in the contact's currency, when the books can pay in it" do
+    document
+    northwind.update!(currency: "EUR")
+    get routes.new_payment_path(kind: "received", contact_id: northwind.id)
+    expect(css_select("label[for=payment_amount]").first.text).to eq("Amount (EUR)")
+    expect(css_select("tr[data-open-document]").size).to eq(1)
+    expect(css_select("select[name=currency] option[selected]")).to be_empty # "Their currency"
+    get routes.new_payment_path(kind: "received", contact_id: northwind.id, currency: "AUD")
+    expect(css_select("label[for=payment_amount]").first.text).to eq("Amount (AUD)")
+
+    northwind.update!(currency: "USD") # no bank account in it
+    get routes.new_payment_path(kind: "received", contact_id: northwind.id)
+    expect(css_select("label[for=payment_amount]").first.text).to eq("Amount (AUD)")
   end
 
   it "keeps an overpayment as a euro credit, refunds it in euros, and pays a euro bill at a loss" do

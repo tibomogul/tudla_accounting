@@ -22,9 +22,15 @@ RSpec.describe TudlaAccounting::Contact do
     expect(supplier).to have_attributes(customer?: false, supplier?: true, party_types: [ :payable ])
     expect(supplier.due_on(Date.current)).to be_nil
 
-    bad = described_class.new(organization: organization, name: " ", kind: "friend", email: "not an email", payment_terms_days: -1)
+    # The organization's own currency is kept as none.
+    expect([ northwind.currency, northwind.foreign? ]).to eq([ "AUD", false ])
+    expect(contact(name: "Euro", currency: " eur ")).to have_attributes(currency: "EUR", foreign?: true)
+    expect(contact(name: "Home", currency: "AUD")[:currency]).to be_nil
+
+    bad = described_class.new(organization: organization, name: " ", kind: "friend", email: "not an email", payment_terms_days: -1, currency: "xyz")
     expect(bad).not_to be_valid
-    expect(bad.errors.attribute_names).to contain_exactly(:name, :kind, :email, :payment_terms_days)
+    expect(bad.errors.attribute_names).to contain_exactly(:name, :kind, :email, :payment_terms_days, :currency)
+    expect(bad.errors[:currency]).to eq([ "is not a known currency code" ])
 
     other = create(:organization, currency: "AUD")
     TudlaAccounting::AccountsCreator.call([ { code: "4000", name: "Theirs", category: "income" }, { code: "2200", name: "GST", category: "liability" } ], other)

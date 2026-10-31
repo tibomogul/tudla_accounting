@@ -3,8 +3,9 @@
 module TudlaAccounting
   # A customer or supplier (kind customer, supplier or both): who documents are to or
   # from, and the party their receivables and payables are owed by or to (see
-  # PartyStatement). payment_terms_days sets when its documents fall due; the default
-  # account and tax code start its documents' lines. An inactive contact keeps its
+  # PartyStatement). payment_terms_days sets when its documents fall due; currency (nil
+  # for the organization's own) is the one its new documents and payments start in; the
+  # default account and tax code start its documents' lines. An inactive contact keeps its
   # history but isn't offered for new documents; one that is owed or owes anything, or
   # ever was, can't be deleted.
   class Contact < ApplicationRecord
@@ -18,12 +19,15 @@ module TudlaAccounting
     normalizes :name, with: ->(name) { name.squish }
     normalizes :email, :phone, :tax_number, with: ->(text) { text.strip.presence }
     normalizes :address, :notes, with: ->(text) { text.strip.presence }
+    normalizes :currency, with: ->(currency) { currency.strip.upcase.presence }
+    before_validation { self.currency = nil if self[:currency] == organization&.currency }
 
     validates :name, presence: true
     validates :kind, inclusion: { in: KINDS.keys }
     validates :email, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_nil: true
     validates :payment_terms_days, numericality: { only_integer: true, greater_than_or_equal_to: 0 }, allow_nil: true
     validate :defaults_fit
+    validate { errors.add(:currency, "is not a known currency code") if foreign? && !Money::Currency.find(self[:currency]) }
 
     before_destroy :ensure_no_history
     after_create { audit("contact.created") }
@@ -39,6 +43,11 @@ module TudlaAccounting
       pattern = "%#{sanitize_sql_like(text.to_s.strip)}%"
       where("name ILIKE :pattern OR email ILIKE :pattern OR tax_number ILIKE :pattern", pattern: pattern)
     end
+
+    # The currency its new documents and payments start in: the organization's unless
+    # another is set.
+    def currency = self[:currency] || organization&.currency || TudlaAccounting.configuration.base_currency
+    def foreign? = self[:currency].present?
 
     def customer? = kind.in?(%w[customer both])
     def supplier? = kind.in?(%w[supplier both])

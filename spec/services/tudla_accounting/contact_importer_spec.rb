@@ -29,6 +29,13 @@ RSpec.describe TudlaAccounting::ContactImporter do
       .to eq([ [ "Globex", "supplier", "2", nil, nil, nil ], [ "Northwind", "customer", nil, 30, "4000", "GST" ] ])
   end
 
+  it "takes the currency they're invoiced in, blank for the organization's" do
+    described_class.call(organization, file([ [ "Name", "Currency" ], [ "Northwind", "eur" ], [ "Globex", "" ], [ "Initech", "AUD" ] ]), ".csv")
+    expect(contacts.map { |contact| [ contact.name, contact[:currency] ] }).to eq([ [ "Globex", nil ], [ "Initech", nil ], [ "Northwind", "EUR" ] ])
+    expect { described_class.call(organization, file([ [ "Name", "Currency" ], [ "Hooli", "XYZ" ] ]), ".csv") }
+      .to raise_error(ArgumentError, "Row 2: Currency is not a known currency code")
+  end
+
   it "reads Excel files, numbers as Excel keeps them" do
     expect(described_class.call(organization, file([ [ "Name", "Payment terms", "Default account" ], [ "Initech", 14, 4000 ] ], extension: ".xlsx"), ".xlsx")).to eq(added: 1, updated: 0)
     expect(contacts.sole).to have_attributes(payment_terms_days: 14, default_account: TudlaAccounting::Account.find_by!(organization: organization, code: "4000"))

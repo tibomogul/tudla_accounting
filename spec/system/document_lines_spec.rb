@@ -50,8 +50,16 @@ RSpec.describe "Writing an invoice", type: :system do
   end
 
   it "asks for a rate in another currency, and works out the amounts in its minor units" do
+    TudlaAccounting::Contact.create!(organization: organization, name: "Kaisha", currency: "JPY")
     visit new_document_path(kind: "sales_invoice")
     expect(page).to have_no_field("document[exchange_rate]")
+    select "Kaisha", from: "Customer"
+    expect(page).to have_select("Currency", selected: "JPY – Japanese Yen")
+    expect(page).to have_field("Rate: 1 JPY in AUD")
+    select "Northwind", from: "Customer"
+    expect(page).to have_select("Currency", selected: "AUD – Australian Dollar")
+    expect(page).to have_no_field("document[exchange_rate]")
+
     select "JPY – Japanese Yen", from: "Currency"
     expect(page).to have_field("Rate: 1 JPY in AUD")
     expect(page).to have_css("[data-document-lines-target=currencyLabel]", exact_text: "JPY")

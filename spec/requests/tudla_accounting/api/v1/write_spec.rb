@@ -138,8 +138,13 @@ RSpec.describe "JSON API: recording in the books", type: :request do
       expect(response).to have_http_status(:created)
       expect(data).to include("name" => "Globex", "kind" => "both", "payment_terms_days" => 14, "default_account_code" => "4000", "default_tax_code" => "GST")
 
-      changed = call(:patch, routes.api_v1_contact_path(data["id"]), { phone: "02 9999 0000", default_tax_code: nil, active: false })["data"]
-      expect(changed).to include("phone" => "02 9999 0000", "default_tax_code" => nil, "default_account_code" => "4000", "active" => false, "email" => "ap@globex.test")
+      expect(data["currency"]).to eq("AUD")
+
+      changed = call(:patch, routes.api_v1_contact_path(data["id"]), { phone: "02 9999 0000", default_tax_code: nil, active: false, currency: "eur" })["data"]
+      expect(changed).to include("phone" => "02 9999 0000", "default_tax_code" => nil, "default_account_code" => "4000", "active" => false, "email" => "ap@globex.test", "currency" => "EUR")
+      expect(call(:patch, routes.api_v1_contact_path(data["id"]), { currency: nil })["data"]["currency"]).to eq("AUD")
+      call(:patch, routes.api_v1_contact_path(data["id"]), { currency: 7 })
+      expect(json["error"]).to include("details" => { "currency" => [ "is not a known currency code" ] })
 
       call(:post, routes.api_v1_contacts_path, { name: "", email: "nope" })
       expect(response).to have_http_status(:unprocessable_content)
@@ -197,6 +202,18 @@ RSpec.describe "JSON API: recording in the books", type: :request do
       call(:post, routes.api_v1_documents_path, invoice.merge(issued_on: "2026-03-01", approve: true))
       expect(json.dig("error", "message")).to eq("The period for the posted date is closed")
       expect(TudlaAccounting::Document.count).to eq(2)
+    end
+
+    it "drafts one in the contact's currency unless another is given, and a credit note in its invoice's" do
+      euro = call(:post, routes.api_v1_documents_path, invoice.merge(currency: "EUR", exchange_rate: "1.6", approve: true))["data"]
+      northwind.update!(currency: "EUR")
+      expect(call(:post, routes.api_v1_documents_path, invoice.merge(exchange_rate: "1.6"))["data"]).to include("currency" => "EUR", "total" => "275.00")
+      expect(call(:post, routes.api_v1_documents_path, invoice.merge(currency: "AUD"))["data"]["currency"]).to eq("AUD")
+
+      northwind.update!(currency: "USD")
+      credit = call(:post, routes.api_v1_documents_path, { kind: "sales_credit", contact_id: northwind.id, issued_on: "2026-04-05", credited_document_id: euro["id"], exchange_rate: "1.6",
+                                                           lines: [ { description: "Discount", unit_price: "25", account_code: "4000" } ] })["data"]
+      expect(credit["currency"]).to eq("EUR")
     end
 
     it "deletes a draft, and says what's wrong" do

@@ -4,13 +4,14 @@ module TudlaAccounting
   # Adds an organization's contacts from a CSV or XLSX file (SpreadsheetRows), all or
   # nothing, and updates those already there by name (ignoring case; their name keeps its spelling). Columns, by
   # heading in any case: Name (needed), Kind (customer, supplier or both; customer if
-  # blank), Email, Phone, Address, Tax number, Payment terms (days), Default account
-  # (its code), Default tax code (its code), Notes. Other columns are left out.
+  # blank), Email, Phone, Address, Tax number, Payment terms (days), Currency (its code;
+  # blank for the organization's), Default account (its code), Default tax code (its
+  # code), Notes. Other columns are left out.
   #
   #   ContactImporter.call(organization, upload.path, ".csv") # => { added: 12, updated: 3 }
   class ContactImporter
     COLUMNS = { "name" => :name, "kind" => :kind, "email" => :email, "phone" => :phone, "address" => :address, "tax number" => :tax_number,
-                "payment terms" => :payment_terms_days, "default account" => :default_account, "default tax code" => :default_tax_code, "notes" => :notes }.freeze
+                "payment terms" => :payment_terms_days, "currency" => :currency, "default account" => :default_account, "default tax code" => :default_tax_code, "notes" => :notes }.freeze
 
     def self.call(...) = new(...).call
 
@@ -35,7 +36,7 @@ module TudlaAccounting
 
           contact = existing[row[:name].to_s.squish.downcase] || Contact.new(organization: @organization)
           contact.name = row[:name] if contact.new_record? # one already here keeps its spelling
-          contact.assign_attributes(row.slice(:email, :phone, :address, :tax_number, :payment_terms_days, :notes).compact)
+          contact.assign_attributes(row.slice(:email, :phone, :address, :tax_number, :payment_terms_days, :currency, :notes).compact)
           contact.kind = row[:kind].downcase if row[:kind].present?
           { default_account: accounts, default_tax_code: tax_codes }.each do |field, by_code|
             next if row[field].blank?

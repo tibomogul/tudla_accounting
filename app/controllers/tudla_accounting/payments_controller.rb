@@ -34,15 +34,16 @@ module TudlaAccounting
       end
     end
 
-    # A payment from (or to) a contact, in a currency (the organization's by default), with
-    # their open invoices (or bills) in it to apply it to; document_id starts it from one of
-    # them, for what is still owed.
+    # A payment from (or to) a contact, in a currency (the contact's, when the books can
+    # pay in it, or else the organization's, by default), with their open invoices (or
+    # bills) in it to apply it to; document_id starts it from one of them, for what is
+    # still owed.
     def new
       document = organization_scope(Document).approved.find(params[:document_id]) if params[:document_id].present?
-      @currency = document&.currency || currency_param
-      @payment = organization_scope(Payment).new(kind: document ? (document.sales? ? "received" : "paid") : kind_param, paid_on: today, contact: document&.contact,
+      contact = document&.contact || (organization_scope(Contact).find_by(id: params[:contact_id]) if params[:contact_id].present?)
+      @currency = document&.currency || (params[:currency].blank? && contact&.currency.presence_in(payment_currencies)) || currency_param
+      @payment = organization_scope(Payment).new(kind: document ? (document.sales? ? "received" : "paid") : kind_param, paid_on: today, contact: contact,
                                                  account_id: default_account_id(@currency))
-      @payment.contact ||= organization_scope(Contact).find_by(id: params[:contact_id]) if params[:contact_id].present?
       @applied = document ? { document.id => document.amount_due.cents } : {}
       @payment.amount_cents = @applied.values.sum if document
       @open = open_documents(@payment, @currency)

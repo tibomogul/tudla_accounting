@@ -319,7 +319,7 @@ department = TudlaAccounting::Dimension.create!(organization: org, code: "DEPT",
 
 ## 7. Add customers and suppliers
 
-Contacts are the customers and suppliers that invoices and bills are to or from. Each has a kind (`customer`, `supplier` or `both`), an email address for sending them documents, and optionally payment terms in days and a default account and tax code. New documents for the contact start from these.
+Contacts are the customers and suppliers that invoices and bills are to or from. Each has a kind (`customer`, `supplier` or `both`), an email address for sending them documents, and optionally payment terms in days, the currency they're invoiced in, and a default account and tax code. New documents for the contact start from these, and new payments start in their currency when a bank account is held in it.
 
 Contacts can be imported from a spreadsheet (CSV or Excel) with these columns. Only `Name` is needed:
 
@@ -331,6 +331,7 @@ Initech Supplies,supplier,billing@initech.test,,,,30,,,Office supplies
 ```
 
 - `Default account` and `Default tax code` are codes, which must already exist.
+- A `Currency` column, also optional, gives a currency code; blank is the organization's own.
 - A row whose name is already a contact updates that contact, ignoring case.
 - The whole file imports or nothing does.
 - See `spec/fixtures/files/contacts.csv` for this example.

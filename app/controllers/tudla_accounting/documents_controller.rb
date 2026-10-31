@@ -38,8 +38,9 @@ module TudlaAccounting
       end
     end
 
-    # A new draft of a kind (an invoice by default), for a contact when one is given; or
-    # (credit=id) a credit note for an approved invoice or bill, copying its lines.
+    # A new draft of a kind (an invoice by default), for a contact when one is given (in
+    # their currency, with their terms and defaults); or (credit=id) a credit note for an
+    # approved invoice or bill, copying its lines.
     def new
       @document = organization_scope(Document).new(kind: params[:kind].presence_in(Document::KINDS.keys) || "sales_invoice", issued_on: today)
       if params[:credit].present?
@@ -47,6 +48,7 @@ module TudlaAccounting
       else
         @document.contact = document_contacts(@document).find_by(id: params[:contact_id]) if params[:contact_id].present?
         @document.due_on = @document.contact&.due_on(today)
+        @document.currency = @document.contact&.[](:currency)
         @document.lines.build(quantity: 1, account: @document.contact&.default_account, tax_code: @document.contact&.default_tax_code)
       end
     end

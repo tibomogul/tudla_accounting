@@ -47,6 +47,12 @@ export default class extends Controller {
       due.setUTCDate(due.getUTCDate() + Number(terms))
       this.dueTarget.value = due.toISOString().slice(0, 10)
     }
+    // Their currency, unless it is fixed (a credit note's is its invoice's).
+    const currency = option.dataset.currency
+    if (currency && this.hasCurrencyTarget && !this.currencyTarget.disabled && this.currencyTarget.value !== currency) {
+      this.currencyTarget.value = currency
+      this.currencyChanged()
+    }
     this.lineTargets.forEach((line) => this.applyDefaults(line))
     this.recalculate()
   }

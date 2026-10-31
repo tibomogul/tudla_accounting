@@ -40,6 +40,13 @@ RSpec.describe "Invoices and bills in another currency", type: :request do
     expect(css_select("select[name='document[currency]'] option").first.text).to eq("AUD – Australian Dollar")
     expect(css_select("[data-document-lines-target=rate][hidden]")).not_to be_empty
 
+    # A contact invoiced in euros: their new documents start in it, and the form switches to it.
+    northwind.update!(currency: "EUR")
+    get routes.new_document_path(kind: "sales_invoice", contact_id: northwind.id)
+    expect(css_select("select[name='document[currency]'] option[selected]").map(&:text)).to eq([ "EUR – Euro" ])
+    expect(css_select("[data-document-lines-target=rate][hidden]")).to be_empty
+    expect(css_select("option[value='#{northwind.id}']").first["data-currency"]).to eq("EUR")
+
     post routes.documents_path, params: { approve: "1", document: invoice_params }
     invoice = TudlaAccounting::Document.sole
     expect(invoice).to have_attributes(currency: "EUR", exchange_rate: 1.6, total_cents: 1_133_33, total: Money.new(1_133_33, "EUR"))

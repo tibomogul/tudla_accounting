@@ -20,7 +20,7 @@
   <div class="tc-card tc-card-body grid gap-4 sm:grid-cols-6">
     <div class="sm:col-span-3 space-y-1">
       <%= form.label :contact_id, sales ? "Customer" : "Supplier", class: "tc-label" %>
-      <%= form.select :contact_id, contacts.map { |contact| [ contact.name, contact.id, { data: { terms: contact.payment_terms_days, account: contact.default_account_id, tax: contact.default_tax_code_id } } ] },
+      <%= form.select :contact_id, contacts.map { |contact| [ contact.name, contact.id, { data: { terms: contact.payment_terms_days, currency: contact.currency, account: contact.default_account_id, tax: contact.default_tax_code_id } } ] },
                       { include_blank: "Choose #{sales ? 'a customer' : 'a supplier'}" }, required: true, class: "tc-input",
                       data: { document_lines_target: "contact", action: "change->document-lines#contactChanged" } %>
       <% if tc_can?(:record) %><p class="tc-hint">Not listed? <%= link_to "Add a contact", new_contact_path(kind: sales ? "customer" : "supplier"), class: "underline", target: "_blank" %>, then reload.</p><% end %>

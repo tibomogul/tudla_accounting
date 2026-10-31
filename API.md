@@ -99,7 +99,7 @@ end
 
 ```json
 { "id": 3, "name": "Northwind", "kind": "both", "email": "ap@northwind.test", "phone": null, "address": "1 Main St\nSydney",
-  "tax_number": "51 824 753 556", "payment_terms_days": 30, "notes": null,
+  "tax_number": "51 824 753 556", "payment_terms_days": 30, "currency": "AUD", "notes": null,
   "default_account_code": "4010", "default_tax_code": "GST", "active": true, "created_at": "...", "updated_at": "..." }
 ```
 
@@ -177,7 +177,7 @@ Idempotency-Key: shop-order-1042
 
 ### Contacts
 
-`POST /contacts` and `PATCH /contacts/:id` (`record`) take `name`, `kind` (customer, supplier, both), `email`, `phone`, `address`, `tax_number`, `payment_terms_days`, `notes`, `active`, `default_account_code` and `default_tax_code`. A `PATCH` changes only the fields sent; `null` clears one.
+`POST /contacts` and `PATCH /contacts/:id` (`record`) take `name`, `kind` (customer, supplier, both), `email`, `phone`, `address`, `tax_number`, `payment_terms_days`, `currency`, `notes`, `active`, `default_account_code` and `default_tax_code`. A `PATCH` changes only the fields sent; `null` clears one. `currency` (an ISO code) is the one their new invoices and bills start in; it reads as the organization's when none is set, and `null` sets it back to that.
 
 ### Invoices, bills and credit notes
 
@@ -188,7 +188,7 @@ Idempotency-Key: shop-order-1042
   "lines": [ { "description": "Consulting", "quantity": "2.5", "unit_price": "100.00", "account_code": "4010", "tax_code": "GST" } ] }
 ```
 
-`kind` is `sales_invoice`, `sales_credit`, `bill` or `supplier_credit`. `due_on` defaults to the contact's payment terms after `issued_on`. Lines need a `description`, `unit_price` and `account_code` (not the receivables or payables account); `quantity` is 1 if not given; `tax_code` must be of the document's side. `dimensions` (dimension code to value code, one value per dimension) tag a line, and its posting once approved. `tax_inclusive` says the prices include the tax. A credit note can name the approved invoice (or bill) it credits, `credited_document_id`, and is applied to it when approved. A document in another currency gives its `currency` (an ISO code; prices are in it) and `exchange_rate`, how many of the organization's currency one unit is worth; without a rate the date's is looked up (`forex_rate_provider`), and the document is refused if there is none. A credit note is in the currency of what it credits.
+`kind` is `sales_invoice`, `sales_credit`, `bill` or `supplier_credit`. `due_on` defaults to the contact's payment terms after `issued_on`. Lines need a `description`, `unit_price` and `account_code` (not the receivables or payables account); `quantity` is 1 if not given; `tax_code` must be of the document's side. `dimensions` (dimension code to value code, one value per dimension) tag a line, and its posting once approved. `tax_inclusive` says the prices include the tax. A credit note can name the approved invoice (or bill) it credits, `credited_document_id`, and is applied to it when approved. A document is in the contact's `currency` unless it gives another (an ISO code; prices are in it); one in another than the organization's has an `exchange_rate`, how many of the organization's currency one unit is worth; without a rate the date's is looked up (`forex_rate_provider`), and the document is refused if there is none. A credit note is in the currency of what it credits.
 
 Their files: an entry's or document's JSON lists them under `attachments` (`id`, `filename`, `content_type`, `byte_size`, `created_at`; empty when the app keeps no attachments). `POST /documents/:id/attachments` and `POST /entries/:id/attachments` (`record`) upload them as multipart form data, `file` (or several as `files[]`), each checked as on the pages (the `attachment_content_types` and `attachment_max_size` settings); the answer lists the record's files. `GET /documents/:id/attachments/:attachment_id` (and the same for entries) downloads one.
 

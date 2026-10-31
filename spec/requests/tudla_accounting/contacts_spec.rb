@@ -40,13 +40,14 @@ RSpec.describe "Contacts", type: :request do
     expect(response.body).to include("No contacts yet.")
     get routes.new_contact_path(kind: "supplier")
     expect(css_select("select[name='contact[kind]'] option[selected]").map(&:text)).to eq([ "Supplier" ])
+    expect(css_select("select[name='contact[currency]'] option[selected]").map(&:text)).to eq([ "AUD – Australian Dollar" ])
 
     post routes.contacts_path, params: { contact: { name: "Northwind", kind: "both", email: "ap@northwind.test", payment_terms_days: "30", default_account_id: account("4000").id,
                                                     address: "1 Main St\nSydney" } }
     expect(response).to redirect_to(routes.contact_path(contact))
     owes(contact, 100, due: Time.zone.local(2026, 3, 31))
     get routes.contact_path(contact)
-    expect(css_select("[data-details]").first.text.squish).to include("ap@northwind.test", "30 days", "4000 - Sales", "1 Main St")
+    expect(css_select("[data-details]").first.text.squish).to include("ap@northwind.test", "30 days", "CurrencyAUD", "4000 - Sales", "1 Main St")
     expect(css_select("[data-open=receivable] h2").first.text.squish).to eq("They owe: 100.00")
     expect(css_select("[data-open=receivable] td").map { |cell| cell.text.squish }).to include("0.00", "100.00", "31 Mar 2026")
     expect(css_select("[data-open=payable]").first.text).to include("Nothing open.")
@@ -56,7 +57,10 @@ RSpec.describe "Contacts", type: :request do
     patch routes.contact_path(contact), params: { contact: { name: "", email: "x" } }
     expect(response).to have_http_status(:unprocessable_entity)
     expect(response.body).to include("Name can&#39;t be blank", "Email is invalid")
-    patch routes.contact_path(contact), params: { contact: { name: "Northwind", active: "0" } }
+    patch routes.contact_path(contact), params: { contact: { currency: "EUR" } }
+    get routes.edit_contact_path(contact)
+    expect(css_select("select[name='contact[currency]'] option[selected]").map(&:text)).to eq([ "EUR – Euro" ])
+    patch routes.contact_path(contact), params: { contact: { name: "Northwind", active: "0", currency: "AUD" } }
     expect(contact).not_to be_active
     get routes.contacts_path
     expect(names).to eq([])
@@ -67,7 +71,8 @@ RSpec.describe "Contacts", type: :request do
     expect(flash[:alert]).to eq("Northwind has invoices, bills or payments; make it inactive instead")
     get routes.edit_contact_path(contact)
     get routes.activity_path(kind: "contact")
-    expect(css_select("tbody tr").map { |row| row.css("td").last.text.squish }).to eq([ "Changed the contact Northwind: active", "Added the contact Northwind" ])
+    expect(css_select("tbody tr").map { |row| row.css("td").last.text.squish }).to eq([ "Changed the contact Northwind: active, currency", "Changed the contact Northwind: currency",
+                                                                                               "Added the contact Northwind" ])
   end
 
   it "searches, filters by side, downloads, imports and deletes" do
@@ -81,8 +86,8 @@ RSpec.describe "Contacts", type: :request do
 
     get routes.contacts_path(format: :csv, kind: "supplier")
     csv = CSV.parse(response.body)
-    expect(csv).to eq([ [ "Name", "Kind", "Email", "Phone", "Address", "Tax number", "Payment terms", "Default account", "Default tax code", "Active", "Notes" ],
-                        [ "Globex", "supplier", "globex@test", nil, nil, nil, nil, nil, nil, "yes", nil ] ])
+    expect(csv).to eq([ [ "Name", "Kind", "Email", "Phone", "Address", "Tax number", "Payment terms", "Default account", "Default tax code", "Active", "Notes", "Currency" ],
+                        [ "Globex", "supplier", "globex@test", nil, nil, nil, nil, nil, nil, "yes", nil, "AUD" ] ])
 
     upload = ->(text, name = "contacts.csv") { Rack::Test::UploadedFile.new(StringIO.new(text), "text/csv", original_filename: name) }
     post routes.import_contacts_path, params: { file: upload.call("Name,Payment terms\nInitech,14\nglobex,7\n") }

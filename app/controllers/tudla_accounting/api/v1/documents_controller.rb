@@ -90,6 +90,10 @@ module TudlaAccounting
           if body.key?(:credited_document_id)
             attributes[:credited_document] = body[:credited_document_id].presence && organization_scope(Document).find(body[:credited_document_id])
           end
+          # A new one is in its credited document's currency, or its contact's, unless given.
+          if document.new_record? && !body.key?(:currency)
+            attributes[:currency] = attributes[:credited_document]&.[](:currency) || attributes[:contact]&.[](:currency)
+          end
           currency = attributes[:currency] || document.currency
           attributes[:lines_attributes] = document.lines.map { |line| { id: line.id, _destroy: true } } + line_attributes(currency) if body.key?(:lines) || document.new_record?
           attributes

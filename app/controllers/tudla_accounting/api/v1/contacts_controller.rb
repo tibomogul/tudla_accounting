@@ -39,6 +39,7 @@ module TudlaAccounting
 
         def contact_attributes
           attributes = body.slice(*FIELDS)
+          attributes[:currency] = body[:currency].to_s if body.key?(:currency) # blank for the organization's own
           attributes[:default_account] = body[:default_account_code].presence && account_by_code(body[:default_account_code], "default_account_code") if body.key?(:default_account_code)
           attributes[:default_tax_code] = body[:default_tax_code].presence && tax_code_by_code(body[:default_tax_code], "default_tax_code") if body.key?(:default_tax_code)
           attributes

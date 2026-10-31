@@ -23,7 +23,7 @@
 <div class="grid gap-6 lg:grid-cols-3">
   <section class="tc-card tc-card-body space-y-2 text-sm" aria-label="Details" data-details>
     <% { "Email" => (@contact.email && mail_to(@contact.email, class: "underline")), "Phone" => @contact.phone, "Tax number" => @contact.tax_number,
-         "Payment terms" => (@contact.payment_terms_days && "#{@contact.payment_terms_days} days"), "Default account" => @contact.default_account&.code_with_name,
+         "Payment terms" => (@contact.payment_terms_days && "#{@contact.payment_terms_days} days"), "Currency" => @contact.currency, "Default account" => @contact.default_account&.code_with_name,
          "Default tax code" => @contact.default_tax_code&.label }.each do |label, value| %>
       <div class="flex justify-between gap-4"><span class="tc-muted"><%= label %></span><span class="text-right"><%= value || "—" %></span></div>
     <% end %>

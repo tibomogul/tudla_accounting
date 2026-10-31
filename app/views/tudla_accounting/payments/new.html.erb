@@ -9,7 +9,7 @@
     <%= form.select :contact_id, contacts.map { |contact| [ contact.name, contact.id ] }, { include_blank: "Choose #{received ? 'a customer' : 'a supplier'}", selected: @payment.contact_id },
                     class: "tc-input", required: true %></div>
   <% if currencies.size > 1 %>
-    <div><%= form.label :currency, "Currency", class: "tc-label" %><%= form.select :currency, currencies, { selected: @currency }, class: "tc-input" %></div>
+    <div><%= form.label :currency, "Currency", class: "tc-label" %><%= form.select :currency, currencies, { include_blank: "Their currency", selected: params[:currency].presence }, class: "tc-input" %></div>
   <% end %>
   <%= form.submit (@payment.contact ? "Change" : "Show what they owe"), class: "tc-btn tc-btn-secondary", name: nil %>
 <% end %>
