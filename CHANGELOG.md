@@ -26,6 +26,7 @@ All notable changes to this project are documented here. The format follows
 - Every rebuild's `balances.rebuilt` audit event now lists the accounts it corrected (`accounts`).
 - Revaluation needs an unrealized gains account only when there's something to revalue.
 - Errors about a missing account name the organization, through the new `organization_label` setting (default: class and id).
+- `ForexRateRetriever` gives every rate to the 8 decimal places the rate columns hold, an inverse of a stored rate and a provider's crossed rate included, so the first lookup and later ones (read back from `ForexRate`) agree, as do revaluation and exchange gain figures with the rates documents and payments store. A provider rate too small to keep raises `RateNotFound`.
 
 ### Removed
 - **Breaking:** the `receivable_account_code`, `payable_account_code`, `retained_earnings_account_code`, `unrealized_fx_gain_account_code` and `realized_fx_gain_account_code` settings: mark the accounts' roles instead (in your chart templates, `AccountsCreator` data and import files). Setting one raises `TudlaAccounting::ConfigurationError` saying which role to mark. There's no upgrade path from 0.2.0, which was never published.

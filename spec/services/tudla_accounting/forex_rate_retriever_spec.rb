@@ -30,9 +30,22 @@ RSpec.describe TudlaAccounting::ForexRateRetriever, type: :service do
     expect(rate("EUR", "AUD")).to eq(BigDecimal("1.6"))
   end
 
+  it "gives every rate to the 8 decimal places the columns hold, fetched or read back" do
+    store("EUR", "USD", "0.9045")
+    expect(rate("USD", "EUR")).to eq(BigDecimal("1.1055832")) # 1.10558319513...
+    TudlaAccounting.configuration.forex_rate_provider = ->(**) { BigDecimal("70.8892") / BigDecimal("62.485") }
+
+    fetched = rate("EUR", "AUD")
+    expect(fetched).to eq(BigDecimal("1.13449948")) # 1.134499479...
+    expect(rate("EUR", "AUD")).to eq(fetched)
+    expect(TudlaAccounting::ForexRate.find_by!(from: "EUR", to: "AUD").rate).to eq(fetched)
+  end
+
   it "raises when there is no provider, or the provider has no rate" do
     expect { rate("EUR", "AUD") }.to raise_error(described_class::RateNotFound, "No EUR/AUD rate for 2026-03-31 and no forex_rate_provider configured")
     TudlaAccounting.configuration.forex_rate_provider = ->(**) { nil }
     expect { rate("EUR", "AUD") }.to raise_error(described_class::RateNotFound, "No EUR/AUD rate for 2026-03-31")
+    TudlaAccounting.configuration.forex_rate_provider = ->(**) { BigDecimal("0.000000001") }
+    expect { rate("EUR", "AUD") }.to raise_error(described_class::RateNotFound, "No EUR/AUD rate for 2026-03-31 (0.000000001 is too small to keep)")
   end
 end
