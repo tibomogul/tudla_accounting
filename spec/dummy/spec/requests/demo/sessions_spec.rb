@@ -9,4 +9,14 @@ RSpec.describe "Demo sign-in", type: :request do
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Demo Co")
   end
+
+  it "seeds Demo GmbH and opens its books, in euros, when asked for them" do
+    allow(Demo::EuroSeeder).to receive(:new).and_wrap_original { |original, **| original.call(entries: 10) }
+    post demo_session_path(books: "euro")
+
+    follow_redirect!
+    expect(response.body).to include("Demo GmbH")
+    expect(response.body).to include('data-tc-decimal-mark=","')
+    expect(Organization.find_by!(name: "Demo GmbH").currency).to eq("EUR")
+  end
 end

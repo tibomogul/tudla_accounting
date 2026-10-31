@@ -29,7 +29,7 @@ class Demo::Seeder
       ActiveRecord::Base.transaction do
         # Two clicks on the demo button at once mustn't seed Demo Co twice.
         ActiveRecord::Base.with_connection { |connection| connection.execute("SELECT pg_advisory_xact_lock(hashtext('tudla_demo_seed'))") }
-        @organization = Organization.find_by(name: NAME)
+        @organization = Organization.find_by(name: self.class::NAME)
         organization ? create_periods : seed
         organization
       end
@@ -53,7 +53,7 @@ class Demo::Seeder
     latest = TudlaAccounting::Period.roots.where(organization: organization).maximum(:thru_date)
     first = latest ? latest.in_time_zone(zone).year + 1 : years.first
     (first..years.last).each do |year|
-      TudlaAccounting::PeriodCreator.call(organization, year) or raise "Couldn't create #{NAME}'s #{year} periods (see the log)"
+      TudlaAccounting::PeriodCreator.call(organization, year) or raise "Couldn't create #{organization.name}'s #{year} periods (see the log)"
     end
   end
 
@@ -122,7 +122,7 @@ class Demo::Seeder
       net = random.rand(100_00..5_000_00)
       tax = net / 10
       income = %w[4010 4020].sample(random: random)
-      entry.particulars = "Invoice #{@invoice_number += 1} – #{CUSTOMERS.sample(random: random)} (#{accounts[income].name.downcase})"
+      entry.particulars = "Invoice #{@invoice_number += 1} – #{self.class::CUSTOMERS.sample(random: random)} (#{accounts[income].name.downcase})"
       entry.reference = "INV-#{@invoice_number}"
       line(entry, bank, :debit, net + tax)
       sale = line(entry, accounts[income], :credit, net, tax_code: @gst, tax_role: :base)
@@ -161,7 +161,7 @@ class Demo::Seeder
   def noon(date) = [ date.in_time_zone(zone).change(hour: 12), Time.current ].min
 
   def line(entry, account, tally, cents, **extra)
-    entry.details.build(account: account, tally: tally, amount_cents: cents, currency: CURRENCY, organization: organization, **extra)
+    entry.details.build(account: account, tally: tally, amount_cents: cents, currency: organization.currency, organization: organization, **extra)
   end
 
   # From next month: software, posted automatically, and an accrual for the month's rent

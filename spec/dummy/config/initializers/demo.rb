@@ -2,9 +2,9 @@
 # (see config.x.demo in config/application.rb), so nothing here reaches them.
 return unless Rails.configuration.x.demo
 
-# The stand-in login shows the demo's button instead of listing Demo Co with the rest.
+# The stand-in login shows the demo's buttons instead of listing its books with the rest.
 Rails.configuration.x.sign_in_partial = "demo/sessions/button"
-Rails.configuration.x.sign_in_organizations = ->(organizations) { organizations.where.not(name: Demo::Seeder::NAME) }
+Rails.configuration.x.sign_in_organizations = ->(organizations) { organizations.where.not(name: [ Demo::Seeder::NAME, Demo::EuroSeeder::NAME ]) }
 
 # Who the demo's invoices are from, when printed and emailed (to files in tmp/mails).
 TudlaAccounting.configure do |config|
@@ -12,5 +12,11 @@ TudlaAccounting.configure do |config|
   # Overdue customers are reminded a week, a fortnight and a month after the due date
   # (by SendRemindersJob, in config/recurring.yml, or from Sales > Reminders due).
   config.reminder_days = [ 7, 14, 30 ]
-  config.document_header = ->(organization) { "#{organization.name}\n1 Demo Street, Sydney NSW 2000\nABN 12 345 678 901" }
+  config.document_header = lambda do |organization|
+    if organization.name == Demo::EuroSeeder::NAME
+      "#{organization.name}\nDemostraße 1, 10115 Berlin\nUSt-IdNr. DE123456789"
+    else
+      "#{organization.name}\n1 Demo Street, Sydney NSW 2000\nABN 12 345 678 901"
+    end
+  end
 end
