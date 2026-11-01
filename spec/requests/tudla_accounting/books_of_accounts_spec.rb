@@ -1,4 +1,5 @@
 require "rails_helper"
+require "roo"
 require_relative "../../support/sign_in"
 require_relative "../../support/configuration"
 
@@ -23,6 +24,8 @@ RSpec.describe "Books of accounts", type: :request do
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("to see reports.")
     get routes.reports_books_path(format: :pdf)
+    expect(response).to have_http_status(:not_found)
+    get routes.reports_books_path(format: :xlsx)
     expect(response).to have_http_status(:not_found)
   end
 
@@ -72,6 +75,26 @@ RSpec.describe "Books of accounts", type: :request do
       expect(response.body).not_to include("No cash accounts are set")
       get routes.reports_books_path(book: "nonsense")
       expect(response.body).to include("General journal, January 1 to March 31, 2026")
+    end
+
+    it "downloads every book in one Excel workbook, for the months shown, when the host has caxlsx" do
+      march = TudlaAccounting::Period.leaf_periods_for_date(organization, Time.zone.local(2026, 3, 15, 12)).first
+      get routes.reports_books_path(book: "sales", from_id: march.id, thru_id: march.id)
+      expect(css_select("a").map { |link| link["href"] }).to include(routes.reports_books_path(format: :xlsx, from_id: march.id, thru_id: march.id))
+
+      get routes.reports_books_path(format: :xlsx, from_id: march.id, thru_id: march.id)
+      expect(response.media_type).to eq(Mime[:xlsx].to_s)
+      expect(response.headers["Content-Disposition"]).to include("books-of-accounts-2026-03-01-to-2026-03-31.xlsx")
+      file = Tempfile.new([ "books", ".xlsx" ], binmode: true).tap { |tempfile| tempfile.write(response.body) && tempfile.close }
+      workbook = Roo::Excelx.new(file.path)
+      expect(workbook.sheets.first(3)).to eq(%w[Cover GeneralJournal GeneralLedger])
+      expect(workbook.sheet("Cover").row(1).first).to eq("BAYANIHAN CORP.")
+
+      allow(TudlaAccounting).to receive(:xlsx?).and_return(false)
+      get routes.reports_books_path
+      expect(response.body).not_to include("Excel (all books)")
+      get routes.reports_books_path(format: :xlsx)
+      expect(response).to have_http_status(:not_found)
     end
   end
 end

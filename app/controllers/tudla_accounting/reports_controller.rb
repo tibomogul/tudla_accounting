@@ -89,7 +89,8 @@ module TudlaAccounting
 
     # One of the books of accounts (book; the general journal by default) over a run of
     # months (this financial year to date by default), a page of the book to a printed
-    # page, or as a PDF. See Reports::BooksOfAccounts.
+    # page, or as a PDF; or all six as an Excel workbook (Reports::BooksWorkbook). See
+    # Reports::BooksOfAccounts.
     def books
       @book_key = params[:book].presence_in(Reports::BooksOfAccounts::BOOKS.keys) || "general_journal"
       if month_range(year_to_date: true)
@@ -102,6 +103,11 @@ module TudlaAccounting
           next head(:not_found) unless @book
 
           send_pdf("#{@book.title}-#{span_name}", fallback: request.path) { PdfMaker.book(@report, @book) }
+        end
+        format.xlsx do
+          next head(:not_found) unless @report && TudlaAccounting.xlsx?
+
+          send_data Reports::BooksWorkbook.new(@report).to_xlsx, filename: "books-of-accounts-#{span_name}.xlsx", type: Mime[:xlsx].to_s
         end
       end
     end

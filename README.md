@@ -325,6 +325,12 @@ Every report downloads as CSV, as shown on its page (period, comparison, months,
 
 Reports → Books of accounts shows one book at a time for a run of months (the financial year to date by default). Each page is headed by the `books_header` setting (the `document_header` without it) and prints on a sheet of its own. **Download PDF** makes the same pages, the wider books on landscape paper, ready to print and bind. Check the layout against the format your tax office approved before using it.
 
+**Excel (all books)** (with the caxlsx gem) downloads all six books for those months in one workbook (`Reports::BooksWorkbook.new(books).to_xlsx`), laid out as the common loose-leaf templates are:
+- **Cover.** A cover sheet lists each book with its number of pages, the count the sworn statement filed with the bound books asks for.
+- **A sheet a book.** Each page is a block of the header, the book's title, the period (or the ledger's account) and page number, the column headings, 30 rows (blank ones filling a short page), the TOTAL row and the check.
+- **Printing.** A page break follows each block, and the sheet is scaled to print a block on one A4 sheet: the journals on landscape, the ledger on portrait, as in the templates.
+- **Formats.** Amounts are numbers, negative ones in parentheses and zero as "-"; dates are dates; text is never a formula.
+
 ### Reporting dimensions
 `TudlaAccounting::Dimension`s (department, project, location...) each have `DimensionValue`s, managed under Setup → Dimensions; inactive ones stop being offered but stay on the lines that have them. Entry lines are tagged with at most one value of each dimension (`DetailTag`): in `Entry.create_from_ruby_hash` with `dimensions: { "DEPT" => "SALES", "PROJ" => "APOLLO" }` on a line (codes), or with a column per dimension in the entry form. Reversals keep the tags; tax lines aren't tagged. Invoice and bill lines take them the same way (a column per dimension in the form, `dimensions` in the API); approving the document tags each line's posting, so profit and loss by dimension includes sales and purchases. A credit note copies them from what it credits.
 

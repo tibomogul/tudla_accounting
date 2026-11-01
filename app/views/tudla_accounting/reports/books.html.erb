@@ -9,6 +9,9 @@
       <%= form.submit "Show", class: "tc-btn tc-btn-secondary", name: nil %>
     <% end %>
     <div class="flex flex-wrap items-center gap-1 print:hidden">
+      <% if TudlaAccounting.xlsx? %>
+        <%= link_to "Excel (all books)", reports_books_path(format: :xlsx, **request.query_parameters.symbolize_keys.except(:book)), class: "tc-btn tc-btn-ghost", data: { turbo: false } %>
+      <% end %>
       <% if TudlaAccounting.pdf? && @book.pages.any? %>
         <%= link_to "Download PDF", reports_books_path(format: :pdf, **request.query_parameters.symbolize_keys), class: "tc-btn tc-btn-ghost", data: { turbo: false } %>
       <% end %>

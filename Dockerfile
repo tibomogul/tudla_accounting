@@ -41,6 +41,7 @@ RUN apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y --no
   libpango-1.0-0 \
   libpangocairo-1.0-0 \
   libpq-dev \
+  libreoffice-calc-nogui \
   libreadline-dev \
   libsqlite3-dev \
   libssl-dev \

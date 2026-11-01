@@ -95,6 +95,7 @@ Controllers in `app/controllers/tudla_accounting/api/v1/` build on `BaseControll
 - `USAGE.md` is tested: `spec/integration/usage_guide_spec.rb` runs its ```ruby blocks in order as one console session (picking them by the heading they're under, and running its `bin/rails tudla_accounting:*` lines as rake tasks), and `spec/system/usage_guide_spec.rb` follows its UI steps by the labels it names. Keep every Ruby block runnable after the ones before it (write alternatives as comments), and update both specs when a heading or a UI label changes
 - Specs that change `TudlaAccounting.configuration` must `include_context "with isolated TudlaAccounting configuration"` (`spec/support/configuration.rb`), which restores it afterwards
 - In API request specs, send no JSON body with a GET (`params: (body.to_json unless method == :get)`): a body replaces the query string
+- `spec/services/tudla_accounting/reports/books_workbook_printing_spec.rb` prints the books workbook through LibreOffice (`soffice`, installed in the Docker image) to check each page fits one A4 sheet; it skips where `soffice` isn't installed, as in CI. Rebuild the image (`docker compose build rails`) if it skips locally
 - Use `stub_const` for inline job classes in specs (Solid Queue requires named classes)
 - SolidCache hashes keys internally — don't query the DB by raw key name
 - Use `TudlaAccounting::Engine.routes.url_helpers` for engine route helpers in specs
