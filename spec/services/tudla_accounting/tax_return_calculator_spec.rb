@@ -119,6 +119,23 @@ RSpec.describe TudlaAccounting::TaxReturnCalculator, type: :service do
     end
   end
 
+  it "works a 2550Q through from sales and purchases to the amount payable, in centavos" do
+    form = TudlaAccounting::TaxReturnForm.from_template!(organization, "ph_2550q")
+    box = ->(label) { form.boxes.find_by!(label: label) }
+    { "31A" => [ "tax_code_base", gst ], "31B" => [ "tax_code_tax", gst ], "32A" => [ "tax_code_base", free ],
+      "44A" => [ "tax_code_base", gstp ], "44B" => [ "tax_code_tax", gstp ] }.each { |label, (source, code)| box.call(label).parts.create!(source: source, tax_code: code) }
+    box.call("16").parts.create!(source: "account", account: account("2300")) # standing in for VAT withheld
+
+    expect(form.boxes.map(&:label).first(4)).to eq(%w[31A 31B 32A 33A])
+    expect(form.boxes.map(&:label).last(12)).to eq(("15".."26").to_a)
+    expect(form.boxes).to all(have_attributes(whole_units?: false))
+    expect(figures(form.reload).slice("34A", "34B", "37B", "50A", "50B", "51B", "60B", "61B", "15", "20", "21", "26")).to eq(
+      "34A" => aud("1300.55"), "34B" => aud("100.06"), "37B" => aud("100.06"), "50A" => aud(50), "50B" => aud(5), "51B" => aud(5), "60B" => aud(5),
+      "61B" => aud("95.06"), "15" => aud("95.06"), "20" => aud(400), "21" => aud("-304.94"), "26" => aud("-304.94")
+    )
+    expect(box.call("61B").parts.map(&:description)).to eq([ "The box 37B", "less The box 60B" ])
+  end
+
   it "lays out the templates, refusing one it doesn't know, all on the audit trail" do
     vat = TudlaAccounting::TaxReturnForm.from_template!(organization, "uk_vat")
     expect(vat.boxes.map(&:label)).to eq((1..9).map { |number| "Box #{number}" })

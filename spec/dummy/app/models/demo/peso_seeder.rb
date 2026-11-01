@@ -3,8 +3,9 @@
 # Bayanihan's consulting is paid three weeks after each invoice; Sampaguita's workshop
 # isn't paid yet; and Acme is invoiced in dollars, zero-rated, at the invoices' own rates,
 # the first paid into the dollar account at a better one (an exchange gain), the second
-# still owed. There is also a hosting company's bill to pay. Like Demo::Seeder, running it
-# again returns the existing books, only adding the new year's periods.
+# still owed. There is also a hosting company's bill to pay, and a quarterly VAT return
+# (BIR Form 2550Q) with last quarter's filed. Like Demo::Seeder, running it again returns
+# the existing books, only adding the new year's periods.
 class Demo::PesoSeeder < Demo::EuroSeeder
   NAME = "Demo Pilipinas Inc."
   CURRENCY = "PHP"
@@ -13,6 +14,11 @@ class Demo::PesoSeeder < Demo::EuroSeeder
   SUPPLIER = [ "Ulap Hosting Inc.", "UH", 25_000_00 ].freeze
 
   private
+
+  def seed
+    super
+    add_tax_return
+  end
 
   def create_tax_codes
     @gst = TudlaAccounting::TaxCode.create!(organization: organization, code: "VAT12", name: "VAT", rate: "0.12", kind: :sales, account: accounts["2200"])
@@ -31,5 +37,17 @@ class Demo::PesoSeeder < Demo::EuroSeeder
     invoices << [ start + 15, acme, [ invoice_line("Integration work", 20, 140_00, @zero) ], { currency: "USD", exchange_rate: BigDecimal("62.85") }, [ 30, accounts["1020"], BigDecimal("63.40") ] ]
     invoices << [ start.next_month + 15, acme, [ invoice_line("Integration work", 20, 140_00, @zero) ], { currency: "USD", exchange_rate: BigDecimal("63.10") }, nil ]
     approve_and_pay(invoices)
+  end
+
+  # A 2550Q with its sales and purchases boxes mapped to the VAT codes, and last quarter's filed.
+  def add_tax_return
+    form = TudlaAccounting::TaxReturnForm.from_template!(organization, "ph_2550q")
+    { "31A" => [ "tax_code_base", @gst ], "31B" => [ "tax_code_tax", @gst ], "32A" => [ "tax_code_base", @zero ],
+      "44A" => [ "tax_code_base", @input ], "44B" => [ "tax_code_tax", @input ] }.each do |label, (source, code)|
+      form.boxes.find_by!(label: label).parts.create!(source: source, tax_code: code)
+    end
+    quarter = today.beginning_of_quarter.prev_day.beginning_of_quarter
+    months = [ quarter, quarter.end_of_quarter ].map { |date| TudlaAccounting::Period.leaf_periods_for_date(organization, date.in_time_zone(zone).change(hour: 12)).first }
+    TudlaAccounting::FiledTaxReturn.file!(form.reload, from: months.first.from_date, thru: months.last.thru_date)
   end
 end

@@ -46,6 +46,16 @@ RSpec.describe Demo::PesoSeeder do
     expect(invoices.map(&:issued_on)).to eq(invoices.map(&:issued_on).sort)
   end
 
+  it "has a 2550Q mapped to its VAT codes, with last quarter's filed" do
+    filed = TudlaAccounting::FiledTaxReturn.find_by!(organization: organization)
+    expect(filed.form.name).to eq("2550Q")
+    expect([ filed.from_date, filed.thru_date ].map { |date| date.in_time_zone(Time.zone).to_date }).to eq([ Date.new(2026, 1, 1), Date.new(2026, 3, 31) ])
+    figures = TudlaAccounting::TaxReturnCalculator.call(filed.form, from: filed.from_date, thru: filed.thru_date)[:boxes].to_h { |row| [ row.box.label, row.amount ] }
+    expect(figures.values_at("31A", "31B")).to all(be_positive)
+    expect(figures["32A"]).to eq(Money.new(175_980_00, "PHP")) # Acme's March invoice, $2,800.00 at 62.85
+    expect(figures["15"]).to eq(figures["31B"] - figures["44B"]) # no input VAT that quarter: the demo's one bill is this month's
+  end
+
   it "has customers and a supplier owing" do
     aging = TudlaAccounting::AgingReportGenerator.call(organization: organization, report_type: :receivable, as_of_date: Date.current)
     expect(aging[:summary].values.map { |party| party[:related_party].name }).to contain_exactly("Acme Inc.", "Sampaguita Foods Inc.")
