@@ -16,9 +16,13 @@ module TudlaAccounting
   # since 1978, which the BSP brings up to date about monthly). Scheduling BspRatesJob for
   # each business day keeps every currency's rate from then on, not only the dollar's.
   #
-  # Each file is downloaded when first needed and again after refresh_after. A file it
-  # can't download counts as having no rate (logged), so the forms ask for one; one whose
-  # layout it doesn't recognise raises ArgumentError. Needs network access to bsp.gov.ph.
+  # Each file is downloaded when first needed and again after refresh_after (the cross
+  # rates, which change monthly, after cross_rates_refresh_after). What it read is kept in
+  # cache (Rails.cache by default; nil for none), so other processes and restarts don't
+  # download and read it again: the cross rates take about 9 seconds, and 0.4 from the
+  # cache. A file it can't download counts as having no rate (logged, not cached), so the
+  # forms ask for one; one whose layout it doesn't recognise raises ArgumentError. Needs
+  # network access to bsp.gov.ph.
   class BspForexRateProvider
     BASE_URL = "https://www.bsp.gov.ph"
     BULLETIN_URL = "#{BASE_URL}/Statistics/RERB/RERB.xlsx".freeze
@@ -38,12 +42,17 @@ module TudlaAccounting
     # Currencies the cross rates quote in an older unit before these dates.
     SINCE = { "ARS" => Date.new(1992, 1, 1), "MXN" => Date.new(1993, 1, 1), "VES" => Date.new(2018, 8, 20) }.freeze
     MONTHS = %w[Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec].freeze
+    # Part of the cache keys: bump it when what the files are read into changes.
+    CACHE_VERSION = 1
 
-    # open: how to read a URL (overridable for tests or caching); refresh_after: how long a
-    # downloaded file is kept before it is read again.
-    def initialize(open: ->(url) { URI.parse(url).open(open_timeout: 10, read_timeout: 60) }, refresh_after: 1.hour)
+    # open: how to read a URL (overridable for tests); refresh_after and
+    # cross_rates_refresh_after: how long what was read from a file is kept before it is
+    # downloaded again; cache: an ActiveSupport cache to keep it in, or nil.
+    def initialize(open: ->(url) { URI.parse(url).open(open_timeout: 10, read_timeout: 60) }, refresh_after: 1.hour, cross_rates_refresh_after: 1.day, cache: Rails.cache)
       @open = open
       @refresh_after = refresh_after
+      @cross_rates_refresh_after = cross_rates_refresh_after
+      @cache = cache
       @files = {}
     end
 
@@ -88,23 +97,27 @@ module TudlaAccounting
       return dollar[:rates][day] if dollar && dollar[:covers].cover?(day) # nil on a day without a quote
       return if SINCE[currency] && day < SINCE[currency]
 
-      file(CROSS_RATES_URL) { |io| parse_cross_rates(io) }&.dig(day, currency)
+      file(CROSS_RATES_URL, keep: @cross_rates_refresh_after) { |io| parse_cross_rates(io) }&.dig(day, currency)
     end
 
-    # A file's parsed contents, downloaded when first asked for and again after
-    # refresh_after; nil (logged) when it can't be downloaded.
-    def file(url)
-      cached = @files[url]
-      return cached[:value] if cached && Time.current - cached[:at] < @refresh_after
-
-      value = yield @open.call(url)
-      @files[url] = { value: value, at: Time.current }
-      value
+    # A file's parsed contents, from this instance, the cache or a download, as long as
+    # what was read is younger than keep (it carries when it was read, so a copy from the
+    # cache expires when the cached one does); nil (logged) when it can't be downloaded.
+    def file(url, keep: @refresh_after)
+      fresh = ->(read) { read if read && Time.current - read[:at] < keep }
+      read = fresh.(@files[url]) || fresh.(@cache&.read(cache_key(url)))
+      unless read
+        read = { value: yield(@open.call(url)), at: Time.current }
+        @cache&.write(cache_key(url), read, expires_in: keep)
+      end
+      (@files[url] = read)[:value]
     rescue *NETWORK_ERRORS => e
       Rails.logger.warn("TudlaAccounting: couldn't download #{url} (#{e.message}); no BSP rates from it")
       @files[url] = { value: nil, at: Time.current }
       nil
     end
+
+    def cache_key(url) = [ "tudla_accounting/bsp_forex_rates", CACHE_VERSION, url ]
 
     def workbook(io) = Roo::Excelx.new(StringIO.new(io.read))
 

@@ -14,7 +14,9 @@ RSpec.describe TudlaAccounting::BspForexRateProvider, type: :service do
 
   let(:opened) { [] }
   let(:files) { FIXTURES.transform_values { |name| -> { file_fixture(name).open } } }
-  subject(:provider) { described_class.new(open: ->(url) { opened << url; files.fetch(url).call }) }
+  let(:cache) { ActiveSupport::Cache::MemoryStore.new }
+  let(:open) { ->(url) { opened << url; files.fetch(url).call } }
+  subject(:provider) { described_class.new(open: open, cache: cache) }
 
   def rate(from, to, date) = provider.call(from: from, to: to, date: date)
   def empty_workbook = StringIO.new(Axlsx::Package.new.tap { |package| package.workbook.add_worksheet(name: "Sheet1") }.to_stream.read)
@@ -76,11 +78,31 @@ RSpec.describe TudlaAccounting::BspForexRateProvider, type: :service do
     end
   end
 
+  it "keeps what it read in the cache, for other instances, until it's due to be read again" do
+    travel_to(Time.zone.local(2026, 10, 30, 12)) do
+      rate("GBP", "PHP", Date.new(2026, 9, 30))
+      expect(opened).to eq([ described_class::BULLETIN_URL, described_class::CROSS_RATES_URL ])
+
+      travel 2.hours
+      other = described_class.new(open: open, cache: cache)
+      expect(other.call(from: "GBP", to: "PHP", date: Date.new(2026, 9, 30))).to eq(BigDecimal("82.6614"))
+      expect(opened.drop(2)).to eq([ described_class::BULLETIN_URL ]) # the bulletin is due again; the cross rates not for a day
+
+      travel 23.hours
+      provider.call(from: "GBP", to: "PHP", date: Date.new(2026, 9, 29))
+      expect(opened.drop(3)).to eq([ described_class::BULLETIN_URL, described_class::CROSS_RATES_URL ])
+    end
+
+    uncached = described_class.new(open: open, cache: nil)
+    expect { uncached.call(from: "USD", to: "PHP", date: Date.new(2026, 10, 30)) }.to change(opened, :size).by(1)
+  end
+
   it "treats a file it can't download as having no rates, and logs it" do
     files[described_class::BULLETIN_URL] = -> { raise SocketError, "getaddrinfo: Name or service not known" }
     allow(Rails.logger).to receive(:warn)
     expect(rate("USD", "PHP", Date.new(2026, 10, 30))).to eq(BigDecimal("63.852")) # the peso–dollar rates have it too
     expect(provider.record_bulletin!).to eq(0)
+    expect(cache.read([ "tudla_accounting/bsp_forex_rates", 1, described_class::BULLETIN_URL ])).to be_nil
     expect(Rails.logger).to have_received(:warn).with(%r{couldn't download https://www.bsp.gov.ph/Statistics/RERB/RERB.xlsx \(getaddrinfo})
   end
 
@@ -97,14 +119,16 @@ RSpec.describe TudlaAccounting::BspForexRateProvider, type: :service do
 
     blank_daily = Axlsx::Package.new.tap { |package| package.workbook.add_worksheet(name: "daily") { |sheet| sheet.add_row [ "Philippine Peso per US Dollar Rate" ] } }
     files[described_class::PESO_DOLLAR_URL] = -> { StringIO.new(blank_daily.to_stream.read) }
-    expect { described_class.new(open: ->(url) { files.fetch(url).call }).call(from: "USD", to: "PHP", date: Date.new(2026, 10, 12)) }
+    expect { described_class.new(open: ->(url) { files.fetch(url).call }, cache: nil).call(from: "USD", to: "PHP", date: Date.new(2026, 10, 12)) }
       .to raise_error(ArgumentError, "Could not find any rates in the BSP peso-dollar file")
   end
 
-  it "reads the URL by default, with timeouts" do
+  it "reads the URL by default, with timeouts, keeping what it read in Rails.cache" do
     expect(URI).to receive(:parse).with(described_class::BULLETIN_URL).and_return(double.tap { |uri|
       expect(uri).to receive(:open).with(open_timeout: 10, read_timeout: 60).and_return(file_fixture("bsp_rerb.xlsx").open)
     })
+    expect(Rails.cache).to receive(:read).and_return(nil)
+    expect(Rails.cache).to receive(:write)
     expect(described_class.new.call(from: "USD", to: "PHP", date: Date.new(2026, 10, 30))).to eq(BigDecimal("63.852"))
   end
 end

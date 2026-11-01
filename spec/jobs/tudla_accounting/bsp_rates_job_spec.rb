@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe TudlaAccounting::BspRatesJob, type: :job do
   it "stores the day's BSP bulletin, once" do
-    provider = TudlaAccounting::BspForexRateProvider.new(open: ->(_url) { file_fixture("bsp_rerb.xlsx").open })
+    provider = TudlaAccounting::BspForexRateProvider.new(open: ->(_url) { file_fixture("bsp_rerb.xlsx").open }, cache: nil)
     allow(TudlaAccounting::BspForexRateProvider).to receive(:new).and_return(provider)
     allow(Rails.logger).to receive(:info)
 
