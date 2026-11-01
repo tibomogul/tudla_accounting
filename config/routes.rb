@@ -72,6 +72,7 @@ TudlaAccounting::Engine.routes.draw do
     get :tax
     get :by_dimension
     get :general_ledger
+    get :books
     get :cash_flow
     get :statement
     get :statements

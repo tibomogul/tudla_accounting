@@ -72,7 +72,7 @@ module TudlaAccounting
                   :due_date_method, :related_party_method, :forex_rate_provider,
                   :parent_controller, :current_organization, :current_actor, :authorize,
                   :cash_account_codes, :tax_basis, :organization_label, :entry_number_format,
-                  :attachment_content_types, :attachment_max_size, :document_header,
+                  :attachment_content_types, :attachment_max_size, :document_header, :books_header,
                   :api_rate_limit, :api_rate_limit_store, :pdf_browser_options, :pdf_paper, :pdf_stylesheet,
                   :document_mailer, :document_mail_from, :document_mail_reply_to
     attr_reader :number_format
@@ -130,6 +130,12 @@ module TudlaAccounting
       #   ->(organization) { [ organization.name, organization.address, "ABN #{organization.abn}" ].join("\n") }
       # Without one, the organization's name (or organization_label).
       @document_header = nil
+      # The heading of each printed page of the books of accounts (Reports::BooksOfAccounts):
+      # a callable given the organization, returning text, its first line the registered
+      # name, e.g. for the BIR's loose-leaf books
+      #   ->(organization) { "#{organization.name}\nTIN: #{organization.tin}   |   #{organization.address}" }
+      # Without one, the document_header.
+      @books_header = nil
       # How many requests an API token may make a minute (nil for no limit), counted in
       # api_rate_limit_store (an ActiveSupport::Cache store; Rails.cache when nil, which
       # must count across processes, as Solid Cache and Redis do, to limit them all).
@@ -258,6 +264,11 @@ module TudlaAccounting
       return document_header.call(organization).to_s if document_header
 
       organization.respond_to?(:name) && organization.name.present? ? organization.name : TudlaAccounting.organization_label(organization)
+    end
+
+    # The books_header setting's text for an organization.
+    def books_header_for(organization)
+      books_header ? books_header.call(organization).to_s : document_header_for(organization)
     end
 
     # The run of numbers posted entries are numbered in, each counted from 1:

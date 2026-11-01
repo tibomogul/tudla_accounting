@@ -216,6 +216,14 @@
   /* So does an invoice, bill or credit note. */
   .tc-app main:has([data-document]) > :not([data-document], :has([data-document])) { display: none; }
   .tc-app [data-document] { border: 0; padding: 0; }
+  /* So does each page of a book of accounts, to be bound. */
+  .tc-app main:has([data-book-page]) > :not([data-book-page]) { display: none; }
+  .tc-app [data-book-page] { border: 0; padding: 0; margin: 0; }
+  .tc-app [data-book-page] + [data-book-page] { break-before: page; }
+  /* Small and tight enough that a page's rows fit its sheet, so the page numbers are the sheets'. */
+  .tc-app [data-book-page], .tc-app [data-book-page] .tc-table { font-size: 0.65rem; line-height: 1.2; }
+  .tc-app [data-book-page] .tc-table td, .tc-app [data-book-page] .tc-table th { padding: 0.15rem 0.375rem; }
+  .tc-app [data-book-page] > * + * { margin-top: 0.375rem; }
   .tc-print-wide { font-size: 0.75rem; }
   .tc-print-wide td, .tc-print-wide th { padding: 0.25rem 0.375rem; }
 }

@@ -1,0 +1,71 @@
+<%# locals: (page:, book:, books:) %>
+<%# A page of a book of accounts (Reports::BooksOfAccounts) as it is printed and bound: the
+    books_header, the book, the period (or the ledger's account) and the page number, its
+    rows, then the page's totals and check. It prints on a sheet of its own. %>
+<% header = TudlaAccounting.configuration.books_header_for(books.organization).lines.map(&:chomp) %>
+<% ledger = book.key == "general_ledger" %>
+<% label_key = (book.keys & %i[particulars party]).first %>
+<article class="tc-card tc-card-body space-y-3 mb-6 text-sm" data-book-page="<%= page.number %>">
+  <header class="text-center space-y-0.5">
+    <p class="font-semibold text-base" data-books-name><%= header.first %></p>
+    <% header.drop(1).each do |line| %><p><%= line %></p><% end %>
+    <h2 class="font-semibold text-base uppercase tracking-wide pt-1"><%= book.title %></h2>
+  </header>
+  <div class="flex flex-wrap justify-between gap-2">
+    <% if ledger %>
+      <p>Account title: <strong><%= page.account.name %></strong> · Account code: <strong class="font-mono"><%= page.account.code %></strong></p>
+    <% else %>
+      <p>For the period: <%= books.period_label %></p>
+    <% end %>
+    <p>Page No.: <strong data-page-number><%= page.number %></strong></p>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="tc-table<%= ' tc-print-wide' if book.columns.size > 6 %>">
+      <thead>
+        <tr>
+          <% book.columns.each do |key, heading| %>
+            <th class="<%= 'tc-num' if TudlaAccounting::Reports::BooksOfAccounts::AMOUNTS.include?(key) || key == :balance %>"><%= safe_join(heading.split("\n"), tag.br) %></th>
+          <% end %>
+        </tr>
+      </thead>
+      <tbody>
+        <% page.rows.each do |row| %>
+          <tr class="<%= 'tc-muted' if row.kind == :brought_forward %>" data-row-kind="<%= row.kind %>">
+            <% book.keys.each do |key| %>
+              <% value = row.cells[key] %>
+              <% if value.is_a?(Money) %>
+                <td class="tc-num whitespace-nowrap"><%= tc_money(value) %></td>
+              <% elsif key == :date %>
+                <td class="whitespace-nowrap"><%= tc_date(value) %></td>
+              <% elsif key == :particulars && row.kind == :credit_line %>
+                <td class="pl-8"><%= value %></td>
+              <% elsif row.kind == :explanation %>
+                <td class="italic tc-muted"><%= value %></td>
+              <% else %>
+                <td class="<%= 'font-mono' if %i[account_code tin].include?(key) %>"><%= value %></td>
+              <% end %>
+            <% end %>
+          </tr>
+        <% end %>
+      </tbody>
+      <tfoot>
+        <tr class="font-semibold" data-totals>
+          <% book.keys.each do |key| %>
+            <% if key == label_key %>
+              <td><%= ledger ? "Total / ending balance" : "Total" %></td>
+            <% elsif page.totals.key?(key) %>
+              <td class="tc-num whitespace-nowrap"><%= tc_money(page.totals[key]) %></td>
+            <% elsif ledger && key == :balance %>
+              <td class="tc-num whitespace-nowrap"><%= tc_money(page.closing) %></td>
+            <% else %>
+              <td></td>
+            <% end %>
+          <% end %>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  <% if book.check %>
+    <p data-check><%= book.check %> <strong class="<%= page.balanced ? '' : 'text-[var(--tc-danger)]' %>"><%= page.balanced ? "Balanced" : "Out of balance" %></strong></p>
+  <% end %>
+</article>

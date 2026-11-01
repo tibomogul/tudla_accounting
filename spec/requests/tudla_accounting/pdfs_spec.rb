@@ -59,6 +59,27 @@ RSpec.describe "PDF downloads", type: :request do
     expect(response).to have_http_status(:not_found)
   end
 
+  it "prints a book of accounts a page to a sheet, its wider books on landscape paper" do
+    invoice
+    2.times { |index| TudlaAccounting::Document.create!(organization: organization, kind: "sales_invoice", contact: northwind, issued_on: Date.new(2026, 4, 2 + index),
+                                                        lines_attributes: [ { description: "More", unit_price_cents: 10_00, account: account("4000") } ]).approve! }
+    get routes.reports_books_path(book: "sales")
+    expect(response.body).to include("Download PDF")
+    get routes.reports_books_path(book: "sales", format: :pdf)
+    expect(response.headers["Content-Disposition"]).to include("Sales-journal-2026-01-01-to-2026-04-30.pdf")
+    reader = PDF::Reader.new(StringIO.new(response.body))
+    expect(reader.pages.size).to eq(1)
+    width, height = reader.pages.first.attributes[:MediaBox].last(2)
+    expect(width).to be > height
+    expect(pdf_text).to include("Acme", "SALES JOURNAL", "INV-0003", "Page No.: 1", "Check (Accounts Receivable = sum of credits): Balanced")
+
+    get routes.reports_books_path(book: "general_ledger", format: :pdf)
+    reader = PDF::Reader.new(StringIO.new(response.body))
+    expect(reader.pages.size).to eq(2) # Receivables and Sales, a sheet each
+    width, height = reader.pages.first.attributes[:MediaBox].last(2)
+    expect(width).to be < height
+  end
+
   it "names a draft's PDF by its kind" do
     draft = TudlaAccounting::Document.create!(organization: organization, kind: "sales_credit", contact: northwind, issued_on: Date.new(2026, 4, 1),
                                               lines_attributes: [ { description: "Refund", unit_price_cents: 10_00, account: account("4000") } ])

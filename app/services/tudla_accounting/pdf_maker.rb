@@ -7,6 +7,7 @@ module TudlaAccounting
   #   PdfMaker.document(invoice)                       # an invoice, bill or credit note
   #   PdfMaker.statements([statement], open_items: false)
   #   PdfMaker.payment(payment)                        # a receipt, or a payment notice
+  #   PdfMaker.book(books, books.book("sales"))        # a book of accounts, a page to a sheet
   #
   # Each returns the PDF's bytes. The page is rendered with the engine's styles inline and
   # the browser is barred from fetching anything, so nothing in it reaches the network.
@@ -30,23 +31,29 @@ module TudlaAccounting
       render("tudla_accounting/payments/notice", { payment: payment }, title: payment.title, organization: payment.organization)
     end
 
+    # Its wider books (more than six columns) on landscape paper.
+    def book(books, book)
+      render("tudla_accounting/reports/book_page", { book: book, books: books }, collection: book.pages, as: :page, title: book.title,
+                                                                                organization: books.organization, landscape: book.columns.size > 6)
+    end
+
     # The PDF of a partial, in the PDF layout, for an organization's amounts.
-    def render(partial, locals, title:, organization:, **options)
+    def render(partial, locals, title:, organization:, landscape: false, **options)
       raise Error, "PDFs need the ferrum gem" unless TudlaAccounting.pdf?
 
       html = PdfViewsController.render(template: "tudla_accounting/pdf_views/page", layout: "tudla_accounting/pdf", assigns: { title: title, organization: organization },
                                        locals: { partial: partial, locals: locals, **options })
-      from_html(html)
+      from_html(html, landscape: landscape)
     end
 
-    def from_html(html)
+    def from_html(html, landscape: false)
       settings = TudlaAccounting.configuration
       browser = Ferrum::Browser.new(**{ timeout: 30 }.merge(settings.pdf_browser_options.to_h))
       begin
         page = browser.create_page
         page.network.blocklist = [ /./ ]
         page.content = html
-        page.pdf(encoding: :binary, format: settings.pdf_paper.to_sym, print_background: true,
+        page.pdf(encoding: :binary, format: settings.pdf_paper.to_sym, landscape: landscape, print_background: true,
                  margin_top: 0.5, margin_bottom: 0.5, margin_left: 0.5, margin_right: 0.5)
       ensure
         browser.quit

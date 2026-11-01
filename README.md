@@ -309,6 +309,22 @@ Every report downloads as CSV, as shown on its page (period, comparison, months,
 
 `Reports::CashFlow.new(organization, from:, thru:, cash_accounts: nil)` is a direct-method cash flow statement: each posted entry that moves cash is attributed to its other lines, grouped by their account's **cash flow activity** — operating, investing or financing, set on the account (inherited from its parent when blank; equity defaults to financing, everything else to operating). Moves between cash accounts cancel out, and `reconciles?` checks that opening cash plus the net change is the closing cash. Cash is the `cash_accounts` given or the `cash_account_codes` setting (each with its sub-accounts); Reports → Cash flow lets you pick them too. With `method: :indirect` (the page's Method choice) it starts instead from the net profit and adds each other balance-sheet account's change over the time, by its activity (receivables growing take cash, payables growing give it); income and expense accounts all count in the net profit, so set accumulated depreciation's activity to operating to show depreciation added back there. Both methods come from the same posted lines and give the same totals.
 
+### Books of accounts
+`Reports::BooksOfAccounts.new(organization, from: month, thru: month)` lays the posted entries out as the books kept on loose-leaf pages, such as the BIR's in the Philippines: a general journal, a general ledger, a cash receipts journal, a cash disbursements journal, a sales journal and a purchase journal (`book(key)`, or `books`), each in pages of 30 rows numbered from 1, with each page's totals and check.
+
+- **Which book.** Each entry goes in one book:
+  - one bringing cash in (debiting the `cash_account_codes` accounts, or those beneath them, more than it credits them) in cash receipts, and one paying cash out in cash disbursements;
+  - otherwise a sales invoice or credit note in sales, and a bill or supplier credit in purchases;
+  - the rest, transfers between cash accounts included, in the general journal.
+- **Columns.** The journals' columns follow a common loose-leaf layout:
+  - receivable and payable by account role (sub-accounts included), sales or expenses by account category, and Output or Input VAT from the tax lines;
+  - in the sales journal, VATable, zero-rated or exempt by the tax code's `treatment` (a line without a code is exempt), with the customer's TIN (`tax_number`).
+  - Anything else goes under Other accounts, a row each. An amount on a column's other side, such as a credit note or tax withheld on a receipt, is negative, so the cash, receivable or payable column always equals the rest.
+- **General journal and ledger.** The general journal writes each entry's debits, then its credits indented, then its explanation. The general ledger gives each account a page or more, each starting with the balance brought forward, debit balances positive and credit ones negative.
+- **Pages.** An entry's rows stay on one page.
+
+Reports → Books of accounts shows one book at a time for a run of months (the financial year to date by default). Each page is headed by the `books_header` setting (the `document_header` without it) and prints on a sheet of its own. **Download PDF** makes the same pages, the wider books on landscape paper, ready to print and bind. Check the layout against the format your tax office approved before using it.
+
 ### Reporting dimensions
 `TudlaAccounting::Dimension`s (department, project, location...) each have `DimensionValue`s, managed under Setup → Dimensions; inactive ones stop being offered but stay on the lines that have them. Entry lines are tagged with at most one value of each dimension (`DetailTag`): in `Entry.create_from_ruby_hash` with `dimensions: { "DEPT" => "SALES", "PROJ" => "APOLLO" }` on a line (codes), or with a column per dimension in the entry form. Reversals keep the tags; tax lines aren't tagged. Invoice and bill lines take them the same way (a column per dimension in the form, `dimensions` in the API); approving the document tags each line's posting, so profit and loss by dimension includes sales and purchases. A credit note copies them from what it credits.
 
@@ -405,7 +421,7 @@ Mounted at `/accounting` by the install generator (see [Integration](#integratio
 - **Accounts:** the chart of accounts as a tree with closing balances. Each account page shows monthly balances and a ledger with running balances. You can create, edit and delete unused accounts, and make accounts no longer used inactive (or active again).
 - **Entries:** search entries (by particulars, reference or number) and filter them, attach receipts, write drafts with a line editor that keeps live debit/credit totals, post them, and reverse posted entries. A posted payment or credit note shows what it was applied to and what is left, with forms to apply it to the party's open invoices or bills (or oldest first) and to take an allocation off; an invoice or bill shows what was applied to it. Reversing a payment takes it off what it settled and reverses its realized exchange difference. An invoice or bill can be reversed once nothing is applied to it, which closes its receivable or payable.
 - **Banking:** import bank statements, see where the books and the bank stand on a date, match statement lines to the books (suggested matches in one click), post entries for bank fees and the like, and see what is in the books but not yet on a statement.
-- **Reports:** balance sheet and profit and loss (alone or compared with the previous period, the year before, or month by month), trial balance, receivables and payables aging, a tax summary for a run of months, profit and loss by dimension, a cash flow statement, and the general ledger, each also as CSV.
+- **Reports:** balance sheet and profit and loss (alone or compared with the previous period, the year before, or month by month), trial balance, receivables and payables aging, a tax summary for a run of months, profit and loss by dimension, a cash flow statement, and the general ledger, each also as CSV; and the books of accounts (journals and ledger) in numbered pages, to print and bind.
 - **Periods:** create calendar or fiscal years, see each year's months, and close or reopen them (reopening asks for a reason).
 - **Setup:** upload a chart of accounts with opening balances (CSV or Excel), or enter or correct opening balances account by account, with live totals checking that they balance. Manage tax codes and reporting dimensions. Also import the receivables and payables open at the cut-over, and run the foreign exchange revaluation. A balance check compares the stored balances with the posted entries and can rebuild them.
 - **Activity:** the audit trail, newest first, filterable by kind, linking to entries, accounts and years that still exist.
@@ -602,6 +618,7 @@ TudlaAccounting.configure do |config|
   # Invoices, bills and credit notes (the engine's own documents)
   config.document_number_format = { "sales_invoice" => "%<number>05d" } # over INV-0001, CN-0001, BILL-0001, SC-0001; or ->(document) { ... }
   config.document_header = ->(organization) { "#{organization.name}\n#{organization.address}" } # who a printed document is from
+  config.books_header = ->(organization) { "#{organization.name}\nTIN: #{organization.tin}   |   #{organization.address}" } # heads the books of accounts' pages; the document_header if unset
 
   # PDFs (with the ferrum gem): Ferrum::Browser options, the paper, and the compiled stylesheet
   config.pdf_browser_options = { browser_path: "/usr/bin/chromium", timeout: 60 }

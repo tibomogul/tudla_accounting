@@ -87,6 +87,25 @@ module TudlaAccounting
       end
     end
 
+    # One of the books of accounts (book; the general journal by default) over a run of
+    # months (this financial year to date by default), a page of the book to a printed
+    # page, or as a PDF. See Reports::BooksOfAccounts.
+    def books
+      @book_key = params[:book].presence_in(Reports::BooksOfAccounts::BOOKS.keys) || "general_journal"
+      if month_range(year_to_date: true)
+        @report = Reports::BooksOfAccounts.new(accounting_organization, from: @from, thru: @thru)
+        @book = @report.book(@book_key)
+      end
+      respond_to do |format|
+        format.html
+        format.pdf do
+          next head(:not_found) unless @book
+
+          send_pdf("#{@book.title}-#{span_name}", fallback: request.path) { PdfMaker.book(@report, @book) }
+        end
+      end
+    end
+
     # Cash in and out by activity over a run of months (the year to date by default), for
     # the chosen cash accounts or those configured.
     def cash_flow

@@ -1,0 +1,31 @@
+<% titles = TudlaAccounting::Reports::BooksOfAccounts::BOOKS.transform_values { |book| book[:title] } %>
+<%= tc_page_header "Books of accounts",
+                   subtitle: (@book ? "#{@book.title}, #{@report.period_label}: #{pluralize(@book.pages.size, 'page')} of #{TudlaAccounting::Reports::BooksOfAccounts::ROWS_PER_PAGE} rows, each printed on its own sheet" : nil) do %>
+  <% if @report %>
+    <%= form_with url: reports_books_path, method: :get, class: "flex flex-wrap items-end gap-2" do |form| %>
+      <div><%= form.label :book, "Book", class: "tc-label" %><%= form.select :book, titles.invert.to_a, { selected: @book_key }, class: "tc-input" %></div>
+      <div><%= form.label :from_id, "From", class: "tc-label" %><%= form.select :from_id, @months.map { |month| [ tc_period_label(month), month.id ] }, { selected: @from.id }, class: "tc-input" %></div>
+      <div><%= form.label :thru_id, "To", class: "tc-label" %><%= form.select :thru_id, @months.map { |month| [ tc_period_label(month), month.id ] }, { selected: @thru.id }, class: "tc-input" %></div>
+      <%= form.submit "Show", class: "tc-btn tc-btn-secondary", name: nil %>
+    <% end %>
+    <div class="flex flex-wrap items-center gap-1 print:hidden">
+      <% if TudlaAccounting.pdf? && @book.pages.any? %>
+        <%= link_to "Download PDF", reports_books_path(format: :pdf, **request.query_parameters.symbolize_keys), class: "tc-btn tc-btn-ghost", data: { turbo: false } %>
+      <% end %>
+      <button type="button" class="tc-btn tc-btn-ghost" data-controller="print" data-action="print#print">Print or save as PDF</button>
+    </div>
+  <% end %>
+<% end %>
+
+<% if @report.nil? %>
+  <%= render "no_periods" %>
+<% else %>
+  <% if %w[cash_receipts cash_disbursements].include?(@book_key) && TudlaAccounting.configuration.cash_account_codes_for(accounting_organization).empty? %>
+    <div class="tc-alert mb-4 print:hidden" role="status">No cash accounts are set (the <code>cash_account_codes</code> setting), so cash received and paid is in the other journals.</div>
+  <% end %>
+  <% if @book.pages.empty? %>
+    <div class="tc-card tc-card-body text-center"><p class="tc-muted">Nothing in the <%= @book.title.downcase %> for these months.</p></div>
+  <% else %>
+    <%= render partial: "book_page", collection: @book.pages, as: :page, locals: { book: @book, books: @report } %>
+  <% end %>
+<% end %>

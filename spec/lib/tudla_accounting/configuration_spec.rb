@@ -71,6 +71,17 @@ RSpec.describe TudlaAccounting::Configuration do
     end
   end
 
+  describe "#books_header_for" do
+    it "heads the books of accounts with the document header unless set otherwise" do
+      organization = Struct.new(:id, :name).new(7, "Acme")
+      expect(config.books_header_for(organization)).to eq("Acme")
+      config.document_header = ->(org) { "#{org.name}\n1 Demo Street" }
+      expect(config.books_header_for(organization)).to eq("Acme\n1 Demo Street")
+      config.books_header = ->(org) { "#{org.name.upcase}\nTIN: 000-000-000-000" }
+      expect(config.books_header_for(organization)).to eq("ACME\nTIN: 000-000-000-000")
+    end
+  end
+
   describe "#dup" do
     it "copies the entry source registry, so the copy can change without affecting the original" do
       config.entry_sources["Invoice"] = ->(_record) { {} }
