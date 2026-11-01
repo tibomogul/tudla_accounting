@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_31_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_01_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -644,11 +644,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_31_100000) do
     t.bigint "organization_id", null: false
     t.string "organization_type", null: false
     t.decimal "rate", precision: 9, scale: 6, default: "0.0", null: false
+    t.integer "treatment", default: 0, null: false
     t.datetime "updated_at", null: false
     t.index ["account_id"], name: "index_tudla_accounting_tax_codes_on_account_id"
     t.index ["organization_type", "organization_id", "code"], name: "tudla_accounting_tax_codes_unique_key", unique: true
     t.check_constraint "kind = ANY (ARRAY[0, 1])", name: "tudla_accounting_tax_codes_kind_known"
     t.check_constraint "rate >= 0::numeric", name: "tudla_accounting_tax_codes_rate_not_negative"
+    t.check_constraint "treatment = 0 OR rate = 0::numeric", name: "tudla_accounting_tax_codes_untaxed_without_rate"
+    t.check_constraint "treatment = ANY (ARRAY[0, 1, 2])", name: "tudla_accounting_tax_codes_treatment_known"
   end
 
   create_table "tudla_accounting_tax_return_box_parts", force: :cascade do |t|

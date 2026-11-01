@@ -22,7 +22,7 @@ class Demo::PesoSeeder < Demo::EuroSeeder
 
   def create_tax_codes
     @gst = TudlaAccounting::TaxCode.create!(organization: organization, code: "VAT12", name: "VAT", rate: "0.12", kind: :sales, account: accounts["2200"])
-    @zero = TudlaAccounting::TaxCode.create!(organization: organization, code: "VATZR", name: "VAT zero-rated", rate: "0", kind: :sales)
+    @zero = TudlaAccounting::TaxCode.create!(organization: organization, code: "VATZR", name: "VAT zero-rated", rate: "0", kind: :sales, treatment: :zero_rated)
     @input = TudlaAccounting::TaxCode.create!(organization: organization, code: "IN12", name: "Input VAT", rate: "0.12", kind: :purchases, account: accounts["2200"])
   end
 

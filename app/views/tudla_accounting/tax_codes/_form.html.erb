@@ -16,6 +16,10 @@
                  choices: [ [ "None (tax-free)", "" ] ] + postable_account_choices(tax_accounts, selected: form.object.account_id),
                  hint: "Where the tax is posted" %>
   </div>
+  <div class="grid gap-4 sm:grid-cols-3">
+    <%= tc_field form, :treatment, as: :select, choices: TudlaAccounting::TaxCode::TREATMENTS.invert.to_a,
+                 hint: "Zero-rated and exempt codes have no rate; returns and the sales journal report them apart" %>
+  </div>
   <label class="flex items-center gap-2 text-sm"><%= form.check_box :active %> Active (offered for new lines)</label>
   <div class="flex flex-wrap gap-2">
     <%= form.submit "Save tax code", class: "tc-btn" %>

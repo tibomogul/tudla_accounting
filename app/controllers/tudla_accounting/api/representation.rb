@@ -112,7 +112,7 @@ module TudlaAccounting
       end
 
       def tax_code_json(code)
-        { id: code.id, code: code.code, name: code.name, kind: code.kind, rate: code.rate.to_s("F"), account_code: code.account&.code, active: code.active? }
+        { id: code.id, code: code.code, name: code.name, kind: code.kind, treatment: code.treatment, rate: code.rate.to_s("F"), account_code: code.account&.code, active: code.active? }
       end
 
       def period_json(period)

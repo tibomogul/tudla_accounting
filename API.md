@@ -166,7 +166,7 @@ end
 
 ### Tax codes and periods
 
-`GET /tax_codes`: `{ "id", "code", "name", "kind" (sales or purchases), "rate" ("0.1" for 10%), "account_code", "active" }`.
+`GET /tax_codes`: `{ "id", "code", "name", "kind" (sales or purchases), "treatment" (standard, zero_rated or exempt; the last two have a rate of 0), "rate" ("0.1" for 10%), "account_code", "active" }`.
 
 `GET /periods`: financial years and their months, latest first: `{ "id", "label" ("Mar 2026"), "kind" (year or month), "year_id", "from_date", "thru_date", "closed" }`. Their ids pick the periods reports cover.
 

@@ -5,12 +5,19 @@ module TudlaAccounting
   # A sales code's tax is collected and owed to the tax authority; a purchases code's is
   # paid and claimed back. The tax is posted to the code's account, on the same side as
   # the line it is on; a zero-rate code needs no account, but its lines are still reported.
+  #
+  # treatment tells apart the codes without tax: standard (taxed at the rate, which may be
+  # 0), zero_rated (taxable at 0%, such as exports) and exempt (outside the tax); the last
+  # two have no rate. Returns and the sales journal report them apart.
   class TaxCode < ApplicationRecord
     belongs_to :organization, polymorphic: true
     belongs_to :account, class_name: "TudlaAccounting::Account", optional: true
     has_many :details, class_name: "TudlaAccounting::Detail", dependent: :restrict_with_error
 
     enum :kind, { sales: 0, purchases: 1 }
+    enum :treatment, { standard: 0, zero_rated: 1, exempt: 2 }, validate: true
+
+    TREATMENTS = { "standard" => "Taxed at the rate", "zero_rated" => "Zero-rated (0%, e.g. exports)", "exempt" => "Exempt (outside the tax)" }.freeze
 
     validates :code, :name, :kind, presence: true
     validates :code, uniqueness: { scope: %i[organization_type organization_id] }
@@ -83,6 +90,7 @@ module TudlaAccounting
 
     def account_for_tax
       errors.add(:rate, "#{@unreadable_rate} isn't a number") if @unreadable_rate
+      errors.add(:rate, "must be 0 for #{zero_rated? ? 'a zero-rated' : 'an exempt'} code") if !standard? && rate.to_d.nonzero?
       if rate.to_d.positive? && account.nil?
         errors.add(:account, "is needed for a code with a rate")
       elsif account && account.organization != organization

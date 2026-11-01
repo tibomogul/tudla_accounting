@@ -54,7 +54,7 @@ module TudlaAccounting
     end
 
     def tax_code_params
-      permitted = params.require(:tax_code).permit(:code, :name, :rate_percent, :kind, :account_id, :active)
+      permitted = params.require(:tax_code).permit(:code, :name, :rate_percent, :kind, :treatment, :account_id, :active)
       permitted[:account_id] = organization_scope(Account).find(permitted[:account_id]).id if permitted[:account_id].present?
       permitted
     end

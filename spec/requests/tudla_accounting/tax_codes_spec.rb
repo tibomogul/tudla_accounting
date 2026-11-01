@@ -32,9 +32,13 @@ RSpec.describe "Tax codes", type: :request do
     expect(flash[:notice]).to eq("Tax code GST (10%) was added.")
     expect(gst).to have_attributes(rate: BigDecimal("0.1"), account: account("2200"), kind: "sales")
 
-    post routes.tax_codes_path, params: { tax_code: { code: "FRE", name: "GST-free", kind: "sales", rate_percent: "0", account_id: "", active: "0" } }
+    get routes.new_tax_code_path
+    expect(css_select("#tax_code_treatment option").map { |option| [ option["value"], option.text ] })
+      .to eq([ [ "standard", "Taxed at the rate" ], [ "zero_rated", "Zero-rated (0%, e.g. exports)" ], [ "exempt", "Exempt (outside the tax)" ] ])
+    post routes.tax_codes_path, params: { tax_code: { code: "FRE", name: "GST-free", kind: "sales", rate_percent: "0", treatment: "zero_rated", account_id: "", active: "0" } }
+    expect(TudlaAccounting::TaxCode.find_by!(code: "FRE")).to be_zero_rated
     get routes.tax_codes_path
-    expect(rows).to eq([ [ "FRE", "GST-free", "Sales (collected)", "0%", "None", "Inactive" ], [ "GST", "GST on sales", "Sales (collected)", "10%", "2200 - GST", "" ] ])
+    expect(rows).to eq([ [ "FRE", "GST-free", "Sales (collected)", "Zero-rated 0%", "None", "Inactive" ], [ "GST", "GST on sales", "Sales (collected)", "10%", "2200 - GST", "" ] ])
 
     patch routes.tax_code_path(gst), params: { tax_code: { rate_percent: "12.5" } }
     expect(flash[:notice]).to eq("Tax code GST (12.5%) was saved.")
@@ -52,6 +56,14 @@ RSpec.describe "Tax codes", type: :request do
 
     post routes.tax_codes_path, params: { tax_code: { code: "GST", name: "GST", kind: "sales", rate_percent: "10", account_id: "" } }
     expect(css_select("[role=alert]").text).to include("Account is needed for a code with a rate")
+
+    post routes.tax_codes_path, params: { tax_code: { code: "EX", name: "Exempt", kind: "sales", rate_percent: "12", treatment: "exempt", account_id: account("2200").id } }
+    expect(css_select("[role=alert]").text).to include("Rate must be 0 for an exempt code")
+    post routes.tax_codes_path, params: { tax_code: { code: "ZR", name: "Zero-rated", kind: "sales", rate_percent: "5", treatment: "zero_rated", account_id: account("2200").id } }
+    expect(css_select("[role=alert]").text).to include("Rate must be 0 for a zero-rated code")
+    post routes.tax_codes_path, params: { tax_code: { code: "ZR", name: "Zero-rated", kind: "sales", rate_percent: "0", treatment: "nil-rated" } }
+    expect(css_select("[role=alert]").text).to include("Treatment is not included in the list")
+    expect(TudlaAccounting::TaxCode.where(code: %w[EX ZR])).to be_empty
   end
 
   context "with a code in use" do
