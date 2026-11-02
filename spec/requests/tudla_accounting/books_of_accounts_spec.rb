@@ -29,6 +29,35 @@ RSpec.describe "Books of accounts", type: :request do
     expect(response).to have_http_status(:not_found)
   end
 
+  it "shows a sample of each book's format with no financial year, for the year asked, and downloads it" do
+    get routes.reports_books_path
+    expect(css_select("a").map { |link| link["href"] }).to include(routes.reports_books_sample_path)
+
+    get routes.reports_books_sample_path(book: "sales", year: 2027)
+    expect(text("h1")).to eq([ "Books of accounts: sample format" ])
+    expect(response.body).to include("For the period: January 1 to December 31, 2027", "These rows are examples, not your postings.")
+    expect(text("[data-book-page] tbody tr").first).to eq("10 Jan 2027 SI-1001 Sample Client Inc. 000-000-000-000 100,000.00 100,000.00")
+    expect(text("[data-check]").sole).to end_with("Balanced")
+    links = css_select("a").map { |link| link["href"] }
+    expect(links).to include(routes.reports_books_sample_path(format: :xlsx, year: 2027), routes.reports_books_sample_path(format: :pdf, book: "sales", year: 2027))
+
+    get routes.reports_books_sample_path(year: "nonsense", book: "nonsense")
+    expect(response.body).to include("General journal", "January 1 to December 31, 2026")
+
+    get routes.reports_books_sample_path(format: :xlsx, year: 2027)
+    expect(response.headers["Content-Disposition"]).to include("sample-books-of-accounts-2027.xlsx")
+    file = Tempfile.new([ "sample", ".xlsx" ], binmode: true).tap { |tempfile| tempfile.write(response.body) && tempfile.close }
+    cover = Roo::Excelx.new(file.path).sheet("Cover")
+    expect((1..cover.last_row).map { |row| cover.cell(row, 1) }).to include("BOOKS OF ACCOUNTS – SAMPLE FORMAT", "A sample of each book's format: the rows are examples, not postings.")
+    expect(cover.cell(cover.last_row - 3, 3)).to eq(6)
+
+    allow(TudlaAccounting).to receive(:xlsx?).and_return(false)
+    get routes.reports_books_sample_path
+    expect(response.body).not_to include("Excel (all books)")
+    get routes.reports_books_sample_path(format: :xlsx)
+    expect(response).to have_http_status(:not_found)
+  end
+
   context "with postings" do
     before do
       TudlaAccounting::PeriodCreator.call(organization, 2026)

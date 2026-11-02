@@ -47,13 +47,25 @@ RSpec.describe TudlaAccounting::Reports::BooksWorkbook, type: :service do
     entry.post(entry.transacted_at)
   end
 
-  it "prints each page of each book on one A4 sheet" do
-    sheets = Dir.mktmpdir do |dir|
-      File.binwrite(File.join(dir, "books.xlsx"), described_class.new(books).to_xlsx)
+  # Each printed sheet's [media box, text].
+  def printed(report)
+    Dir.mktmpdir do |dir|
+      File.binwrite(File.join(dir, "books.xlsx"), described_class.new(report).to_xlsx)
       output, status = Open3.capture2e(soffice, "-env:UserInstallation=file://#{dir}/profile", "--headless", "--convert-to", "pdf", "--outdir", dir, File.join(dir, "books.xlsx"))
       expect(status).to be_success, output
       PDF::Reader.new(File.join(dir, "books.pdf")).pages.map { |page| [ page.attributes[:MediaBox], page.text.squish ] }
     end
+  end
+
+  it "prints the sample format on a cover and a sheet a book" do
+    sheets = printed(TudlaAccounting::Reports::SampleBooks.new(organization, year: 2027))
+    expect(sheets.size).to eq(7)
+    expect(sheets.first.last).to include("SAMPLE FORMAT")
+    expect(sheets.drop(1).map(&:last)).to all(include("Page No.: 1", "TOTAL"))
+  end
+
+  it "prints each page of each book on one A4 sheet" do
+    sheets = printed(books)
 
     expected = books.books.flat_map { |each| each.pages.empty? ? [ [ each, nil ] ] : each.pages.map { |page| [ each, page ] } }
     expect(books.books.map { |each| [ each.key, each.pages.size ] }).to include([ "general_journal", 4 ], [ "cash_receipts", 2 ], [ "sales", 2 ])

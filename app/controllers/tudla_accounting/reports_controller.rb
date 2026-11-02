@@ -112,6 +112,24 @@ module TudlaAccounting
       end
     end
 
+    # A page of each book with made-up rows, to show their format (Reports::SampleBooks),
+    # for a year (this one by default). It needs no financial year or postings.
+    def books_sample
+      @book_key = params[:book].presence_in(Reports::BooksOfAccounts::BOOKS.keys) || "general_journal"
+      year = params[:year].to_i
+      @report = Reports::SampleBooks.new(accounting_organization, year: year.between?(2000, 2100) ? year : Date.current.year)
+      @book = @report.book(@book_key)
+      respond_to do |format|
+        format.html
+        format.pdf { send_pdf("Sample-#{@book.title}-#{@report.year}", fallback: request.path) { PdfMaker.book(@report, @book) } }
+        format.xlsx do
+          next head(:not_found) unless TudlaAccounting.xlsx?
+
+          send_data Reports::BooksWorkbook.new(@report).to_xlsx, filename: "sample-books-of-accounts-#{@report.year}.xlsx", type: Mime[:xlsx].to_s
+        end
+      end
+    end
+
     # Cash in and out by activity over a run of months (the year to date by default), for
     # the chosen cash accounts or those configured.
     def cash_flow

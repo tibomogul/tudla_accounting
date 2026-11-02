@@ -1,0 +1,20 @@
+<% titles = TudlaAccounting::Reports::BooksOfAccounts::BOOKS.transform_values { |book| book[:title] } %>
+<%= tc_page_header "Books of accounts: sample format", subtitle: "A page of each book with made-up rows, to show the format (the BIR asks for one with the application to use loose-leaf books)" do %>
+  <%= form_with url: reports_books_sample_path, method: :get, class: "flex flex-wrap items-end gap-2" do |form| %>
+    <div><%= form.label :book, "Book", class: "tc-label" %><%= form.select :book, titles.invert.to_a, { selected: @book_key }, class: "tc-input" %></div>
+    <div><%= form.label :year, "Year", class: "tc-label" %><%= form.number_field :year, value: @report.year, class: "tc-input" %></div>
+    <%= form.submit "Show", class: "tc-btn tc-btn-secondary", name: nil %>
+  <% end %>
+  <div class="flex flex-wrap items-center gap-1 print:hidden">
+    <% if TudlaAccounting.xlsx? %>
+      <%= link_to "Excel (all books)", reports_books_sample_path(format: :xlsx, year: @report.year), class: "tc-btn tc-btn-ghost", data: { turbo: false } %>
+    <% end %>
+    <% if TudlaAccounting.pdf? %>
+      <%= link_to "Download PDF", reports_books_sample_path(format: :pdf, book: @book_key, year: @report.year), class: "tc-btn tc-btn-ghost", data: { turbo: false } %>
+    <% end %>
+    <button type="button" class="tc-btn tc-btn-ghost" data-controller="print" data-action="print#print">Print or save as PDF</button>
+  </div>
+<% end %>
+
+<div class="tc-alert mb-4 print:hidden" role="status">These rows are examples, not your postings. <%= link_to "Back to the books", reports_books_path, class: "underline" %></div>
+<%= render partial: "book_page", collection: @book.pages, as: :page, locals: { book: @book, books: @report } %>

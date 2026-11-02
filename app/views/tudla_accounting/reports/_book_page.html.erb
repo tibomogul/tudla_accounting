@@ -42,7 +42,7 @@
               <% elsif row.kind == :explanation %>
                 <td class="italic tc-muted"><%= value %></td>
               <% else %>
-                <td class="<%= 'font-mono' if %i[account_code tin].include?(key) %>"><%= value %></td>
+                <td class="<%= { account_code: 'font-mono', tin: 'font-mono whitespace-nowrap' }[key] %>"><%= value %></td>
               <% end %>
             <% end %>
           </tr>

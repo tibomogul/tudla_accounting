@@ -77,6 +77,9 @@ module TudlaAccounting
         @thru = thru
       end
 
+      # Whether the rows are made up (SampleBooks) rather than postings.
+      def sample? = false
+
       def books = BOOKS.keys.map { |key| book(key) }
 
       def book(key)

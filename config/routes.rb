@@ -73,6 +73,7 @@ TudlaAccounting::Engine.routes.draw do
     get :by_dimension
     get :general_ledger
     get :books
+    get "books/sample", action: :books_sample, as: :books_sample
     get :cash_flow
     get :statement
     get :statements

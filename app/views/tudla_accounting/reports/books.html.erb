@@ -18,6 +18,7 @@
       <button type="button" class="tc-btn tc-btn-ghost" data-controller="print" data-action="print#print">Print or save as PDF</button>
     </div>
   <% end %>
+  <%= link_to "Sample format", reports_books_sample_path, class: "tc-btn tc-btn-ghost print:hidden" %>
 <% end %>
 
 <% if @report.nil? %>

@@ -57,7 +57,7 @@ module TudlaAccounting
       def add_cover
         @workbook.add_worksheet(name: "Cover", page_setup: { paper_size: 9, orientation: :portrait }, page_margins: MARGINS) do |sheet|
           header_lines.each_with_index { |line, index| sheet.add_row [ line ], style: style(index.zero? ? :name : :line), types: [ :string ] }
-          sheet.add_row [ "BOOKS OF ACCOUNTS" ], style: style(:title), types: [ :string ]
+          sheet.add_row [ books.sample? ? "BOOKS OF ACCOUNTS – SAMPLE FORMAT" : "BOOKS OF ACCOUNTS" ], style: style(:title), types: [ :string ]
           sheet.add_row [ "For the period: #{books.period_label}" ], style: style(:line), types: [ :string ]
           sheet.add_row []
           sheet.add_row [ "Book", "Sheet", "Pages" ], style: style(:heading), height: 20
@@ -65,6 +65,7 @@ module TudlaAccounting
           sheet.add_row [ "Total pages", nil, books.books.sum { |book| book.pages.size } ], style: [ style(:total_label), style(:total_label), style(:total_count) ], types: %i[string string integer]
           sheet.add_row []
           sheet.add_row [ "Each page prints on a sheet of its own, numbered from 1 in each book, #{BooksOfAccounts::ROWS_PER_PAGE} rows to a page." ], style: style(:note), types: [ :string ]
+          sheet.add_row [ "A sample of each book's format: the rows are examples, not postings." ], style: style(:note), types: [ :string ] if books.sample?
           (header_lines.size + 2).times { |index| sheet.merge_cells("A#{index + 1}:C#{index + 1}") }
           sheet.column_widths 36, 28, 12
         end

@@ -331,6 +331,8 @@ Reports → Books of accounts shows one book at a time for a run of months (the 
 - **Printing.** A page break follows each block, and the sheet is scaled to print a block on one A4 sheet: the journals on landscape, the ledger on portrait, as in the templates.
 - **Formats.** Amounts are numbers, negative ones in parentheses and zero as "-"; dates are dates; text is never a formula.
 
+**Sample format** (`Reports::SampleBooks.new(organization, year: 2027)`) makes a page of each book with made-up rows instead of postings, for the application to use loose-leaf books, which asks for sample formats. It needs no financial year, so a new company can print it, and downloads the same ways: Excel with all six books, or a PDF of one.
+
 ### Reporting dimensions
 `TudlaAccounting::Dimension`s (department, project, location...) each have `DimensionValue`s, managed under Setup → Dimensions; inactive ones stop being offered but stay on the lines that have them. Entry lines are tagged with at most one value of each dimension (`DetailTag`): in `Entry.create_from_ruby_hash` with `dimensions: { "DEPT" => "SALES", "PROJ" => "APOLLO" }` on a line (codes), or with a column per dimension in the entry form. Reversals keep the tags; tax lines aren't tagged. Invoice and bill lines take them the same way (a column per dimension in the form, `dimensions` in the API); approving the document tags each line's posting, so profit and loss by dimension includes sales and purchases. A credit note copies them from what it credits.
 

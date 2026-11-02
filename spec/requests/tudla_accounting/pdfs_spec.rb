@@ -80,6 +80,13 @@ RSpec.describe "PDF downloads", type: :request do
     expect(width).to be < height
   end
 
+  it "prints a book's sample format on one sheet" do
+    get routes.reports_books_sample_path(book: "purchases", year: 2027, format: :pdf)
+    expect(response.headers["Content-Disposition"]).to include("Sample-Purchase-journal-2027.pdf")
+    expect(PDF::Reader.new(StringIO.new(response.body)).pages.size).to eq(1)
+    expect(pdf_text).to include("PURCHASE JOURNAL", "Sample Supplier", "000-000-000-000", "January 1 to December 31, 2027", "Balanced")
+  end
+
   it "names a draft's PDF by its kind" do
     draft = TudlaAccounting::Document.create!(organization: organization, kind: "sales_credit", contact: northwind, issued_on: Date.new(2026, 4, 1),
                                               lines_attributes: [ { description: "Refund", unit_price_cents: 10_00, account: account("4000") } ])
