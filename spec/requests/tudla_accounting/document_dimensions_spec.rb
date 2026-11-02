@@ -50,13 +50,13 @@ RSpec.describe "Dimensions on invoice and bill lines", type: :request do
     ) }
     invoice = TudlaAccounting::Document.sole
     expect(response).to redirect_to(routes.document_path(invoice))
-    expect(invoice.lines.map(&:dimension_value_ids)).to eq([ [ eng.id, apollo.id ], [ sales.id ] ])
+    expect(invoice.lines.map { |line| line.dimension_value_ids.sort }).to eq([ [ eng.id, apollo.id ], [ sales.id ] ]) # tags have no order of their own
 
     get routes.document_path(invoice)
     expect(css_select("tr[data-line-dimensions]").map { |row| row.css("td").map(&:text) }).to eq([ [ "Consulting", "4000 - Sales", "Engineering", "Apollo" ], [ "Training", "4000 - Sales", "Sales", "—" ] ])
     expect(css_select("[data-document]").text).not_to include("Engineering") # not on the printed document
 
-    tags = invoice.entry.details.to_h { |detail| [ [ detail.account.code, detail.amount_cents ], detail.tags.map(&:dimension_value) ] }
+    tags = invoice.entry.details.to_h { |detail| [ [ detail.account.code, detail.amount_cents ], detail.tags.map(&:dimension_value).sort_by(&:id) ] }
     expect(tags).to eq([ "1100-AUD", 165_00 ] => [], [ "4000", 100_00 ] => [ eng, apollo ], [ "4000", 50_00 ] => [ sales ], [ "2200", 10_00 ] => [], [ "2200", 5_00 ] => [])
     report = TudlaAccounting::DimensionReport.call(organization, department, from: Date.new(2026, 1, 1), thru: Date.new(2026, 12, 31))
     expect(report[:income].sole[:amounts].transform_keys { |value| value&.code }.transform_values(&:cents)).to include("SALES" => 50_00, "ENG" => 100_00)
