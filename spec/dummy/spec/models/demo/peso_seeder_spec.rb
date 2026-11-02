@@ -29,6 +29,16 @@ RSpec.describe Demo::PesoSeeder do
     expect(TudlaAccounting::MoneyFormatter.labelled(sampaguita.total, organization)).to eq("₱56,112.00") # 45,000.00 plus 6 × 850.00, and 12% VAT
   end
 
+  it "keeps its books of accounts, with money in and out of the bank in the cash journals, every page balanced" do
+    books = TudlaAccounting::Reports::BooksOfAccounts.new(organization, from: TudlaAccounting::Period.leaf_periods_for_date(organization, Date.new(2026, 1, 1)).first, thru: this_month)
+    pages = books.books.to_h { |book| [ book.key, book.pages ] }
+    expect(pages.values_at("cash_receipts", "cash_disbursements", "sales", "general_ledger")).to all(be_present)
+    expect(pages.except("general_ledger").values.flatten.map(&:balanced)).to all(be(true))
+    rows = pages.values_at("cash_receipts", "sales").flatten.flat_map(&:rows).map(&:cells)
+    expect(rows).to include(a_hash_including(particulars: start_with("Payment from Bayanihan Trading Corp."), receivable: be_positive),
+                            a_hash_including(party: "Acme Inc.", zero_rated: be_positive))
+  end
+
   it "invoices Acme in dollars, zero-rated, at their own rates, the first paid at a better one" do
     acme = TudlaAccounting::Contact.find_by!(organization: organization, name: "Acme Inc.")
     invoices = TudlaAccounting::Document.where(organization: organization, contact: acme).order(:issued_on)

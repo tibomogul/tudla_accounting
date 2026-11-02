@@ -12,6 +12,9 @@ TudlaAccounting.configure do |config|
   # Overdue customers are reminded a week, a fortnight and a month after the due date
   # (by SendRemindersJob, in config/recurring.yml, or from Sales > Reminders due).
   config.reminder_days = [ 7, 14, 30 ]
+  # Cash and bank (1010, with the accounts beneath it) is cash in every demo's chart: the
+  # cash flow statement's default, and what the books of accounts' cash journals go by.
+  config.cash_account_codes = %w[1010]
   config.document_header = lambda do |organization|
     case organization.name
     when Demo::EuroSeeder::NAME then "#{organization.name}\nDemostraße 1, 10115 Berlin\nUSt-IdNr. DE123456789"
