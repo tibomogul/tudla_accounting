@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-03
+
+Tagged but not published to RubyGems.
+
 ### Changed
 - The statements page and emailing every statement (`PartyStatement.to_send`) read all the customers' or suppliers' items and age them in one go, in the same number of queries however many there are, rather than about 20 queries for each.
 - **Breaking:** the pages read typed numbers (amounts, quantities, exchange rates, tax and budget percentages) in the organization's number format, and fill their fields in it, so books whose currency writes `1.234,56` (the euro, say) now type `1234,50` rather than `1234.50`, which is refused, saying how to write it. Set `number_format = :point` to keep reading `1234.50` there. The JSON API, CSV and Excel files and imports are unchanged.
@@ -134,6 +138,7 @@ First release.
 - Web pages for all of the above, styled with Tailwind CSS v4 and following the host's light/dark theme.
 - Set-based posting and batched balance reads for large ledgers; `perf/benchmark.rb` to measure them.
 
-[Unreleased]: https://github.com/tibomogul/tudla_accounting/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/tibomogul/tudla_accounting/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/tibomogul/tudla_accounting/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/tibomogul/tudla_accounting/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/tibomogul/tudla_accounting/releases/tag/v0.1.0
