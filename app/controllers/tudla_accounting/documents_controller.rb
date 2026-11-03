@@ -49,7 +49,8 @@ module TudlaAccounting
         @document.contact = document_contacts(@document).find_by(id: params[:contact_id]) if params[:contact_id].present?
         @document.due_on = @document.contact&.due_on(today)
         @document.currency = @document.contact&.[](:currency)
-        @document.lines.build(quantity: 1, account: @document.contact&.default_account, tax_code: @document.contact&.default_tax_code)
+        @document.lines.build(quantity: 1, account: @document.contact&.default_account, tax_code: @document.contact&.default_tax_code,
+                              withholding_code: (@document.contact&.default_withholding_code if @document.purchases?))
       end
     end
 
@@ -91,7 +92,7 @@ module TudlaAccounting
     private
 
     def set_document
-      @document = organization_scope(Document).includes(lines: %i[account tax_code]).find(params[:id])
+      @document = organization_scope(Document).includes(lines: %i[account tax_code withholding_code]).find(params[:id])
     end
 
     def require_draft
@@ -127,8 +128,8 @@ module TudlaAccounting
       open = Document.with_open_cents.where(id: documents.approved.select(:id))
       ids = Document.from(open, :tudla_accounting_documents)
       ids = case status
-      when "unpaid" then ids.where("open_cents = total_cents")
-      when "part_paid" then ids.where("open_cents > 0 AND open_cents < total_cents")
+      when "unpaid" then ids.where("open_cents = total_cents - withheld_cents")
+      when "part_paid" then ids.where("open_cents > 0 AND open_cents < total_cents - withheld_cents")
       when "paid" then ids.where("open_cents = 0")
       else ids.where("open_cents > 0 AND due_on < ?", today)
       end
@@ -170,7 +171,7 @@ module TudlaAccounting
     # be read.
     def document_attributes
       permitted = params.require(:document).permit(:kind, :contact_id, :reference, :issued_on, :due_on, :tax_inclusive, :notes, :credited_document_id, :currency, :exchange_rate,
-                                                   lines: [ :id, :description, :quantity, :unit_price, :account_id, :tax_code_id, :_destroy, { dimensions: {} } ])
+                                                   lines: [ :id, :description, :quantity, :unit_price, :account_id, :tax_code_id, :withholding_code_id, :_destroy, { dimensions: {} } ])
       permitted.delete(:kind) if @document.persisted?
       problems = []
       if permitted.key?(:exchange_rate) # blank: the day's rate is looked up
@@ -185,7 +186,8 @@ module TudlaAccounting
           description: line[:description].to_s,
           quantity: typed_decimal(line[:quantity]) { problems << "Line #{index + 1}: #{line[:quantity]} isn't a quantity" } || 1,
           unit_price_cents: price.to_i, account_id: (organization_scope(Account).find(line[:account_id]).id if line[:account_id].present?),
-          tax_code_id: (organization_scope(TaxCode).find(line[:tax_code_id]).id if line[:tax_code_id].present?), dimension_value_ids: dimension_value_ids(line)
+          tax_code_id: (organization_scope(TaxCode).find(line[:tax_code_id]).id if line[:tax_code_id].present?), dimension_value_ids: dimension_value_ids(line),
+          withholding_code_id: (organization_scope(WithholdingCode).find(line[:withholding_code_id]).id if line[:withholding_code_id].present?)
         )
       end
       permitted[:contact_id] = organization_scope(Contact).find(permitted[:contact_id]).id if permitted[:contact_id].present?
@@ -197,7 +199,7 @@ module TudlaAccounting
       @document.assign_attributes(kind: original.sales? ? "sales_credit" : "supplier_credit", contact: original.contact, credited_document: original,
                                   tax_inclusive: original.tax_inclusive, reference: original.number_label, currency: original[:currency], exchange_rate: original.exchange_rate)
       original.lines.each do |line|
-        @document.lines.build(line.attributes.slice("description", "quantity", "unit_price_cents", "account_id", "tax_code_id", "dimension_value_ids"))
+        @document.lines.build(line.attributes.slice("description", "quantity", "unit_price_cents", "account_id", "tax_code_id", "withholding_code_id", "dimension_value_ids"))
       end
     end
 
@@ -218,10 +220,10 @@ module TudlaAccounting
       rows = Document.with_open_cents.where(id: documents.select(:id)).includes(:contact).order(issued_on: :desc, id: :desc).map do |document|
         [ document.kind_label, document.number_label, document.issued_on, document.contact.name, document.reference, document.due_on,
           document.subtotal, document.tax, document.total, document.amount_due, STATUSES.fetch(document.payment_status, document.payment_status.humanize),
-          document.currency, document.amount_due_in_base ]
+          document.currency, document.amount_due_in_base, document.withheld ]
       end
       Reports::Table.new([ [ "Kind", "Number", "Date", "Contact", "Reference", "Due", "Subtotal", "Tax", "Total", "Due now", "Status",
-                             "Currency", "Due now (#{accounting_organization.currency})" ], *rows ])
+                             "Currency", "Due now (#{accounting_organization.currency})", "Tax withheld" ], *rows ])
     end
   end
 end

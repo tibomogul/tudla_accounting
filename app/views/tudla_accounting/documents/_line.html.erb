@@ -1,4 +1,4 @@
-<%# locals: (line:, index:, account_options:, tax_options:, dimensions:, scope: "document") %>
+<%# locals: (line:, index:, account_options:, tax_options:, dimensions:, withholding_options: [], scope: "document") %>
 <% name = ->(field) { "#{scope}[lines][#{index}][#{field}]" } %>
 <tr data-document-lines-target="line" <%= "hidden" if line.marked_for_destruction? %>>
   <td class="min-w-56">
@@ -14,6 +14,10 @@
                                       aria: { label: "Account" }, data: { document_lines_target: "account" } %></td>
   <td class="min-w-32"><%= select_tag name.call(:tax_code_id), options_for_select(tax_options, line.tax_code_id), include_blank: "No tax", class: "tc-input", aria: { label: "Tax" },
                                       data: { document_lines_target: "tax", action: "change->document-lines#recalculate" } %></td>
+  <% if withholding_options.any? %>
+    <td class="min-w-32"><%= select_tag name.call(:withholding_code_id), options_for_select(withholding_options, line.withholding_code_id), include_blank: "None", class: "tc-input", aria: { label: "Withheld" },
+                                        data: { document_lines_target: "withholding", action: "change->document-lines#recalculate" } %></td>
+  <% end %>
   <% dimensions.each do |dimension, values| %>
     <td class="min-w-32"><%= select_tag "#{name.call(:dimensions)}[#{dimension.id}]", options_for_select(values, line.dimension_value_for(dimension)&.id), include_blank: "—",
                                         class: "tc-input", aria: { label: dimension.name } %></td>

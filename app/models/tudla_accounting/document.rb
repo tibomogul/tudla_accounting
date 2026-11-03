@@ -16,6 +16,11 @@ module TudlaAccounting
   # (credited_document) as far as that is still owed. The engine maps its documents to
   # those roles itself (see CarryingAmountRole), whatever carrying_amount_sources says.
   #
+  # A bill's lines can withhold tax from the supplier (DocumentLine#withholding_code):
+  # total stays what the supplier charged, what is owed is payable_cents, the total less
+  # withheld_cents, and the entry posts the tax on the same side as the payable. Each
+  # line's is kept as a WithheldTax row, and a supplier credit's as a negative one.
+  #
   # An approved document doesn't change; void! reverses its entry instead, and so does
   # reversing the entry itself. A draft can be deleted.
   class Document < ApplicationRecord
@@ -127,6 +132,9 @@ module TudlaAccounting
     def subtotal = money(subtotal_cents)
     def tax = money(tax_cents)
     def total = money(total_cents)
+    def withheld = money(withheld_cents)
+    def payable_cents = total_cents - withheld_cents
+    def payable = money(payable_cents)
 
     # What is still owed on an approved invoice or bill, or left to apply of a credit note,
     # in its currency; nothing on a draft or a voided one. From with_open_cents when the
@@ -149,9 +157,9 @@ module TudlaAccounting
       Money.new(cents.to_i.abs, organization.currency)
     end
 
-    # The total in the organization's currency, as posting converts it: line by line.
+    # What is owed in the organization's currency, as posting converts it: line by line.
     def total_in_base
-      Money.new(live_lines.sum { |line| in_base_cents(line.net_cents.to_i) + in_base_cents(line.tax_cents.to_i) }, organization.currency)
+      Money.new(live_lines.sum { |line| in_base_cents(line.net_cents.to_i) + in_base_cents(line.tax_cents.to_i) - in_base_cents(line.withheld_cents.to_i) }, organization.currency)
     end
 
     # The receivable or payable its entry opened.
@@ -164,7 +172,7 @@ module TudlaAccounting
 
       due = amount_due.cents
       if due.zero? then "paid"
-      elsif due < total_cents then "part_paid"
+      elsif due < payable_cents then "part_paid"
       else "unpaid"
       end
     end
@@ -193,6 +201,7 @@ module TudlaAccounting
         posting.save!
         posting.post(posting.transacted_at)
         update!(status: "approved", entry: posting, approved_at: at)
+        record_withheld_taxes(posting)
         audit("document.approved", entry_id: posting.id)
       end
       self
@@ -221,6 +230,7 @@ module TudlaAccounting
     # Its entry was reversed on `on` (by void! or on the entry's own page): it is void.
     def entry_reversed!(on)
       update!(status: "void", voided_on: on)
+      WithheldTax.reverse!(entry, on: on)
     end
 
     private
@@ -235,13 +245,15 @@ module TudlaAccounting
       self.subtotal_cents = live_lines.sum(&:net_cents)
       self.tax_cents = live_lines.sum { |line| line.tax_cents.to_i }
       self.total_cents = subtotal_cents + tax_cents
+      self.withheld_cents = live_lines.sum { |line| line.withheld_cents.to_i }
     end
 
     # The entry: the total to the receivable or payable account, and each line's net amount
     # (tagged with the line's dimension values) and tax to its accounts on the other side
     # (the other way round for a credit note). A foreign document's amounts are converted
     # line by line, the total being their sum, and its total goes to the account's
-    # sub-account in its currency with its foreign amount.
+    # sub-account in its currency with its foreign amount. Tax withheld goes to its account
+    # on the same side as the total, which is that much less.
     def build_entry
       control = Account.for_role_in_currency!(organization, sales? ? :receivable : :payable, self[:currency])
       charge = sales? != credit? ? Detail::TALLY_DEBIT : Detail::TALLY_CREDIT
@@ -252,7 +264,7 @@ module TudlaAccounting
                           related: credited_document&.entry)
       line = ->(account, tally, cents, **extra) { posting.details.build(account: account, tally: tally, amount_cents: cents, currency: organization.currency, **extra) }
       total = line.call(control, charge, 0)
-      total.build_foreign_exchange(other_currency: currency, other_currency_cents: total_cents, rate: exchange_rate) if foreign?
+      total.build_foreign_exchange(other_currency: currency, other_currency_cents: payable_cents, rate: exchange_rate) if foreign?
       live_lines.each do |item|
         net_cents, tax_cents = in_base_cents(item.net_cents), in_base_cents(item.tax_cents.to_i)
         if net_cents.positive?
@@ -262,9 +274,23 @@ module TudlaAccounting
         line.call(item.tax_code.account, other, tax_cents, description: item.description, tax_code: item.tax_code, tax_role: :tax) if tax_cents.positive?
       end
       total.amount_cents = posting.details.sum(&:amount_cents)
+      live_lines.select(&:withholding_code).each do |item|
+        cents = in_base_cents(item.withheld_cents)
+        next unless cents.positive?
+
+        line.call(item.withholding_code.payable_account, charge, cents, description: item.description)
+        total.amount_cents -= cents
+      end
       posting
     end
 
+    def record_withheld_taxes(posting)
+      sign = credit? ? -1 : 1
+      live_lines.select { |line| line.withheld_cents.positive? }.each do |line|
+        WithheldTax.create!(organization: organization, contact: contact, withholding_code: line.withholding_code, entry: posting, document_line: line, direction: "from_supplier", on: issued_on,
+                            base_cents: sign * in_base_cents(line.net_cents), withheld_cents: sign * in_base_cents(line.withheld_cents))
+      end
+    end
 
     def contact_fits
       return unless contact

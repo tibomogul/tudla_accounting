@@ -1,14 +1,14 @@
 module TudlaAccounting
   module Api
     # Reads an invoice's lines as the JSON API is given them (documents and recurring
-    # invoices): description, quantity (1 if not given), unit_price, account_code, tax_code
-    # and dimensions (dimension code => value code).
+    # invoices): description, quantity (1 if not given), unit_price, account_code, tax_code,
+    # dimensions (dimension code => value code) and, where it is allowed, withholding_code.
     module InvoiceLines
       private
 
       # The lines' attributes, their prices in currency; ArgumentError naming the line on
       # anything wrong.
-      def line_attributes(currency)
+      def line_attributes(currency, withholding: false)
         lines = body[:lines]
         raise ArgumentError, "lines must be a list" unless lines.is_a?(Array)
 
@@ -18,7 +18,8 @@ module TudlaAccounting
 
           { description: line[:description].to_s, quantity: (line[:quantity].presence && decimal(line[:quantity], "#{label}'s quantity")) || 1,
             unit_price_cents: cents(line[:unit_price], "#{label}'s unit_price", currency: currency), account: account_by_code(line[:account_code], label),
-            tax_code: line[:tax_code].presence && tax_code_by_code(line[:tax_code], label), dimension_value_ids: dimension_value_ids(line[:dimensions], label) }
+            tax_code: line[:tax_code].presence && tax_code_by_code(line[:tax_code], label), dimension_value_ids: dimension_value_ids(line[:dimensions], label),
+            **(withholding ? { withholding_code: line[:withholding_code].presence && withholding_code_by_code(line[:withholding_code], label) } : {}) }
         end
       end
 

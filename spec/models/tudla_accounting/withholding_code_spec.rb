@@ -69,7 +69,7 @@ RSpec.describe TudlaAccounting::WithholdingCode do
     contact = TudlaAccounting::Contact.create!(organization: organization, name: "Ledger & Co", kind: "supplier", default_withholding_code: code)
     expect(code).to be_used
     expect(code.destroy).to be(false)
-    expect(code.errors.full_messages).to eq([ "Contacts use WC010 as their default; change them first" ])
+    expect(code.errors.full_messages).to eq([ "Bills, payments or contacts use WC010; make it inactive instead" ])
     contact.update!(default_withholding_code: nil)
     expect(code.destroy).to be_truthy
   end

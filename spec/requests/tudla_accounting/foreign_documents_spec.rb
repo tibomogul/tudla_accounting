@@ -68,7 +68,7 @@ RSpec.describe "Invoices and bills in another currency", type: :request do
     expect(cells("tr[data-document-row]").sole.values_at(5, 6)).to eq([ "EUR 1,133.33", "EUR 1,133.33" ])
     expect(cells("tfoot tr").last.second).to eq("1,813.33")
     get routes.sales_documents_path(format: :csv)
-    expect(response.body.lines.last.chomp).to end_with("1033.33,100.00,1133.33,1133.33,Awaiting payment,EUR,1813.33")
+    expect(response.body.lines.last.chomp).to end_with("1033.33,100.00,1133.33,1133.33,Awaiting payment,EUR,1813.33,0.00")
 
     expect(TudlaAccounting::EmailDraft.for_document(invoice)[:message]).to include("for EUR 1,133.33,")
   end

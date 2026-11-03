@@ -27,7 +27,7 @@
       <% applications.each do |target, amount, _allocation| %>
         <tr>
           <% if target.is_a?(TudlaAccounting::Document) %>
-            <td><%= target.number_label %><%= " (your #{target.reference})" if target.purchases? && target.reference %></td>
+            <td><%= target.number_label %><%= " (your #{target.reference})" if target.purchases? && target.reference %><% if target.withheld_cents.positive? %><span class="block tc-muted text-xs" data-withheld><%= tc_money(target.withheld) %> tax withheld from the bill</span><% end %></td>
             <td><%= tc_date(target.issued_on) %></td>
           <% elsif target.is_a?(TudlaAccounting::Payment) %>
             <td><%= received ? "Refunded to you" : "Refunded to us" %><%= " (#{target.reference})" if target.reference %></td>

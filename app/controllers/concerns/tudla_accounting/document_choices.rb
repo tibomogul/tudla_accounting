@@ -6,7 +6,7 @@ module TudlaAccounting
     extend ActiveSupport::Concern
 
     included do
-      helper_method :document_accounts, :document_tax_codes, :document_contacts
+      helper_method :document_accounts, :document_tax_codes, :document_contacts, :document_withholding_codes
     end
 
     private
@@ -29,6 +29,16 @@ module TudlaAccounting
     def document_tax_codes(record)
       used = record.lines.filter_map(&:tax_code_id)
       codes = organization_scope(TaxCode).where(kind: record.sales? ? :sales : :purchases)
+      codes.active.or(codes.where(id: used)).order(:code)
+    end
+
+    # On a bill or supplier credit, the active codes for tax withheld from suppliers, and
+    # any its lines have already; on anything else, none.
+    def document_withholding_codes(record)
+      return WithholdingCode.none if record.sales?
+
+      used = record.lines.filter_map(&:withholding_code_id)
+      codes = organization_scope(WithholdingCode).where.not(payable_account_id: nil)
       codes.active.or(codes.where(id: used)).order(:code)
     end
   end

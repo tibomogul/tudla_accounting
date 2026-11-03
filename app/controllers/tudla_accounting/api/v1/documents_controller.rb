@@ -17,7 +17,7 @@ module TudlaAccounting
         permits :post, only: %i[approve void]
 
         def index
-          documents = organization_scope(Document).includes(:organization, :contact, lines: %i[account tax_code]).order(:issued_on, :id)
+          documents = organization_scope(Document).includes(:organization, :contact, lines: %i[account tax_code withholding_code]).order(:issued_on, :id)
           documents = documents.where(kind: params[:kind]) if params[:kind].present?
           documents = documents.where(status: params[:status]) if params[:status].present?
           documents = documents.where(contact_id: params[:contact_id]) if params[:contact_id].present?
@@ -96,7 +96,7 @@ module TudlaAccounting
             attributes[:currency] = attributes[:credited_document]&.[](:currency) || attributes[:contact]&.[](:currency)
           end
           currency = attributes[:currency] || document.currency
-          attributes[:lines_attributes] = document.lines.map { |line| { id: line.id, _destroy: true } } + line_attributes(currency) if body.key?(:lines) || document.new_record?
+          attributes[:lines_attributes] = document.lines.map { |line| { id: line.id, _destroy: true } } + line_attributes(currency, withholding: true) if body.key?(:lines) || document.new_record?
           attributes
         end
       end

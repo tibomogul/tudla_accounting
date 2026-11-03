@@ -106,4 +106,29 @@ RSpec.describe "Writing an invoice", type: :system do
       within("tfoot") { expect(page).to have_css("[data-document-lines-target=subtotal]", exact_text: "1,500.00") }
     end
   end
+
+  it "starts a bill's lines with the supplier's withholding code, and takes it off what is payable as it's typed" do
+    TudlaAccounting::AccountsCreator.call([ { code: "2100", name: "Payables", category: "liability", role: "payable" }, { code: "2300", name: "Withholding payable", category: "liability" },
+                                            { code: "6000", name: "Repairs", category: "expense" } ], organization)
+    account = ->(code) { TudlaAccounting::Account.find_by!(organization: organization, code: code) }
+    TudlaAccounting::WithholdingCode.create!(organization: organization, code: "WC100", name: "Rent", rate: "0.05", payable_account: account.call("2300"))
+    contractors = TudlaAccounting::WithholdingCode.create!(organization: organization, code: "WC120", name: "Contractors", rate: "0.02", payable_account: account.call("2300"))
+    TudlaAccounting::Contact.create!(organization: organization, name: "Ledger & Co", kind: "supplier", default_account: account.call("6000"), default_withholding_code: contractors)
+
+    visit new_document_path(kind: "bill")
+    fill_in "Date", with: Date.new(Date.current.year, 3, 2)
+    select "Ledger & Co", from: "Supplier"
+    expect(page).to have_select("Withheld", selected: "WC120 (2%)")
+
+    fill_in "Description", with: "Aircon repair"
+    fill_in "Unit price", with: "10,000"
+    within("tfoot") { expect(page).to have_content("Less tax withheld 200.00").and have_content("Amount payable 9,800.00") }
+
+    select "WC100 (5%)", from: "Withheld"
+    within("tfoot") { expect(page).to have_content("Less tax withheld 500.00").and have_content("Amount payable 9,500.00") }
+
+    click_button "Save and approve"
+    expect(page).to have_content("approved and posted.")
+    within("[data-document]") { expect(page).to have_content("Less tax withheld, WC100 (5%)").and have_content("9,500.00") }
+  end
 end

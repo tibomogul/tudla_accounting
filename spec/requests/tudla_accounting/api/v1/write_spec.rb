@@ -177,7 +177,7 @@ RSpec.describe "JSON API: recording in the books", type: :request do
 
       changed = call(:patch, routes.api_v1_document_path(data["id"]), { due_on: "2026-04-20", lines: [ { description: "Design", unit_price: "50", account_code: "4000" } ] })["data"]
       expect(changed).to include("due_on" => "2026-04-20", "reference" => "PO 9", "total" => "50.00")
-      expect(changed["lines"]).to eq([ { "description" => "Design", "quantity" => "1.0", "unit_price" => "50.00", "amount" => "50.00", "account_code" => "4000", "tax_code" => nil, "tax" => "0.00", "dimensions" => {} } ])
+      expect(changed["lines"]).to eq([ { "description" => "Design", "quantity" => "1.0", "unit_price" => "50.00", "amount" => "50.00", "account_code" => "4000", "tax_code" => nil, "tax" => "0.00", "withholding_code" => nil, "withheld" => "0.00", "dimensions" => {} } ])
       expect(call(:patch, routes.api_v1_document_path(data["id"]), { notes: "Thanks" })["data"]["lines"].size).to eq(1)
 
       approved = call(:post, routes.approve_api_v1_document_path(data["id"]))["data"]
@@ -241,6 +241,23 @@ RSpec.describe "JSON API: recording in the books", type: :request do
         expect(response).to have_http_status(:unprocessable_content), sent.inspect
         expect(json.dig("error", "message")).to start_with(message), sent.inspect
       end
+    end
+  end
+
+  describe "withholding on a bill" do
+    before { TudlaAccounting::AccountsCreator.call([ { code: "2300", name: "Withholding payable", category: "liability" } ], organization) }
+
+    let!(:code) { TudlaAccounting::WithholdingCode.create!(organization: organization, code: "WC120", name: "Contractors", rate: "0.02", payable_account: account("2300")) }
+
+    it "takes a line's code, says what was withheld, and refuses one it doesn't know" do
+      data = call(:post, routes.api_v1_documents_path, { kind: "bill", contact_id: northwind.id, issued_on: "2026-03-10", approve: true,
+                                                         lines: [ { description: "Repair", unit_price: "1000.00", account_code: "4000", withholding_code: "WC120" } ] })["data"]
+      expect(response).to have_http_status(:created)
+      expect(data).to include("total" => "1000.00", "withheld" => "20.00", "amount_due" => "980.00")
+      expect(data["lines"].sole).to include("withholding_code" => "WC120", "withheld" => "20.00")
+
+      call(:post, routes.api_v1_documents_path, { kind: "bill", contact_id: northwind.id, issued_on: "2026-03-10", lines: [ { description: "x", unit_price: "1", account_code: "4000", withholding_code: "NOPE" } ] })
+      expect(response.parsed_body["error"]["message"]).to eq("Line 1: there is no withholding code NOPE")
     end
   end
 

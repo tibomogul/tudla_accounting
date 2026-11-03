@@ -20,6 +20,7 @@ module TudlaAccounting
     validates :code, uniqueness: { scope: %i[organization_type organization_id] }
     validates :rate, numericality: { greater_than: 0, less_than: 1 }
     validate :accounts_fit
+    validate :unchanged_once_posted, on: :update
     before_destroy :ensure_unused, prepend: true
 
     after_create { audit("withholding_code.created") }
@@ -28,7 +29,13 @@ module TudlaAccounting
 
     scope :active, -> { where(active: true) }
 
-    def used? = Contact.where(default_withholding_code_id: id).exists?
+    # The tax on base_cents at this code's rate, rounded to the cent the configured way.
+    def withheld_cents(base_cents)
+      (BigDecimal(base_cents) * rate).round(0, TudlaAccounting.configuration.rounding).to_i
+    end
+
+    def used? = posted? || Contact.where(default_withholding_code_id: id).exists? || DocumentLine.where(withholding_code_id: id).exists?
+    def posted? = WithheldTax.where(withholding_code_id: id).exists?
 
     private
 
@@ -39,8 +46,15 @@ module TudlaAccounting
     def ensure_unused
       return unless used?
 
-      errors.add(:base, "Contacts use #{code} as their default; change them first")
+      errors.add(:base, "Bills, payments or contacts use #{code}; make it inactive instead")
       throw :abort
+    end
+
+    # Reports read the rate and the accounts from the code, so what has been posted under
+    # it fixes them.
+    def unchanged_once_posted
+      fields = %w[code rate payable_account_id creditable_account_id].select { |field| will_save_change_to_attribute?(field) }
+      errors.add(:base, "Tax has been posted under #{code_was}, so its #{fields.map { |field| field.delete_suffix('_id').humanize(capitalize: false) }.to_sentence} can't change; add a new code instead") if fields.any? && posted?
     end
 
     def accounts_fit

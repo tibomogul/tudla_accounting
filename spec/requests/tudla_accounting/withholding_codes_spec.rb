@@ -70,7 +70,7 @@ RSpec.describe "Withholding codes", type: :request do
     expect(response.body).to include("This code is in use")
     expect(css_select("form[data-controller=confirm]")).to be_empty
     delete routes.withholding_code_path(made)
-    expect(flash[:alert]).to eq("Contacts use WC010 as their default; change them first")
+    expect(flash[:alert]).to eq("Bills, payments or contacts use WC010; make it inactive instead")
   end
 
   it "adds a starter list, once, and says when it can't" do

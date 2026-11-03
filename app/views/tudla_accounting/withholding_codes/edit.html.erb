@@ -4,5 +4,5 @@
                   form: { data: { controller: "confirm", confirm_message_value: "Delete #{@withholding_code.code}?", action: "submit->confirm#ask" } } %>
   <% end %>
 <% end %>
-<% if @withholding_code.used? %><p class="tc-hint mb-4">This code is in use, so it can't be deleted; make it inactive to stop offering it.</p><% end %>
+<% if @withholding_code.used? %><p class="tc-hint mb-4">This code is in use, so it can't be deleted; make it inactive to stop offering it. Once tax is posted under it, its code, rate and accounts can't change either.</p><% end %>
 <%= render "form", withholding_code: @withholding_code %>

@@ -5,11 +5,11 @@ import { parseNumber, parseUnits, formatUnits } from "tudla_accounting/amounts"
 // (quantity times unit price) and the subtotal, tax and total as they're typed, the way
 // the server will (tax rounded per line, added or split out). Choosing a contact sets the
 // due date from their payment terms (when the form has dates), and their default account
-// and tax code on lines that have none yet. Choosing another currency asks for its rate.
+// tax code and withholding code on lines that have none yet. Choosing another currency asks for its rate.
 // The server works it all out again.
 export default class extends Controller {
   static targets = ["lines", "line", "template", "quantity", "price", "account", "tax", "amount", "destroy",
-    "subtotal", "taxTotal", "total", "inclusive", "contact", "issued", "due", "currency", "currencyLabel", "rate", "rateCurrency"]
+    "subtotal", "taxTotal", "total", "withholding", "withheldTotal", "payable", "inclusive", "contact", "issued", "due", "currency", "currencyLabel", "rate", "rateCurrency"]
   static values = { exponent: { type: Number, default: 2 } }
 
   connect() {
@@ -77,12 +77,15 @@ export default class extends Controller {
     if (option.dataset.account) account.value = option.dataset.account
     const tax = line.querySelector("[data-document-lines-target=tax]")
     if (option.dataset.tax && !tax.value) tax.value = option.dataset.tax
+    const withholding = line.querySelector("[data-document-lines-target=withholding]")
+    if (withholding && option.dataset.withholding && !withholding.value) withholding.value = option.dataset.withholding
   }
 
   recalculate() {
     const inclusive = this.hasInclusiveTarget && this.inclusiveTarget.checked
     let amounts = 0
     let taxes = 0
+    let withheld = 0
     this.lineTargets.filter((line) => !line.hidden).forEach((line) => {
       const typed = line.querySelector("[data-document-lines-target=quantity]").value
       const quantity = typed.trim() === "" ? 1 : parseNumber(typed) ?? 0
@@ -92,11 +95,17 @@ export default class extends Controller {
       line.querySelector("[data-document-lines-target=amount]").textContent = this.format(amount)
       amounts += amount
       taxes += tax
+      const withholding = line.querySelector("[data-document-lines-target=withholding]")
+      withheld += Math.round((inclusive ? amount - tax : amount) * Number(withholding?.selectedOptions[0]?.dataset.rate || 0))
     })
     const subtotal = inclusive ? amounts - taxes : amounts
     this.subtotalTarget.textContent = this.format(subtotal)
     this.taxTotalTarget.textContent = this.format(taxes)
     this.totalTarget.textContent = this.format(subtotal + taxes)
+    if (this.hasWithheldTotalTarget) {
+      this.withheldTotalTarget.textContent = this.format(withheld)
+      this.payableTarget.textContent = this.format(subtotal + taxes - withheld)
+    }
   }
 
   // Amounts in the currency's minor units (see tudla_accounting/amounts).

@@ -6,12 +6,15 @@ module TudlaAccounting
   # the document's side (a sales code on sales, a purchases code on bills). amount_cents is
   # quantity times unit price, rounded to the cent; tax_cents the tax on it, added or
   # (when the document's amounts include the tax) split out, rounded per line as an
-  # entry's tax is. dimension_value_ids tag it (one value per dimension) as an entry's line
+  # entry's tax is. On a bill or supplier credit, withholding_code gives the tax withheld
+  # from the supplier, withheld_cents: its rate on the amount before tax, rounded per
+  # line. dimension_value_ids tag it (one value per dimension) as an entry's line
   # is tagged; approving the document tags its posting.
   class DocumentLine < ApplicationRecord
     belongs_to :document, class_name: "TudlaAccounting::Document", inverse_of: :lines
     belongs_to :account, class_name: "TudlaAccounting::Account"
     belongs_to :tax_code, class_name: "TudlaAccounting::TaxCode", optional: true
+    belongs_to :withholding_code, class_name: "TudlaAccounting::WithholdingCode", optional: true
 
     normalizes :description, with: ->(description) { description.squish }
 
@@ -25,6 +28,7 @@ module TudlaAccounting
     def work_out(inclusive)
       self.amount_cents = (quantity.to_d * unit_price_cents.to_i).round(0, TudlaAccounting.configuration.rounding).to_i
       self.tax_cents = tax_code ? tax_code.tax_cents(amount_cents, inclusive: inclusive) : 0
+      self.withheld_cents = withholding_code ? withholding_code.withheld_cents(net_cents) : 0
     end
 
     # The amount before tax.
@@ -64,11 +68,24 @@ module TudlaAccounting
         errors.add(:account, blocker) if blocker
       end
       dimensions_fit(organization)
+      withholding_fits(organization)
       return unless tax_code
 
       errors.add(:tax_code, "must belong to the same organization") if tax_code.organization != organization
       wanted = document.sales? ? "sales" : "purchases"
       errors.add(:tax_code, "must be a #{wanted} code") if Document::KINDS.key?(document.kind) && tax_code.kind != wanted
+    end
+
+    # Tax is withheld on the purchases side here, under a code that says where it goes; a
+    # customer's withholding is recorded on their payment.
+    def withholding_fits(organization)
+      return unless withholding_code
+
+      if withholding_code.organization != organization then errors.add(:withholding_code, "must belong to the same organization")
+      elsif !document.purchases? then errors.add(:withholding_code, "can only be on a bill or supplier credit; record what a customer withholds on their payment")
+      elsif withholding_code.payable_account.nil? then errors.add(:withholding_code, "#{withholding_code.code} has no account for tax withheld from suppliers")
+      elsif !withholding_code.active? && will_save_change_to_withholding_code_id? then errors.add(:withholding_code, "#{withholding_code.code} is inactive")
+      end
     end
 
     def dimensions_fit(organization)

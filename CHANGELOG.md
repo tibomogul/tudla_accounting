@@ -8,7 +8,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- Withholding codes (`WithholdingCode`): a tax withheld from payments, with its rate and the accounts it posts to, and a contact's default. `WithholdingCodeTemplates` has a starter list of the Philippines' common expanded withholding codes; check its rates before relying on them. `GET /withholding_codes` lists them in the API. Nothing posts to them yet.
+- Withholding codes (`WithholdingCode`): a tax withheld from payments, with its rate and the accounts it posts to, and a contact's default. `WithholdingCodeTemplates` has a starter list of the Philippines' common expanded withholding codes; check its rates before relying on them. `GET /withholding_codes` lists them in the API.
+- Withholding from suppliers on bills: a bill or supplier credit's line can have a withholding code, starting from the contact's default. Approving posts the tax to the code's account, so the payable is the amount left to pay, and keeps a `WithheldTax` row for each line; voiding adds an opposite row. The bill, its PDF and the payment notice show what was withheld. The base is the line's amount before VAT, which commentary supports but we haven't confirmed in a BIR issuance. A code's rate and accounts can't change once tax is posted under it.
 
 ## [0.3.0] - 2026-11-03
 
