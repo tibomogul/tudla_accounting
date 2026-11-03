@@ -1,0 +1,38 @@
+<%= tc_page_header "Withholding summary", subtitle: (@report ? "#{tc_date(@from.from_date)} to #{tc_date(@thru.thru_date)}, by code and month" : nil) do %>
+  <% if @report %>
+    <%= render "withholding_form", url: reports_withholding_path %>
+    <%= render "download" %>
+  <% end %>
+<% end %>
+
+<% if @report.nil? %>
+  <%= render "no_periods" %>
+<% elsif !@report.any_codes? %>
+  <%= render "no_withholding_codes" %>
+<% else %>
+  <% { "from_supplier" => "Tax you withheld from suppliers", "by_customer" => "Tax customers withheld from you" }.each do |direction, title| %>
+    <% rows = @report.summary(direction) %>
+    <section class="tc-card overflow-x-auto mb-2" aria-label="<%= title %>" data-withholding-summary="<%= direction %>">
+      <h2 class="tc-card-body tc-card-title pb-0"><%= title %></h2>
+      <% if rows.empty? %>
+        <p class="tc-card-body tc-muted text-sm">Nothing in these months.</p>
+      <% else %>
+        <table class="tc-table">
+          <thead><tr><th>Code</th><th>Name</th><th class="tc-num">Rate</th><% @report.months.each do |month| %><th class="tc-num"><%= month.strftime("%b %Y") %></th><% end %><th class="tc-num">Income</th><th class="tc-num">Tax withheld</th></tr></thead>
+          <tbody>
+            <% rows.each do |row| %>
+              <tr><td class="font-mono"><%= row.code.code %></td><td><%= row.code.name %></td><td class="tc-num"><%= row.code.rate_percent %>%</td>
+                <% row.months.each do |amount| %><td class="tc-num"><%= tc_money(amount) %></td><% end %>
+                <td class="tc-num"><%= tc_money(row.base) %></td><td class="tc-num"><%= tc_money(row.withheld) %></td></tr>
+            <% end %>
+            <tr class="font-semibold"><td colspan="3">Total</td>
+              <% @report.month_totals(direction).each do |amount| %><td class="tc-num"><%= tc_money(amount) %></td><% end %>
+              <td class="tc-num"><%= tc_money(rows.sum(Money.new(0, accounting_organization.currency), &:base)) %></td><td class="tc-num" data-total="<%= direction %>"><%= tc_money(@report.total(direction)) %></td></tr>
+          </tbody>
+        </table>
+      <% end %>
+    </section>
+    <%= render "withholding_checks", report: @report, direction: direction %>
+  <% end %>
+  <p class="tc-hint">Amounts reversed and supplier credits count in the month they were dated, so they can be negative here.</p>
+<% end %>

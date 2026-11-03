@@ -81,6 +81,9 @@ TudlaAccounting::Engine.routes.draw do
     get :statement
     get :statements
     get :tax_return
+    get :withholding
+    get :qap
+    get :sawt
   end
 
   resources :budgets do

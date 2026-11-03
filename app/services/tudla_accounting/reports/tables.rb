@@ -57,6 +57,39 @@ module TudlaAccounting
                     Table.total([ nil, report[:net_tax].negative? ? "Net tax refundable" : "Net tax payable", nil, nil, nil, report[:net_tax] ]) ])
       end
 
+      # A section a side: a row per code with its months, then the total and the accounts'
+      # movement.
+      def withholding_summary(report)
+        months = report.months
+        blanks = Array.new(months.size)
+        rows = { "from_supplier" => "Withheld from suppliers", "by_customer" => "Withheld by customers" }.flat_map do |direction, section|
+          summary = report.summary(direction)
+          checks = report.checks(direction).flat_map do |check|
+            [ [ section, check.account.code, "#{check.account.name}: account's movement", nil, *blanks, nil, check.movement ],
+              [ section, check.account.code, "#{check.account.name}: difference", nil, *blanks, nil, check.difference ] ]
+          end
+          [ *summary.map { |row| [ section, row.code.code, row.code.name, row.code.rate * 100, *row.months, row.base, row.withheld ] },
+            Table.total([ section, nil, "Total", nil, *report.month_totals(direction), summary.sum(Money.new(0, report.organization.currency), &:base), report.total(direction) ]), *checks ]
+        end
+        Table.new([ [ "Section", "Code", "Name", "Rate %", *months.map { |month| month.strftime("%b %Y") }, "Income", "Tax withheld" ], *rows ])
+      end
+
+      def qap(report) = withholding_list(report.qap, report, "Payee")
+
+      # What the list leaves out follows its total.
+      def sawt(report)
+        table = withholding_list(report.sawt, report, "Withholding agent")
+        Table.new([ *table.rows, [ nil, nil, "Not listed: waiting for a certificate", nil, nil, nil, report.waiting, nil ], [ nil, nil, "Not listed: since reversed", nil, nil, nil, report.reversed, nil ] ])
+      end
+
+      def withholding_list(rows, report, who)
+        zero = Money.new(0, report.organization.currency)
+        body = rows.each_with_index.map do |row, index|
+          [ index + 1, row.contact.tax_number, row.contact.name, row.code.code, row.code.rate * 100, row.base, row.withheld, ("No TIN" if row.contact.tax_number.blank?) ]
+        end
+        Table.new([ [ "No.", "TIN", who, "Code", "Rate %", "Income", "Tax withheld", "Note" ], *body, Table.total([ nil, nil, "Total", nil, nil, rows.sum(zero, &:base), rows.sum(zero, &:withheld), nil ]) ])
+      end
+
       # A column per dimension value ("Untagged" for lines without one), then the total.
       def by_dimension(report)
         columns = report[:columns]

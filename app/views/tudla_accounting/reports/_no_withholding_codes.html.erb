@@ -1,0 +1,3 @@
+<div class="tc-card tc-card-body text-center">
+  <p class="tc-muted">No withholding codes yet.<% if tc_can?(:administer) %> <%= link_to "Add them", withholding_codes_path, class: "underline" %> to withhold tax and report on it.<% end %></p>
+</div>

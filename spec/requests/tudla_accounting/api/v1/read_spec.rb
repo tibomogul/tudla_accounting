@@ -221,6 +221,9 @@ RSpec.describe "JSON API: reading the books", type: :request do
       expect(receivables["rows"].first["cells"]).to include("Northwind", "275.00")
       expect(api_get(routes.api_v1_report_path("payables"))["data"]["rows"].map { |row| row["total"] }).to all(be(true))
       expect(api_get(routes.api_v1_report_path("tax"), from_id: april.id, thru_id: april.id, basis: "accrual")["data"]["rows"].first["cells"]).to include("GST")
+      expect(api_get(routes.api_v1_report_path("withholding"))["data"]["headings"]).to include("Tax withheld")
+      expect(api_get(routes.api_v1_report_path("qap"), from_id: april.id, thru_id: april.id)["data"]["headings"]).to include("Payee")
+      expect(api_get(routes.api_v1_report_path("sawt"))["data"]["headings"]).to include("Withholding agent")
       ledger = api_get(routes.api_v1_report_path("general_ledger"), from_id: april.id, thru_id: april.id, account: "4010")["data"]
       expect(ledger["rows"].map { |row| row["cells"] }.flatten).to include("Invoice INV-0001 – Northwind")
 

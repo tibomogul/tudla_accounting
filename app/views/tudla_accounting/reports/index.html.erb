@@ -12,7 +12,10 @@
        [ "Cash flow", reports_cash_flow_path, "Cash in and out from operating, investing and financing activities." ],
        [ "Budgets", budgets_path, "Planned income and expenses for a year, month by month, typed in or uploaded as a spreadsheet." ],
        [ "General ledger", reports_general_ledger_path, "Every posted line, account by account, with running balances; downloadable as CSV." ],
-       [ "Books of accounts", reports_books_path, "The journals and ledger in numbered pages of 30 rows, with page totals, to print and bind (the BIR's loose-leaf books)." ] ].each do |title, path, description| %>
+       [ "Books of accounts", reports_books_path, "The journals and ledger in numbered pages of 30 rows, with page totals, to print and bind (the BIR's loose-leaf books)." ],
+       *(@withholding ? [ [ "Withholding summary", reports_withholding_path, "Tax withheld by code and month, against the accounts, for the 0619-E and 1601-EQ." ],
+                          [ "Tax withheld from suppliers (QAP)", reports_qap_path, "Each supplier's income and tax by code for a quarter." ],
+                          [ "Tax withheld from you (SAWT)", reports_sawt_path, "Each customer's income and tax by code, with certificates received." ] ] : []) ].each do |title, path, description| %>
     <%= link_to path, class: "tc-card tc-card-body block hover:border-[var(--tc-primary)]" do %>
       <p class="font-semibold"><%= title %></p>
       <p class="tc-muted text-sm mt-1"><%= description %></p>

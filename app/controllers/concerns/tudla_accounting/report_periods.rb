@@ -29,14 +29,20 @@ module TudlaAccounting
     end
 
     # @months, and the run @from..@thru picked with from_id/thru_id (either way round), by
-    # default this month or (year_to_date) the start of its year to it. False without months.
-    def month_range(year_to_date: false)
+    # default this month, (year_to_date) the start of its year to it, or (quarter) its filing
+    # quarter. False without months.
+    def month_range(year_to_date: false, quarter: false)
       @months = months.reverse
       return false if @months.empty?
 
       current = @months.find { |month| month.includes_date?(Time.current) }
       default_thru = current || @months.last
       default_from = year_to_date ? @months.find { |month| month.parent_id == default_thru.parent_id } : default_thru
+      if quarter
+        span = FilingQuarters.new(accounting_organization).of(default_thru.from_date.to_date)
+        within = @months.select { |month| span.range.cover?(month.from_date.to_date) }
+        default_from, default_thru = within.first, within.last
+      end
       @from = picked_month(:from_id) || default_from
       @thru = picked_month(:thru_id) || (params[:from_id].present? && !year_to_date ? @from : default_thru)
       @from, @thru = @thru, @from if @thru.from_date < @from.from_date

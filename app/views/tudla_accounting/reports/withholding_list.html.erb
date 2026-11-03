@@ -1,0 +1,42 @@
+<% qap = @list == :qap %>
+<% who = qap ? "Payee" : "Withholding agent" %>
+<%= tc_page_header (qap ? "Tax withheld from suppliers (QAP)" : "Tax withheld from you (SAWT)"), subtitle: (@report ? "#{tc_date(@from.from_date)} to #{tc_date(@thru.thru_date)}" : nil) do %>
+  <% if @report %>
+    <%= render "withholding_form", url: qap ? reports_qap_path : reports_sawt_path %>
+    <%= render "download" %>
+  <% end %>
+<% end %>
+
+<% if @report.nil? %>
+  <%= render "no_periods" %>
+<% elsif !@report.any_codes? %>
+  <%= render "no_withholding_codes" %>
+<% else %>
+  <% rows = qap ? @report.qap : @report.sawt %>
+  <% missing = rows.select { |row| row.contact.tax_number.blank? }.map { |row| row.contact.name }.uniq %>
+  <% if missing.any? %>
+    <div class="tc-alert tc-alert-warning mb-4" role="alert" data-missing-tin>No TIN for <%= missing.to_sentence %>. Add it on the contact before filing.</div>
+  <% end %>
+  <section class="tc-card overflow-x-auto mb-4" aria-label="<%= qap ? "Payees" : "Withholding agents" %>">
+    <table class="tc-table">
+      <thead><tr><th>TIN</th><th><%= who %></th><th>Code</th><th class="tc-num">Rate</th><th class="tc-num">Income</th><th class="tc-num">Tax withheld</th></tr></thead>
+      <tbody>
+        <% if rows.empty? %><tr><td colspan="6" class="tc-muted text-center"><%= qap ? "Nothing withheld in these months." : "No certificates marked received for these months." %></td></tr><% end %>
+        <% rows.each do |row| %>
+          <tr data-withholding-row><td class="whitespace-nowrap"><%= row.contact.tax_number || tag.span("No TIN", class: "tc-negative") %></td>
+            <td><%= link_to row.contact.name, contact_path(row.contact), class: "underline" %></td><td class="font-mono"><%= row.code.code %></td><td class="tc-num"><%= row.code.rate_percent %>%</td>
+            <td class="tc-num"><%= tc_money(row.base) %></td><td class="tc-num"><%= tc_money(row.withheld) %></td></tr>
+        <% end %>
+        <% zero = Money.new(0, accounting_organization.currency) %>
+        <tr class="font-semibold"><td colspan="4">Total</td><td class="tc-num"><%= tc_money(rows.sum(zero, &:base)) %></td><td class="tc-num" data-total="list"><%= tc_money(rows.sum(zero, &:withheld)) %></td></tr>
+      </tbody>
+    </table>
+  </section>
+  <% unless qap %>
+    <section class="tc-card tc-card-body space-y-2 text-sm mb-4" aria-label="Not listed" data-not-listed>
+      <div class="flex justify-between gap-4"><span>Not listed: waiting for a certificate (<%= link_to "chase them", withholding_certificates_path, class: "underline" %>)</span><span data-waiting><%= tc_money(@report.waiting) %></span></div>
+      <% unless @report.reversed.zero? %><div class="flex justify-between gap-4"><span>Not listed: since reversed</span><span data-reversed><%= tc_money(@report.reversed) %></span></div><% end %>
+    </section>
+  <% end %>
+  <%= render "withholding_checks", report: @report, direction: qap ? "from_supplier" : "by_customer" %>
+<% end %>

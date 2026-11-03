@@ -4,6 +4,7 @@ module TudlaAccounting
 
     GENERAL_LEDGER_PAGE = 500 # lines
     def index
+      @withholding = organization_scope(WithholdingCode).exists?
     end
 
     def balance_sheet
@@ -63,6 +64,19 @@ module TudlaAccounting
       @filed = FiledTaxReturn.active.where(form: @form).where("from_date <= ? AND thru_date >= ?", @thru.thru_date, @from.from_date).newest_first.to_a
       respond_with_table("#{@form.name.parameterize}-#{@report[:basis]}-#{span_name}") { Reports::Tables.tax_return(@report) }
     end
+
+    # The tax withheld by code and month over a run of months (this quarter by default).
+    def withholding
+      return respond_with_table("withholding-summary") unless month_range(quarter: true)
+
+      @report = Reports::Withholding.new(accounting_organization, from: @from, thru: @thru)
+      respond_with_table("withholding-summary-#{span_name}") { Reports::Tables.withholding_summary(@report) }
+    end
+
+    # The suppliers tax was withheld from, or the customers who withheld it with their
+    # certificates in, over a run of months (this quarter by default).
+    def qap = withholding_list(:qap)
+    def sawt = withholding_list(:sawt)
 
     # Profit and loss with a column per value of a dimension, over a run of months (the
     # current year to date by default).
@@ -172,6 +186,14 @@ module TudlaAccounting
     end
 
     private
+
+    def withholding_list(list)
+      @list = list
+      return respond_with_table(list.to_s, html: -> { render :withholding_list }) unless month_range(quarter: true)
+
+      @report = Reports::Withholding.new(accounting_organization, from: @from, thru: @thru)
+      respond_with_table("#{list}-#{span_name}", html: -> { render :withholding_list }) { Reports::Tables.public_send(list, @report) }
+    end
 
     # What the statement pages share: the type, its parties, the dates and what to show.
     def statement_options
