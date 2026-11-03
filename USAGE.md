@@ -616,7 +616,7 @@ Check these with an accountant before relying on them; we couldn't confirm them 
 
 - Setup → Withholding codes adds them one at a time (New withholding code), or from the starter list of 20 common Philippine codes.
 - Purchases → New bill has a Withheld column on each line, and the totals show the amount payable.
-- Sales → Payments received → Record a payment has rows for what the customer withheld, and Tax certificates, from Payments received, lists the amounts to chase and marks them received.
+- Sales → Payments received → Record a payment has rows for what the customer withheld. Started from an invoice, the cash comes down by the tax as you type it, until you change the cash yourself. Tax certificates, from Payments received, lists the amounts to chase and marks them received.
 - Reports → Withholding summary, Tax withheld from suppliers (QAP), Tax withheld from you (SAWT), and Certificates to suppliers (2307).
 
 **In the console:**

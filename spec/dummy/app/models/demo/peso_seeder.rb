@@ -20,7 +20,7 @@ class Demo::PesoSeeder < Demo::EuroSeeder
   PAYMENT_NOTE = "Please pay within 30 days to account 0012-3456-7890, quoting the invoice number."
   SUPPLIER = [ "Ulap Hosting Inc.", "UH", 25_000_00 ].freeze
   # The withholding_agent setting's details, on its 2307s.
-  WITHHOLDING_AGENT = { tin: "000-123-456-00000", address: "1 Ayala Avenue, Makati City", zip: "1226", signatory_name: "Maria Santos", signatory_title: "Finance Manager", signatory_tin: "000-987-654-00000" }.freeze
+  WITHHOLDING_AGENT = { tin: "000-123-456-000", address: "1 Ayala Avenue, Makati City", zip: "1226", signatory_name: "Maria Santos", signatory_title: "Finance Manager", signatory_tin: "000-987-654-00000" }.freeze
 
   private
 

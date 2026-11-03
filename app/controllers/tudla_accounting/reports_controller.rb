@@ -82,6 +82,7 @@ module TudlaAccounting
     # months: the list, or as a PDF, all of them or (contact_id) one supplier's.
     def supplier_certificates
       three_months
+      @quarter_choices = quarter_choices
       @any_codes = organization_scope(WithholdingCode).exists?
       @report = Reports::SupplierCertificates.new(accounting_organization, @quarter) if @quarter
       certificates = @report&.certificates.to_a

@@ -1,7 +1,7 @@
 <%= tc_page_header "Certificates to suppliers (2307)", subtitle: (@quarter ? "#{tc_date(@quarter.from)} to #{tc_date(@quarter.thru)}" : nil) do %>
   <% if @quarter %>
     <%= form_with url: reports_supplier_certificates_path, method: :get, class: "flex flex-wrap items-end gap-2" do |form| %>
-      <div><%= form.label :quarter, "Quarter", class: "tc-label" %><%= form.select :quarter, @quarters.map { |quarter| [ quarter.label, quarter.from.iso8601 ] }, { selected: @quarter.from.iso8601 }, class: "tc-input" %></div>
+      <div><%= form.label :quarter, "Quarter", class: "tc-label" %><%= select_tag :quarter, grouped_options_for_select(@quarter_choices, @quarter.from.iso8601), class: "tc-input" %></div>
       <%= form.submit "Show", class: "tc-btn tc-btn-secondary", name: nil %>
     <% end %>
     <% if TudlaAccounting.pdf? && @report.certificates.any? %>

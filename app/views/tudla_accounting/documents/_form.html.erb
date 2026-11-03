@@ -50,7 +50,7 @@
   </div>
 
   <div class="tc-card overflow-x-auto">
-    <table class="tc-table">
+    <table class="tc-table tc-table-lines">
       <thead>
         <tr><th>Description</th><th class="tc-num">Quantity</th><th class="tc-num">Unit price</th><th>Account</th><th>Tax</th><% if withholding_options.any? %><th>Withheld</th><% end %><% dimensions.each do |dimension, _values| %><th><%= dimension.name %></th><% end %><th class="tc-num">Amount (<span data-document-lines-target="currencyLabel"><%= currency.iso_code %></span>)</th><th><span class="sr-only">Remove</span></th></tr>
       </thead>

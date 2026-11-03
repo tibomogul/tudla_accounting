@@ -118,6 +118,8 @@
   }
   .tc-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--tc-border); }
   .tc-table tbody tr:hover { background: var(--tc-bg-subtle); }
+  /* A form's lines, with more columns to fit than most tables. */
+  .tc-table-lines th, .tc-table-lines td { padding-inline: 0.5rem; }
   .tc-table .tc-num, .tc-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
   .tc-badge {

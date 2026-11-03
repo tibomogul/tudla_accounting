@@ -61,6 +61,15 @@ module TudlaAccounting
       @quarter = @quarters.find { |quarter| quarter.from == filing.from } || @quarters.find { |quarter| quarter.from < filing.from } || @quarters.last
     end
 
+    # The three-month runs for a select: the filing quarters first, since those are what
+    # certificates normally cover, then the others.
+    def quarter_choices
+      quarters = FilingQuarters.new(accounting_organization)
+      filing, others = @quarters.partition { |quarter| quarters.of(quarter.from).from == quarter.from }
+      { "Filing quarters" => filing, "Other three months" => others }.reject { |_, group| group.empty? }
+                                                                     .transform_values { |group| group.map { |quarter| [ quarter.label, quarter.from.iso8601 ] } }
+    end
+
     def picked_month(param)
       return if params[param].blank?
 

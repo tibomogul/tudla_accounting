@@ -131,4 +131,55 @@ RSpec.describe "Writing an invoice", type: :system do
     expect(page).to have_content("approved and posted.")
     within("[data-document]") { expect(page).to have_content("Less tax withheld, WC100 (5%)").and have_content("9,500.00") }
   end
+
+  it "shows a bill's whole unit price and codes with withholding and a dimension, without scrolling the table on a wide screen" do
+    page.current_window.resize_to(1400, 900)
+    TudlaAccounting::AccountsCreator.call([ { code: "2100", name: "Payables", category: "liability", role: "payable" }, { code: "2300", name: "Withholding payable", category: "liability" },
+                                            { code: "6000", name: "Repairs", category: "expense" } ], organization)
+    account = ->(code) { TudlaAccounting::Account.find_by!(organization: organization, code: code) }
+    TudlaAccounting::TaxCode.create!(organization: organization, code: "IN12", name: "Input VAT", rate: "0.12", kind: :purchases, account: account.call("2200"))
+    TudlaAccounting::WithholdingCode.create!(organization: organization, code: "WC120", name: "Contractors", rate: "0.02", payable_account: account.call("2300"))
+    TudlaAccounting::Dimension.create!(organization: organization, code: "DEPT", name: "Department").dimension_values.create!(code: "ENG", name: "Eng")
+
+    visit new_document_path(kind: "bill")
+    select "IN12 (12%)", from: "Tax"
+    select "WC120 (2%)", from: "Withheld"
+    fill_in "Unit price", with: "1,234,567.89"
+    fits = ->(label) { page.evaluate_script("(() => { const e = document.querySelector(`[aria-label='${#{label.to_json}}']`); const c = document.createElement('canvas').getContext('2d'); c.font = getComputedStyle(e).font; const s = getComputedStyle(e); const text = e.tagName === 'SELECT' ? e.selectedOptions[0].text : e.value; return c.measureText(text).width <= e.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight); })()") }
+    expect(%w[Tax Withheld].push("Unit price").map(&fits)).to all(be(true))
+    widths = page.evaluate_script("(() => { const c = document.querySelector('table').parentElement; return [c.scrollWidth, c.clientWidth, window.innerWidth, ...[...document.querySelector('tbody tr').children].map(td => Math.round(td.getBoundingClientRect().width))]; })()")
+    expect(widths[0]).to be <= widths[1], widths.inspect
+  end
+
+  it "brings the cash down by the tax typed on a payment started from an invoice, until the cash is changed by hand" do
+    TudlaAccounting::AccountsCreator.call([ { code: "1010", name: "Bank", category: "asset" }, { code: "1200", name: "Creditable tax", category: "asset" } ], organization)
+    account = ->(code) { TudlaAccounting::Account.find_by!(organization: organization, code: code) }
+    TudlaAccounting::WithholdingCode.create!(organization: organization, code: "WC160", name: "Services", rate: "0.02", creditable_account: account.call("1200"))
+    customer = TudlaAccounting::Contact.create!(organization: organization, name: "Tala Logistics Inc.", kind: "customer")
+    invoice = TudlaAccounting::Document.create!(organization: organization, kind: "sales_invoice", contact: customer, issued_on: Date.new(Date.current.year, 3, 2),
+                                                lines_attributes: [ { description: "Work", unit_price_cents: 56_000_00, account: account.call("4000") } ]).approve!
+
+    visit new_payment_path(document_id: invoice.id)
+    expect(page).to have_content("stays as a credit for Tala Logistics Inc.")
+    expect(page).to have_no_content("Inc..")
+    expect(page).to have_field("Cash received (#{organization.currency})", with: "56000.00")
+    fill_in "Tax withheld 1", with: "1,000"
+    expect(page).to have_field("Cash received (#{organization.currency})", with: "55000.00")
+    fill_in "Tax withheld 1", with: ""
+    expect(page).to have_field("Cash received (#{organization.currency})", with: "56000.00")
+
+    fill_in "Cash received (#{organization.currency})", with: "40000"
+    fill_in "Tax withheld 1", with: "1,000"
+    expect(page).to have_field("Cash received (#{organization.currency})", with: "40000")
+
+    visit new_payment_path(document_id: invoice.id)
+    select "1010 - Bank", from: "Into"
+    select "WC160 (2%) Services", from: "Withholding code 1"
+    fill_in "Tax withheld 1", with: "1,000"
+    fill_in "Income 1", with: ""
+    click_button "Record payment"
+    expect(page).to have_current_path(%r{/payments/\d+\z})
+    expect(page).to have_content("55,000.00").and have_content("Applied")
+    expect(invoice.reload.payment_status).to eq("paid")
+  end
 end

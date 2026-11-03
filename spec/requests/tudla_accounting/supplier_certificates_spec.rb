@@ -66,7 +66,9 @@ RSpec.describe "Certificates to suppliers", type: :request do
 
       get routes.reports_supplier_certificates_path
       expect(css_select("#quarter option[selected]").map { |option| option["value"] }).to eq([ "2026-04-01" ])
-      expect(text("#quarter option")).to include("Jan–Mar 2026", "Feb–Apr 2026", "Oct–Dec 2026")
+      expect(css_select("#quarter optgroup").map { |group| group["label"] }).to eq([ "Filing quarters", "Other three months" ])
+      expect(text("#quarter optgroup[label='Filing quarters'] option")).to eq([ "Oct–Dec 2026", "Jul–Sep 2026", "Apr–Jun 2026", "Jan–Mar 2026" ])
+      expect(text("#quarter optgroup[label='Other three months'] option")).to include("Sep–Nov 2026", "Feb–Apr 2026")
       expect(cells("[data-certificate-row]").map { |row| row.sub(/ PDF\z/, "") }).to eq([ "No TIN Aurora Builders WC120 5,000.00 100.00", "123-456-789-000 Ledger & Co WC120 10,000.00 200.00" ])
       expect(text("[data-confirm-rdo]").sole).to include("Revenue District Office")
       expect(text("[data-missing-tin]").sole).to include("No TIN for Aurora Builders")
