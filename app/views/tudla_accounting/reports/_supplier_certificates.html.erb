@@ -1,0 +1,107 @@
+<%# locals: (report:, certificates:) %>
+<%# BIR Form 2307 (January 2018), its first page, a sheet each: the layout of the form, with
+    its own styles so the sheet stays the same whatever the pdf_stylesheet. The seal and
+    barcode aren't reproduced. The signatures, the business tax lines and the payee's ZIP
+    code (contacts don't hold one) are left blank. Each sheet must stay on one page, so names
+    and addresses stop at two lines, and a line's description at two small ones (its ATC
+    says what it is). %>
+<% agent = TudlaAccounting.configuration.withholding_agent_for(report.organization) %>
+<% quarter = report.quarter %>
+<style>
+  .form-2307 { color: #000; background: #fff; font: 8pt/1.15 Arial, Helvetica, sans-serif; break-after: page; }
+  .form-2307:last-child { break-after: auto; }
+  .form-2307 table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .form-2307 td, .form-2307 th { padding: 1pt 3pt; overflow-wrap: anywhere; }
+  .form-2307 .government { text-align: center; font-weight: bold; font-size: 7.5pt; }
+  .form-2307 .bir-use { float: left; font-size: 7pt; border: .5pt solid #000; background: #d9d9d9; padding: 1pt 3pt; }
+  .form-2307 .title { border: 1.5pt solid #000; }
+  .form-2307 .title td { border-right: 1pt solid #000; padding: 2pt 4pt; }
+  .form-2307 .form-number { width: 19%; text-align: center; font-size: 7.5pt; }
+  .form-2307 .form-number b { display: block; font-size: 21pt; line-height: 1; }
+  .form-2307 .form-name { text-align: center; font-size: 15pt; font-weight: bold; line-height: 1.2; }
+  .form-2307 .form-code { width: 16%; text-align: center; font-size: 7pt; vertical-align: bottom; }
+  .form-2307 .main { border: 1.5pt solid #000; border-top: 0; }
+  .form-2307 .bar { background: #d9d9d9; }
+  .form-2307 .part { background: #d9d9d9; font-weight: bold; text-align: center; border-top: 1.5pt solid #000; border-bottom: 1.5pt solid #000; }
+  .form-2307 .center { text-align: center; }
+  .form-2307 .number { font-weight: bold; margin-right: 6pt; }
+  .form-2307 .fill { background: #fff; border: .5pt solid #000; min-height: 12pt; padding: 1pt 3pt; font-size: 8.5pt; }
+  .form-2307 .clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+  .form-2307 .description { font-size: 6pt; line-height: 6.5pt; }
+  .form-2307 .with-zip { display: flex; gap: 6pt; align-items: flex-end; }
+  .form-2307 .with-zip > .fill { flex: 1; }
+  .form-2307 .zip { width: 68pt; text-align: center; }
+  .form-2307 .boxes { display: inline-flex; align-items: center; gap: 0; background: #fff; vertical-align: middle; }
+  .form-2307 .group { display: inline-flex; border: .5pt solid #000; }
+  .form-2307 .box { display: inline-block; width: 10pt; height: 13pt; line-height: 13pt; text-align: center; border-right: .25pt solid #666; font-size: 8.5pt; }
+  .form-2307 .box:last-child { border-right: 0; }
+  .form-2307 .dash { background: #d9d9d9; padding: 0 4pt; font-weight: bold; }
+  .form-2307 .entry { background: #fff; border: .5pt solid #000; padding: 1pt 4pt; font-size: 8.5pt; }
+  .form-2307 .lines th { background: #d9d9d9; border: .5pt solid #000; text-align: center; font-size: 7.5pt; font-weight: bold; }
+  .form-2307 .lines td { border: .5pt solid #000; height: 13.5pt; font-size: 7.5pt; }
+  .form-2307 .lines .amount { text-align: right; white-space: nowrap; }
+  .form-2307 .lines .caption { font-weight: bold; }
+  .form-2307 .lines .shaded { background: #d9d9d9; font-weight: bold; }
+  .form-2307 .declaration { padding: 3pt 4pt; border-top: 1pt solid #000; font-size: 7.5pt; }
+  .form-2307 .sign { height: 24pt; vertical-align: bottom; text-align: center; font-size: 8.5pt; font-weight: bold; border-top: 1pt solid #000; }
+  .form-2307 .agent { display: flex; align-items: center; gap: 4pt; font-size: 7pt; text-align: center; }
+  .form-2307 .agent-number { flex: 1; background: #fff; border: .5pt solid #000; height: 13pt; }
+  .form-2307 .note { font-size: 7pt; margin-top: 1pt; }
+</style>
+
+<% certificates.flat_map(&:sheets).each do |sheet| %>
+  <% contact = sheet.contact %>
+  <section class="form-2307" data-form-2307>
+    <div class="bir-use">For BIR &nbsp; BCS/<br>Use Only Item:</div>
+    <div class="government">Republic of the Philippines<br>Department of Finance<br>Bureau of Internal Revenue</div>
+    <table class="title" style="clear: both"><tr>
+      <td class="form-number">BIR Form No.<b>2307</b>January 2018 (ENCS)</td>
+      <td class="form-name">Certificate of Creditable Tax<br>Withheld at Source</td>
+      <td class="form-code">2307 01/18ENCS</td>
+    </tr></table>
+
+    <table class="main">
+      <tr><td style="font-size: 7.5pt; border-bottom: .5pt solid #000">Fill in all applicable spaces. Mark all appropriate boxes with an "X".</td></tr>
+      <tr><td class="bar"><span class="number">1</span> For the Period &nbsp; &nbsp; From <%= render "tudla_accounting/reports/certificate_date", date: quarter.from %> <i>(MM/DD/YYYY)</i> &nbsp; &nbsp; &nbsp; To <%= render "tudla_accounting/reports/certificate_date", date: quarter.thru %> <i>(MM/DD/YYYY)</i></td></tr>
+
+      <tr><td class="part">Part I – Payee Information</td></tr>
+      <tr><td class="bar"><span class="number">2</span> Taxpayer Identification Number <i>(TIN)</i> &nbsp; <%= render "tudla_accounting/reports/certificate_tin", tin: contact.tax_number %></td></tr>
+      <tr><td class="bar"><span class="number">3</span> Payee’s Name <i>(Last Name, First Name, Middle Name for Individual OR Registered Name for Non-Individual)</i><div class="fill"><div class="clamp" data-payee-name><%= contact.name %></div></div></td></tr>
+      <tr><td class="bar"><div class="with-zip"><div style="flex: 1"><span class="number">4</span> Registered Address<div class="fill"><div class="clamp" data-payee-address><%= contact.address.to_s.squish %></div></div></div><div class="zip"><b>4A</b> ZIP Code<div class="fill"></div></div></div></td></tr>
+      <tr><td class="bar"><span class="number">5</span> Foreign Address, <i>if applicable</i><div class="fill"></div></td></tr>
+
+      <tr><td class="part">Part II – Payor Information</td></tr>
+      <tr><td class="bar"><span class="number">6</span> Taxpayer Identification Number <i>(TIN)</i> &nbsp; <%= render "tudla_accounting/reports/certificate_tin", tin: agent[:tin] %></td></tr>
+      <tr><td class="bar"><span class="number">7</span> Payor’s Name <i>(Last Name, First Name, Middle Name for Individual OR Registered Name for Non-Individual)</i><div class="fill"><div class="clamp" data-payor-name><%= agent[:name] %></div></div></td></tr>
+      <tr><td class="bar"><div class="with-zip"><div style="flex: 1"><span class="number">8</span> Registered Address<div class="fill"><div class="clamp" data-payor-address><%= agent[:address].to_s.squish %></div></div></div><div class="zip"><b>8A</b> ZIP Code<div class="fill" data-payor-zip><%= agent[:zip] %></div></div></div></td></tr>
+      <tr><td class="part">Part III – Details of Monthly Income Payments and Taxes Withheld</td></tr>
+    </table>
+
+    <table class="lines main">
+      <colgroup><col style="width: 26%"><col style="width: 7%"><col style="width: 12%"><col style="width: 12%"><col style="width: 12%"><col style="width: 15%"><col style="width: 16%"></colgroup>
+      <tr><th rowspan="2">Income Payments Subject to Expanded Withholding Tax</th><th rowspan="2">ATC</th><th colspan="4" style="padding: 0">AMOUNT OF INCOME PAYMENTS</th><th rowspan="2">Tax Withheld for the Quarter</th></tr>
+      <tr><th>1st Month of the Quarter</th><th>2nd Month of the Quarter</th><th>3rd Month of the Quarter</th><th>Total</th></tr>
+      <% sheet.lines.each do |line| %>
+        <tr data-certificate-line><td><div class="clamp description"><%= line.code.name %></div></td><td class="center"><%= line.code.code %></td>
+          <% line.months.each do |month| %><td class="amount"><%= tc_money(month) unless month.zero? %></td><% end %>
+          <td class="amount"><%= tc_money(line.total) %></td><td class="amount"><%= tc_money(line.withheld) %></td></tr>
+      <% end %>
+      <% (report.class::LINES_PER_SHEET - sheet.lines.size).times do %><tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><% end %>
+      <tr data-certificate-total><td class="shaded caption">Total</td><td></td>
+        <% 3.times do |index| %><td class="amount"><%= tc_money(sheet.month_total(index)) %></td><% end %>
+        <td class="amount"><%= tc_money(sheet.total) %></td><td class="amount"><%= tc_money(sheet.withheld) %></td></tr>
+      <tr><td class="shaded center" style="font-size: 6.5pt">Money Payments Subject to Withholding of Business Tax (Government &amp; Private)</td><td></td><td class="shaded" colspan="5"></td></tr>
+      <% 9.times do %><tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><% end %>
+      <tr><td class="shaded caption">Total</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    </table>
+
+    <table class="main">
+      <tr><td colspan="7" class="declaration">&nbsp; &nbsp; &nbsp; We declare under the penalties of perjury that this certificate has been made in good faith, verified by us, and to the best of our knowledge and belief, is true and correct, pursuant to the provisions of the National Internal Revenue Code, as amended, and the regulations issued under authority thereof. Further, we give our consent to the processing of our information as contemplated under the *Data Privacy Act of 2012 (R.A. No. 10173) for legitimate and lawful purposes.</td></tr>
+      <% printed = [ agent[:signatory_name], agent[:signatory_title], ("TIN #{agent[:signatory_tin]}" if agent[:signatory_tin].present?) ].compact_blank.join(" · ") %>
+      <%= render "tudla_accounting/reports/certificate_signature", who: "Payor", printed: printed %>
+      <tr><td colspan="7" class="part">CONFORME:</td></tr>
+      <%= render "tudla_accounting/reports/certificate_signature", who: "Payee" %>
+    </table>
+    <p class="note">*NOTE: The BIR Data Privacy is in the BIR website (www.bir.gov.ph)</p>
+  </section>
+<% end %>

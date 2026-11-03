@@ -78,6 +78,25 @@ module TudlaAccounting
     def qap = withholding_list(:qap)
     def sawt = withholding_list(:sawt)
 
+    # The tax certificates (BIR Form 2307) for the suppliers tax was withheld from in three
+    # months: the list, or as a PDF, all of them or (contact_id) one supplier's.
+    def supplier_certificates
+      three_months
+      @any_codes = organization_scope(WithholdingCode).exists?
+      @report = Reports::SupplierCertificates.new(accounting_organization, @quarter) if @quarter
+      certificates = @report&.certificates.to_a
+      respond_to do |format|
+        format.html { @page = Paginator.new(certificates, page: params[:page]) }
+        format.pdf do
+          chosen = params[:contact_id].present? ? certificates.select { |certificate| certificate.contact.id.to_s == params[:contact_id] } : certificates
+          next head(:not_found) if chosen.empty?
+
+          who = params[:contact_id].present? ? chosen.first.contact.name : "all-suppliers"
+          send_pdf("BIR-2307-#{who}-#{@quarter.from}-to-#{@quarter.thru}", fallback: reports_supplier_certificates_path(quarter: @quarter.from)) { PdfMaker.supplier_certificates(@report, chosen) }
+        end
+      end
+    end
+
     # Profit and loss with a column per value of a dimension, over a run of months (the
     # current year to date by default).
     def by_dimension

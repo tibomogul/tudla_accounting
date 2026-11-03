@@ -8,6 +8,7 @@ module TudlaAccounting
   #   PdfMaker.statements([statement], open_items: false)
   #   PdfMaker.payment(payment)                        # a receipt, or a payment notice
   #   PdfMaker.book(books, books.book("sales"))        # a book of accounts, a page to a sheet
+  #   PdfMaker.supplier_certificates(report, certificates) # tax certificates, on their form's paper
   #
   # Each returns the PDF's bytes. The page is rendered with the engine's styles inline and
   # the browser is barred from fetching anything, so nothing in it reaches the network.
@@ -37,24 +38,31 @@ module TudlaAccounting
                                                                                 organization: books.organization, landscape: book.columns.size > 6)
     end
 
+    # BIR Form 2307s, a sheet each, on the 8.5 x 13 inch paper the form is laid out for,
+    # whatever pdf_paper says. See Reports::SupplierCertificates.
+    def supplier_certificates(report, certificates)
+      render("tudla_accounting/reports/supplier_certificates", { report: report, certificates: certificates }, title: "BIR Form 2307", organization: report.organization,
+                                                                                                                paper: { paper_width: 8.5, paper_height: 13 }, margin: 0.3)
+    end
+
     # The PDF of a partial, in the PDF layout, for an organization's amounts.
-    def render(partial, locals, title:, organization:, landscape: false, **options)
+    def render(partial, locals, title:, organization:, landscape: false, paper: nil, margin: 0.5, **options)
       raise Error, "PDFs need the ferrum gem" unless TudlaAccounting.pdf?
 
       html = PdfViewsController.render(template: "tudla_accounting/pdf_views/page", layout: "tudla_accounting/pdf", assigns: { title: title, organization: organization },
                                        locals: { partial: partial, locals: locals, **options })
-      from_html(html, landscape: landscape)
+      from_html(html, landscape: landscape, paper: paper, margin: margin)
     end
 
-    def from_html(html, landscape: false)
+    def from_html(html, landscape: false, paper: nil, margin: 0.5)
       settings = TudlaAccounting.configuration
       browser = Ferrum::Browser.new(**{ timeout: 30 }.merge(settings.pdf_browser_options.to_h))
       begin
         page = browser.create_page
         page.network.blocklist = [ /./ ]
         page.content = html
-        page.pdf(encoding: :binary, format: settings.pdf_paper.to_sym, landscape: landscape, print_background: true,
-                 margin_top: 0.5, margin_bottom: 0.5, margin_left: 0.5, margin_right: 0.5)
+        page.pdf(encoding: :binary, **(paper || { format: settings.pdf_paper.to_sym }), landscape: landscape, print_background: true,
+                 margin_top: margin, margin_bottom: margin, margin_left: margin, margin_right: margin)
       ensure
         browser.quit
       end

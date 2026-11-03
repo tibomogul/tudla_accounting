@@ -1,0 +1,8 @@
+<%# locals: (groups:, dashes: false) %>
+<%# Characters in the boxes of a form, a run of boxes for each group. %>
+<span class="boxes">
+  <% groups.each_with_index do |group, index| %>
+    <% if dashes && index.positive? %><span class="dash">-</span><% end %>
+    <span class="group"><% group.each do |character| %><span class="box"><%= character.strip %></span><% end %></span>
+  <% end %>
+</span>

@@ -1,0 +1,4 @@
+<%# locals: (date: nil) %>
+<%# A date in the form's MM/DD/YYYY boxes, empty without one. %>
+<% text = date ? date.strftime("%m%d%Y") : " " * 8 %>
+<%= render "tudla_accounting/reports/certificate_boxes", groups: [ text[0, 2].chars, text[2, 2].chars, text[4, 4].chars ] %>

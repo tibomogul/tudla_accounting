@@ -1,0 +1,10 @@
+<%# locals: (who:, printed: nil) %>
+<%# A signature block of the form: room to sign above the printed name, and the tax agent's details left blank. %>
+<tr><td colspan="7" class="sign"><%= printed %></td></tr>
+<tr><td colspan="7" class="bar center">Signature over Printed Name of <%= who %>/<%= who %>’s Authorized Representative/Tax Agent<br><i>(Indicate Title/Designation and TIN)</i></td></tr>
+<tr><td colspan="7" class="bar"><div class="agent">
+  <span class="agent-label">Tax Agent Accreditation No./<br>Attorney’s Roll No. (if applicable)</span>
+  <span class="agent-number"></span>
+  <span class="agent-label">Date of Issue<br><i>(MM/DD/YYYY)</i></span><%= render "tudla_accounting/reports/certificate_date" %>
+  <span class="agent-label">Date of Expiry<br><i>(MM/DD/YYYY)</i></span><%= render "tudla_accounting/reports/certificate_date" %>
+</div></td></tr>

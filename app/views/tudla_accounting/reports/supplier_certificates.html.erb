@@ -1,0 +1,48 @@
+<%= tc_page_header "Certificates to suppliers (2307)", subtitle: (@quarter ? "#{tc_date(@quarter.from)} to #{tc_date(@quarter.thru)}" : nil) do %>
+  <% if @quarter %>
+    <%= form_with url: reports_supplier_certificates_path, method: :get, class: "flex flex-wrap items-end gap-2" do |form| %>
+      <div><%= form.label :quarter, "Quarter", class: "tc-label" %><%= form.select :quarter, @quarters.map { |quarter| [ quarter.label, quarter.from.iso8601 ] }, { selected: @quarter.from.iso8601 }, class: "tc-input" %></div>
+      <%= form.submit "Show", class: "tc-btn tc-btn-secondary", name: nil %>
+    <% end %>
+    <% if TudlaAccounting.pdf? && @report.certificates.any? %>
+      <%= link_to "All as PDF", reports_supplier_certificates_path(format: :pdf, quarter: @quarter.from), class: "tc-btn tc-btn-ghost print:hidden", data: { turbo: false } %>
+    <% end %>
+  <% end %>
+<% end %>
+
+<% if @quarter.nil? %>
+  <%= render "no_periods" %>
+<% elsif !@any_codes %>
+  <%= render "no_withholding_codes" %>
+<% else %>
+  <div class="tc-card tc-card-body text-sm mb-4" role="note" data-confirm-rdo>
+    These follow the first page of BIR Form 2307 (January 2018), without the BIR's seal and barcode. Check with your Revenue District Office that they accept it before issuing them.
+    The ZIP code of the supplier is left to be written in, and an individual's name prints as it is on the contact: the form asks for last name, first name, middle name.
+  </div>
+  <% missing = @report.missing_agent_details %>
+  <% if missing.any? %>
+    <div class="tc-alert tc-alert-warning mb-4" role="alert" data-missing-agent>The certificates will have no <%= missing.to_sentence(two_words_connector: " or ", last_word_connector: " or ") %> for you. Give them in the host app's <code>withholding_agent</code> setting.</div>
+  <% end %>
+  <% if @report.waiting_for_tin.any? %>
+    <div class="tc-alert tc-alert-warning mb-4" role="alert" data-missing-tin>No TIN for <%= @report.waiting_for_tin.map { |certificate| certificate.contact.name }.to_sentence %>. Add it on the contact before issuing.</div>
+  <% end %>
+  <section class="tc-card overflow-x-auto mb-4" aria-label="Certificates">
+    <table class="tc-table">
+      <thead><tr><th>TIN</th><th>Supplier</th><th>Codes</th><th class="tc-num">Income</th><th class="tc-num">Tax withheld</th><% if TudlaAccounting.pdf? %><th><span class="sr-only">Certificate</span></th><% end %></tr></thead>
+      <tbody>
+        <% if @page.records.empty? %><tr><td colspan="6" class="tc-muted text-center">Nothing withheld from suppliers in these months.</td></tr><% end %>
+        <% @page.records.each do |certificate| %>
+          <tr data-certificate-row>
+            <td class="whitespace-nowrap"><%= certificate.contact.tax_number || tag.span("No TIN", class: "tc-negative") %></td>
+            <td><%= link_to certificate.contact.name, contact_path(certificate.contact), class: "underline" %>
+              <% if certificate.negative? %><p class="tc-muted text-xs" data-negative>A negative here is a bill from an earlier quarter voided or credited. Ask your accountant how to treat it.</p><% end %></td>
+            <td class="font-mono"><%= certificate.lines.map { |line| line.code.code }.join(", ") %></td>
+            <td class="tc-num"><%= tc_money(certificate.total) %></td><td class="tc-num"><%= tc_money(certificate.withheld) %></td>
+            <% if TudlaAccounting.pdf? %><td class="text-right"><%= link_to "PDF", reports_supplier_certificates_path(format: :pdf, quarter: @quarter.from, contact_id: certificate.contact.id), class: "underline", data: { turbo: false }, aria: { label: "PDF for #{certificate.contact.name}" } %></td><% end %>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </section>
+  <%= render "tudla_accounting/shared/pagination", paginator: @page %>
+<% end %>

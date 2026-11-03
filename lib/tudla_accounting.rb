@@ -74,7 +74,7 @@ module TudlaAccounting
                   :due_date_method, :related_party_method, :forex_rate_provider,
                   :parent_controller, :current_organization, :current_actor, :authorize,
                   :cash_account_codes, :tax_basis, :organization_label, :entry_number_format,
-                  :attachment_content_types, :attachment_max_size, :document_header, :books_header,
+                  :attachment_content_types, :attachment_max_size, :document_header, :books_header, :withholding_agent,
                   :api_rate_limit, :api_rate_limit_store, :pdf_browser_options, :pdf_paper, :pdf_stylesheet,
                   :document_mailer, :document_mail_from, :document_mail_reply_to
     attr_reader :number_format
@@ -138,6 +138,7 @@ module TudlaAccounting
       #   ->(organization) { "#{organization.name}\nTIN: #{organization.tin}   |   #{organization.address}" }
       # Without one, the document_header.
       @books_header = nil
+      @withholding_agent = nil
       # How many requests an API token may make a minute (nil for no limit), counted in
       # api_rate_limit_store (an ActiveSupport::Cache store; Rails.cache when nil, which
       # must count across processes, as Solid Cache and Redis do, to limit them all).
@@ -271,6 +272,14 @@ module TudlaAccounting
     # The books_header setting's text for an organization.
     def books_header_for(organization)
       books_header ? books_header.call(organization).to_s : document_header_for(organization)
+    end
+
+    # Who signs the tax certificates issued to suppliers: the withholding_agent setting's
+    # details for an organization (tin, name, address, zip, signatory_name, signatory_tin,
+    # signatory_title), by default only its name.
+    def withholding_agent_for(organization)
+      name = organization.respond_to?(:name) && organization.name.present? ? organization.name : TudlaAccounting.organization_label(organization)
+      { name: name, tin: nil, address: nil, zip: nil, signatory_name: nil, signatory_tin: nil, signatory_title: nil }.merge(withholding_agent&.call(organization).to_h)
     end
 
     # The run of numbers posted entries are numbered in, each counted from 1:

@@ -1,0 +1,8 @@
+<%# locals: (tin:) %>
+<%# A TIN in the form's boxes, or as it is when it doesn't fit them. %>
+<% boxes = TudlaAccounting::Reports::SupplierCertificates.tin_boxes(tin) %>
+<% if boxes %>
+  <%= render "tudla_accounting/reports/certificate_boxes", groups: boxes, dashes: true %>
+<% else %>
+  <span class="entry"><%= tin %></span>
+<% end %>

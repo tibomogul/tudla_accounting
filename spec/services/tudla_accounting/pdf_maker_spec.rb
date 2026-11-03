@@ -36,6 +36,55 @@ RSpec.describe TudlaAccounting::PdfMaker, type: :service do
     expect(pdf).not_to include("Payments and credits", "Void invoice")
   end
 
+  context "with tax certificates" do
+    let(:peso_books) { create(:organization, name: "Bayanihan Corp.", currency: "PHP") }
+    let(:quarter) { TudlaAccounting::FilingQuarters.new(peso_books).of(Date.new(2026, 2, 1)) }
+    let(:report) { TudlaAccounting::Reports::SupplierCertificates.new(peso_books, quarter) }
+
+    before do
+      TudlaAccounting::PeriodCreator.call(peso_books, 2026)
+      TudlaAccounting::AccountsCreator.call([
+        { code: "2100", name: "Payables", category: "liability", role: "payable" }, { code: "2300", name: "Withholding payable", category: "liability" }, { code: "6000", name: "Fees", category: "expense" }
+      ], peso_books)
+    end
+
+    def withholding(number, name = "Contractors (corporate)")
+      TudlaAccounting::WithholdingCode.create!(organization: peso_books, code: number, name: name, rate: "0.02", payable_account: TudlaAccounting::Account.find_by!(organization: peso_books, code: "2300"))
+    end
+
+    def certified_bill(contact, code, cents)
+      TudlaAccounting::Document.create!(organization: peso_books, kind: "bill", contact: contact, issued_on: Date.new(2026, 2, 10),
+                                        lines_attributes: [ { description: "Work", unit_price_cents: cents, account: TudlaAccounting::Account.find_by!(organization: peso_books, code: "6000"), withholding_code: code } ]).approve!
+    end
+
+    it "fills BIR Form 2307 on its own paper, whatever pdf_paper says, with the signatures left to sign" do
+      TudlaAccounting.configuration.withholding_agent = ->(org) { { name: org.name, tin: "000-111-222-00000", address: "1 Demo Street, Makati City", zip: "1223", signatory_name: "Maria Santos", signatory_title: "Finance Manager", signatory_tin: "000-333-444-000" } }
+      supplier = TudlaAccounting::Contact.create!(organization: peso_books, name: "Sampaguita Consulting", kind: "supplier", tax_number: "123-456-789-000", address: "2 Made-up Road\nQuezon City")
+      certified_bill(supplier, withholding("WC120"), 1_234_567_89)
+
+      pages = PDF::Reader.new(StringIO.new(described_class.supplier_certificates(report, report.certificates))).pages
+      expect(pages.size).to eq(1)
+      expect(pages.first.attributes[:MediaBox]).to eq([ 0, 0, 612, 936 ])
+      text = pages.first.text.squish
+      expect(text).to include("BIR Form No.", "2307", "January 2018 (ENCS)", "Part I – Payee Information", "Sampaguita Consulting", "2 Made-up Road Quezon City",
+                              "Part II – Payor Information", "Bayanihan Corp.", "1 Demo Street, Makati City", "1223", "WC120", "1,234,567.89", "24,691.36",
+                              "Maria Santos · Finance Manager · TIN 000-333-444-000", "CONFORME:")
+      expect(text.delete(" ")).to include("123-456-789-000", "000-111-222-00000", "02", "01012026", "03312026")
+    end
+
+    it "keeps each sheet on one page with the longest names and addresses, and every line full, on as many sheets as the lines need" do
+      long = "A very long name for a certificate that goes on and on past the end of its box, " * 4
+      TudlaAccounting.configuration.withholding_agent = ->(_org) { { name: long, tin: "FOREIGN-1", address: long, zip: "1223", signatory_name: "Maria Santos", signatory_title: "Finance Manager", signatory_tin: "000-333-444-000" } }
+      supplier = TudlaAccounting::Contact.create!(organization: peso_books, name: long, kind: "supplier", tax_number: "FOREIGN-99", address: long)
+      12.times { |index| certified_bill(supplier, withholding("WX%03d" % index, long), 987_654_321_00) }
+
+      pages = PDF::Reader.new(StringIO.new(described_class.supplier_certificates(report, report.certificates))).pages
+      expect(pages.size).to eq(2)
+      expect(pages.map { |page| page.text.squish }).to all(include("CONFORME:", "*NOTE: The BIR Data Privacy"))
+      expect(pages.first.text).to include("FOREIGN-99", "9,876,543,210.00")
+    end
+  end
+
   it "writes a foreign document's amounts as the organization's pages do" do
     euros = TudlaAccounting::Document.create!(organization: organization, kind: "sales_invoice", contact: northwind, issued_on: Date.new(2026, 3, 10), currency: "EUR", exchange_rate: "1.6",
                                               lines_attributes: [ { description: "Work", unit_price_cents: 1_234_50, account: account("4000") } ])

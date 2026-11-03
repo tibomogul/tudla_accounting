@@ -15,6 +15,7 @@
        [ "Books of accounts", reports_books_path, "The journals and ledger in numbered pages of 30 rows, with page totals, to print and bind (the BIR's loose-leaf books)." ],
        *(@withholding ? [ [ "Withholding summary", reports_withholding_path, "Tax withheld by code and month, against the accounts, for the 0619-E and 1601-EQ." ],
                           [ "Tax withheld from suppliers (QAP)", reports_qap_path, "Each supplier's income and tax by code for a quarter." ],
+                          [ "Certificates to suppliers (2307)", reports_supplier_certificates_path, "A BIR Form 2307 for each supplier tax was withheld from in a quarter, to print and sign." ],
                           [ "Tax withheld from you (SAWT)", reports_sawt_path, "Each customer's income and tax by code, with certificates received." ] ] : []) ].each do |title, path, description| %>
     <%= link_to path, class: "tc-card tc-card-body block hover:border-[var(--tc-primary)]" do %>
       <p class="font-semibold"><%= title %></p>

@@ -49,6 +49,18 @@ module TudlaAccounting
       true
     end
 
+    # @quarters, every run of three months in a row the periods cover, latest first, and
+    # @quarter, the run picked (with the quarter parameter, its first day), by default this
+    # filing quarter, else the latest before it, else the earliest. Nil without such a run.
+    def three_months
+      runs = months.reverse.each_cons(3).select { |run| run.each_cons(2).all? { |month, following| month.thru_date.to_date + 1 == following.from_date.to_date } }
+      @quarters = runs.map { |first, _, last| FilingQuarters::Quarter.new(from: first.from_date.to_date, thru: last.thru_date.to_date) }.reverse
+      return @quarter = @quarters.find { |quarter| quarter.from.iso8601 == params[:quarter] } || raise(ActiveRecord::RecordNotFound) if params[:quarter].present?
+
+      filing = FilingQuarters.new(accounting_organization).of(Date.current)
+      @quarter = @quarters.find { |quarter| quarter.from == filing.from } || @quarters.find { |quarter| quarter.from < filing.from } || @quarters.last
+    end
+
     def picked_month(param)
       return if params[param].blank?
 

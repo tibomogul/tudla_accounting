@@ -84,6 +84,7 @@ TudlaAccounting::Engine.routes.draw do
     get :withholding
     get :qap
     get :sawt
+    get :supplier_certificates
   end
 
   resources :budgets do
