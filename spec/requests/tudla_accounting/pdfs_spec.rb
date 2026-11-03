@@ -84,7 +84,8 @@ RSpec.describe "PDF downloads", type: :request do
     get routes.reports_books_sample_path(book: "purchases", year: 2027, format: :pdf)
     expect(response.headers["Content-Disposition"]).to include("Sample-Purchase-journal-2027.pdf")
     expect(PDF::Reader.new(StringIO.new(response.body)).pages.size).to eq(1)
-    expect(pdf_text).to include("PURCHASE JOURNAL", "Sample Supplier", "000-000-000-000", "January 1 to December 31, 2027", "Balanced")
+    # The name is checked word by word: where its narrow column wraps it depends on the fonts installed.
+    expect(pdf_text).to include("PURCHASE JOURNAL", "Sample", "Supplier", "Corp.", "000-000-000-000", "January 1 to December 31, 2027", "Balanced")
   end
 
   it "names a draft's PDF by its kind" do
