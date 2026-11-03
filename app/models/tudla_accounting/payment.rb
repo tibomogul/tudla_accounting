@@ -22,6 +22,18 @@ module TudlaAccounting
   #   Payment.record!(organization:, kind: "refund", contact: northwind, account: bank,
   #                   paid_on: Date.current, amount_cents: 50_00, refund_of: credit_note)
   #
+  # A customer may withhold tax from what they pay (kind received only): withholdings lists
+  # each amount, with its code, what the certificate says was withheld and the income it
+  # was withheld from (worked out from the rate when not given), in the payment's currency.
+  # amount_cents stays the cash received. The tax posts to the code's creditable account,
+  # and the receivable is credited with both, which is what can be applied. Each amount
+  # keeps a WithheldTax row, for marking its certificate received and for the reports.
+  #
+  #   Payment.record!(organization:, kind: "received", contact: northwind, account: bank,
+  #                   paid_on: Date.current, amount_cents: 11_000_00,
+  #                   withholdings: [ { code: wc120, withheld_cents: 200_00 } ],
+  #                   applications: [ { document: invoice, amount_cents: 11_200_00 } ])
+  #
   # The engine maps its payments to the receipt, disbursement, refund and supplier_refund
   # roles itself (see CarryingAmountRole). void! reverses the entry, taking the payment off
   # what it was applied to (a refund off the credit it paid back), and so does reversing
@@ -44,6 +56,7 @@ module TudlaAccounting
     belongs_to :contact, class_name: "TudlaAccounting::Contact"
     belongs_to :account, class_name: "TudlaAccounting::Account"
     belongs_to :entry, class_name: "TudlaAccounting::Entry", optional: true
+    has_many :withheld_taxes, class_name: "TudlaAccounting::WithheldTax", inverse_of: :payment
     include ForeignCurrency
 
     normalizes :reference, with: ->(reference) { reference.strip.presence }
@@ -56,6 +69,7 @@ module TudlaAccounting
     validates :reference, length: { maximum: 255 }
     validate :contact_fits, on: :create
     validate :account_fits, on: :create
+    validate :withholdings_fit, on: :create
     validate(on: :create) { currency_rated(paid_on) }
     validate :unchanged_once_recorded, on: :update
 
@@ -71,10 +85,12 @@ module TudlaAccounting
     # Records a payment and posts it, applying it to documents ([{ document:, amount_cents: }],
     # each an approved invoice or bill of the contact's), and with bank_line (a statement
     # line on the account) matches it to that line; a refund names the credit it pays back
-    # (refund_of). All or nothing; ArgumentError when it can't be recorded.
-    def self.record!(applications: [], bank_line: nil, refund_of: nil, **attributes)
+    # (refund_of); a customer's payment can list the tax they withheld (withholdings). All
+    # or nothing; ArgumentError when it can't be recorded.
+    def self.record!(applications: [], bank_line: nil, refund_of: nil, withholdings: [], **attributes)
       payment = new(attributes)
       payment.refund_of = refund_of
+      payment.withholdings = withholdings
       transaction(requires_new: true) do
         payment.save!
         payment.post!(applications)
@@ -87,10 +103,28 @@ module TudlaAccounting
 
     def self.kinds_for(side) = KINDS.select { |_kind, about| about[:side] == side.to_sym }.keys
 
-    # What is left of a credit (a payment or credit note) to apply or refund, in cents.
-    def self.credit_left_cents(credit) = credit.is_a?(Payment) ? credit.unapplied.cents : credit.amount_due.cents
+    # What is left of a credit (a payment or credit note) to refund, in cents. Tax withheld
+    # was never received in cash, so it can be applied but not refunded.
+    def self.credit_left_cents(credit)
+      return credit.amount_due.cents unless credit.is_a?(Payment)
+
+      [ credit.unapplied.cents - credit.withheld_cents, 0 ].max
+    end
 
     attr_writer :refund_of
+    attr_reader :withholdings
+
+    # [{ code:, withheld_cents:, base_cents: }], the base worked out from the rate when not
+    # given.
+    def withholdings=(given)
+      @withholdings = given.map do |withholding|
+        code, withheld = withholding.values_at(:code, :withheld_cents)
+        base = withholding[:base_cents].presence
+        base ||= (BigDecimal(withheld) / code.rate).round.to_i if code && withheld
+        { code: code, withheld_cents: withheld, base_cents: base }
+      end
+      self.withheld_cents = @withholdings.sum { |withholding| withholding[:withheld_cents].to_i }
+    end
 
     def kind_label = KINDS.fetch(kind)[:label]
     def received? = kind == "received"
@@ -99,6 +133,10 @@ module TudlaAccounting
     def money_in? = KINDS.fetch(kind)[:money_in]
     def void? = status == "void"
     def amount = money(amount_cents)
+    def withheld = money(withheld_cents)
+    # The cash and the tax withheld: what it settles of what the contact owes.
+    def settled_cents = amount_cents + withheld_cents
+    def settled = money(settled_cents)
 
     # The receivable or payable credit it opens, for CarryingAmountProcessor.
     def carrying_amount_role = KINDS.fetch(kind)[:role]
@@ -152,6 +190,7 @@ module TudlaAccounting
       at = posting.transacted_at
       posting.post(at)
       update!(entry: posting)
+      record_withheld_taxes(posting)
       applications.each do |document, cents|
         Allocator.allocate!(credit, document.entry, **(foreign? ? { other_currency_cents: cents } : { amount_cents: cents }), at: at)
       end
@@ -178,6 +217,7 @@ module TudlaAccounting
     # Its entry was reversed on `on` (by void! or on the entry's own page): it is void.
     def entry_reversed!(on)
       update!(status: "void", voided_on: on)
+      WithheldTax.reverse!(entry, on: on)
     end
 
     private
@@ -196,7 +236,10 @@ module TudlaAccounting
         raise ArgumentError, "#{text(money(cents))} is more than is owed on #{document.number_label}" if cents > document.amount_due.cents
       end
       total = applications.sum(&:last)
-      raise ArgumentError, "The payment is #{text(amount)} but #{text(money(total))} is applied" if total > amount_cents
+      return unless total > settled_cents
+
+      what = withheld_cents.positive? ? "The payment and the tax withheld come to" : "The payment is"
+      raise ArgumentError, "#{what} #{text(settled)} but #{text(money(total))} is applied"
     end
 
     # A refund pays back a posted payment or approved credit note of the contact's, on the
@@ -225,7 +268,8 @@ module TudlaAccounting
 
     # The bank account against the receivable (a customer's payment or refund) or payable
     # (a supplier's) account, or its sub-account in a foreign payment's currency, both lines
-    # then with the foreign amount; a refund's related to the credit it pays back.
+    # then with the foreign amount; a refund's related to the credit it pays back. Tax
+    # withheld is a line of its own, and the receivable is credited with it too.
     def build_entry(documents)
       control = Account.for_role_in_currency!(organization, sales? ? :receivable : :payable, self[:currency])
       at = ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].local(paid_on.year, paid_on.month, paid_on.day)
@@ -234,11 +278,23 @@ module TudlaAccounting
                           particulars: "#{title}#{" (#{numbers.join(', ')})" if numbers.any?}")
       debit, credit_account = money_in? ? [ account, control ] : [ control, account ]
       cents = in_base_cents(amount_cents)
+      withheld_lines = Array(withholdings).map { |withholding| [ withholding[:code], in_base_cents(withholding[:withheld_cents]) ] }
       [ [ debit, Detail::TALLY_DEBIT ], [ credit_account, Detail::TALLY_CREDIT ] ].each do |line_account, tally|
-        line = posting.details.build(account: line_account, tally: tally, amount_cents: cents, currency: organization.currency)
-        line.build_foreign_exchange(other_currency: currency, other_currency_cents: amount_cents, rate: exchange_rate) if foreign?
+        on_control = line_account == control
+        line = posting.details.build(account: line_account, tally: tally, amount_cents: cents + (on_control ? withheld_lines.sum(&:last) : 0), currency: organization.currency)
+        line.build_foreign_exchange(other_currency: currency, other_currency_cents: on_control ? settled_cents : amount_cents, rate: exchange_rate) if foreign?
+      end
+      withheld_lines.each do |code, withheld|
+        posting.details.build(account: code.creditable_account, tally: Detail::TALLY_DEBIT, amount_cents: withheld, currency: organization.currency, description: code.label)
       end
       posting
+    end
+
+    def record_withheld_taxes(posting)
+      Array(withholdings).each do |withholding|
+        WithheldTax.create!(organization: organization, contact: contact, withholding_code: withholding[:code], entry: posting, payment: self, direction: "by_customer", on: paid_on,
+                            base_cents: in_base_cents(withholding[:base_cents]), withheld_cents: in_base_cents(withholding[:withheld_cents]))
+      end
     end
 
     def contact_fits
@@ -259,6 +315,23 @@ module TudlaAccounting
       errors.add(:account, "is inactive") unless account.active?
       control = account.path.any? { |held| held.role.in?(%w[receivable payable]) } # receivables or payables, or beneath them
       errors.add(:account, "must be a bank or cash account") if control || !account.category.in?([ Account::CATEGORY_ASSET, Account::CATEGORY_LIABILITY ])
+    end
+
+    def withholdings_fit
+      return if withholdings.blank?
+
+      errors.add(:base, "Only a payment received from a customer can have tax withheld") unless received?
+      withholdings.each do |withholding|
+        code, withheld, base = withholding.values_at(:code, :withheld_cents, :base_cents)
+        next errors.add(:base, "Choose a withholding code for the tax withheld") unless code
+
+        errors.add(:base, "#{code.code} isn't a withholding code of this organization's") if code.organization != organization
+        errors.add(:base, "#{code.code} is inactive") unless code.active?
+        errors.add(:base, "#{code.code} has no account for tax withheld from you") unless code.creditable_account
+        errors.add(:base, "The tax withheld under #{code.code} must be more than zero") unless withheld.to_i.positive?
+        errors.add(:base, "Give the income #{code.code} was withheld from") unless base.to_i.positive?
+        errors.add(:base, "The tax withheld under #{code.code} is more than the income it was withheld from") if base.to_i.positive? && withheld.to_i > base.to_i
+      end
     end
 
     def unchanged_once_recorded

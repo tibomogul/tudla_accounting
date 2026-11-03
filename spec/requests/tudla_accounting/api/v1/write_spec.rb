@@ -244,6 +244,40 @@ RSpec.describe "JSON API: recording in the books", type: :request do
     end
   end
 
+  describe "tax a customer withheld" do
+    let(:code) { TudlaAccounting::WithholdingCode.create!(organization: organization, code: "WC160", name: "Services", rate: "0.02", creditable_account: account("1000")) }
+
+    it "records it on a payment, and marks its certificate received" do
+      code
+      data = call(:post, routes.api_v1_payments_path, { kind: "received", contact_id: northwind.id, account_code: "1000", paid_on: "2026-03-20", amount: "980.00",
+                                                        withholdings: [ { code: "WC160", withheld: "20.00" } ] })["data"]
+      expect(data).to include("amount" => "980.00", "withheld" => "20.00", "unapplied" => "1000.00")
+      row = data["withheld_taxes"].sole
+      expect(row).to include("code" => "WC160", "on" => "2026-03-20", "base" => "1000.00", "withheld" => "20.00", "certificate_received_on" => nil)
+
+      marked = call(:post, "#{routes.api_v1_payments_path.delete_suffix('/payments')}/withheld_taxes/#{row['id']}/certificate", { on: "2026-04-05" })["data"]
+      expect(marked).to include("id" => row["id"], "certificate_received_on" => "2026-04-05")
+      expect(call(:get, routes.api_v1_payment_path(data["id"]))["data"]["withheld_taxes"].sole["certificate_received_on"]).to eq("2026-04-05")
+      expect(call(:get, routes.api_v1_payments_path)["data"].sole["withheld"]).to eq("20.00")
+
+      call(:post, "#{routes.api_v1_payments_path.delete_suffix('/payments')}/withheld_taxes/#{row['id']}/certificate", {})
+      expect(response.parsed_body["error"]["message"]).to eq("On is missing")
+      call(:post, routes.void_api_v1_payment_path(data["id"]), { on: "2026-04-06", reason: "Bounced" })
+      expect(response.parsed_body["error"]["message"]).to include("unmark it first")
+      expect(call(:delete, "#{routes.api_v1_payments_path.delete_suffix('/payments')}/withheld_taxes/#{row['id']}/certificate")["data"]["certificate_received_on"]).to be_nil
+    end
+
+    it "says what is wrong with a withholding" do
+      code
+      attempt = ->(withholdings) { call(:post, routes.api_v1_payments_path, { kind: "received", contact_id: northwind.id, account_code: "1000", paid_on: "2026-03-20", amount: "980.00", withholdings: withholdings }) }
+      attempt.call([ "WC160" ])
+      expect(response.parsed_body["error"]["message"]).to eq("Withholding 1 must be an object with code and withheld")
+      attempt.call([ { code: "NOPE", withheld: "1.00" } ])
+      expect(response.parsed_body["error"]["message"]).to eq("Withholding 1: there is no withholding code NOPE")
+      expect(attempt.call([ { code: "WC160", withheld: "20.00", base: "900.00" } ])["data"]["withheld_taxes"].sole["base"]).to eq("900.00")
+    end
+  end
+
   describe "withholding on a bill" do
     before { TudlaAccounting::AccountsCreator.call([ { code: "2300", name: "Withholding payable", category: "liability" } ], organization) }
 

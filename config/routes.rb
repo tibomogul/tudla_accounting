@@ -26,6 +26,8 @@ TudlaAccounting::Engine.routes.draw do
         member { post :void }
         post :apply, on: :member, to: "applications#create", defaults: { credit: "payment" }
       end
+      post "withheld_taxes/:id/certificate", to: "withheld_taxes#mark"
+      delete "withheld_taxes/:id/certificate", to: "withheld_taxes#unmark"
       resources :recurring_invoices, only: %i[index show create update destroy] do
         post :run, on: :collection
         post :make, on: :member
@@ -128,6 +130,13 @@ TudlaAccounting::Engine.routes.draw do
   get "purchases", to: "documents#index", defaults: { side: "purchases" }, as: :purchase_documents
   get "sales/payments", to: "payments#index", defaults: { kind: "received" }, as: :received_payments
   get "purchases/payments", to: "payments#index", defaults: { kind: "paid" }, as: :paid_payments
+  resources :withholding_certificates, only: :index do
+    post :mark_all, on: :collection
+    member do
+      post :mark
+      post :unmark
+    end
+  end
   resources :payments, only: %i[show new create] do
     member { post :void }
   end

@@ -84,6 +84,8 @@ module TudlaAccounting
         "Reverse the payment this exchange difference came from instead"
       elsif !refund? && details.any? { |detail| detail.carrying_amount&.charge? && detail.carrying_amount.allocations_to.active.any? }
         "Reverse the payments against it first"
+      elsif WithheldTax.where(entry_id: id).where.not(certificate_received_on: nil).exists?
+        "The tax certificate for it is marked received; unmark it first"
       end
     end
 

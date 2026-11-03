@@ -66,7 +66,7 @@ RSpec.describe "Payments in another currency", type: :request do
     get routes.received_payments_path
     expect(cells("tr[data-payment-row]").sole[4]).to eq("EUR 1,000.00")
     get routes.received_payments_path(format: :csv)
-    expect(response.body.lines.last.chomp).to end_with("Payment received,EUR")
+    expect(response.body.lines.last.chomp).to end_with("Payment received,EUR,0.00")
 
     statement = TudlaAccounting::PartyStatement.call(organization: organization, type: :receivable, party: northwind, from: Date.new(2026, 4, 1), thru: Date.new(2026, 4, 30))
     expect(statement.lines.filter_map(&:foreign)).to eq([ Money.new(1_000_00, "EUR"), Money.new(-1_000_00, "EUR") ])

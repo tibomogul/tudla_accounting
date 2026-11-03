@@ -1,0 +1,22 @@
+<%# locals: (codes:, contact:, currency:) %>
+<%# The tax a customer withheld from a payment, as their certificate says. Three rows, for a
+    payment covering more than one kind of income. %>
+<div class="tc-card overflow-x-auto" data-withholdings>
+  <h2 class="tc-card-body tc-card-title pb-0">Tax withheld by <%= contact.name %></h2>
+  <table class="tc-table">
+    <thead><tr><th>Code</th><th class="tc-num">Tax withheld (<%= currency %>)</th><th class="tc-num">Income (<%= currency %>)</th></tr></thead>
+    <tbody>
+      <% 3.times do |index| %>
+        <% typed = params.dig(:payment, :withholdings, index.to_s) %>
+        <% chosen = typed ? typed[:withholding_code_id] : (contact.default_withholding_code_id if index.zero?) %>
+        <tr>
+          <td><%= select_tag "payment[withholdings][#{index}][withholding_code_id]", options_for_select(codes.map { |code| [ "#{code.label} #{code.name}", code.id ] }, chosen.to_s),
+                             include_blank: "Choose a code", class: "tc-input", aria: { label: "Withholding code #{index + 1}" } %></td>
+          <td class="w-40"><%= text_field_tag "payment[withholdings][#{index}][withheld]", typed && typed[:withheld], inputmode: "decimal", class: "tc-input tc-num", aria: { label: "Tax withheld #{index + 1}" } %></td>
+          <td class="w-40"><%= text_field_tag "payment[withholdings][#{index}][base]", typed && typed[:base], inputmode: "decimal", class: "tc-input tc-num", aria: { label: "Income #{index + 1}" } %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+  <p class="tc-card-body tc-hint">Type the tax as the customer's certificate gives it. Leave the income blank to work it out from the code's rate. The cash and the tax together can be applied to invoices; what's left of the cash can be refunded, the tax can't.</p>
+</div>

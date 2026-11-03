@@ -47,7 +47,7 @@ RSpec.describe TudlaAccounting::Document, "withholding from suppliers" do
     expect(approved).to have_attributes(payment_status: "unpaid", amount_due: php(11_000), total_in_base: php(11_000))
     expect(rows.sole).to have_attributes(contact: supplier, withholding_code: code, entry: approved.entry, document_line: approved.lines.first, direction: "from_supplier",
                                          on: Date.new(2026, 3, 10), base_cents: 10_000_00, withheld_cents: 200_00, reversal: false)
-    expect { rows.sole.update!(withheld_cents: 1) }.to raise_error(ActiveRecord::ReadOnlyRecord)
+    expect { rows.sole.update!(withheld_cents: 1) }.to raise_error(ActiveRecord::RecordInvalid, /can.t be changed/)
     expect(code.reload).to be_posted
   end
 
@@ -93,6 +93,7 @@ RSpec.describe TudlaAccounting::Document, "withholding from suppliers" do
   it "balances the purchase journal and leaves the VAT report as it was, on either basis" do
     approved = bill.approve!
     books = TudlaAccounting::Reports::BooksOfAccounts.new(organization, from: year.children.order(:from_date).to_a[2], thru: year.children.order(:from_date).to_a[2])
+    expect(books.book("general_ledger").pages.find { |ledger| ledger.account.code == "2300" }.totals).to include(debit: php(0), credit: php(200))
     page = books.book("purchases").pages.sole
     expect(page.balanced).to be(true)
     expect(page.rows.first.cells).to include(payable: php(11_000), purchases: php(10_000), input_vat: php(1_200), account_title: "Withholding payable", other: php(-200))

@@ -1,0 +1,54 @@
+<%= tc_page_header "Tax certificates", subtitle: "What customers withheld from their payments, by customer and quarter" do %>
+  <%= link_to "Payments received", received_payments_path, class: "tc-btn tc-btn-ghost" %>
+<% end %>
+
+<%= form_with url: withholding_certificates_path, method: :get, class: "tc-card tc-card-body mb-6 flex flex-wrap items-end gap-3" do |form| %>
+  <div><%= form.label :show, "Show", class: "tc-label" %>
+    <%= form.select :show, [ [ "Waiting for a certificate", "waiting" ], [ "Certificate received", "received" ], [ "All", "all" ] ], { selected: @show }, class: "tc-input" %></div>
+  <div class="grow"><%= form.label :contact_id, "Customer", class: "tc-label" %>
+    <%= form.select :contact_id, @customers.map { |customer| [ customer.name, customer.id ] }, { include_blank: "All customers", selected: params[:contact_id] }, class: "tc-input" %></div>
+  <%= form.submit "Show", class: "tc-btn tc-btn-secondary", name: nil %>
+<% end %>
+
+<% if @page.records.empty? %>
+  <p class="tc-card tc-card-body tc-muted text-sm"><%= @show == "waiting" ? "No certificates to chase." : "Nothing to show." %></p>
+<% end %>
+
+<div class="space-y-6">
+  <% @page.records.each do |group| %>
+    <section class="tc-card overflow-x-auto" data-certificate-group aria-label="<%= group.contact.name %>, <%= group.quarter.label %>">
+      <div class="tc-card-body flex flex-wrap items-center justify-between gap-3 pb-0">
+        <h2 class="tc-card-title"><%= link_to group.contact.name, contact_path(group.contact), class: "underline" %>, <%= group.quarter.label %></h2>
+        <% waiting = group.rows.count { |row| !row.certificate_received? } %>
+        <% if tc_can?(:post) && waiting > 1 %>
+          <%= form_with url: mark_all_withholding_certificates_path, class: "flex items-center gap-2" do |form| %>
+            <%= form.hidden_field :contact_id, value: group.contact.id %>
+            <%= form.hidden_field :quarter, value: group.quarter.from %>
+            <%= form.date_field :on, value: Date.current, required: true, class: "tc-input", aria: { label: "Certificates received on" } %>
+            <%= form.submit "Mark all #{waiting} received", class: "tc-btn tc-btn-secondary" %>
+          <% end %>
+        <% end %>
+      </div>
+      <table class="tc-table">
+        <thead><tr><th>Date</th><th>Payment</th><th>Code</th><th class="tc-num">Income</th><th class="tc-num">Tax withheld</th><th>Certificate</th></tr></thead>
+        <tbody>
+          <% group.rows.each do |row| %>
+            <tr data-certificate-row>
+              <td class="whitespace-nowrap"><%= tc_date(row.on) %></td>
+              <td><%= link_to row.payment.reference || row.payment.title, payment_path(row.payment), class: "underline" %></td>
+              <td><%= row.withholding_code.code %></td>
+              <td class="tc-num"><%= tc_money(Money.new(row.base_cents, accounting_organization.currency)) %></td>
+              <td class="tc-num"><%= tc_money(Money.new(row.withheld_cents, accounting_organization.currency)) %></td>
+              <td><%= render "mark", row: row %></td>
+            </tr>
+          <% end %>
+        </tbody>
+        <tfoot><tr class="font-semibold"><td colspan="3">Total</td>
+          <td class="tc-num"><%= tc_money(Money.new(group.rows.sum(&:base_cents), accounting_organization.currency)) %></td>
+          <td class="tc-num"><%= tc_money(Money.new(group.rows.sum(&:withheld_cents), accounting_organization.currency)) %></td><td></td></tr></tfoot>
+      </table>
+    </section>
+  <% end %>
+</div>
+
+<%= render "tudla_accounting/shared/pagination", paginator: @page %>

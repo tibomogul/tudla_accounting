@@ -5,10 +5,15 @@ module TudlaAccounting
     extend ActiveSupport::Concern
 
     included do
-      helper_method :payment_accounts, :payment_currencies, :bank_accounts
+      helper_method :payment_accounts, :payment_currencies, :bank_accounts, :payment_withholding_codes
     end
 
     private
+
+    # The codes a customer's withholding can be recorded under.
+    def payment_withholding_codes
+      organization_scope(WithholdingCode).active.where.not(creditable_account_id: nil).order(:code)
+    end
 
     # The bank and cash accounts a payment in a currency can go through (in the
     # organization's, those held in no other).

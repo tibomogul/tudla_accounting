@@ -10,7 +10,7 @@
     <button type="button" class="tc-btn tc-btn-ghost" data-controller="print" data-action="print#print"><%= received ? "Print receipt" : "Print payment notice" %></button>
     <% if tc_can?(:post) && !@payment.void? %>
       <%= link_to (received ? "Email receipt" : "Email payment notice"), new_email_path(payment_id: @payment.id), class: "tc-btn tc-btn-secondary" %>
-      <% if @payment.unapplied.positive? %><%= link_to (received ? "Refund to them" : "Record their refund"), new_refund_path(payment_id: @payment.id), class: "tc-btn tc-btn-secondary" %><% end %>
+      <% if TudlaAccounting::Payment.credit_left_cents(@payment).positive? %><%= link_to (received ? "Refund to them" : "Record their refund"), new_refund_path(payment_id: @payment.id), class: "tc-btn tc-btn-secondary" %><% end %>
     <% end %>
   <% end %>
 <% end %>
@@ -26,6 +26,10 @@
   <section class="tc-card tc-card-body space-y-2 text-sm" aria-label="Details" data-details>
     <% details = { (money_in ? "From" : "To") => link_to(@payment.contact.name, contact_path(@payment.contact), class: "underline"), (money_in ? "Into" : "Out of") => @payment.account.code_with_name,
                    "Reference" => @payment.reference, "Amount" => tc_money_text(@payment.amount) } %>
+    <% if @payment.withheld_cents.positive? %>
+      <% details["Tax withheld"] = tc_money_text(@payment.withheld) %>
+      <% details["Settles"] = tc_money_text(@payment.settled) %>
+    <% end %>
     <% if refund %>
       <% details["Pays back"] = @payment.refund_of && credit_link(@payment.refund_of) %>
     <% else %>
@@ -63,6 +67,23 @@
   </section>
   <% end %>
 </div>
+
+<% if @payment.withheld_taxes.any? %>
+  <section class="tc-card overflow-x-auto mt-6" aria-labelledby="withheld-heading" data-withheld-taxes>
+    <h2 id="withheld-heading" class="tc-card-body tc-card-title pb-0">Tax withheld</h2>
+    <table class="tc-table">
+      <thead><tr><th>Code</th><th class="tc-num">Income</th><th class="tc-num">Tax withheld</th><th>Certificate</th></tr></thead>
+      <tbody>
+        <% @payment.withheld_taxes.reject(&:reversal).sort_by(&:id).each do |row| %>
+          <tr><td><%= row.withholding_code.label %></td>
+            <td class="tc-num"><%= tc_money(Money.new(row.base_cents, accounting_organization.currency)) %></td>
+            <td class="tc-num"><%= tc_money(Money.new(row.withheld_cents, accounting_organization.currency)) %></td>
+            <td><%= render "tudla_accounting/withholding_certificates/mark", row: row %></td></tr>
+        <% end %>
+      </tbody>
+    </table>
+  </section>
+<% end %>
 
 <%= render "tudla_accounting/emails/list", deliveries: @deliveries %>
 

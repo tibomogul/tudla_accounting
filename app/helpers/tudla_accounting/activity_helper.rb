@@ -2,7 +2,7 @@ module TudlaAccounting
   module ActivityHelper
     ACTIVITY_KINDS = { "entry" => "Entries", "account" => "Accounts", "period" => "Periods",
                        "opening_balances" => "Opening balances", "balances" => "Balance rebuilds",
-                       "allocation" => "Payments applied", "tax_code" => "Tax codes", "withholding_code" => "Withholding codes",
+                       "allocation" => "Payments applied", "tax_code" => "Tax codes", "withholding_code" => "Withholding codes", "withheld_tax" => "Tax certificates",
                        "bank_statement" => "Statement imports", "bank_line" => "Bank matches",
                        "dimension" => "Dimensions", "dimension_value" => "Dimension values",
                        "recurring_entry" => "Recurring entries", "recurring_invoice" => "Recurring invoices", "bank_rule" => "Bank rules",
@@ -40,6 +40,8 @@ module TudlaAccounting
       when "withholding_code.created" then safe_join([ "Added the withholding code ", subject ])
       when "withholding_code.updated" then safe_join([ "Changed ", subject, ": #{details.fetch('changes', {}).keys.map(&:humanize).join(', ').downcase}" ])
       when "withholding_code.deleted" then safe_join([ "Deleted the withholding code ", subject ])
+      when "withheld_tax.certificate_received" then safe_join([ "Marked the #{details['code']} certificate received on #{tc_date(details['on'])} for ", subject ])
+      when "withheld_tax.certificate_unmarked" then safe_join([ "Unmarked the #{details['code']} certificate for ", subject ])
       when "bank_statement.imported" then safe_join([ "Imported a statement for ", subject, ": #{pluralize(details['imported'], 'line')} new, #{details['skipped']} already there" ])
       when "bank_line.matched" then safe_join([ "Matched the statement line ", subject ])
       when "bank_line.unmatched" then safe_join([ "Unmatched the statement line ", subject ])

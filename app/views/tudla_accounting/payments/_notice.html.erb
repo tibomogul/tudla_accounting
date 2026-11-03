@@ -44,6 +44,10 @@
       <% end %>
     </tbody>
     <tfoot>
+      <% if payment.withheld_cents.positive? %>
+        <tr><td colspan="2" class="text-right">Total settled</td><td class="tc-num"><%= tc_money(payment.settled) %></td></tr>
+        <tr data-withheld><td colspan="2" class="text-right">Less tax you withheld, <%= payment.withheld_taxes.reject(&:reversal).map { |row| row.withholding_code.code }.uniq.to_sentence %></td><td class="tc-num"><%= tc_money(-payment.withheld) %></td></tr>
+      <% end %>
       <tr class="font-semibold"><td colspan="2" class="text-right"><%= received ? "Total received" : "Total paid" %></td><td class="tc-num"><%= tc_money(payment.amount) %></td></tr>
     </tfoot>
   </table>

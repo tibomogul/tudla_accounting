@@ -100,7 +100,15 @@ module TudlaAccounting
               entry_id: (target.is_a?(Entry) ? target.id : target.entry_id), amount: amount(applied), applied_at: time(allocation.allocated_at), active: allocation.active? }
           end,
           refund_of: payment.refund_of&.then { |credit| credit.is_a?(Payment) ? { payment_id: credit.id } : { document_id: credit.id } },
+          withheld: amount(payment.withheld), withheld_taxes: payment.withheld_taxes.reject(&:reversal).sort_by(&:id).map { |row| withheld_tax_json(row) },
           voided_on: date(payment.voided_on), void_reason: payment.void_reason, created_at: time(payment.created_at), updated_at: time(payment.updated_at) }
+      end
+
+      # In the organization's currency.
+      def withheld_tax_json(row)
+        currency = row.organization.currency
+        { id: row.id, code: row.withholding_code.code, on: date(row.on), base: amount(Money.new(row.base_cents, currency)), withheld: amount(Money.new(row.withheld_cents, currency)),
+          certificate_received_on: date(row.certificate_received_on) }
       end
 
       # Its files (none without Active Storage), each fetched from its attachments endpoint.

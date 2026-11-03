@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_03_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_03_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -515,6 +515,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_03_130000) do
     t.datetime "updated_at", null: false
     t.string "void_reason"
     t.date "voided_on"
+    t.bigint "withheld_cents", default: 0, null: false
     t.index ["account_id"], name: "index_tudla_accounting_payments_on_account"
     t.index ["contact_id"], name: "index_tudla_accounting_payments_on_contact"
     t.index ["entry_id"], name: "index_tudla_accounting_payments_on_entry", unique: true
@@ -522,6 +523,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_03_130000) do
     t.index ["organization_type", "organization_id", "paid_on"], name: "index_tudla_accounting_payments_on_paid_on"
     t.check_constraint "(currency IS NULL) = (exchange_rate IS NULL) AND (exchange_rate IS NULL OR exchange_rate > 0::numeric)", name: "tudla_accounting_payments_foreign_currency_rated"
     t.check_constraint "amount_cents > 0", name: "tudla_accounting_payments_amount_positive"
+    t.check_constraint "withheld_cents >= 0", name: "tudla_accounting_payments_withheld_not_negative"
     t.check_constraint "kind::text = ANY (ARRAY['received'::character varying, 'paid'::character varying, 'refund'::character varying, 'supplier_refund'::character varying]::text[])", name: "tudla_accounting_payments_kind_known"
     t.check_constraint "status::text = ANY (ARRAY['posted'::character varying::text, 'void'::character varying::text])", name: "tudla_accounting_payments_status_known"
   end
@@ -699,6 +701,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_03_130000) do
 
   create_table "tudla_accounting_withheld_taxes", force: :cascade do |t|
     t.bigint "base_cents", null: false
+    t.date "certificate_received_on"
     t.bigint "contact_id", null: false
     t.datetime "created_at", null: false
     t.string "direction", null: false
@@ -707,6 +710,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_03_130000) do
     t.date "on", null: false
     t.bigint "organization_id", null: false
     t.string "organization_type", null: false
+    t.bigint "payment_id"
     t.boolean "reversal", default: false, null: false
     t.bigint "withheld_cents", null: false
     t.bigint "withholding_code_id", null: false
@@ -714,6 +718,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_03_130000) do
     t.index ["document_line_id"], name: "index_tudla_accounting_withheld_taxes_on_document_line"
     t.index ["entry_id"], name: "index_tudla_accounting_withheld_taxes_on_entry"
     t.index ["organization_type", "organization_id", "direction", "on"], name: "index_tudla_accounting_withheld_taxes_on_organization_and_date"
+    t.index ["payment_id"], name: "index_tudla_accounting_withheld_taxes_on_payment"
     t.index ["withholding_code_id"], name: "index_tudla_accounting_withheld_taxes_on_withholding_code"
     t.check_constraint "direction::text = ANY (ARRAY['from_supplier'::character varying::text, 'by_customer'::character varying::text])", name: "tudla_accounting_withheld_taxes_direction_known"
   end
@@ -797,6 +802,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_03_130000) do
   add_foreign_key "tudla_accounting_withheld_taxes", "tudla_accounting_contacts", column: "contact_id"
   add_foreign_key "tudla_accounting_withheld_taxes", "tudla_accounting_document_lines", column: "document_line_id"
   add_foreign_key "tudla_accounting_withheld_taxes", "tudla_accounting_entries", column: "entry_id"
+  add_foreign_key "tudla_accounting_withheld_taxes", "tudla_accounting_payments", column: "payment_id"
   add_foreign_key "tudla_accounting_withheld_taxes", "tudla_accounting_withholding_codes", column: "withholding_code_id"
   add_foreign_key "tudla_accounting_withholding_codes", "tudla_accounting_accounts", column: "creditable_account_id"
   add_foreign_key "tudla_accounting_withholding_codes", "tudla_accounting_accounts", column: "payable_account_id"

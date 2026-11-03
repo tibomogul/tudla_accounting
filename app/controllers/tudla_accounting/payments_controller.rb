@@ -50,7 +50,8 @@ module TudlaAccounting
     end
 
     def create
-      permitted = params.require(:payment).permit(:kind, :contact_id, :account_id, :paid_on, :amount, :exchange_rate, :reference, :notes, :email_it, applications: {})
+      permitted = params.require(:payment).permit(:kind, :contact_id, :account_id, :paid_on, :amount, :exchange_rate, :reference, :notes, :email_it, applications: {},
+                                                  withholdings: %i[withholding_code_id withheld base])
       account = organization_scope(Account).find(permitted[:account_id]) if permitted[:account_id].present?
       @currency = account ? account.currency.presence || accounting_organization.currency : currency_param
       problems = []
@@ -61,12 +62,13 @@ module TudlaAccounting
                                                  exchange_rate: typed_decimal(permitted[:exchange_rate]) { problems << "#{permitted[:exchange_rate]} isn't an exchange rate" })
       @applied = (permitted[:applications]&.to_h || {}).filter_map { |id, text| [ id.to_i, cents.call(text, "applied") ] if text.present? }.to_h.compact
       @open = open_documents(@payment, @currency)
+      withholdings = typed_withholdings(permitted[:withholdings], cents)
       raise ArgumentError, problems.to_sentence if problems.any?
 
       documents = organization_scope(Document).where(id: @applied.keys).index_by(&:id)
       applications = @applied.map { |id, applied| { document: documents.fetch(id) { raise ActiveRecord::RecordNotFound }, amount_cents: applied } }
       @payment = Payment.record!(**@payment.attributes.symbolize_keys.slice(:kind, :contact_id, :account_id, :paid_on, :amount_cents, :exchange_rate, :reference, :notes),
-                                 organization: accounting_organization, applications: applications)
+                                 organization: accounting_organization, applications: applications, withholdings: withholdings)
       redirect_to payment_path(@payment), notice: "#{@payment.title} of #{helpers.tc_money_text(@payment.amount)} recorded.#{email_it(@payment) if permitted[:email_it] == '1'}"
     rescue ArgumentError => e
       @payment.errors.add(:base, e.message)
@@ -114,6 +116,16 @@ module TudlaAccounting
 
     private
 
+    # The rows of the form's tax withheld that have an amount typed.
+    def typed_withholdings(rows, cents)
+      (rows&.values || []).filter_map do |row|
+        next if row[:withheld].blank?
+
+        { code: organization_scope(WithholdingCode).find_by(id: row[:withholding_code_id]), withheld_cents: cents.call(row[:withheld], "tax withheld"),
+          base_cents: (cents.call(row[:base], "income") if row[:base].present?) }
+      end
+    end
+
     # Queues its receipt or payment notice, as its template says; what the notice says
     # about it.
     def email_it(payment)
@@ -125,7 +137,7 @@ module TudlaAccounting
     end
 
     def set_payment
-      @payment = organization_scope(Payment).includes(:contact, :account).find(params[:id])
+      @payment = organization_scope(Payment).includes(:contact, :account, withheld_taxes: :withholding_code).find(params[:id])
     end
 
     def kind_param = params[:kind].presence_in(%w[received paid]) || "received"
@@ -161,9 +173,9 @@ module TudlaAccounting
 
     def payments_table(payments)
       rows = payments.map do |payment|
-        [ payment.paid_on, payment.contact.name, payment.reference, payment.account.code, payment.amount, payment.unapplied, payment.status, payment.kind_label, payment.currency ]
+        [ payment.paid_on, payment.contact.name, payment.reference, payment.account.code, payment.amount, payment.unapplied, payment.status, payment.kind_label, payment.currency, payment.withheld ]
       end
-      Reports::Table.new([ [ "Date", "Contact", "Reference", "Account", "Amount", "Unapplied", "Status", "Kind", "Currency" ], *rows ])
+      Reports::Table.new([ [ "Date", "Contact", "Reference", "Account", "Amount", "Unapplied", "Status", "Kind", "Currency", "Tax withheld" ], *rows ])
     end
   end
 end

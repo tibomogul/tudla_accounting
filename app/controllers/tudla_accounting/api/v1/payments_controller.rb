@@ -7,14 +7,15 @@ module TudlaAccounting
       # Recording one (create) and voiding it need :post. An Idempotency-Key makes a
       # retried create return the payment the first recorded. A refund (kind refund or
       # supplier_refund) names the credit it pays back: refund_of { payment_id } or
-      # { document_id } (a credit note).
+      # { document_id } (a credit note). A customer's payment can list the tax they withheld:
+      # withholdings [{ code, withheld, base }], base worked out from the rate when not given.
       class PaymentsController < BaseController
         include Representation
 
         permits :post, only: %i[create void]
 
         def index
-          payments = organization_scope(Payment).includes(:organization, :contact, :account, entry: { details: :carrying_amount }).order(:paid_on, :id)
+          payments = organization_scope(Payment).includes(:organization, :contact, :account, withheld_taxes: %i[withholding_code organization], entry: { details: :carrying_amount }).order(:paid_on, :id)
           payments = payments.where(kind: params[:kind]) if params[:kind].present?
           payments = payments.where(status: params[:status]) if params[:status].present?
           payments = payments.where(contact_id: params[:contact_id]) if params[:contact_id].present?
@@ -42,7 +43,7 @@ module TudlaAccounting
                                     account: account, paid_on: date_param(:paid_on) || raise(ArgumentError, "paid_on is missing"),
                                     amount_cents: cents(body[:amount], "amount", currency: currency), reference: body[:reference], notes: body[:notes],
                                     exchange_rate: body[:exchange_rate].presence && decimal(body[:exchange_rate], "exchange_rate"),
-                                    idempotency_key: idempotency_key, applications: applications, refund_of: refund_of)
+                                    idempotency_key: idempotency_key, applications: applications, refund_of: refund_of, withholdings: withholdings(currency))
           render_made(payment_json(payment))
         rescue ActiveRecord::RecordNotUnique
           render_made(payment_json(replay(organization_scope(Payment)) || raise))
@@ -55,6 +56,16 @@ module TudlaAccounting
         end
 
         private
+
+        def withholdings(currency)
+          Array.wrap(body[:withholdings]).each_with_index.map do |withholding, index|
+            label = "Withholding #{index + 1}"
+            raise ArgumentError, "#{label} must be an object with code and withheld" unless withholding.is_a?(Hash)
+
+            { code: withholding_code_by_code(withholding[:code], label), withheld_cents: cents(withholding[:withheld], "#{label}'s withheld", currency: currency),
+              base_cents: withholding[:base].presence && cents(withholding[:base], "#{label}'s base", currency: currency) }
+          end
+        end
 
         def refund_of
           given = body[:refund_of]
