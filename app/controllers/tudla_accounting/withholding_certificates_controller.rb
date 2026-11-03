@@ -13,7 +13,7 @@ module TudlaAccounting
       rows = { "waiting" => :certificate_waiting, "received" => :certificate_received, "all" => :standing }.fetch(@show).then { |scope| organization_scope(WithheldTax).by_customer.public_send(scope) }
       rows = rows.where(contact_id: params[:contact_id]) if params[:contact_id].present?
       quarters = FilingQuarters.new(accounting_organization)
-      groups = rows.includes(:contact, :withholding_code, :payment).order(:on, :id).group_by { |row| [ row.contact, quarters.of(row.on) ] }
+      groups = rows.includes(:contact, :withholding_code, payment: :contact).order(:on, :id).group_by { |row| [ row.contact, quarters.of(row.on) ] }
                    .map { |(contact, quarter), held| Group.new(contact: contact, quarter: quarter, rows: held) }
       @page = Paginator.new(groups.sort_by { |group| [ group.quarter.from, group.contact.name.downcase ] }, page: params[:page])
     end

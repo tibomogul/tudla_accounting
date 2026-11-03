@@ -39,7 +39,7 @@
               <td><%= row.withholding_code.code %></td>
               <td class="tc-num"><%= tc_money(Money.new(row.base_cents, accounting_organization.currency)) %></td>
               <td class="tc-num"><%= tc_money(Money.new(row.withheld_cents, accounting_organization.currency)) %></td>
-              <td><%= render "mark", row: row %></td>
+              <td><%= render "mark", row: row, reversed: false %></td>
             </tr>
           <% end %>
         </tbody>

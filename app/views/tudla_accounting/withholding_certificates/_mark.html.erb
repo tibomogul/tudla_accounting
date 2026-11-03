@@ -1,4 +1,4 @@
-<%# locals: (row:) %>
+<%# locals: (row:, reversed: row.reversed?) %>
 <%# When a row's certificate came in, or waiting for it, with the button to change that. %>
 <div class="flex flex-wrap items-center gap-2" data-certificate="<%= row.certificate_received? ? "received" : "waiting" %>">
   <% if row.certificate_received? %>
@@ -6,7 +6,7 @@
     <% if tc_can?(:post) %>
       <%= form_with url: unmark_withholding_certificate_path(row) do |form| %><%= form.submit "Unmark", class: "tc-btn tc-btn-ghost" %><% end %>
     <% end %>
-  <% elsif row.reversed? %>
+  <% elsif reversed %>
     <span class="tc-muted">Reversed</span>
   <% elsif tc_can?(:post) %>
     <%= form_with url: mark_withholding_certificate_path(row), class: "flex items-center gap-2" do |form| %>

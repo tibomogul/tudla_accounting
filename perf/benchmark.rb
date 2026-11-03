@@ -6,7 +6,9 @@
 # Runs in its own organization ("Perf Co"), deleted afterwards unless KEEP=1. Prints the
 # time and the number of SQL queries for each step. Besides the entries, a quarter as many
 # invoices and bills are approved (some in euros), most of them paid, with credit notes,
-# refunds, a recurring invoice and a budget.
+# refunds, a recurring invoice and a budget. Half the suppliers have tax withheld on their
+# bills, and every fourth customer payment in the organization's currency is less tax, half
+# of those with the certificate marked received.
 ENTRY_COUNT = Integer(ENV.fetch("ENTRIES", "2000"))
 DOCUMENT_COUNT = ENTRY_COUNT / 4
 srand(42)
@@ -25,6 +27,7 @@ end
 def purge(organization)
   TudlaAccounting::DatabaseProtection.allowing_posted_changes do
     scope = ->(model) { model.where(organization_type: organization.class.name, organization_id: organization.id) }
+    scope.call(TudlaAccounting::WithheldTax).delete_all
     scope.call(TudlaAccounting::Delivery).delete_all
     scope.call(TudlaAccounting::Document).update_all(credited_document_id: nil)
     scope.call(TudlaAccounting::Document).delete_all # their lines go with them
@@ -46,6 +49,7 @@ def purge(organization)
     scope.call(TudlaAccounting::Balance).delete_all
     scope.call(TudlaAccounting::Entry).delete_all
     scope.call(TudlaAccounting::TaxCode).delete_all
+    scope.call(TudlaAccounting::WithholdingCode).delete_all
     dimensions = scope.call(TudlaAccounting::Dimension)
     TudlaAccounting::DimensionValue.where(dimension: dimensions).delete_all
     dimensions.delete_all
@@ -67,9 +71,10 @@ years = [ 2025, 2026 ].map { |year| TudlaAccounting::PeriodCreator.call(organiza
 TudlaAccounting::AccountsCreator.call([
   { code: "1000", name: "Assets", category: "asset", children: [
     { code: "1010", name: "Cash and bank", category: "asset", children: (1..3).map { |i| { code: "101#{i}", name: "Bank #{i}", category: "asset" } } },
-    { code: "1100", name: "Receivables", category: "asset", role: "receivable" }, { code: "1500", name: "Equipment", category: "asset" } ] },
+    { code: "1100", name: "Receivables", category: "asset", role: "receivable" }, { code: "1200", name: "Creditable tax", category: "asset" }, { code: "1500", name: "Equipment", category: "asset" } ] },
   { code: "2000", name: "Liabilities", category: "liability", children: [
-    { code: "2100", name: "Payables", category: "liability", role: "payable" }, { code: "2200", name: "GST", category: "liability" }, { code: "2500", name: "Loan", category: "liability" } ] },
+    { code: "2100", name: "Payables", category: "liability", role: "payable" }, { code: "2200", name: "GST", category: "liability" }, { code: "2300", name: "Withholding payable", category: "liability" },
+    { code: "2500", name: "Loan", category: "liability" } ] },
   { code: "3000", name: "Equity", category: "equity", children: [ { code: "3100", name: "Capital", category: "equity" }, { code: "3900", name: "Retained earnings", category: "equity", role: "retained_earnings" } ] },
   { code: "4000", name: "Income", category: "income", children: (1..4).map { |i| { code: "40#{i}0", name: "Sales #{i}", category: "income" } } },
   { code: "6000", name: "Expenses", category: "expense", children: (1..9).map { |i| { code: "60#{i}0", name: "Expense #{i}", category: "expense" } } }
@@ -79,6 +84,9 @@ accounts["1500"].update!(cash_flow_activity: :investing)
 accounts["2500"].update!(cash_flow_activity: :financing)
 gst = TudlaAccounting::TaxCode.create!(organization: organization, code: "GST", name: "GST", rate: "0.1", kind: :sales, account: accounts["2200"])
 gst_paid = TudlaAccounting::TaxCode.create!(organization: organization, code: "GST-P", name: "GST on purchases", rate: "0.1", kind: :purchases, account: accounts["2200"])
+withholding = %w[WC010 WC120].zip(%w[0.1 0.02]).map do |code, rate|
+  TudlaAccounting::WithholdingCode.create!(organization: organization, code: code, name: "Code #{code}", rate: rate, payable_account: accounts["2300"], creditable_account: accounts["1200"])
+end
 department = TudlaAccounting::Dimension.create!(organization: organization, code: "DEPT", name: "Department")
 teams = %w[SALES ENG OPS ADMIN].map { |code| department.dimension_values.create!(code: code, name: code.capitalize) }
 banks = %w[1011 1012 1013].map { |code| accounts[code] }
@@ -122,11 +130,12 @@ customers = Array.new(30) do |i|
 end
 suppliers = Array.new(10) do |i|
   TudlaAccounting::Contact.create!(organization: organization, name: "Supplier #{i + 1}", kind: "supplier", email: "supplier#{i + 1}@example.test",
-                                   payment_terms_days: 30, default_account: expenses.sample, default_tax_code: gst_paid)
+                                   payment_terms_days: 30, default_account: expenses.sample, default_tax_code: gst_paid, default_withholding_code: (withholding[i % 4 / 2] if i < 5))
 end
 document_lines = lambda do |contact, foreign|
   Array.new(rand(1..3)) do
-    { description: "Item", quantity: rand(1..5), unit_price_cents: rand(20_00..800_00), account: contact.default_account, tax_code: (contact.default_tax_code unless foreign) }
+    { description: "Item", quantity: rand(1..5), unit_price_cents: rand(20_00..800_00), account: contact.default_account, tax_code: (contact.default_tax_code unless foreign),
+      withholding_code: contact.default_withholding_code }.compact
   end
 end
 # Seven in ten are invoices; one invoice in twenty is in euros.
@@ -157,10 +166,18 @@ payments = measure("record payments, credit notes and refunds") do
       next
     end
 
-    owed = document.total.cents
+    owed = document.amount_due.cents
     paid = index % 10 == 6 ? owed / 2 : owed
     extra = (index % 50).zero? ? 10_00 : 0
     paid_on = [ document.issued_on + rand(0..40), last_day ].min
+    if document.sales? && (index % 4).zero? && (index % 50).nonzero? && index % 10 != 6
+      withheld = document.lines.sum(&:net_cents) / 50
+      less_tax = TudlaAccounting::Payment.record!(organization: organization, kind: "received", contact: document.contact, account: banks.first, paid_on: paid_on, amount_cents: paid - withheld,
+                                                  withholdings: [ { code: withholding.last, withheld_cents: withheld } ], applications: [ { document: document, amount_cents: paid } ])
+      less_tax.withheld_taxes.each { |row| row.mark_certificate!(on: paid_on) } if (index % 8).zero?
+      next less_tax
+    end
+
     payment = TudlaAccounting::Payment.record!(organization: organization, kind: document.sales? ? "received" : "paid", contact: document.contact, account: banks.first,
                                                paid_on: paid_on, amount_cents: paid + extra, applications: [ { document: document, amount_cents: paid } ])
     if extra.positive?
@@ -168,6 +185,15 @@ payments = measure("record payments, credit notes and refunds") do
                                        paid_on: paid_on, amount_cents: extra, refund_of: payment)
     end
     payment
+  end
+end
+# What withholding adds to approving a bill: the same one-line bills, without it and with it.
+[ [ "without", nil ], [ "with", withholding.first ] ].each do |word, code|
+  measure("approve 50 bills #{word} withholding") do
+    50.times do
+      TudlaAccounting::Document.create!(organization: organization, kind: "bill", contact: suppliers.last, issued_on: last_day, due_on: last_day,
+                                        lines_attributes: [ { description: "Item", quantity: 1, unit_price_cents: 100_00, account: expenses.first, tax_code: gst_paid, withholding_code: code } ]).approve!
+    end
   end
 end
 puts format("  details: %d, balances: %d, documents: %d, payments: %d", TudlaAccounting::Detail.where(organization: organization).count,
@@ -202,6 +228,12 @@ measure("recurring invoices (a year, approved)") { TudlaAccounting::RecurringInv
 budget = measure("budget from last year's actuals") do
   TudlaAccounting::Budget.create!(organization: organization, period: year, name: "Plan", main: true).tap { |plan| plan.fill_from_actuals!(years.first, percent: 5) }
 end
+withholding_year = TudlaAccounting::Reports::Withholding.new(organization, from: months.first, thru: months.last)
+measure("withholding summary (year)") { [ withholding_year.summary("from_supplier"), withholding_year.summary("by_customer"), withholding_year.checks("from_supplier"), withholding_year.checks("by_customer") ] }
+measure("QAP and SAWT (year)") { [ withholding_year.qap, withholding_year.sawt, withholding_year.waiting, withholding_year.reversed ] }
+filing_quarter = TudlaAccounting::FilingQuarters.new(organization).of(Date.new(2026, 4, 1))
+measure("supplier certificates (quarter)") { TudlaAccounting::Reports::SupplierCertificates.new(organization, filing_quarter).certificates.map(&:sheets) }
+puts format("  withheld rows: %d", TudlaAccounting::WithheldTax.where(organization: organization).count)
 measure("bank summary (one account)") { TudlaAccounting::BankReconciler.new(bank).summary(as_of: Date.new(2026, 12, 31)) }
 measure("bank suggestions (one account)") { TudlaAccounting::BankReconciler.new(bank).suggestions }
 differences = measure("balance check (differences)") { TudlaAccounting::BalanceRebuilder.new(organization).differences.size }
@@ -255,7 +287,12 @@ base = "/tudla_accounting"
   "statements (customers, March)" => "/reports/statements?type=receivable&from=#{march.from_date.to_date}&thru=#{march.thru_date.to_date}",
   "pay run" => "/pay_run/new?due_by=#{year.thru_date.to_date}", "reminders due" => "/sales/reminders", "recurring invoices" => "/recurring_invoices",
   "budgets" => "/budgets", "budget" => "/budgets/#{budget.id}", "budget (edit)" => "/budgets/#{budget.id}/edit",
-  "profit and loss vs budget" => "/reports/profit_and_loss?period_id=#{year.id}&compare=budget", "bank rules" => "/bank_rules"
+  "profit and loss vs budget" => "/reports/profit_and_loss?period_id=#{year.id}&compare=budget", "bank rules" => "/bank_rules",
+  "withholding summary" => "/reports/withholding?from_id=#{months.first.id}&thru_id=#{months.last.id}",
+  "QAP (year)" => "/reports/qap?from_id=#{months.first.id}&thru_id=#{months.last.id}", "SAWT (year)" => "/reports/sawt?from_id=#{months.first.id}&thru_id=#{months.last.id}",
+  "supplier certificates" => "/reports/supplier_certificates?quarter=2026-04-01", "supplier certificates PDF" => "/reports/supplier_certificates.pdf?quarter=2026-04-01",
+  "tax certificates" => "/withholding_certificates?show=all", "withholding codes" => "/withholding_codes",
+  "bill with tax withheld" => "/documents/#{documents.find { |document| document.withheld_cents.positive? }.id}", "new bill" => "/documents/new?kind=bill"
 }.each do |label, path|
   status = measure("GET #{label}") { app.get(base + path) }
   puts "  !! status #{status}" unless status == 200
