@@ -330,7 +330,7 @@ Globex,customer,payables@globex.test,,,,30,,GST,
 Initech Supplies,supplier,billing@initech.test,,,,30,,,Office supplies
 ```
 
-- `Default account` and `Default tax code` are codes, which must already exist.
+- `Default account`, `Default tax code` and `Default withholding code` are codes, which must already exist.
 - A `Currency` column, also optional, gives a currency code; blank is the organization's own.
 - A row whose name is already a contact updates that contact, ignoring case.
 - The whole file imports or nothing does.

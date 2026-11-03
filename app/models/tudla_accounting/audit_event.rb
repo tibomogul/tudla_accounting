@@ -38,7 +38,7 @@ module TudlaAccounting
       when Document then object.label
       when Payment then "#{object.title} of #{MoneyFormatter.labelled(object.amount, object.organization)}"
       when ApiToken then "API token #{object.name}"
-      when Period, Budget, FiledTaxReturn, Allocation, TaxCode, BankStatementLine, Dimension, DimensionValue then object.label
+      when Period, Budget, FiledTaxReturn, Allocation, TaxCode, WithholdingCode, BankStatementLine, Dimension, DimensionValue then object.label
       else
         %i[name email].each { |method| return object.public_send(method).to_s if object.respond_to?(method) && object.public_send(method).present? }
         "#{object.class.name} ##{object.id}"

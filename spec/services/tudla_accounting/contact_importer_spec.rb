@@ -41,6 +41,14 @@ RSpec.describe TudlaAccounting::ContactImporter do
     expect(contacts.sole).to have_attributes(payment_terms_days: 14, default_account: TudlaAccounting::Account.find_by!(organization: organization, code: "4000"))
   end
 
+  it "sets the default withholding code by its code" do
+    TudlaAccounting::AccountsCreator.call([ { code: "2300", name: "Withholding payable", category: "liability" } ], organization)
+    code = TudlaAccounting::WithholdingCode.create!(organization: organization, code: "WC010", name: "Professionals", rate: "0.1", payable_account: TudlaAccounting::Account.find_by!(organization: organization, code: "2300"))
+    described_class.call(organization, file([ [ "Name", "Kind", "Default withholding code" ], [ "Ledger & Co", "supplier", "WC010" ] ]), ".csv")
+    expect(contacts.sole.default_withholding_code).to eq(code)
+    expect { described_class.call(organization, file([ [ "Name", "Default withholding code" ], [ "Initech", "NOPE" ] ]), ".csv") }.to raise_error(ArgumentError, /no withholding code has the code NOPE/)
+  end
+
   it "imports nothing when a row is wrong, saying which" do
     expect { described_class.call(organization, file([ [ "Email" ] ]), ".csv") }.to raise_error(ArgumentError, "The file has no Name column")
     expect do

@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Withholding codes (`WithholdingCode`): a tax withheld from payments, with its rate and the accounts it posts to, and a contact's default. `WithholdingCodeTemplates` has a starter list of the Philippines' common expanded withholding codes; check its rates before relying on them. `GET /withholding_codes` lists them in the API. Nothing posts to them yet.
+
 ## [0.3.0] - 2026-11-03
 
 Tagged but not published to RubyGems.

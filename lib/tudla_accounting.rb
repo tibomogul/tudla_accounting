@@ -27,6 +27,7 @@ module TudlaAccounting
     opening_balances.saved balances.rebuilt
     allocation.created allocation.reversed
     tax_code.created tax_code.updated tax_code.deleted
+    withholding_code.created withholding_code.updated withholding_code.deleted
     bank_statement.imported bank_line.matched bank_line.unmatched
     dimension.created dimension.updated dimension_value.created dimension_value.updated
     recurring_entry.created recurring_entry.updated recurring_entry.deleted recurring_entry.generated

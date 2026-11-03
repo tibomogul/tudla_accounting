@@ -20,6 +20,11 @@
                                             choices: [ [ "None", "" ] ] + postable_account_choices(contact_accounts, selected: contact.default_account_id) %></div>
     <div class="sm:col-span-2"><%= tc_field form, :default_tax_code_id, as: :select, label: "Default tax code",
                       choices: [ [ "None", "" ] ] + contact_tax_codes.select { |code| code.active? || code.id == contact.default_tax_code_id }.map { |code| [ code.label, code.id ] } %></div>
+    <% withholding_codes = contact_withholding_codes.select { |code| code.active? || code.id == contact.default_withholding_code_id } %>
+    <% if withholding_codes.any? %>
+      <div class="sm:col-span-2"><%= tc_field form, :default_withholding_code_id, as: :select, label: "Default withholding code",
+                        choices: [ [ "None", "" ] ] + withholding_codes.map { |code| [ "#{code.label} #{code.name}", code.id ] }, hint: "Starts the lines of their bills; none for a supplier nothing is withheld from" %></div>
+    <% end %>
   </fieldset>
   <div class="tc-card tc-card-body grid gap-4">
     <%= tc_field form, :notes, as: :text_area, rows: 3 %>

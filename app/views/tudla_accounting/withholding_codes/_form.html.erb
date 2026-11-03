@@ -1,0 +1,25 @@
+<%# locals: (withholding_code:) %>
+<%= form_with model: withholding_code, url: (withholding_code.persisted? ? withholding_code_path(withholding_code) : withholding_codes_path), class: "tc-card tc-card-body space-y-4 max-w-2xl" do |form| %>
+  <% other_errors = withholding_code.errors.reject { |error| %i[code name].include?(error.attribute) }.map(&:full_message) %>
+  <% if other_errors.any? %>
+    <div class="tc-alert tc-alert-danger" role="alert"><%= other_errors.to_sentence %></div>
+  <% end %>
+  <div class="grid gap-4 sm:grid-cols-3">
+    <%= tc_field form, :code, required: true, hint: "The tax authority's, e.g. WC010" %>
+    <div class="sm:col-span-2"><%= tc_field form, :name, required: true %></div>
+  </div>
+  <div class="grid gap-4 sm:grid-cols-3">
+    <%= tc_field form, :rate_percent, label: "Rate (%)", inputmode: "decimal", required: true %>
+    <%= tc_field form, :payable_account_id, as: :select, label: "Withheld from suppliers",
+                 choices: [ [ "None", "" ] ] + postable_account_choices(payable_accounts, selected: form.object.payable_account_id),
+                 hint: "The liability it is owed in" %>
+    <%= tc_field form, :creditable_account_id, as: :select, label: "Withheld by customers",
+                 choices: [ [ "None", "" ] ] + postable_account_choices(creditable_accounts, selected: form.object.creditable_account_id),
+                 hint: "The asset it is claimed from" %>
+  </div>
+  <label class="flex items-center gap-2 text-sm"><%= form.check_box :active %> Active (offered for new bills and payments)</label>
+  <div class="flex flex-wrap gap-2">
+    <%= form.submit "Save withholding code", class: "tc-btn" %>
+    <%= link_to "Cancel", withholding_codes_path, class: "tc-btn tc-btn-ghost" %>
+  </div>
+<% end %>

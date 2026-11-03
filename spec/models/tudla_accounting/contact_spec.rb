@@ -35,9 +35,11 @@ RSpec.describe TudlaAccounting::Contact do
     other = create(:organization, currency: "AUD")
     TudlaAccounting::AccountsCreator.call([ { code: "4000", name: "Theirs", category: "income" }, { code: "2200", name: "GST", category: "liability" } ], other)
     theirs = TudlaAccounting::TaxCode.create!(organization: other, code: "GST", name: "GST", rate: "0.1", kind: :sales, account: TudlaAccounting::Account.find_by!(organization: other, code: "2200"))
-    foreign = described_class.new(organization: organization, name: "x", default_account: TudlaAccounting::Account.find_by!(organization: other, code: "4000"), default_tax_code: theirs)
+    their_withholding = TudlaAccounting::WithholdingCode.create!(organization: other, code: "WC010", name: "Professionals", rate: "0.1", payable_account: TudlaAccounting::Account.find_by!(organization: other, code: "2200"))
+    foreign = described_class.new(organization: organization, name: "x", default_account: TudlaAccounting::Account.find_by!(organization: other, code: "4000"), default_tax_code: theirs,
+                                  default_withholding_code: their_withholding)
     expect(foreign).not_to be_valid
-    expect(foreign.errors.attribute_names).to contain_exactly(:default_account, :default_tax_code)
+    expect(foreign.errors.attribute_names).to contain_exactly(:default_account, :default_tax_code, :default_withholding_code)
   end
 
   it "is found by name, email or tax number, by side" do

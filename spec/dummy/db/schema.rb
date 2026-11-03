@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_01_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_03_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -266,6 +266,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_01_120000) do
     t.string "currency", limit: 3
     t.bigint "default_account_id"
     t.bigint "default_tax_code_id"
+    t.bigint "default_withholding_code_id"
     t.string "email"
     t.string "kind", default: "customer", null: false
     t.string "name", null: false
@@ -278,6 +279,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_01_120000) do
     t.datetime "updated_at", null: false
     t.index ["default_account_id"], name: "index_tudla_accounting_contacts_on_default_account"
     t.index ["default_tax_code_id"], name: "index_tudla_accounting_contacts_on_default_tax_code"
+    t.index ["default_withholding_code_id"], name: "index_tudla_accounting_contacts_on_default_withholding_code"
     t.index ["organization_type", "organization_id", "name"], name: "index_tudla_accounting_contacts_on_name"
     t.check_constraint "kind::text = ANY (ARRAY['customer'::character varying::text, 'supplier'::character varying::text, 'both'::character varying::text])", name: "tudla_accounting_contacts_kind_known"
     t.check_constraint "payment_terms_days IS NULL OR payment_terms_days >= 0", name: "tudla_accounting_contacts_terms_not_negative"
@@ -689,6 +691,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_01_120000) do
     t.index ["organization_type", "organization_id", "name"], name: "index_tudla_accounting_tax_return_forms_on_name", unique: true
   end
 
+  create_table "tudla_accounting_withholding_codes", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.string "code", null: false
+    t.datetime "created_at", null: false
+    t.bigint "creditable_account_id"
+    t.string "name", null: false
+    t.bigint "organization_id", null: false
+    t.string "organization_type", null: false
+    t.bigint "payable_account_id"
+    t.decimal "rate", precision: 9, scale: 6, null: false
+    t.datetime "updated_at", null: false
+    t.index ["creditable_account_id"], name: "index_tudla_accounting_withholding_codes_on_creditable_account"
+    t.index ["organization_type", "organization_id", "code"], name: "tudla_accounting_withholding_codes_unique_key", unique: true
+    t.index ["payable_account_id"], name: "index_tudla_accounting_withholding_codes_on_payable_account"
+    t.check_constraint "payable_account_id IS NOT NULL OR creditable_account_id IS NOT NULL", name: "tudla_accounting_withholding_codes_account_given"
+    t.check_constraint "rate > 0::numeric AND rate < 1::numeric", name: "tudla_accounting_withholding_codes_rate_range"
+  end
+
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "tudla_accounting_accounts", "tudla_accounting_accounts", column: "contra_account_id"
@@ -712,6 +732,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_01_120000) do
   add_foreign_key "tudla_accounting_carrying_amounts", "tudla_accounting_details", column: "detail_id"
   add_foreign_key "tudla_accounting_contacts", "tudla_accounting_accounts", column: "default_account_id"
   add_foreign_key "tudla_accounting_contacts", "tudla_accounting_tax_codes", column: "default_tax_code_id"
+  add_foreign_key "tudla_accounting_contacts", "tudla_accounting_withholding_codes", column: "default_withholding_code_id"
   add_foreign_key "tudla_accounting_detail_tags", "tudla_accounting_details", column: "detail_id"
   add_foreign_key "tudla_accounting_detail_tags", "tudla_accounting_dimension_values", column: "dimension_value_id"
   add_foreign_key "tudla_accounting_detail_tags", "tudla_accounting_dimensions", column: "dimension_id"
@@ -745,4 +766,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_01_120000) do
   add_foreign_key "tudla_accounting_tax_return_box_parts", "tudla_accounting_tax_return_boxes", column: "box_id", on_delete: :cascade
   add_foreign_key "tudla_accounting_tax_return_box_parts", "tudla_accounting_tax_return_boxes", column: "from_box_id", on_delete: :cascade
   add_foreign_key "tudla_accounting_tax_return_boxes", "tudla_accounting_tax_return_forms", column: "form_id", on_delete: :cascade
+  add_foreign_key "tudla_accounting_withholding_codes", "tudla_accounting_accounts", column: "creditable_account_id"
+  add_foreign_key "tudla_accounting_withholding_codes", "tudla_accounting_accounts", column: "payable_account_id"
 end

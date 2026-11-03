@@ -10,6 +10,8 @@ module TudlaAccounting
   # 0), zero_rated (taxable at 0%, such as exports) and exempt (outside the tax); the last
   # two have no rate. Returns and the sales journal report them apart.
   class TaxCode < ApplicationRecord
+    include PercentRate
+
     belongs_to :organization, polymorphic: true
     belongs_to :account, class_name: "TudlaAccounting::Account", optional: true
     has_many :details, class_name: "TudlaAccounting::Detail", dependent: :restrict_with_error
@@ -32,32 +34,12 @@ module TudlaAccounting
 
     scope :active, -> { where(active: true) }
 
-    # The rate as a percentage, for forms and labels, in the organization's number format:
-    # "10" for 0.1, "12.5" (or "12,5") for 0.125.
-    def rate_percent
-      rate && AmountParser.number_text(rate * 100, format: number_format)
-    end
-
-    def rate_percent=(percent)
-      self.rate = AmountParser.decimal(percent, format: number_format)&./(100)
-    rescue ArgumentError
-      self.rate = nil
-      @unreadable_rate = percent
-    end
-
     # The tax on amount_cents at this code's rate: on top of it, or (inclusive) the part of
     # it that is tax. Rounded to the cent the configured way.
     def tax_cents(amount_cents, inclusive: false)
       amount = BigDecimal(amount_cents)
       tax = inclusive ? amount * rate / (1 + rate) : amount * rate
       tax.round(0, TudlaAccounting.configuration.rounding).to_i
-    end
-
-    def number_format = organization ? NumberFormat.for(organization) : AmountParser::POINT
-
-    # "GST (10%)"
-    def label
-      "#{code} (#{rate_percent}%)"
     end
 
     def used?
@@ -89,7 +71,6 @@ module TudlaAccounting
     end
 
     def account_for_tax
-      errors.add(:rate, "#{@unreadable_rate} isn't a number") if @unreadable_rate
       errors.add(:rate, "must be 0 for #{zero_rated? ? 'a zero-rated' : 'an exempt'} code") if !standard? && rate.to_d.nonzero?
       if rate.to_d.positive? && account.nil?
         errors.add(:account, "is needed for a code with a rate")

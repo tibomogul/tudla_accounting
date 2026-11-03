@@ -100,7 +100,7 @@ end
 ```json
 { "id": 3, "name": "Northwind", "kind": "both", "email": "ap@northwind.test", "phone": null, "address": "1 Main St\nSydney",
   "tax_number": "51 824 753 556", "payment_terms_days": 30, "currency": "AUD", "notes": null,
-  "default_account_code": "4010", "default_tax_code": "GST", "active": true, "created_at": "...", "updated_at": "..." }
+  "default_account_code": "4010", "default_tax_code": "GST", "default_withholding_code": null, "active": true, "created_at": "...", "updated_at": "..." }
 ```
 
 ### Invoices, bills and credit notes
@@ -168,6 +168,8 @@ end
 
 `GET /tax_codes`: `{ "id", "code", "name", "kind" (sales or purchases), "treatment" (standard, zero_rated or exempt; the last two have a rate of 0), "rate" ("0.1" for 10%), "account_code", "active" }`.
 
+`GET /withholding_codes`: `{ "id", "code", "name", "rate" ("0.1" for 10%), "payable_account_code" (for tax withheld from suppliers), "creditable_account_code" (for tax customers withhold), "active" }`.
+
 `GET /periods`: financial years and their months, latest first: `{ "id", "label" ("Mar 2026"), "kind" (year or month), "year_id", "from_date", "thru_date", "closed" }`. Their ids pick the periods reports cover.
 
 ## Recording
@@ -205,7 +207,7 @@ Idempotency-Key: shop-order-1042
 
 ### Contacts
 
-`POST /contacts` and `PATCH /contacts/:id` (`record`) take `name`, `kind` (customer, supplier, both), `email`, `phone`, `address`, `tax_number`, `payment_terms_days`, `currency`, `notes`, `active`, `default_account_code` and `default_tax_code`. A `PATCH` changes only the fields sent; `null` clears one. `currency` (an ISO code) is the one their new invoices and bills start in; it reads as the organization's when none is set, and `null` sets it back to that.
+`POST /contacts` and `PATCH /contacts/:id` (`record`) take `name`, `kind` (customer, supplier, both), `email`, `phone`, `address`, `tax_number`, `payment_terms_days`, `currency`, `notes`, `active`, `default_account_code`, `default_tax_code` and `default_withholding_code`. A `PATCH` changes only the fields sent; `null` clears one. `currency` (an ISO code) is the one their new invoices and bills start in; it reads as the organization's when none is set, and `null` sets it back to that.
 
 ### Invoices, bills and credit notes
 

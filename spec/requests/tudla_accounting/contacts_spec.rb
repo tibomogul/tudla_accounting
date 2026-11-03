@@ -35,6 +35,30 @@ RSpec.describe "Contacts", type: :request do
     TudlaAccounting::CarryingAmount.create!(detail: receivable, amount_cents: amount * 100, carrying_amount_type: :receivable, related_party: party, due_date: due)
   end
 
+  it "offers a default withholding code once there are any, keeping an inactive one a contact has" do
+    TudlaAccounting.configuration.authorize = ->(_controller, _permission) { true }
+    get routes.new_contact_path
+    expect(css_select("#contact_default_withholding_code_id")).to be_empty
+
+    TudlaAccounting::AccountsCreator.call([ { code: "2300", name: "Withholding payable", category: "liability" } ], organization)
+    code = TudlaAccounting::WithholdingCode.create!(organization: organization, code: "WC010", name: "Professionals", rate: "0.1", payable_account: account("2300"))
+    get routes.new_contact_path
+    expect(css_select("#contact_default_withholding_code_id option").map(&:text)).to eq([ "None", "WC010 (10%) Professionals" ])
+
+    post routes.contacts_path, params: { contact: { name: "Ledger & Co", kind: "supplier", default_withholding_code_id: code.id } }
+    expect(contact("Ledger & Co").default_withholding_code).to eq(code)
+    get routes.contact_path(contact("Ledger & Co"))
+    expect(css_select("[data-details]").text.squish).to include("Default withholding codeWC010 (10%)")
+    get routes.contacts_path(format: :csv)
+    expect(CSV.parse(response.body).last.last).to eq("WC010")
+
+    code.update!(active: false)
+    get routes.edit_contact_path(contact("Ledger & Co"))
+    expect(css_select("#contact_default_withholding_code_id option").map(&:text)).to include("WC010 (10%) Professionals")
+    get routes.new_contact_path
+    expect(css_select("#contact_default_withholding_code_id")).to be_empty
+  end
+
   it "adds a contact, shows what they owe, edits and deactivates them, on the activity log" do
     get routes.contacts_path
     expect(response.body).to include("No contacts yet.")
@@ -86,8 +110,8 @@ RSpec.describe "Contacts", type: :request do
 
     get routes.contacts_path(format: :csv, kind: "supplier")
     csv = CSV.parse(response.body)
-    expect(csv).to eq([ [ "Name", "Kind", "Email", "Phone", "Address", "Tax number", "Payment terms", "Default account", "Default tax code", "Active", "Notes", "Currency" ],
-                        [ "Globex", "supplier", "globex@test", nil, nil, nil, nil, nil, nil, "yes", nil, "AUD" ] ])
+    expect(csv).to eq([ [ "Name", "Kind", "Email", "Phone", "Address", "Tax number", "Payment terms", "Default account", "Default tax code", "Active", "Notes", "Currency", "Default withholding code" ],
+                        [ "Globex", "supplier", "globex@test", nil, nil, nil, nil, nil, nil, "yes", nil, "AUD", nil ] ])
 
     upload = ->(text, name = "contacts.csv") { Rack::Test::UploadedFile.new(StringIO.new(text), "text/csv", original_filename: name) }
     post routes.import_contacts_path, params: { file: upload.call("Name,Payment terms\nInitech,14\nglobex,7\n") }

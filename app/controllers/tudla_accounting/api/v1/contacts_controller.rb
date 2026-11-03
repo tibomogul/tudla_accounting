@@ -12,7 +12,7 @@ module TudlaAccounting
         permits :record, only: %i[create update]
 
         def index
-          contacts = organization_scope(Contact).includes(:default_account, :default_tax_code).order(Arel.sql("LOWER(name)"), :id)
+          contacts = organization_scope(Contact).includes(:default_account, :default_tax_code, :default_withholding_code).order(Arel.sql("LOWER(name)"), :id)
           contacts = contacts.public_send(params[:kind].pluralize) if params[:kind].presence_in(%w[customer supplier])
           contacts = contacts.search(params[:q]) if params[:q].present?
           contacts = contacts.where(active: ActiveModel::Type::Boolean.new.cast(params[:active])) if params.key?(:active)
@@ -42,6 +42,7 @@ module TudlaAccounting
           attributes[:currency] = body[:currency].to_s if body.key?(:currency) # blank for the organization's own
           attributes[:default_account] = body[:default_account_code].presence && account_by_code(body[:default_account_code], "default_account_code") if body.key?(:default_account_code)
           attributes[:default_tax_code] = body[:default_tax_code].presence && tax_code_by_code(body[:default_tax_code], "default_tax_code") if body.key?(:default_tax_code)
+          attributes[:default_withholding_code] = body[:default_withholding_code].presence && withholding_code_by_code(body[:default_withholding_code], "default_withholding_code") if body.key?(:default_withholding_code)
           attributes
         end
       end

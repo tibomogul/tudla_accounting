@@ -33,6 +33,7 @@ TudlaAccounting::Engine.routes.draw do
       get "pay_run", to: "pay_runs#show"
       resources :pay_runs, only: :create
       resources :tax_codes, only: :index
+      resources :withholding_codes, only: :index
       resources :periods, only: :index
       get "reports/:report", to: "reports#show", as: :report
     end
@@ -88,6 +89,9 @@ TudlaAccounting::Engine.routes.draw do
     member { post :revoke }
   end
   resources :tax_codes, except: :show
+  resources :withholding_codes, except: :show do
+    collection { post :add_template }
+  end
   resources :filed_tax_returns, only: %i[index show create] do
     member { post :withdraw }
   end

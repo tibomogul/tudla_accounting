@@ -5,7 +5,7 @@ module TudlaAccounting
   # from, and the party their receivables and payables are owed by or to (see
   # PartyStatement). payment_terms_days sets when its documents fall due; currency (nil
   # for the organization's own) is the one its new documents and payments start in; the
-  # default account and tax code start its documents' lines. An inactive contact keeps its
+  # default account, tax code and withholding code start its documents' lines. An inactive contact keeps its
   # history but isn't offered for new documents; one that is owed or owes anything, or
   # ever was, can't be deleted.
   class Contact < ApplicationRecord
@@ -14,6 +14,7 @@ module TudlaAccounting
     belongs_to :organization, polymorphic: true
     belongs_to :default_account, class_name: "TudlaAccounting::Account", optional: true
     belongs_to :default_tax_code, class_name: "TudlaAccounting::TaxCode", optional: true
+    belongs_to :default_withholding_code, class_name: "TudlaAccounting::WithholdingCode", optional: true
     has_many :documents, class_name: "TudlaAccounting::Document"
 
     normalizes :name, with: ->(name) { name.squish }
@@ -75,6 +76,7 @@ module TudlaAccounting
     def defaults_fit
       errors.add(:default_account, "must belong to the same organization") if default_account && default_account.organization != organization
       errors.add(:default_tax_code, "must belong to the same organization") if default_tax_code && default_tax_code.organization != organization
+      errors.add(:default_withholding_code, "must belong to the same organization") if default_withholding_code && default_withholding_code.organization != organization
     end
 
     def ensure_no_history

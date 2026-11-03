@@ -6,7 +6,7 @@ module TudlaAccounting
     permits :record, only: %i[new create edit update destroy import]
 
     before_action :set_contact, only: %i[show edit update destroy]
-    helper_method :contact_accounts, :contact_tax_codes
+    helper_method :contact_accounts, :contact_tax_codes, :contact_withholding_codes
 
     def index
       contacts = organization_scope(Contact).order(Arel.sql("LOWER(name)"), :id)
@@ -78,22 +78,27 @@ module TudlaAccounting
     end
 
     def contact_params
-      permitted = params.require(:contact).permit(:name, :kind, :email, :phone, :address, :tax_number, :payment_terms_days, :currency, :default_account_id, :default_tax_code_id, :active, :notes)
+      permitted = params.require(:contact).permit(:name, :kind, :email, :phone, :address, :tax_number, :payment_terms_days, :currency, :default_account_id, :default_tax_code_id, :default_withholding_code_id, :active, :notes)
       permitted[:default_account_id] = organization_scope(Account).find(permitted[:default_account_id]).id if permitted[:default_account_id].present?
       permitted[:default_tax_code_id] = organization_scope(TaxCode).find(permitted[:default_tax_code_id]).id if permitted[:default_tax_code_id].present?
+      permitted[:default_withholding_code_id] = organization_scope(WithholdingCode).find(permitted[:default_withholding_code_id]).id if permitted[:default_withholding_code_id].present?
       permitted
     end
 
     def contacts_table(contacts)
-      Reports::Table.new([ [ "Name", "Kind", "Email", "Phone", "Address", "Tax number", "Payment terms", "Default account", "Default tax code", "Active", "Notes", "Currency" ],
-                           *contacts.includes(:default_account, :default_tax_code).map do |contact|
+      Reports::Table.new([ [ "Name", "Kind", "Email", "Phone", "Address", "Tax number", "Payment terms", "Default account", "Default tax code", "Active", "Notes", "Currency", "Default withholding code" ],
+                           *contacts.includes(:default_account, :default_tax_code, :default_withholding_code).map do |contact|
                              [ contact.name, contact.kind, contact.email, contact.phone, contact.address, contact.tax_number, contact.payment_terms_days,
-                               contact.default_account&.code, contact.default_tax_code&.code, contact.active? ? "yes" : "no", contact.notes, contact.currency ]
+                               contact.default_account&.code, contact.default_tax_code&.code, contact.active? ? "yes" : "no", contact.notes, contact.currency, contact.default_withholding_code&.code ]
                            end ])
     end
 
     def contact_accounts
       organization_scope(Account).order(:code)
+    end
+
+    def contact_withholding_codes
+      organization_scope(WithholdingCode).order(:code)
     end
 
     def contact_tax_codes

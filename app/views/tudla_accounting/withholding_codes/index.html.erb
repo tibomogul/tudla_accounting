@@ -1,0 +1,49 @@
+<%= tc_page_header "Withholding codes", subtitle: "Taxes withheld from payments, and the accounts they post to" do %>
+  <%= link_to "New withholding code", new_withholding_code_path, class: "tc-btn" %>
+<% end %>
+
+<% if @withholding_codes.empty? %>
+  <div class="tc-card tc-card-body text-center">
+    <p class="tc-muted">No withholding codes yet. Add one for each tax you withhold from suppliers or customers withhold from you, or start from a list below.</p>
+  </div>
+<% else %>
+  <div class="tc-card overflow-x-auto">
+    <table class="tc-table">
+      <thead><tr><th>Code</th><th>Name</th><th class="tc-num">Rate</th><th>Withheld from suppliers</th><th>Withheld by customers</th><th></th></tr></thead>
+      <tbody>
+        <% @withholding_codes.each do |code| %>
+          <tr>
+            <td class="font-mono"><%= link_to code.code, edit_withholding_code_path(code), class: "underline" %></td>
+            <td><%= code.name %></td>
+            <td class="tc-num"><%= code.rate_percent %>%</td>
+            <td><%= code.payable_account&.code_with_name || tag.span("None", class: "tc-muted") %></td>
+            <td><%= code.creditable_account&.code_with_name || tag.span("None", class: "tc-muted") %></td>
+            <td class="text-right"><% unless code.active? %><%= tc_badge "Inactive" %><% end %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
+
+<%= form_with url: add_template_withholding_codes_path, class: "tc-card tc-card-body space-y-4 mt-6" do %>
+  <h2 class="tc-card-title">Add a starter list</h2>
+  <p class="tc-hint">Adds the codes you don't have yet, which you can then change or remove. Check their rates against the tax authority's current ones before relying on them.</p>
+  <div class="grid gap-4 sm:grid-cols-3">
+    <div>
+      <%= label_tag :template, "List", class: "tc-label" %>
+      <%= select_tag :template, options_for_select(TudlaAccounting::WithholdingCodeTemplates.choices), class: "tc-input" %>
+    </div>
+    <div>
+      <%= label_tag :payable_account_id, "Account for tax withheld from suppliers", class: "tc-label" %>
+      <%= select_tag :payable_account_id, options_for_select([ [ "None", "" ] ] + postable_account_choices(payable_accounts)), class: "tc-input" %>
+    </div>
+    <div>
+      <%= label_tag :creditable_account_id, "Account for tax customers withhold", class: "tc-label" %>
+      <%= select_tag :creditable_account_id, options_for_select([ [ "None", "" ] ] + postable_account_choices(creditable_accounts)), class: "tc-input" %>
+    </div>
+  </div>
+  <%= submit_tag "Add the list", class: "tc-btn tc-btn-secondary" %>
+<% end %>
+
+<p class="mt-6"><%= link_to "← Back to setup", setup_path, class: "tc-btn tc-btn-ghost" %></p>

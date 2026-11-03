@@ -156,6 +156,10 @@ module TudlaAccounting
           organization_scope(TaxCode).find_by(code: code.to_s) or raise ArgumentError, "#{label}: there is no tax code #{code}"
         end
 
+        def withholding_code_by_code(code, label)
+          organization_scope(WithholdingCode).find_by(code: code.to_s) or raise ArgumentError, "#{label}: there is no withholding code #{code}"
+        end
+
         def contact_by_id(id)
           raise ArgumentError, "contact_id is missing" if id.blank?
 

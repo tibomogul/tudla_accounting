@@ -2,7 +2,7 @@ module TudlaAccounting
   module ActivityHelper
     ACTIVITY_KINDS = { "entry" => "Entries", "account" => "Accounts", "period" => "Periods",
                        "opening_balances" => "Opening balances", "balances" => "Balance rebuilds",
-                       "allocation" => "Payments applied", "tax_code" => "Tax codes",
+                       "allocation" => "Payments applied", "tax_code" => "Tax codes", "withholding_code" => "Withholding codes",
                        "bank_statement" => "Statement imports", "bank_line" => "Bank matches",
                        "dimension" => "Dimensions", "dimension_value" => "Dimension values",
                        "recurring_entry" => "Recurring entries", "recurring_invoice" => "Recurring invoices", "bank_rule" => "Bank rules",
@@ -37,6 +37,9 @@ module TudlaAccounting
       when "tax_code.created" then safe_join([ "Added the tax code ", subject ])
       when "tax_code.updated" then safe_join([ "Changed ", subject, ": #{details.fetch('changes', {}).keys.map(&:humanize).join(', ').downcase}" ])
       when "tax_code.deleted" then safe_join([ "Deleted the tax code ", subject ])
+      when "withholding_code.created" then safe_join([ "Added the withholding code ", subject ])
+      when "withholding_code.updated" then safe_join([ "Changed ", subject, ": #{details.fetch('changes', {}).keys.map(&:humanize).join(', ').downcase}" ])
+      when "withholding_code.deleted" then safe_join([ "Deleted the withholding code ", subject ])
       when "bank_statement.imported" then safe_join([ "Imported a statement for ", subject, ": #{pluralize(details['imported'], 'line')} new, #{details['skipped']} already there" ])
       when "bank_line.matched" then safe_join([ "Matched the statement line ", subject ])
       when "bank_line.unmatched" then safe_join([ "Unmatched the statement line ", subject ])
@@ -151,6 +154,7 @@ module TudlaAccounting
       when Dimension then edit_dimension_path(subject)
       when DimensionValue then edit_dimension_dimension_value_path(subject.dimension_id, subject)
       when TaxCode then edit_tax_code_path(subject)
+      when WithholdingCode then edit_withholding_code_path(subject)
       when Allocation then entry_path(subject.from.detail.entry_id)
       when RecurringEntry then recurring_entry_path(subject)
       when RecurringInvoice then recurring_invoice_path(subject)
