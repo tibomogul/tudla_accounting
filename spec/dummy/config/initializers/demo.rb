@@ -22,6 +22,7 @@ TudlaAccounting.configure do |config|
     else "#{organization.name}\n1 Demo Street, Sydney NSW 2000\nABN 12 345 678 901"
     end
   end
+  config.withholding_agent = ->(organization) { organization.name == Demo::PesoSeeder::NAME ? Demo::PesoSeeder::WITHHOLDING_AGENT : {} }
 end
 
 # Made-up USD/EUR/PHP rates for any date, for the foreign invoices and payments in the books

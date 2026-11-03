@@ -99,10 +99,10 @@ RSpec.describe "USAGE.md" do
     # Running the books
     documents = TudlaAccounting::Document.where(organization: organization).order(:id)
     expect(documents.map { |document| [ document.number_label, document.payment_status, document.amount_due.format ] })
-      .to eq([ [ "INV-0001", "paid", "$0.00" ], [ "BILL-0001", "paid", "$0.00" ], [ "INV-0002", "unpaid", "€1.000,00" ], [ "SC-0001", "paid", "$0.00" ], [ "INV-0003", "unpaid", "$550.00" ] ])
+      .to eq([ [ "INV-0001", "paid", "$0.00" ], [ "BILL-0001", "paid", "$0.00" ], [ "INV-0002", "unpaid", "€1.000,00" ], [ "SC-0001", "paid", "$0.00" ], [ "INV-0003", "unpaid", "$550.00" ], [ "BILL-0002", "unpaid", "$1,080.00" ], [ "INV-0004", "paid", "$0.00" ] ])
     expect(documents.third.entry.details.map { |detail| detail.account.code }).to include("1100-EUR")
     expect(TudlaAccounting::Payment.where(organization: organization).order(:id).map { |payment| [ payment.kind, payment.amount_cents ] })
-      .to eq([ [ "received", 1_700_00 ], [ "refund", 50_00 ], [ "paid", 198_00 ] ])
+      .to eq([ [ "received", 1_700_00 ], [ "refund", 50_00 ], [ "paid", 198_00 ], [ "received", 1_080_00 ] ])
     expect(TudlaAccounting::RecurringInvoice.find_by!(organization: organization).next_on).to eq(Date.new(2026, 7, 1))
     expect(TudlaAccounting::Delivery.where(organization: organization).order(:id).map { |delivery| [ delivery.kind, delivery.to ] })
       .to eq([ %w[payment_notice billing@cloudnine.test], %w[reminder payables@globex.test] ])
@@ -114,6 +114,11 @@ RSpec.describe "USAGE.md" do
     expect(budget.amounts.transform_values { |months| months.values.sum }).to eq(account("4010").id => 24_000_00, account("6020").id => 2_400_00)
     expect(TudlaAccounting::Entry.where(organization: organization).where("particulars LIKE ?", "%Revaluation of%").count).to eq(2) # the revaluation and its reversal
     expect(year.children.order(:from_date).first.closed?).to be(false) # closed, then reopened
+    july = TudlaAccounting::Period.leaf_periods_for_date(organization, Time.zone.local(2026, 7, 15, 12)).first
+    withholding = TudlaAccounting::Reports::Withholding.new(organization, from: july, thru: july)
+    expect(withholding.qap.map { |row| [ row.contact.name, row.code.code, row.base.cents, row.withheld.cents ] }).to eq([ [ "Cloudnine Hosting", "WC120", 1_000_00, 20_00 ] ])
+    expect(withholding.sawt.map { |row| [ row.contact.name, row.withheld.cents ] }).to eq([ [ "Northwind Traders", 20_00 ] ])
+    expect(session.local_variable_get(:certificates).certificates.sole.withheld).to eq(Money.new(20_00, "USD"))
     expect(differences).to be_empty
   end
 

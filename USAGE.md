@@ -597,6 +597,64 @@ TudlaAccounting::Reports::BudgetComparison.new(budget, year) # actual, budget, a
 # Next year's, from this year's results plus 5%: budget.fill_from_actuals!(year, percent: 5)
 ```
 
+## Withholding tax
+
+Where a customer or the books must withhold tax from a payment, as the Philippines' expanded withholding tax has it, each tax is a **withholding code**: a code (the BIR's ATC), a rate, and the accounts it posts to, a liability for tax withheld from suppliers and an asset for tax customers withhold. Books with no codes see none of this.
+
+- A **bill's line** can withhold under a code, starting from the supplier's default. Approving it posts the tax, so the payable is what's left to pay.
+- A **payment received** can list what the customer withheld, as their certificate gives it. The cash and the tax together settle the invoice.
+- **Reports** list the tax by code and month, by supplier (QAP) and by customer (SAWT, only amounts with the certificate marked received), and make each supplier's BIR Form 2307.
+
+Check these with an accountant before relying on them; we couldn't confirm them in BIR issuances:
+
+- that the tax is worked out on the amount before VAT;
+- when a 2307 is due;
+- the QAP's and SAWT's columns;
+- whether the BIR accepts a rebuilt 2307.
+
+**In the UI:**
+
+- Setup → Withholding codes adds them one at a time (New withholding code), or from the starter list of 20 common Philippine codes.
+- Purchases → New bill has a Withheld column on each line, and the totals show the amount payable.
+- Sales → Payments received → Record a payment has rows for what the customer withheld, and Tax certificates, from Payments received, lists the amounts to chase and marks them received.
+- Reports → Withholding summary, Tax withheld from suppliers (QAP), Tax withheld from you (SAWT), and Certificates to suppliers (2307).
+
+**In the console:**
+
+```ruby
+withheld_payable = TudlaAccounting::Account.create!(organization: org, parent: TudlaAccounting::Account.find_by!(organization: org, code: "2000"), code: "2300", name: "Withholding tax payable", category: "liability")
+creditable = TudlaAccounting::Account.create!(organization: org, parent: TudlaAccounting::Account.find_by!(organization: org, code: "1000"), code: "1200", name: "Creditable withholding tax", category: "asset")
+contractors = TudlaAccounting::WithholdingCode.create!(organization: org, code: "WC120", name: "Contractors", rate: "0.02", payable_account: withheld_payable, creditable_account: creditable)
+# Or the starter list: TudlaAccounting::WithholdingCodeTemplates.add!(org, "ph_expanded", payable_account: withheld_payable, creditable_account: creditable)
+
+withheld_bill = TudlaAccounting::Document.create!(
+  organization: org, kind: "bill", contact: cloudnine, issued_on: Date.new(2026, 7, 6), due_on: cloudnine.due_on(Date.new(2026, 7, 6)),
+  lines_attributes: [ { description: "Server installation", quantity: 1, unit_price_cents: 1_000_00, account: cloudnine.default_account, tax_code: cloudnine.default_tax_code, withholding_code: contractors } ]
+)
+withheld_bill.approve!   # BILL-0002
+withheld_bill.total      # $1,100.00
+withheld_bill.withheld   # $20.00, 2% of the amount before tax
+withheld_bill.amount_due # $1,080.00
+
+invoice_withheld = TudlaAccounting::Document.create!(
+  organization: org, kind: "sales_invoice", contact: northwind, issued_on: Date.new(2026, 7, 7), due_on: northwind.due_on(Date.new(2026, 7, 7)),
+  lines_attributes: [ { description: "Consulting, July", quantity: 1, unit_price_cents: 1_000_00, account: sales, tax_code: gst_on_sales } ]
+).approve!
+paid_less_tax = TudlaAccounting::Payment.record!(organization: org, kind: "received", contact: northwind, account: bank, paid_on: Date.new(2026, 7, 8), amount_cents: 1_080_00,
+                                                 withholdings: [ { code: contractors, withheld_cents: 20_00 } ], applications: [ { document: invoice_withheld, amount_cents: 1_100_00 } ])
+invoice_withheld.reload.payment_status # "paid"
+paid_less_tax.withheld_taxes.first.mark_certificate!(on: Date.new(2026, 7, 20)) # now on the SAWT
+
+quarter = TudlaAccounting::FilingQuarters.new(org).of(Date.new(2026, 7, 1)) # Jul–Sep 2026
+july = TudlaAccounting::Period.leaf_periods_for_date(org, Time.zone.local(2026, 7, 15, 12)).first
+TudlaAccounting::Reports::Withholding.new(org, from: july, thru: july).qap # one row: Cloudnine Hosting, WC120, $1,000.00, $20.00
+certificates = TudlaAccounting::Reports::SupplierCertificates.new(org, quarter)
+certificates.certificates.first.withheld # $20.00
+# TudlaAccounting::PdfMaker.supplier_certificates(certificates, certificates.certificates) makes their PDF
+```
+
+The BIR Form 2307 follows the first page of the January 2018 edition, without the seal and barcode. Your own details on it come from the `withholding_agent` setting; the supplier's ZIP code is left to write in. Tax entered by hand or on an advance payment isn't in these reports, only in the difference each one shows from the account's movement.
+
 ## Revaluing foreign currency
 
 At a month end, open foreign-currency receivables and payables can be revalued at that day's rate. The unrealized gain or loss is posted to the `unrealized_fx_gain` account and reversed the next day. Running it again for the same date does nothing more.

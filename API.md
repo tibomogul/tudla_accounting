@@ -281,7 +281,7 @@ A bill's `amount` is what is paid of it, all that is owed when not given, in the
 | `receivables`, `payables` | `as_of` (a date; today by default): the aging report |
 | `tax` | `from_id`, `thru_id` (months; this month by default), `basis` (accrual or cash) |
 | `general_ledger` | `from_id`, `thru_id`, `account` (a code) |
-| `withholding`, `qap`, `sawt` | `from_id`, `thru_id` (this quarter by default): the tax withheld by code and month, by supplier and code, and by customer and code with certificates received |
+| `withholding`, `qap`, `sawt` | `from_id`, `thru_id` (this quarter by default): the tax withheld by code and month, by supplier and code, and by customer and code with certificates received. Their columns aren't from a BIR specification, so check them before filing |
 | `cash_flow` | `from_id`, `thru_id` (the start of the year to this month by default), `method` (direct or indirect); needs the `cash_account_codes` setting |
 
 A period id that isn't one of the organization's gets `404`.

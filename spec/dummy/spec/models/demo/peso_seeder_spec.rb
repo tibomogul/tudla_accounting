@@ -52,7 +52,7 @@ RSpec.describe Demo::PesoSeeder do
 
   it "numbers the invoices in date order" do
     invoices = TudlaAccounting::Document.where(organization: organization).sales.order(:number)
-    expect(invoices.pluck(:number_label)).to eq((1..6).map { |number| format("INV-%04d", number) })
+    expect(invoices.pluck(:number_label)).to eq((1..8).map { |number| format("INV-%04d", number) })
     expect(invoices.map(&:issued_on)).to eq(invoices.map(&:issued_on).sort)
   end
 
@@ -63,14 +63,60 @@ RSpec.describe Demo::PesoSeeder do
     figures = TudlaAccounting::TaxReturnCalculator.call(filed.form, from: filed.from_date, thru: filed.thru_date)[:boxes].to_h { |row| [ row.box.label, row.amount ] }
     expect(figures.values_at("31A", "31B")).to all(be_positive)
     expect(figures["32A"]).to eq(Money.new(175_980_00, "PHP")) # Acme's March invoice, $2,800.00 at 62.85
-    expect(figures["15"]).to eq(figures["31B"] - figures["44B"]) # no input VAT that quarter: the demo's one bill is this month's
+    expect(figures["44A"]).to eq(Money.new(60_000_00, "PHP")) # Dakila's bill that quarter
+    expect(figures["15"]).to eq(figures["31B"] - figures["44B"])
   end
 
   it "has customers and a supplier owing" do
     aging = TudlaAccounting::AgingReportGenerator.call(organization: organization, report_type: :receivable, as_of_date: Date.current)
     expect(aging[:summary].values.map { |party| party[:related_party].name }).to contain_exactly("Acme Inc.", "Sampaguita Foods Inc.")
-    bill = TudlaAccounting::Document.find_by!(organization: organization, kind: "bill")
+    bill = TudlaAccounting::Document.find_by!(organization: organization, contact: TudlaAccounting::Contact.find_by!(name: "Ulap Hosting Inc."))
     expect(bill).to have_attributes(status: "approved", total: Money.new(28_000_00, "PHP"))
-    expect(TudlaAccounting::PayRun.due(organization, currency: "PHP")).to eq([ bill ])
+    expect(TudlaAccounting::PayRun.due(organization, currency: "PHP")).to include(bill)
+  end
+
+  context "with withholding" do
+    let(:second_quarter) { TudlaAccounting::FilingQuarters.new(organization).of(Date.current) }
+    let(:first_quarter) { TudlaAccounting::FilingQuarters.new(organization).of(Date.new(2026, 3, 1)) }
+
+    def report(first, last) = TudlaAccounting::Reports::Withholding.new(organization, from: first, thru: last)
+    def month(number) = TudlaAccounting::Period.leaf_periods_for_date(organization, Time.zone.local(2026, number, 15, 12)).first
+
+    it "has the BIR's starter codes, and the suppliers' 2307s each quarter, with the agent's details" do
+      expect(TudlaAccounting::WithholdingCode.where(organization: organization).count).to eq(20)
+      expect(TudlaAccounting.configuration.withholding_agent_for(organization)).to include(name: "Demo Pilipinas Inc.", zip: "1226")
+      expect(TudlaAccounting::Reports::SupplierCertificates.new(organization, first_quarter).missing_agent_details).to be_empty
+
+      certificates = TudlaAccounting::Reports::SupplierCertificates.new(organization, first_quarter).certificates
+      expect(certificates.map { |certificate| [ certificate.contact.name, certificate.lines.map { |line| line.code.code }, certificate.total.cents, certificate.withheld.cents ] })
+        .to eq([ [ "Dakila Consulting Corp.", %w[WC050], 60_000_00, 6_000_00 ] ])
+      certificates = TudlaAccounting::Reports::SupplierCertificates.new(organization, second_quarter).certificates
+      expect(certificates.map { |certificate| [ certificate.contact.name, certificate.withheld.cents ] }).to eq([ [ "Dakila Consulting Corp.", 6_000_00 ], [ "Matibay Builders Inc.", 3_000_00 ] ])
+    end
+
+    it "pays a supplier the bill less the tax, posting the tax to the payable" do
+      dakila = TudlaAccounting::Contact.find_by!(organization: organization, name: "Dakila Consulting Corp.")
+      paid, open = TudlaAccounting::Document.where(organization: organization, contact: dakila).order(:issued_on).with_open_cents.to_a
+      expect(paid).to have_attributes(payment_status: "paid", total: Money.new(67_200_00, "PHP"), withheld: Money.new(6_000_00, "PHP"))
+      expect(open).to have_attributes(payment_status: "unpaid", amount_due: Money.new(61_200_00, "PHP"))
+      checks = report(month(1), this_month).checks("from_supplier")
+      expect(checks.map { |check| [ check.account.code, check.listed.cents, check.difference.cents ] }).to eq([ [ "2300", 15_000_00, 0 ] ])
+    end
+
+    it "settles Tala's invoices with its payments and the tax, listing only the certified one on the SAWT" do
+      tala = TudlaAccounting::Contact.find_by!(organization: organization, name: "Tala Logistics Inc.")
+      expect(TudlaAccounting::Document.where(organization: organization, contact: tala).with_open_cents.map(&:payment_status)).to eq(%w[paid paid])
+      full = report(month(1), this_month)
+      expect(full.sawt.map { |row| [ row.contact.name, row.code.code, row.base.cents, row.withheld.cents ] }).to eq([ [ "Tala Logistics Inc.", "WC160", 100_000_00, 2_000_00 ] ])
+      expect(full.waiting.cents).to eq(2_000_00)
+      expect(full.checks("by_customer").map { |check| [ check.account.code, check.difference.cents ] }).to eq([ [ "1200", 0 ] ])
+    end
+
+    it "makes each supplier's 2307 on one sheet" do
+      quarter = TudlaAccounting::Reports::SupplierCertificates.new(organization, second_quarter)
+      pages = PDF::Reader.new(StringIO.new(TudlaAccounting::PdfMaker.supplier_certificates(quarter, quarter.certificates))).pages
+      expect(pages.size).to eq(2)
+      expect(pages.first.text).to include("Dakila Consulting Corp.", "1 Ayala Avenue, Makati City", "WC050", "Maria Santos")
+    end
   end
 end

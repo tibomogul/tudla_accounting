@@ -85,6 +85,12 @@ Why: Rails 8.1 does **not** auto-append engine migration paths to the host app's
 
 Controllers in `app/controllers/tudla_accounting/api/v1/` build on `BaseController` (`body`, `cents`, `decimal`, `account_by_code`, `contact_by_id`, `date_param`, `render_page`, `require_permission!`, the `permits` DSL) and `Representation` (`*_json`). Creating endpoints honour an `Idempotency-Key` header (`replay` / `render_made`; the key is stored on the record). Document every endpoint in `API.md`.
 
+### Withholding tax
+
+`WithholdingCode` is the tax, and `WithheldTax` (one row per amount, in the organization's currency) is what every withholding report reads. Rows don't change: reversing adds an opposite row dated then, so an earlier quarter stays as it was and each quarter ties to the account. Only `certificate_received_on` changes. Bills post the tax on approval and payments received on recording; `document.total` stays gross and `amount_due` comes from the net payable.
+
+`Reports::SupplierCertificates` and `reports/_supplier_certificates` make BIR Form 2307. The partial has its own inline styles and must stay on one page of its 8.5 x 13 paper (`pdf_maker_spec` checks the longest case). Philippine forms and codes are templates over a general mechanism, and the README lists what isn't confirmed by the BIR; don't state those as fact.
+
 ### Ancestry
 
 `has_ancestry` must specify `ancestry_format: :materialized_path2` whenever the migration declares `null: false, default: "/"` on the ancestry column. The ancestry 5.x default format is `:materialized_path`, which uses `nil` for the root and crashes against a NOT NULL column.

@@ -209,6 +209,41 @@ RSpec.describe "USAGE.md, in the UI", type: :system do
                                         lines_attributes: [ { description: "Licence", quantity: 1, unit_price_cents: 1_000_00, account: account("4010") } ]).approve!
     end
 
+    it "withholds tax from a supplier and reports it" do
+      # Withholding tax: Setup → Withholding codes, then New withholding code
+      nav "Setup"
+      click_link "Withholding codes"
+      expect(page).to have_current_path(withholding_codes_path)
+      TudlaAccounting::AccountsCreator.call([ { code: "2300", name: "Withholding payable", category: "liability" } ], organization)
+      visit current_path
+      click_link "New withholding code"
+      fill_in "Code", with: "WC120"
+      fill_in "Name", with: "Contractors"
+      fill_in "Rate (%)", with: "2"
+      select "2300 - Withholding payable", from: "Withheld from suppliers"
+      click_button "Save withholding code"
+      expect(page).to have_current_path(withholding_codes_path)
+      expect(page).to have_content("WC120")
+
+      # Purchases → New bill, with the Withheld column
+      nav "Purchases"
+      click_link "New bill"
+      expect(page).to have_current_path(new_document_path, ignore_query: true)
+      select "Cloudnine Hosting", from: "Supplier"
+      fill_in "Description", with: "Server installation"
+      fill_in "Unit price", with: "1000"
+      select "WC120", from: "Withheld"
+      click_button "Save and approve"
+      expect(page).to have_current_path(%r{/documents/\d+\z})
+      expect(page).to have_content("Less tax withheld").and have_content("20.00")
+
+      # Reports → Certificates to suppliers (2307)
+      nav "Reports"
+      click_link "Certificates to suppliers (2307)"
+      expect(page).to have_current_path(reports_supplier_certificates_path)
+      expect(page).to have_content("Cloudnine Hosting").and have_content("WC120").and have_content("Revenue District Office")
+    end
+
     it "invoices, gets paid, pays suppliers, chases, reconciles and budgets" do
       # Invoices and bills: Sales → New invoice
       nav "Sales"
