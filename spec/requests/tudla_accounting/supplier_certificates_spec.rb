@@ -105,6 +105,12 @@ RSpec.describe "Certificates to suppliers", type: :request do
       expect(css_select("#quarter option[selected]").map { |option| option["value"] }).to eq([ "2026-01-01" ])
     end
 
+    it "doesn't double the full stop after a name that ends in one" do
+      bill(TudlaAccounting::Contact.create!(organization: organization, name: "Matibay Inc.", kind: "supplier"), Date.new(2026, 4, 10), 1_000_00)
+      get routes.reports_supplier_certificates_path
+      expect(text("[data-missing-tin]").sole).to eq("No TIN for Matibay Inc. Add it on the contact before issuing.")
+    end
+
     it "downloads all the certificates, or one supplier's, and hides the links without PDFs" do
       bill(ledger, Date.new(2026, 4, 10), 10_000_00)
       bill(aurora, Date.new(2026, 5, 10), 5_000_00)
