@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-04
+
+Tagged but not published to RubyGems.
+
 ### Added
 
 - Withholding codes (`WithholdingCode`): a tax withheld from payments, with its rate and the accounts it posts to, and a contact's default. `WithholdingCodeTemplates` has a starter list of the Philippines' common expanded withholding codes; check its rates before relying on them. `GET /withholding_codes` lists them in the API.
@@ -152,7 +156,8 @@ First release.
 - Web pages for all of the above, styled with Tailwind CSS v4 and following the host's light/dark theme.
 - Set-based posting and batched balance reads for large ledgers; `perf/benchmark.rb` to measure them.
 
-[Unreleased]: https://github.com/tibomogul/tudla_accounting/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/tibomogul/tudla_accounting/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/tibomogul/tudla_accounting/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/tibomogul/tudla_accounting/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/tibomogul/tudla_accounting/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/tibomogul/tudla_accounting/releases/tag/v0.1.0

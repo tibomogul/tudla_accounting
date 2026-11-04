@@ -504,7 +504,7 @@ TudlaAccounting::Balance.find_by(account: cash, period: year).ending_amount   # 
 
 ## Getting Started
 
-TudlaAccounting is pre-1.0 and no version has been published yet: the tags (0.1.0, 0.2.0, 0.3.0) are milestones, and later versions don't support upgrading from them. Start from a fresh install.
+TudlaAccounting is pre-1.0 and no version has been published yet: the tags (0.1.0, 0.2.0, 0.3.0, 0.4.0) are milestones, and later versions don't support upgrading from them. Start from a fresh install.
 
 ```bash
 docker compose up -d
