@@ -106,6 +106,8 @@
   .tc-btn-ghost { background: transparent; color: var(--tc-text-muted); }
   .tc-btn-ghost:hover { background: var(--tc-bg-subtle); color: var(--tc-text); opacity: 1; }
   .tc-btn-sm { padding: 0.25rem 0.625rem; font-size: 0.8125rem; }
+  /* A submit input doesn't wrap by default, and its label is now a whole question. */
+  form[data-confirmed="true"] .tc-btn { white-space: normal; max-width: 100%; height: auto; }
 
   .tc-card { background: var(--tc-surface); border: 1px solid var(--tc-border); border-radius: 0.75rem; }
   .tc-card-body { padding: 1.25rem; }

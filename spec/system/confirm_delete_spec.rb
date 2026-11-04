@@ -35,6 +35,31 @@ RSpec.describe "Confirming a delete", type: :system do
     expect(page).to have_no_css(".tc-alert")
   end
 
+  it "keeps a long question on a submit button inside its card, wrapping it" do
+    TudlaAccounting::PeriodCreator.call(organization, Date.current.year)
+    bank = create(:tudla_accounting_account, code: "1000", category: :asset, currency: "AUD", organization: organization)
+    create(:tudla_accounting_account, code: "1100", category: :asset, role: "receivable", organization: organization)
+    customer = TudlaAccounting::Contact.create!(organization: organization, name: "Northwind")
+    payment = TudlaAccounting::Payment.record!(organization: organization, kind: "received", contact: customer, account: bank, paid_on: Date.current, amount_cents: 100_00)
+
+    size = page.current_window.size
+    [ 1200, 420 ].each do |width|
+      page.current_window.resize_to(width, 800)
+      visit payment_path(payment)
+      find("summary", text: "Void this payment").click
+      wait_for_confirm
+      fill_in "Reason", with: "Recorded twice"
+      click_button "Void"
+      question = "Void it? Its entry is reversed and it comes off what it paid. Click again to confirm"
+      expect(page).to have_button(question)
+      button, card = page.evaluate_script("(() => { const b = document.querySelector('form[data-confirmed] [type=submit]'); return [b, b.closest('.tc-card')].map(e => { const r = e.getBoundingClientRect(); return [r.left, r.right]; }); })()")
+      expect(button[0]).to be >= card[0]
+      expect(button[1]).to be <= card[1]
+    end
+  ensure
+    page.current_window.resize_to(*size) if size
+  end
+
   it "asks for a second click on input-type buttons too, e.g. reversing an entry" do
     TudlaAccounting::PeriodCreator.call(organization, Date.current.year)
     capital = create(:tudla_accounting_account, code: "3000", category: :equity, organization: organization)

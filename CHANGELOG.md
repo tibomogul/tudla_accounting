@@ -15,6 +15,10 @@ All notable changes to this project are documented here. The format follows
 - Certificates to suppliers: a new report lists a BIR Form 2307 for each supplier tax was withheld from in any three months in a row (the current filing quarter by default, with the filing quarters listed first), and makes the PDF for one supplier or all of them, on the form's 8.5 x 13 inch paper, following the first page of the January 2018 edition, without its seal and barcode. A new `withholding_agent` setting gives your TIN, address, ZIP code and signatory. Signatures and the business tax lines stay blank, and names and addresses stop at two lines. Whether the BIR accepts a rebuilt form isn't confirmed: check with your RDO.
 - The demo's Demo Pilipinas Inc. withholds tax: the starter codes, a consultant billed at 10%, a contractor at 2%, and a customer withholding 2%. Existing demo books don't get these until they're rebuilt with `bin/setup --reset`.
 
+### Fixed
+
+- A long confirmation on a form's submit button, such as voiding a payment, ran out of its card. It now wraps inside it.
+
 ## [0.3.0] - 2026-11-03
 
 Tagged but not published to RubyGems.
