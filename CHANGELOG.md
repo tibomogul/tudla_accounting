@@ -14,6 +14,7 @@ All notable changes to this project are documented here. The format follows
 - Withholding reports: a summary by code and month, the tax withheld from suppliers (QAP) and from you (SAWT, certificates received only), on screen, in CSV and Excel, and in the API (`withholding`, `qap`, `sawt`). Each shows any difference from the accounts' movement, and flags a contact with no TIN. Their columns come from secondary sources, not the BIR's own specification, and there's no DAT file yet.
 - Certificates to suppliers: a new report lists a BIR Form 2307 for each supplier tax was withheld from in any three months in a row (the current filing quarter by default, with the filing quarters listed first), and makes the PDF for one supplier or all of them, on the form's 8.5 x 13 inch paper, following the first page of the January 2018 edition, without its seal and barcode. A new `withholding_agent` setting gives your TIN, address, ZIP code and signatory. Signatures and the business tax lines stay blank, and names and addresses stop at two lines. Whether the BIR accepts a rebuilt form isn't confirmed: check with your RDO.
 - The demo's Demo Pilipinas Inc. withholds tax: the starter codes, a consultant billed at 10%, a contractor at 2%, and a customer withholding 2%. Existing demo books don't get these until they're rebuilt with `bin/setup --reset`.
+- Contacts have a postal code, apart from the address: on their form and page, under the address on invoices, bills and payment notices, in the API (`postal_code`), and in imports and the contacts CSV, which gains a last column, "Postal code". It fills the ZIP code box on BIR Form 2307.
 
 ### Fixed
 
@@ -22,7 +23,6 @@ All notable changes to this project are documented here. The format follows
 ## [0.3.0] - 2026-11-03
 
 Tagged but not published to RubyGems.
-- Contacts have a postal code, apart from the address: on their form and page, under the address on invoices, bills and payment notices, in the API (`postal_code`), and in imports and the contacts CSV, which gains a last column, "Postal code". It fills the ZIP code box on BIR Form 2307.
 
 ### Changed
 - The statements page and emailing every statement (`PartyStatement.to_send`) read all the customers' or suppliers' items and age them in one go, in the same number of queries however many there are, rather than about 20 queries for each.
