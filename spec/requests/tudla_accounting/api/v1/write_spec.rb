@@ -141,6 +141,7 @@ RSpec.describe "JSON API: recording in the books", type: :request do
       expect(data["currency"]).to eq("AUD")
 
       expect(data["default_withholding_code"]).to be_nil
+      expect(call(:patch, routes.api_v1_contact_path(data["id"]), { postal_code: "1100" })["data"]["postal_code"]).to eq("1100")
       TudlaAccounting::WithholdingCode.create!(organization: organization, code: "WC010", name: "Professionals", rate: "0.1", payable_account: TudlaAccounting::Account.find_by!(organization: organization, code: "2200"))
       expect(call(:patch, routes.api_v1_contact_path(data["id"]), { default_withholding_code: "WC010" })["data"]["default_withholding_code"]).to eq("WC010")
       expect(call(:patch, routes.api_v1_contact_path(data["id"]), { default_withholding_code: nil })["data"]["default_withholding_code"]).to be_nil

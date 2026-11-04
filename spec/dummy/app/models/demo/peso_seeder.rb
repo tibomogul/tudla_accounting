@@ -53,7 +53,7 @@ class Demo::PesoSeeder < Demo::EuroSeeder
     invoices << [ start + 15, acme, [ invoice_line("Integration work", 20, 140_00, @zero) ], { currency: "USD", exchange_rate: BigDecimal("62.85") }, [ 30, accounts["1020"], BigDecimal("63.40") ] ]
     invoices << [ start.next_month + 15, acme, [ invoice_line("Integration work", 20, 140_00, @zero) ], { currency: "USD", exchange_rate: BigDecimal("63.10") }, nil ]
     tala = TudlaAccounting::Contact.create!(organization: organization, name: "Tala Logistics Inc.", kind: "customer", payment_terms_days: 30, email: "accounts@tala-logistics-inc.example",
-                                            currency: CURRENCY, default_account: accounts["4010"], tax_number: "000-555-666-00000", address: "5 Made-up Road, Pasig City")
+                                            currency: CURRENCY, default_account: accounts["4010"], tax_number: "000-555-666-00000", address: "5 Made-up Road, Pasig City", postal_code: "1600")
     # The 21st of each of these months, paid a week later, so always by today.
     deliveries = [ start + 20, start.next_month(2) + 20 ]
     invoices += deliveries.map { |date| [ date, tala, [ invoice_line("Logistics consulting", 1, 100_000_00, @gst) ], {}, nil ] }
@@ -73,8 +73,8 @@ class Demo::PesoSeeder < Demo::EuroSeeder
 
   def add_supplier_bill
     start = today.prev_month(3).beginning_of_month
-    dakila = withheld_supplier("Dakila Consulting Corp.", "000-222-333-00000", "2 Made-up Street, Quezon City", "WC050")
-    matibay = withheld_supplier("Matibay Builders Inc.", "000-333-444-00000", "3 Made-up Avenue, Cebu City", "WC120")
+    dakila = withheld_supplier("Dakila Consulting Corp.", "000-222-333-00000", "2 Made-up Street, Quezon City", "1100", "WC050")
+    matibay = withheld_supplier("Matibay Builders Inc.", "000-333-444-00000", "3 Made-up Avenue, Cebu City", "6000", "WC120")
     first = withheld_bill(dakila, start + 7, "Management consulting", 60_000_00)
     TudlaAccounting::Payment.record!(organization: organization, kind: "paid", contact: dakila, account: accounts["1011"], paid_on: first.issued_on + 14, reference: "Transfer #{first.number_label}",
                                      amount_cents: first.amount_due.cents, applications: [ { document: first, amount_cents: first.amount_due.cents } ])
@@ -84,8 +84,8 @@ class Demo::PesoSeeder < Demo::EuroSeeder
     super
   end
 
-  def withheld_supplier(name, tin, address, code)
-    TudlaAccounting::Contact.create!(organization: organization, name: name, kind: "supplier", payment_terms_days: 30, tax_number: tin, address: address,
+  def withheld_supplier(name, tin, address, postal_code, code)
+    TudlaAccounting::Contact.create!(organization: organization, name: name, kind: "supplier", payment_terms_days: 30, tax_number: tin, address: address, postal_code: postal_code,
                                      default_account: accounts["6020"], default_tax_code: @input, default_withholding_code: withholding_code(code))
   end
 

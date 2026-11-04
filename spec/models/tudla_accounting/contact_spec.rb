@@ -77,4 +77,12 @@ RSpec.describe TudlaAccounting::Contact do
     expect(TudlaAccounting::AuditEvent.where(organization: organization, subject_label: "Globex").pluck(:action, :details))
       .to eq([ [ "contact.created", {} ], [ "contact.updated", { "changes" => { "phone" => [ nil, "02 9999 0000" ] } } ], [ "contact.deleted", {} ] ])
   end
+
+  it "keeps a postal code short enough for a form's box, and prints it under the address" do
+    expect(described_class.new(organization: organization, name: "Too long", postal_code: "1" * 13)).not_to be_valid
+    expect(contact(name: "Blank", postal_code: "  ").postal_code).to be_nil
+    expect(contact(name: "Neither").full_address).to be_nil
+    expect(contact(name: "Code only", postal_code: "1100").full_address).to eq("1100")
+    expect(contact(name: "Both", address: "2 Made-up Road", postal_code: " 1100 ").full_address).to eq("2 Made-up Road\n1100")
+  end
 end

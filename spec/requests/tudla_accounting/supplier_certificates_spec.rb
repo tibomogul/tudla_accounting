@@ -29,7 +29,7 @@ RSpec.describe "Certificates to suppliers", type: :request do
 
   context "with a financial year" do
     let(:code) { TudlaAccounting::WithholdingCode.create!(organization: organization, code: "WC120", name: "Contractors (corporate)", rate: "0.02", payable_account: account("2300")) }
-    let(:ledger) { TudlaAccounting::Contact.create!(organization: organization, name: "Ledger & Co", kind: "supplier", tax_number: "123-456-789-000", address: "2 Made-up Road\nQuezon City") }
+    let(:ledger) { TudlaAccounting::Contact.create!(organization: organization, name: "Ledger & Co", kind: "supplier", tax_number: "123-456-789-000", address: "2 Made-up Road\nQuezon City", postal_code: "1100") }
     let(:aurora) { TudlaAccounting::Contact.create!(organization: organization, name: "Aurora Builders", kind: "supplier") }
 
     before do

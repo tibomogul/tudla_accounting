@@ -5,7 +5,7 @@ RSpec.describe TudlaAccounting::PdfMaker, type: :service do
   include_context "with isolated TudlaAccounting configuration"
 
   let(:organization) { create(:organization, name: "Acme", currency: "AUD") }
-  let(:northwind) { TudlaAccounting::Contact.create!(organization: organization, name: "Northwind", kind: "both", address: "1 Main St\nSydney") }
+  let(:northwind) { TudlaAccounting::Contact.create!(organization: organization, name: "Northwind", kind: "both", address: "1 Main St\nSydney", postal_code: "2000") }
 
   before do
     TudlaAccounting::PeriodCreator.call(organization, 2026)
@@ -32,7 +32,7 @@ RSpec.describe TudlaAccounting::PdfMaker, type: :service do
   it "makes an invoice's PDF as it prints, from the document header to the notes" do
     pdf = text(described_class.document(invoice))
     expect(pdf).to include("Acme Pty Ltd", "ABN 12 345 678 901", "Invoice", "INV-0001", "10 Mar 2026", "9 Apr 2026", "PO 9",
-                           "Northwind", "1 Main St", "Consulting – strategy", "1,200.00", "Pay to BSB 000-000")
+                           "Northwind", "1 Main St", "2000", "Consulting – strategy", "1,200.00", "Pay to BSB 000-000")
     expect(pdf).not_to include("Payments and credits", "Void invoice")
   end
 
@@ -59,14 +59,14 @@ RSpec.describe TudlaAccounting::PdfMaker, type: :service do
 
     it "fills BIR Form 2307 on its own paper, whatever pdf_paper says, with the signatures left to sign" do
       TudlaAccounting.configuration.withholding_agent = ->(org) { { name: org.name, tin: "000-111-222-00000", address: "1 Demo Street, Makati City", zip: "1223", signatory_name: "Maria Santos", signatory_title: "Finance Manager", signatory_tin: "000-333-444-000" } }
-      supplier = TudlaAccounting::Contact.create!(organization: peso_books, name: "Sampaguita Consulting", kind: "supplier", tax_number: "123-456-789-000", address: "2 Made-up Road\nQuezon City")
+      supplier = TudlaAccounting::Contact.create!(organization: peso_books, name: "Sampaguita Consulting", kind: "supplier", tax_number: "123-456-789-000", address: "2 Made-up Road\nQuezon City", postal_code: "1100")
       certified_bill(supplier, withholding("WC120"), 1_234_567_89)
 
       pages = PDF::Reader.new(StringIO.new(described_class.supplier_certificates(report, report.certificates))).pages
       expect(pages.size).to eq(1)
       expect(pages.first.attributes[:MediaBox]).to eq([ 0, 0, 612, 936 ])
       text = pages.first.text.squish
-      expect(text).to include("BIR Form No.", "2307", "January 2018 (ENCS)", "Part I – Payee Information", "Sampaguita Consulting", "2 Made-up Road Quezon City",
+      expect(text).to include("BIR Form No.", "2307", "January 2018 (ENCS)", "Part I – Payee Information", "Sampaguita Consulting", "2 Made-up Road Quezon City", "1100",
                               "Part II – Payor Information", "Bayanihan Corp.", "1 Demo Street, Makati City", "1223", "WC120", "1,234,567.89", "24,691.36",
                               "Maria Santos · Finance Manager · TIN 000-333-444-000", "CONFORME:")
       expect(text.delete(" ")).to include("123-456-789-000", "000-111-222-00000", "02", "01012026", "03312026")
@@ -75,7 +75,7 @@ RSpec.describe TudlaAccounting::PdfMaker, type: :service do
     it "keeps each sheet on one page with the longest names and addresses, and every line full, on as many sheets as the lines need" do
       long = "A very long name for a certificate that goes on and on past the end of its box, " * 4
       TudlaAccounting.configuration.withholding_agent = ->(_org) { { name: long, tin: "FOREIGN-1", address: long, zip: "1223", signatory_name: "Maria Santos", signatory_title: "Finance Manager", signatory_tin: "000-333-444-000" } }
-      supplier = TudlaAccounting::Contact.create!(organization: peso_books, name: long, kind: "supplier", tax_number: "FOREIGN-99", address: long)
+      supplier = TudlaAccounting::Contact.create!(organization: peso_books, name: long, kind: "supplier", tax_number: "FOREIGN-99", address: long, postal_code: "W" * TudlaAccounting::Contact::POSTAL_CODE_LENGTH)
       12.times { |index| certified_bill(supplier, withholding("WX%03d" % index, long), 987_654_321_00) }
 
       pages = PDF::Reader.new(StringIO.new(described_class.supplier_certificates(report, report.certificates))).pages
@@ -120,7 +120,7 @@ RSpec.describe TudlaAccounting::PdfMaker, type: :service do
                                              lines_attributes: [ { description: "Paper", unit_price_cents: 80_00, account: account("6000") } ]).approve!
     paid = TudlaAccounting::Payment.record!(organization: organization, kind: "paid", contact: northwind, account: account("1000"), paid_on: Date.new(2026, 3, 21),
                                             amount_cents: 80_00, applications: [ { document: bill, amount_cents: 80_00 } ])
-    expect(text(described_class.payment(paid))).to include("Payment notice", "Paid to Northwind", "BILL-0001 (your S-44)", "2 Mar 2026", "Total paid 80.00")
+    expect(text(described_class.payment(paid))).to include("Payment notice", "Paid to Northwind", "2000", "BILL-0001 (your S-44)", "2 Mar 2026", "Total paid 80.00")
   end
 
   it "loads nothing from the network while it makes one" do

@@ -332,6 +332,7 @@ Initech Supplies,supplier,billing@initech.test,,,,30,,,Office supplies
 
 - `Default account`, `Default tax code` and `Default withholding code` are codes, which must already exist.
 - A `Currency` column, also optional, gives a currency code; blank is the organization's own.
+- A `Postal code` column, also optional, takes the postal or ZIP code. In Excel, format that column as text: a number loses a leading zero, as in 0400.
 - A row whose name is already a contact updates that contact, ignoring case.
 - The whole file imports or nothing does.
 - See `spec/fixtures/files/contacts.csv` for this example.
@@ -653,7 +654,7 @@ certificates.certificates.first.withheld # $20.00
 # TudlaAccounting::PdfMaker.supplier_certificates(certificates, certificates.certificates) makes their PDF
 ```
 
-The BIR Form 2307 follows the first page of the January 2018 edition, without the seal and barcode. Your own details on it come from the `withholding_agent` setting; the supplier's ZIP code is left to write in. Tax entered by hand or on an advance payment isn't in these reports, only in the difference each one shows from the account's movement.
+The BIR Form 2307 follows the first page of the January 2018 edition, without the seal and barcode. Your own details on it come from the `withholding_agent` setting; the supplier's ZIP code is the postal code on their contact. Tax entered by hand or on an advance payment isn't in these reports, only in the difference each one shows from the account's movement.
 
 ## Revaluing foreign currency
 

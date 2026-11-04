@@ -17,7 +17,7 @@
   <section class="text-sm" aria-label="<%= received ? "From" : "To" %>">
     <p class="tc-muted"><%= received ? "Received from" : "Paid to" %></p>
     <p class="font-semibold"><%= payment.contact.name %></p>
-    <% if payment.contact.address %><p class="whitespace-pre-line"><%= payment.contact.address %></p><% end %>
+    <% if payment.contact.full_address %><p class="whitespace-pre-line"><%= payment.contact.full_address %></p><% end %>
   </section>
 
   <% applications = payment.applications.select { |_target, _amount, allocation| allocation.active? } %>

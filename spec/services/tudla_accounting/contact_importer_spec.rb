@@ -29,6 +29,13 @@ RSpec.describe TudlaAccounting::ContactImporter do
       .to eq([ [ "Globex", "supplier", "2", nil, nil, nil ], [ "Northwind", "customer", nil, 30, "4000", "GST" ] ])
   end
 
+  it "takes the postal code, keeping a leading zero, and a blank clears it" do
+    described_class.call(organization, file([ [ "Name", "Postal code" ], [ "Northwind", "0400" ] ]), ".csv")
+    expect(contacts.sole.postal_code).to eq("0400")
+    described_class.call(organization, file([ [ "Name", "Postal code" ], [ "Northwind", "" ] ]), ".csv")
+    expect(contacts.sole.postal_code).to be_nil
+  end
+
   it "takes the currency they're invoiced in, blank for the organization's" do
     described_class.call(organization, file([ [ "Name", "Currency" ], [ "Northwind", "eur" ], [ "Globex", "" ], [ "Initech", "AUD" ] ]), ".csv")
     expect(contacts.map { |contact| [ contact.name, contact[:currency] ] }).to eq([ [ "Globex", nil ], [ "Initech", nil ], [ "Northwind", "EUR" ] ])

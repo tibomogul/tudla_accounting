@@ -99,7 +99,7 @@ end
 
 ```json
 { "id": 3, "name": "Northwind", "kind": "both", "email": "ap@northwind.test", "phone": null, "address": "1 Main St\nSydney",
-  "tax_number": "51 824 753 556", "payment_terms_days": 30, "currency": "AUD", "notes": null,
+  "postal_code": "2000", "tax_number": "51 824 753 556", "payment_terms_days": 30, "currency": "AUD", "notes": null,
   "default_account_code": "4010", "default_tax_code": "GST", "default_withholding_code": null, "active": true, "created_at": "...", "updated_at": "..." }
 ```
 
@@ -207,7 +207,7 @@ Idempotency-Key: shop-order-1042
 
 ### Contacts
 
-`POST /contacts` and `PATCH /contacts/:id` (`record`) take `name`, `kind` (customer, supplier, both), `email`, `phone`, `address`, `tax_number`, `payment_terms_days`, `currency`, `notes`, `active`, `default_account_code`, `default_tax_code` and `default_withholding_code`. A `PATCH` changes only the fields sent; `null` clears one. `currency` (an ISO code) is the one their new invoices and bills start in; it reads as the organization's when none is set, and `null` sets it back to that.
+`POST /contacts` and `PATCH /contacts/:id` (`record`) take `name`, `kind` (customer, supplier, both), `email`, `phone`, `address`, `postal_code`, `tax_number`, `payment_terms_days`, `currency`, `notes`, `active`, `default_account_code`, `default_tax_code` and `default_withholding_code`. A `PATCH` changes only the fields sent; `null` clears one. `currency` (an ISO code) is the one their new invoices and bills start in; it reads as the organization's when none is set, and `null` sets it back to that.
 
 ### Invoices, bills and credit notes
 

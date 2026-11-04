@@ -27,7 +27,7 @@
          "Default tax code" => @contact.default_tax_code&.label, **(@contact.default_withholding_code ? { "Default withholding code" => @contact.default_withholding_code.label } : {}) }.each do |label, value| %>
       <div class="flex justify-between gap-4"><span class="tc-muted"><%= label %></span><span class="text-right"><%= value || "—" %></span></div>
     <% end %>
-    <% if @contact.address %><div><p class="tc-muted">Address</p><p class="whitespace-pre-line"><%= @contact.address %></p></div><% end %>
+    <% if @contact.full_address %><div><p class="tc-muted">Address</p><p class="whitespace-pre-line"><%= @contact.full_address %></p></div><% end %>
     <% if @contact.notes %><div><p class="tc-muted">Notes</p><p class="whitespace-pre-line"><%= @contact.notes %></p></div><% end %>
   </section>
 

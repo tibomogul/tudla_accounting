@@ -9,6 +9,7 @@
     <div class="sm:col-span-2"><%= tc_field form, :email, as: :email_field %></div>
     <div class="sm:col-span-2"><%= tc_field form, :phone, as: :telephone_field %></div>
     <div class="sm:col-span-4"><%= tc_field form, :address, as: :text_area, rows: 3 %></div>
+    <div class="sm:col-span-2"><%= tc_field form, :postal_code, label: "Postal code", maxlength: TudlaAccounting::Contact::POSTAL_CODE_LENGTH, hint: "Or ZIP code" %></div>
     <div class="sm:col-span-2"><%= tc_field form, :tax_number, label: "Tax number", hint: "ABN, VAT number or the like" %></div>
   </div>
   <fieldset class="tc-card tc-card-body grid gap-4 sm:grid-cols-4">

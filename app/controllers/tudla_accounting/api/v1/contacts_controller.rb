@@ -7,7 +7,7 @@ module TudlaAccounting
       class ContactsController < BaseController
         include Representation
 
-        FIELDS = %i[name kind email phone address tax_number payment_terms_days notes active].freeze
+        FIELDS = %i[name kind email phone address postal_code tax_number payment_terms_days notes active].freeze
 
         permits :record, only: %i[create update]
 

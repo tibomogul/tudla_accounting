@@ -116,7 +116,7 @@ RSpec.describe Demo::PesoSeeder do
       quarter = TudlaAccounting::Reports::SupplierCertificates.new(organization, second_quarter)
       pages = PDF::Reader.new(StringIO.new(TudlaAccounting::PdfMaker.supplier_certificates(quarter, quarter.certificates))).pages
       expect(pages.size).to eq(2)
-      expect(pages.first.text).to include("Dakila Consulting Corp.", "1 Ayala Avenue, Makati City", "WC050", "Maria Santos")
+      expect(pages.first.text).to include("Dakila Consulting Corp.", "1100", "1 Ayala Avenue, Makati City", "WC050", "Maria Santos")
     end
   end
 end

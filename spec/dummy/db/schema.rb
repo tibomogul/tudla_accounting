@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_03_140000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_04_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -275,6 +275,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_03_140000) do
     t.string "organization_type", null: false
     t.integer "payment_terms_days"
     t.string "phone"
+    t.string "postal_code"
     t.string "tax_number"
     t.datetime "updated_at", null: false
     t.index ["default_account_id"], name: "index_tudla_accounting_contacts_on_default_account"

@@ -50,7 +50,7 @@ RSpec.describe "Contacts", type: :request do
     get routes.contact_path(contact("Ledger & Co"))
     expect(css_select("[data-details]").text.squish).to include("Default withholding codeWC010 (10%)")
     get routes.contacts_path(format: :csv)
-    expect(CSV.parse(response.body).last.last).to eq("WC010")
+    expect(CSV.parse(response.body).last[-2]).to eq("WC010")
 
     code.update!(active: false)
     get routes.edit_contact_path(contact("Ledger & Co"))
@@ -110,8 +110,8 @@ RSpec.describe "Contacts", type: :request do
 
     get routes.contacts_path(format: :csv, kind: "supplier")
     csv = CSV.parse(response.body)
-    expect(csv).to eq([ [ "Name", "Kind", "Email", "Phone", "Address", "Tax number", "Payment terms", "Default account", "Default tax code", "Active", "Notes", "Currency", "Default withholding code" ],
-                        [ "Globex", "supplier", "globex@test", nil, nil, nil, nil, nil, nil, "yes", nil, "AUD", nil ] ])
+    expect(csv).to eq([ [ "Name", "Kind", "Email", "Phone", "Address", "Tax number", "Payment terms", "Default account", "Default tax code", "Active", "Notes", "Currency", "Default withholding code", "Postal code" ],
+                        [ "Globex", "supplier", "globex@test", nil, nil, nil, nil, nil, nil, "yes", nil, "AUD", nil, nil ] ])
 
     upload = ->(text, name = "contacts.csv") { Rack::Test::UploadedFile.new(StringIO.new(text), "text/csv", original_filename: name) }
     post routes.import_contacts_path, params: { file: upload.call("Name,Payment terms\nInitech,14\nglobex,7\n") }
@@ -127,6 +127,13 @@ RSpec.describe "Contacts", type: :request do
     expect(flash[:notice]).to eq("Contact Initech deleted.")
     get routes.activity_path(kind: "contact")
     expect(css_select("tbody tr").first.css("td").last.text.squish).to eq("Deleted the contact Initech")
+
+    post routes.contacts_path, params: { contact: { name: "Zip & Co", address: "2 Made-up Road", postal_code: "1100" } }
+    expect(contact("Zip & Co").postal_code).to eq("1100")
+    get routes.contact_path(contact("Zip & Co"))
+    expect(css_select("[data-details]").text.squish).to include("2 Made-up Road 1100")
+    get routes.edit_contact_path(contact("Zip & Co"))
+    expect(css_select("input[name='contact[postal_code]']").first["value"]).to eq("1100")
 
     post routes.contacts_path, params: { contact: { name: "", payment_terms_days: "-3" } }
     expect(response).to have_http_status(:unprocessable_entity)

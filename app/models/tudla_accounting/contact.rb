@@ -10,6 +10,7 @@ module TudlaAccounting
   # ever was, can't be deleted.
   class Contact < ApplicationRecord
     KINDS = { "customer" => "Customer", "supplier" => "Supplier", "both" => "Customer and supplier" }.freeze
+    POSTAL_CODE_LENGTH = 12 # the longest that fits the box on a printed form
 
     belongs_to :organization, polymorphic: true
     belongs_to :default_account, class_name: "TudlaAccounting::Account", optional: true
@@ -18,7 +19,7 @@ module TudlaAccounting
     has_many :documents, class_name: "TudlaAccounting::Document"
 
     normalizes :name, with: ->(name) { name.squish }
-    normalizes :email, :phone, :tax_number, with: ->(text) { text.strip.presence }
+    normalizes :email, :phone, :postal_code, :tax_number, with: ->(text) { text.strip.presence }
     normalizes :address, :notes, with: ->(text) { text.strip.presence }
     normalizes :currency, with: ->(currency) { currency.strip.upcase.presence }
     before_validation { self.currency = nil if self[:currency] == organization&.currency }
@@ -26,6 +27,7 @@ module TudlaAccounting
     validates :name, presence: true
     validates :kind, inclusion: { in: KINDS.keys }
     validates :email, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_nil: true
+    validates :postal_code, length: { maximum: POSTAL_CODE_LENGTH }
     validates :payment_terms_days, numericality: { only_integer: true, greater_than_or_equal_to: 0 }, allow_nil: true
     validate :defaults_fit
     validate { errors.add(:currency, "is not a known currency code") if foreign? && !Money::Currency.find(self[:currency]) }
@@ -49,6 +51,9 @@ module TudlaAccounting
     # another is set.
     def currency = self[:currency] || organization&.currency || TudlaAccounting.configuration.base_currency
     def foreign? = self[:currency].present?
+
+    # The address as it prints on documents, with the postal code on its own line.
+    def full_address = [ address, postal_code ].compact.join("\n").presence
 
     def customer? = kind.in?(%w[customer both])
     def supplier? = kind.in?(%w[supplier both])

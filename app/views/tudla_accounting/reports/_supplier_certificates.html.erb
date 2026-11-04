@@ -1,8 +1,8 @@
 <%# locals: (report:, certificates:) %>
 <%# BIR Form 2307 (January 2018), its first page, a sheet each: the layout of the form, with
     its own styles so the sheet stays the same whatever the pdf_stylesheet. The seal and
-    barcode aren't reproduced. The signatures, the business tax lines and the payee's ZIP
-    code (contacts don't hold one) are left blank. Each sheet must stay on one page, so names
+    barcode aren't reproduced. The signatures and the business tax lines are left blank.
+    Each sheet must stay on one page, so names
     and addresses stop at two lines, and a line's description at two small ones (its ATC
     says what it is). %>
 <% agent = TudlaAccounting.configuration.withholding_agent_for(report.organization) %>
@@ -67,7 +67,7 @@
       <tr><td class="part">Part I – Payee Information</td></tr>
       <tr><td class="bar"><span class="number">2</span> Taxpayer Identification Number <i>(TIN)</i> &nbsp; <%= render "tudla_accounting/reports/certificate_tin", tin: contact.tax_number %></td></tr>
       <tr><td class="bar"><span class="number">3</span> Payee’s Name <i>(Last Name, First Name, Middle Name for Individual OR Registered Name for Non-Individual)</i><div class="fill"><div class="clamp" data-payee-name><%= contact.name %></div></div></td></tr>
-      <tr><td class="bar"><div class="with-zip"><div style="flex: 1"><span class="number">4</span> Registered Address<div class="fill"><div class="clamp" data-payee-address><%= contact.address.to_s.squish %></div></div></div><div class="zip"><b>4A</b> ZIP Code<div class="fill"></div></div></div></td></tr>
+      <tr><td class="bar"><div class="with-zip"><div style="flex: 1"><span class="number">4</span> Registered Address<div class="fill"><div class="clamp" data-payee-address><%= contact.address.to_s.squish %></div></div></div><div class="zip"><b>4A</b> ZIP Code<div class="fill" data-payee-zip><%= contact.postal_code %></div></div></div></td></tr>
       <tr><td class="bar"><span class="number">5</span> Foreign Address, <i>if applicable</i><div class="fill"></div></td></tr>
 
       <tr><td class="part">Part II – Payor Information</td></tr>

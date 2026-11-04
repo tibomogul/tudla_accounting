@@ -19,7 +19,7 @@
   <section class="text-sm" aria-label="<%= document.sales? ? "To" : "From" %>">
     <p class="tc-muted"><%= document.sales? ? "To" : "From" %></p>
     <p class="font-semibold"><%= document.contact.name %></p>
-    <% if document.contact.address %><p class="whitespace-pre-line"><%= document.contact.address %></p><% end %>
+    <% if document.contact.full_address %><p class="whitespace-pre-line"><%= document.contact.full_address %></p><% end %>
     <% if document.contact.tax_number %><p>Tax number <%= document.contact.tax_number %></p><% end %>
   </section>
 
