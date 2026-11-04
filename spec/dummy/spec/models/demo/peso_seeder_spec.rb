@@ -120,6 +120,25 @@ RSpec.describe Demo::PesoSeeder do
       %i[sales purchases].each { |side| expect(lists.difference(side)).to have_attributes(base: Money.new(0, "PHP"), tax: Money.new(0, "PHP")) }
     end
 
+    it "splits this month's equipment from the services on the purchases list" do
+      rows = TudlaAccounting::Reports::SummaryLists.new(organization, from: month(6), thru: month(6)).purchases
+      expect(rows.find { |row| row.contact&.name == "Sulong Equipment Trading Inc." }).to have_attributes(capital_goods: Money.new(80_000_00, "PHP"), services: Money.new(0, "PHP"), tax: Money.new(9_600_00, "PHP"))
+      expect(rows.find { |row| row.contact&.name == "Dakila Consulting Corp." }).to have_attributes(services: Money.new(60_000_00, "PHP"), capital_goods: Money.new(0, "PHP"))
+    end
+
+    it "has a 2550Q that matches the summary lists, in a filed quarter and the current one" do
+      form = TudlaAccounting::TaxReturnForm.find_by!(organization: organization, name: "2550Q")
+      [ [ month(1), month(3) ], [ month(4), month(6) ] ].each do |first, last|
+        boxes = TudlaAccounting::TaxReturnCalculator.call(form, from: first.from_date, thru: last.thru_date)[:boxes].to_h { |row| [ row.box.label, row.amount ] }
+        lists = TudlaAccounting::Reports::SummaryLists.new(organization, from: first, thru: last)
+        sales = lists.total(:sales)
+        purchases = lists.total(:purchases)
+        expect(boxes.values_at("31A", "31B", "32A", "33A")).to eq(sales.values_at(:taxable, :tax, :zero_rated, :exempt))
+        expect(boxes["44A"]).to eq(purchases.values_at(:services, :capital_goods, :other_goods, :not_set).sum)
+        expect(boxes["44B"]).to eq(purchases[:tax])
+      end
+    end
+
     it "makes each supplier's 2307 on one sheet" do
       quarter = TudlaAccounting::Reports::SupplierCertificates.new(organization, second_quarter)
       pages = PDF::Reader.new(StringIO.new(TudlaAccounting::PdfMaker.supplier_certificates(quarter, quarter.certificates))).pages

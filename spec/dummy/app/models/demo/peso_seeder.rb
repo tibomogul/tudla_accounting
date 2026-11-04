@@ -4,7 +4,9 @@
 # isn't paid yet; and Acme is invoiced in dollars, zero-rated, at the invoices' own rates,
 # the first paid into the dollar account at a better one (an exchange gain), the second
 # still owed. There is also a hosting company's bill to pay, and a quarterly VAT return
-# (BIR Form 2550Q) with last quarter's filed.
+# (BIR Form 2550Q) with last quarter's filed. Sulong's equipment is this month's capital
+# goods, so the purchases list splits them from the services, and the 2550Q's figures match
+# the summary lists'.
 #
 # It withholds tax as well, from the BIR's starter list of codes: Dakila's consulting at 10%
 # (last quarter's bill paid, this month's not) and Matibay's contract work at 2% (not paid),
@@ -39,6 +41,7 @@ class Demo::PesoSeeder < Demo::EuroSeeder
     @gst = TudlaAccounting::TaxCode.create!(organization: organization, code: "VAT12", name: "VAT", rate: "0.12", kind: :sales, account: accounts["2200"])
     @zero = TudlaAccounting::TaxCode.create!(organization: organization, code: "VATZR", name: "VAT zero-rated", rate: "0", kind: :sales, treatment: :zero_rated)
     @input = TudlaAccounting::TaxCode.create!(organization: organization, code: "IN12", name: "Input VAT", rate: "0.12", kind: :purchases, purchase_type: :services, account: accounts["2200"])
+    @capital_input = TudlaAccounting::TaxCode.create!(organization: organization, code: "IN12C", name: "Input VAT on capital goods", rate: "0.12", kind: :purchases, purchase_type: :capital_goods, account: accounts["2200"])
     TudlaAccounting::WithholdingCodeTemplates.add!(organization, "ph_expanded", payable_account: accounts["2300"], creditable_account: accounts["1200"])
   end
 
@@ -81,7 +84,17 @@ class Demo::PesoSeeder < Demo::EuroSeeder
     # This month's, so the reports' default quarter always has both, whatever the day.
     withheld_bill(dakila, today.beginning_of_month, "Management consulting", 60_000_00)
     withheld_bill(matibay, today.beginning_of_month, "Office fit-out", 150_000_00)
+    add_equipment_bill
     super
+  end
+
+  # Under the form's ₱1 million for capital goods, so none of its input tax is deferred.
+  def add_equipment_bill
+    sulong = TudlaAccounting::Contact.create!(organization: organization, name: "Sulong Equipment Trading Inc.", kind: "supplier", payment_terms_days: 30, tax_number: "000-444-555-00000",
+                                              address: "4 Made-up Boulevard, Taguig City", postal_code: "1630", default_account: accounts["1500"], default_tax_code: @capital_input)
+    date = today.beginning_of_month
+    TudlaAccounting::Document.create!(organization: organization, kind: "bill", contact: sulong, issued_on: date, due_on: sulong.due_on(date),
+                                      lines_attributes: [ invoice_line("Servers and network equipment", 1, 80_000_00, @capital_input, account: accounts["1500"]) ]).approve!
   end
 
   def withheld_supplier(name, tin, address, postal_code, code)
@@ -96,11 +109,14 @@ class Demo::PesoSeeder < Demo::EuroSeeder
 
   def withholding_code(code) = TudlaAccounting::WithholdingCode.find_by!(organization: organization, code: code)
 
-  # A 2550Q with its sales and purchases boxes mapped to the VAT codes, and last quarter's filed.
+  # A 2550Q with its sales and purchases boxes mapped to the VAT codes, and last quarter's
+  # filed. The form has no line of its own for capital goods up to ₱1 million, so they're
+  # with the domestic purchases.
   def add_tax_return
     form = TudlaAccounting::TaxReturnForm.from_template!(organization, "ph_2550q")
-    { "31A" => [ "tax_code_base", @gst ], "31B" => [ "tax_code_tax", @gst ], "32A" => [ "tax_code_base", @zero ],
-      "44A" => [ "tax_code_base", @input ], "44B" => [ "tax_code_tax", @input ] }.each do |label, (source, code)|
+    [ [ "31A", "tax_code_base", @gst ], [ "31B", "tax_code_tax", @gst ], [ "32A", "tax_code_base", @zero ],
+      [ "44A", "tax_code_base", @input ], [ "44A", "tax_code_base", @capital_input ],
+      [ "44B", "tax_code_tax", @input ], [ "44B", "tax_code_tax", @capital_input ] ].each do |label, source, code|
       form.boxes.find_by!(label: label).parts.create!(source: source, tax_code: code)
     end
     quarter = today.beginning_of_quarter.prev_day.beginning_of_quarter
