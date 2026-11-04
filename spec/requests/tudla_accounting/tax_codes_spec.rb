@@ -40,11 +40,19 @@ RSpec.describe "Tax codes", type: :request do
     get routes.tax_codes_path
     expect(rows).to eq([ [ "FRE", "GST-free", "Sales (collected)", "Zero-rated 0%", "None", "Inactive" ], [ "GST", "GST on sales", "Sales (collected)", "10%", "2200 - GST", "" ] ])
 
+    get routes.new_tax_code_path(kind: "purchases")
+    expect(css_select("#tax_code_purchase_type option").map(&:text)).to eq([ "Not set", "Services", "Capital goods", "Other goods" ])
+    post routes.tax_codes_path, params: { tax_code: { code: "CAP", name: "Input VAT on equipment", kind: "purchases", rate_percent: "10", account_id: account("2200").id, purchase_type: "capital_goods", active: "1" } }
+    get routes.tax_codes_path
+    expect(rows.find { |row| row.first == "CAP" }[2]).to eq("Purchases (paid) · Capital goods")
+    patch routes.tax_code_path(TudlaAccounting::TaxCode.find_by!(code: "CAP")), params: { tax_code: { purchase_type: "" } }
+    expect(TudlaAccounting::TaxCode.find_by!(code: "CAP").purchase_type).to be_nil
+
     patch routes.tax_code_path(gst), params: { tax_code: { rate_percent: "12.5" } }
     expect(flash[:notice]).to eq("Tax code GST (12.5%) was saved.")
     get routes.activity_path(kind: "tax_code")
     expect(css_select("tbody td:last-child").map { |cell| cell.text.squish })
-      .to eq([ "Changed GST (12.5%): rate", "Added the tax code FRE (0%)", "Added the tax code GST (10%)" ])
+      .to eq([ "Changed GST (12.5%): rate", "Changed CAP (10%): purchase type", "Added the tax code CAP (10%)", "Added the tax code FRE (0%)", "Added the tax code GST (10%)" ])
     expect(css_select("tbody a").map { |link| link["href"] }).to include(routes.edit_tax_code_path(gst))
   end
 

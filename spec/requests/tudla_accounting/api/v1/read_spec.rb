@@ -194,7 +194,7 @@ RSpec.describe "JSON API: reading the books", type: :request do
     expect(api_get(routes.api_v1_payments_path, kind: "received", status: "posted", contact_id: northwind.id, from: "2026-04-10", to: "2026-04-10")["meta"]["total_count"]).to eq(1)
     expect(api_get(routes.api_v1_payments_path, kind: "paid")["data"]).to eq([])
 
-    expect(api_get(routes.api_v1_tax_codes_path)["data"]).to eq([ { "id" => gst.id, "code" => "GST", "name" => "GST", "kind" => "sales", "treatment" => "standard", "rate" => "0.1", "account_code" => "2200", "active" => true } ])
+    expect(api_get(routes.api_v1_tax_codes_path)["data"]).to eq([ { "id" => gst.id, "code" => "GST", "name" => "GST", "kind" => "sales", "treatment" => "standard", "purchase_type" => nil, "rate" => "0.1", "account_code" => "2200", "active" => true } ])
     withholding = TudlaAccounting::WithholdingCode.create!(organization: organization, code: "WC010", name: "Professionals", rate: "0.1", payable_account: TudlaAccounting::Account.find_by!(organization: organization, code: "2200"))
     expect(api_get(routes.api_v1_withholding_codes_path)["data"]).to eq([ { "id" => withholding.id, "code" => "WC010", "name" => "Professionals", "rate" => "0.1", "payable_account_code" => "2200", "creditable_account_code" => nil, "active" => true } ])
     periods = api_get(routes.api_v1_periods_path, per_page: 200)["data"]

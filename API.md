@@ -166,7 +166,7 @@ end
 
 ### Tax codes and periods
 
-`GET /tax_codes`: `{ "id", "code", "name", "kind" (sales or purchases), "treatment" (standard, zero_rated or exempt; the last two have a rate of 0), "rate" ("0.1" for 10%), "account_code", "active" }`.
+`GET /tax_codes`: `{ "id", "code", "name", "kind" (sales or purchases), "treatment" (standard, zero_rated or exempt; the last two have a rate of 0), "purchase_type" (services, capital_goods or other_goods, on a taxed purchases code that has one, otherwise null), "rate" ("0.1" for 10%), "account_code", "active" }`.
 
 `GET /withholding_codes`: `{ "id", "code", "name", "rate" ("0.1" for 10%), "payable_account_code" (for tax withheld from suppliers), "creditable_account_code" (for tax customers withhold), "active" }`.
 

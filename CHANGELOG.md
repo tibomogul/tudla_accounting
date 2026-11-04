@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- A purchases tax code can say what its lines are bought as: services, capital goods or other goods (`purchase_type`, "Bought as" on its form, and in `GET /tax_codes`). It starts unset.
+
 ## [0.4.0] - 2026-11-04
 
 Tagged but not published to RubyGems.

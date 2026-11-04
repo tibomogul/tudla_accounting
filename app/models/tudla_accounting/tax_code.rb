@@ -9,6 +9,10 @@ module TudlaAccounting
   # treatment tells apart the codes without tax: standard (taxed at the rate, which may be
   # 0), zero_rated (taxable at 0%, such as exports) and exempt (outside the tax); the last
   # two have no rate. Returns and the sales journal report them apart.
+  #
+  # purchase_type says what a taxed purchases code's lines are bought as, for lists that
+  # split them (the Philippines' summary list of purchases). It can be left unset, and only
+  # such a code has one. It can change after use: it classifies lines, and posts nothing.
   class TaxCode < ApplicationRecord
     include PercentRate
 
@@ -19,8 +23,13 @@ module TudlaAccounting
     enum :kind, { sales: 0, purchases: 1 }
     enum :treatment, { standard: 0, zero_rated: 1, exempt: 2 }, validate: true
 
+    enum :purchase_type, { services: 0, capital_goods: 1, other_goods: 2 }, prefix: :bought_as, validate: { allow_nil: true }
+
     TREATMENTS = { "standard" => "Taxed at the rate", "zero_rated" => "Zero-rated (0%, e.g. exports)", "exempt" => "Exempt (outside the tax)" }.freeze
 
+    PURCHASE_TYPES = { "services" => "Services", "capital_goods" => "Capital goods", "other_goods" => "Other goods" }.freeze
+
+    before_validation { self.purchase_type = nil unless purchases? && standard? }
     validates :code, :name, :kind, presence: true
     validates :code, uniqueness: { scope: %i[organization_type organization_id] }
     validates :rate, numericality: { greater_than_or_equal_to: 0, less_than: 10 }
