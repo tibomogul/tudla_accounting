@@ -15,7 +15,7 @@
   <% rows = qap ? @report.qap : @report.sawt %>
   <% missing = rows.select { |row| row.contact.tax_number.blank? }.map { |row| row.contact.name }.uniq %>
   <% if missing.any? %>
-    <div class="tc-alert tc-alert-warning mb-4" role="alert" data-missing-tin>No TIN for <%= missing.to_sentence %>. Add it on the contact before filing.</div>
+    <div class="tc-alert tc-alert-warning mb-4" role="alert" data-missing-tin>No TIN for <%= missing.to_sentence.delete_suffix(".") %>. Add it on the contact before filing.</div>
   <% end %>
   <section class="tc-card overflow-x-auto mb-4" aria-label="<%= qap ? "Payees" : "Withholding agents" %>">
     <table class="tc-table">

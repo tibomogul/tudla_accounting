@@ -619,6 +619,7 @@ Check these with an accountant before relying on them; we couldn't confirm them 
 - Purchases → New bill has a Withheld column on each line, and the totals show the amount payable.
 - Sales → Payments received → Record a payment has rows for what the customer withheld. Started from an invoice, the cash comes down by the tax as you type it, until you change the cash yourself. Tax certificates, from Payments received, lists the amounts to chase and marks them received.
 - Reports → Withholding summary, Tax withheld from suppliers (QAP), Tax withheld from you (SAWT), and Certificates to suppliers (2307).
+- Reports → Summary list of sales, and Summary list of purchases, for the BIR's SLSP. To split purchases into services, capital goods and other goods, choose "Bought as" on each purchases tax code (Setup → Tax codes). Check the unconfirmed points in the README before relying on them; these lists prepare the filing, and aren't a DAT file.
 
 **In the console:**
 
@@ -652,6 +653,7 @@ TudlaAccounting::Reports::Withholding.new(org, from: july, thru: july).qap # one
 certificates = TudlaAccounting::Reports::SupplierCertificates.new(org, quarter)
 certificates.certificates.first.withheld # $20.00
 # TudlaAccounting::PdfMaker.supplier_certificates(certificates, certificates.certificates) makes their PDF
+TudlaAccounting::Reports::SummaryLists.new(org, from: july, thru: july).sales # a row per customer per month: Northwind Traders, July, VATable $1,000.00
 ```
 
 The BIR Form 2307 follows the first page of the January 2018 edition, without the seal and barcode. Your own details on it come from the `withholding_agent` setting; the supplier's ZIP code is the postal code on their contact. Tax entered by hand or on an advance payment isn't in these reports, only in the difference each one shows from the account's movement.

@@ -25,7 +25,7 @@ RSpec.describe "Report pages", type: :request do
 
   it "lists the reports" do
     get routes.reports_path
-    expect(css_select("a.tc-card p.font-semibold").map(&:text)).to eq([ "Balance sheet", "Profit and loss", "Trial balance", "Receivables aging", "Payables aging", "Tax return", "Statements", "Tax summary", "Profit and loss by dimension", "Cash flow", "Budgets", "General ledger", "Books of accounts" ])
+    expect(css_select("a.tc-card p.font-semibold").map(&:text)).to eq([ "Balance sheet", "Profit and loss", "Trial balance", "Receivables aging", "Payables aging", "Tax return", "Statements", "Tax summary", "Profit and loss by dimension", "Cash flow", "Budgets", "General ledger", "Books of accounts", "Summary list of sales", "Summary list of purchases" ])
   end
 
   it "asks for a financial year before showing statements" do

@@ -118,6 +118,9 @@ RSpec.describe "USAGE.md" do
     withholding = TudlaAccounting::Reports::Withholding.new(organization, from: july, thru: july)
     expect(withholding.qap.map { |row| [ row.contact.name, row.code.code, row.base.cents, row.withheld.cents ] }).to eq([ [ "Cloudnine Hosting", "WC120", 1_000_00, 20_00 ] ])
     expect(withholding.sawt.map { |row| [ row.contact.name, row.withheld.cents ] }).to eq([ [ "Northwind Traders", 20_00 ] ])
+    lists = TudlaAccounting::Reports::SummaryLists.new(organization, from: july, thru: july)
+    expect(lists.sales.map { |row| [ row.contact.name, row.taxable.cents ] }).to include([ "Northwind Traders", 1_000_00 ])
+    expect(lists.difference(:sales)).to have_attributes(base: Money.new(0, "USD"), tax: Money.new(0, "USD"))
     expect(session.local_variable_get(:certificates).certificates.sole.withheld).to eq(Money.new(20_00, "USD"))
     expect(differences).to be_empty
   end

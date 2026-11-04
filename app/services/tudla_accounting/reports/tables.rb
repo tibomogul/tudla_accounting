@@ -90,6 +90,32 @@ module TudlaAccounting
         Table.new([ [ "No.", "TIN", who, "Code", "Rate %", "Income", "Tax withheld", "Note" ], *body, Table.total([ nil, nil, "Total", nil, nil, rows.sum(zero, &:base), rows.sum(zero, &:withheld), nil ]) ])
       end
 
+      # A row per contact per month, then the total and any difference from the tax summary.
+      # Final VAT withheld and non-creditable input tax aren't recorded, so stay at zero.
+      def summary_list(report, side)
+        sales = side == :sales
+        totals = report.total(side)
+        zero = Money.new(0, report.organization.currency)
+        bases = sales ? %i[exempt zero_rated taxable] : %i[exempt zero_rated services capital_goods other_goods]
+        bases += [ :not_set ] unless totals[:not_set].zero?
+        labels = { exempt: "Exempt", zero_rated: "Zero-rated", taxable: "VATable (before VAT)", services: "Services", capital_goods: "Capital goods", other_goods: "Other goods", not_set: "Not set" }
+        lay_out = ->(who, amounts, tax, total, note) do
+          [ *who, *amounts, zero, tax, *([ zero ] unless sales), total, note ]
+        end
+        body = report.rows_for(side).map do |row|
+          contact = row.contact
+          no_tin = contact && contact.tax_number.blank? && (!sales || !row.taxable.zero?)
+          who = [ row.month.strftime("%b %Y"), contact&.tax_number, contact ? contact.name : "No contact", *([ contact&.full_address.to_s.squish.presence ] unless sales) ]
+          lay_out.call(who, bases.map { |name| row.public_send(name) }, row.tax, row.total, ("No TIN" if no_tin))
+        end
+        label = ->(text) { [ nil, nil, text, *([ nil ] unless sales) ] }
+        total = lay_out.call(label.call("Total"), bases.map { |name| totals[name] }, totals[:tax], report.rows_for(side).sum(zero, &:total), nil)
+        difference = report.difference(side)
+        check = lay_out.call(label.call("Difference from the tax summary"), bases.map { nil }, difference.tax, difference.base, nil)
+        Table.new([ [ "Month", "TIN", sales ? "Buyer" : "Seller", *("Address" unless sales), *bases.map { |name| labels.fetch(name) }, "Final VAT withheld", sales ? "Output tax" : "Creditable input tax",
+                      *("Non-creditable input tax" unless sales), sales ? "Total sales" : "Total purchases", "Note" ], *body, Table.total(total), check ])
+      end
+
       # A column per dimension value ("Untagged" for lines without one), then the total.
       def by_dimension(report)
         columns = report[:columns]

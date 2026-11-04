@@ -14,10 +14,11 @@ module TudlaAccounting
       #   cash_flow                           from_id, thru_id (the start of the year to this month by default),
       #                                       method (direct or indirect)
       #   withholding, qap, sawt              from_id, thru_id (this quarter by default)
+      #   sales_list, purchases_list          from_id, thru_id (this quarter by default)
       class ReportsController < BaseController
         include ReportPeriods
 
-        REPORTS = %w[balance_sheet profit_and_loss trial_balance receivables payables tax general_ledger cash_flow withholding qap sawt].freeze
+        REPORTS = %w[balance_sheet profit_and_loss trial_balance receivables payables tax general_ledger cash_flow withholding qap sawt sales_list purchases_list].freeze
 
         def show
           report = params[:report].presence_in(REPORTS) or raise ActiveRecord::RecordNotFound
@@ -66,6 +67,13 @@ module TudlaAccounting
         def withholding_table = withholding_report&.then { |report| Reports::Tables.withholding_summary(report) }
         def qap_table = withholding_report&.then { |report| Reports::Tables.qap(report) }
         def sawt_table = withholding_report&.then { |report| Reports::Tables.sawt(report) }
+
+        def sales_list_table = summary_list_table(:sales)
+        def purchases_list_table = summary_list_table(:purchases)
+
+        def summary_list_table(side)
+          month_range(quarter: true) && Reports::Tables.summary_list(Reports::SummaryLists.new(accounting_organization, from: @from, thru: @thru), side)
+        end
 
         def withholding_report
           month_range(quarter: true) && Reports::Withholding.new(accounting_organization, from: @from, thru: @thru)

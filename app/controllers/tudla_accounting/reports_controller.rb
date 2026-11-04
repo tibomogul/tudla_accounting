@@ -78,6 +78,11 @@ module TudlaAccounting
     def qap = withholding_list(:qap)
     def sawt = withholding_list(:sawt)
 
+    # What was sold to each customer or bought from each supplier, month by month, over a
+    # run of months (this quarter by default).
+    def sales_list = summary_list(:sales)
+    def purchases_list = summary_list(:purchases)
+
     # The tax certificates (BIR Form 2307) for the suppliers tax was withheld from in three
     # months: the list, or as a PDF, all of them or (contact_id) one supplier's.
     def supplier_certificates
@@ -213,6 +218,15 @@ module TudlaAccounting
 
       @report = Reports::Withholding.new(accounting_organization, from: @from, thru: @thru)
       respond_with_table("#{list}-#{span_name}", html: -> { render :withholding_list }) { Reports::Tables.public_send(list, @report) }
+    end
+
+    def summary_list(side)
+      @side = side
+      name = "#{side}-list"
+      return respond_with_table(name, html: -> { render :summary_list }) unless month_range(quarter: true)
+
+      @report = Reports::SummaryLists.new(accounting_organization, from: @from, thru: @thru)
+      respond_with_table("#{name}-#{span_name}", html: -> { render :summary_list }) { Reports::Tables.summary_list(@report, side) }
     end
 
     # What the statement pages share: the type, its parties, the dates and what to show.

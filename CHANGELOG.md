@@ -9,6 +9,7 @@ All notable changes to this project are documented here. The format follows
 ### Added
 
 - A purchases tax code can say what its lines are bought as: services, capital goods or other goods (`purchase_type`, "Bought as" on its form, and in `GET /tax_codes`). It starts unset.
+- Summary lists of sales and purchases, for the Philippines' SLSP: a row per customer or supplier per month, on screen, in CSV and Excel, and in the API (`sales_list`, `purchases_list`). A line goes by its tax code; one with no code counts as exempt, with the amount flagged. Each list shows any difference from the tax summary, and flags a missing TIN or a purchases code with no type. They go by posting date, with a notice on cash-basis books. There's no DAT file or importation list; final VAT withheld and non-creditable input tax stay at zero. The fields follow RR 16-2005, but we couldn't find the BIR's record layout, so the column order isn't confirmed.
 
 ## [0.4.0] - 2026-11-04
 

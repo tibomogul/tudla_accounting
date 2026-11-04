@@ -281,6 +281,7 @@ A bill's `amount` is what is paid of it, all that is owed when not given, in the
 | `receivables`, `payables` | `as_of` (a date; today by default): the aging report |
 | `tax` | `from_id`, `thru_id` (months; this month by default), `basis` (accrual or cash) |
 | `general_ledger` | `from_id`, `thru_id`, `account` (a code) |
+| `sales_list`, `purchases_list` | `from_id`, `thru_id` (this quarter by default): a row per customer or supplier per month, exempt, zero-rated and VATable, purchases split by the tax code's `purchase_type`, with the tax, then the total and any difference from the tax summary. For the Philippines' SLSP; the columns follow RR 16-2005, and the BIR's column order isn't confirmed. |
 | `withholding`, `qap`, `sawt` | `from_id`, `thru_id` (this quarter by default): the tax withheld by code and month, by supplier and code, and by customer and code with certificates received. Their columns aren't from a BIR specification, so check them before filing |
 | `cash_flow` | `from_id`, `thru_id` (the start of the year to this month by default), `method` (direct or indirect); needs the `cash_account_codes` setting |
 

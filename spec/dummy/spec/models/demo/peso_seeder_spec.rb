@@ -112,6 +112,14 @@ RSpec.describe Demo::PesoSeeder do
       expect(full.checks("by_customer").map { |check| [ check.account.code, check.difference.cents ] }).to eq([ [ "1200", 0 ] ])
     end
 
+    it "has summary lists that tie to the tax summary, with its suppliers' purchases as services" do
+      lists = TudlaAccounting::Reports::SummaryLists.new(organization, from: month(1), thru: month(12))
+      expect(lists.sales.map { |row| row.contact&.name }).to include("Tala Logistics Inc.")
+      expect(lists.purchases.map { |row| row.contact&.name }).to include("Dakila Consulting Corp.")
+      expect(lists.total(:purchases)[:not_set]).to eq(Money.new(0, "PHP"))
+      %i[sales purchases].each { |side| expect(lists.difference(side)).to have_attributes(base: Money.new(0, "PHP"), tax: Money.new(0, "PHP")) }
+    end
+
     it "makes each supplier's 2307 on one sheet" do
       quarter = TudlaAccounting::Reports::SupplierCertificates.new(organization, second_quarter)
       pages = PDF::Reader.new(StringIO.new(TudlaAccounting::PdfMaker.supplier_certificates(quarter, quarter.certificates))).pages

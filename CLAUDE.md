@@ -91,6 +91,8 @@ Controllers in `app/controllers/tudla_accounting/api/v1/` build on `BaseControll
 
 `Reports::SupplierCertificates` and `reports/_supplier_certificates` make BIR Form 2307. The partial has its own inline styles and must stay on one page of its 8.5 x 13 paper (`pdf_maker_spec` checks the longest case). Philippine forms and codes are templates over a general mechanism, and the README lists what isn't confirmed by the BIR; don't state those as fact.
 
+`Reports::SummaryLists` (the SLSP) reads posted `Detail` lines, by tax code, grouped by contact and posting month in the engine's time zone. A reversal has no source of its own, so it finds its document through the entry it reverses. It must keep tying to `TaxReport` on the accrual basis (`difference`). A purchases code's `purchase_type` splits the taxed purchases, and can be unset.
+
 ### Ancestry
 
 `has_ancestry` must specify `ancestry_format: :materialized_path2` whenever the migration declares `null: false, default: "/"` on the ancestry column. The ancestry 5.x default format is `:materialized_path`, which uses `nil` for the root and crashes against a NOT NULL column.

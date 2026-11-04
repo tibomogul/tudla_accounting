@@ -1,0 +1,67 @@
+<% sales = @side == :sales %>
+<%= tc_page_header (sales ? "Summary list of sales" : "Summary list of purchases"), subtitle: (@report ? "#{tc_date(@from.from_date)} to #{tc_date(@thru.thru_date)}" : nil) do %>
+  <% if @report %>
+    <%= render "withholding_form", url: sales ? reports_sales_list_path : reports_purchases_list_path %>
+    <%= render "download" %>
+  <% end %>
+<% end %>
+
+<% if @report.nil? %>
+  <%= render "no_periods" %>
+<% else %>
+  <% agent = TudlaAccounting.configuration.withholding_agent_for(accounting_organization) %>
+  <div class="tc-card tc-card-body text-sm mb-4 space-y-1" role="note" data-confirm-rdo>
+    <p class="font-semibold" data-filer><%= agent[:name] %><% if agent[:tin].present? %> · TIN <%= agent[:tin] %><% end %><% if agent[:address].present? %> · <%= agent[:address].to_s.squish %><% end %></p>
+    <p>A row per contact per month, following the fields of RR 16-2005 §4.114-3. This is to prepare the filing, not a DAT file: the BIR's column order isn't confirmed, so check with your Revenue District Office how to submit it. Final VAT withheld<%= " and non-creditable input tax" unless sales %> aren't recorded here, and stay at zero.</p>
+  </div>
+  <% if TudlaAccounting.configuration.tax_basis.to_s == "cash" %>
+    <div class="tc-alert tc-alert-warning mb-4" role="alert" data-cash-basis>These books report tax on the cash basis. These lists go by the month each line was posted, so they won't match the tax return or tax summary.</div>
+  <% end %>
+  <% missing = @report.missing_tin(@side) %>
+  <% if missing.any? %>
+    <div class="tc-alert tc-alert-warning mb-4" role="alert" data-missing-tin>No TIN for <%= missing.to_sentence.delete_suffix(".") %>. Add it on the contact before filing.</div>
+  <% end %>
+  <% unless sales || @report.codes_not_set.empty? %>
+    <div class="tc-alert tc-alert-warning mb-4" role="alert" data-codes-not-set><%= @report.codes_not_set.map(&:code).to_sentence %> <%= @report.codes_not_set.one? ? "doesn't say" : "don't say" %> what's bought under <%= @report.codes_not_set.one? ? "it" : "them" %>, so those purchases are under Not set. Choose "Bought as" on the <%= link_to "tax code", tax_codes_path, class: "underline" %>.</div>
+  <% end %>
+  <% unless @report.uncoded(@side).zero? %>
+    <div class="tc-alert tc-alert-warning mb-4" role="alert" data-uncoded>Exempt includes <%= tc_money_text(@report.uncoded(@side)) %> from lines with no tax code. Check they really are exempt.</div>
+  <% end %>
+  <% if @report.no_contact?(@side) %>
+    <div class="tc-alert tc-alert-warning mb-4" role="alert" data-no-contact>"No contact" is tax-coded lines on entries that aren't an invoice or bill, so they have no <%= sales ? "buyer" : "seller" %> to list them under.</div>
+  <% end %>
+
+  <% rows = @report.rows_for(@side) %>
+  <% totals = @report.total(@side) %>
+  <% columns = sales ? { "Exempt" => :exempt, "Zero-rated" => :zero_rated, "VATable (before VAT)" => :taxable } : { "Exempt" => :exempt, "Zero-rated" => :zero_rated, "Services" => :services, "Capital goods" => :capital_goods, "Other goods" => :other_goods, **(totals[:not_set].zero? ? {} : { "Not set" => :not_set }) } %>
+  <% zero = Money.new(0, accounting_organization.currency) %>
+  <section class="tc-card overflow-x-auto mb-4" aria-label="<%= sales ? "Sales" : "Purchases" %>">
+    <table class="tc-table">
+      <thead><tr><th>Month</th><th>TIN</th><th><%= sales ? "Buyer" : "Seller" %></th><% unless sales %><th>Address</th><% end %><% columns.each_key do |heading| %><th class="tc-num"><%= heading %></th><% end %><th class="tc-num">Final VAT withheld</th><th class="tc-num"><%= sales ? "Output tax" : "Creditable input tax" %></th><% unless sales %><th class="tc-num">Non-creditable input tax</th><% end %><th class="tc-num"><%= sales ? "Total sales" : "Total purchases" %></th></tr></thead>
+      <tbody>
+        <% if rows.empty? %><tr><td colspan="<%= columns.size + (sales ? 6 : 8) %>" class="tc-muted text-center">Nothing posted in these months.</td></tr><% end %>
+        <% rows.each do |row| %>
+          <tr data-list-row>
+            <td class="whitespace-nowrap"><%= row.month.strftime("%b %Y") %></td>
+            <% if row.contact %>
+              <td class="whitespace-nowrap"><%= row.contact.tax_number || (tag.span("No TIN", class: "tc-negative") if !sales || !row.taxable.zero?) %></td>
+              <td><%= link_to row.contact.name, contact_path(row.contact), class: "underline" %></td>
+              <% unless sales %><td><%= row.contact.full_address.to_s.squish %></td><% end %>
+            <% else %>
+              <td></td><td class="tc-muted">No contact</td><% unless sales %><td></td><% end %>
+            <% end %>
+            <% columns.each_value do |name| %><td class="tc-num"><%= tc_money(row.public_send(name)) %></td><% end %>
+            <td class="tc-num"><%= tc_money(zero) %></td><td class="tc-num"><%= tc_money(row.tax) %></td><% unless sales %><td class="tc-num"><%= tc_money(zero) %></td><% end %><td class="tc-num"><%= tc_money(row.total) %></td>
+          </tr>
+        <% end %>
+        <tr class="font-semibold" data-list-total><td colspan="<%= sales ? 3 : 4 %>">Total</td><% columns.each_value do |name| %><td class="tc-num"><%= tc_money(totals[name]) %></td><% end %>
+          <td class="tc-num"><%= tc_money(zero) %></td><td class="tc-num"><%= tc_money(totals[:tax]) %></td><% unless sales %><td class="tc-num"><%= tc_money(zero) %></td><% end %><td class="tc-num"><%= tc_money(rows.sum(zero, &:total)) %></td></tr>
+      </tbody>
+    </table>
+  </section>
+  <% difference = @report.difference(@side) %>
+  <section class="tc-card tc-card-body space-y-2 text-sm mb-6" aria-label="Against the tax summary" data-list-check>
+    <div class="flex justify-between gap-4"><span>Difference from the <%= link_to "tax summary", reports_tax_path(from_id: @from.id, thru_id: @thru.id, basis: "accrual"), class: "underline" %>: amounts with a tax code</span><span class="<%= "tc-negative" unless difference.base.zero? %>"><%= tc_money(difference.base) %></span></div>
+    <div class="flex justify-between gap-4"><span>Difference from the tax summary: tax</span><span class="<%= "tc-negative" unless difference.tax.zero? %>"><%= tc_money(difference.tax) %></span></div>
+  </section>
+<% end %>
