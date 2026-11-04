@@ -64,7 +64,7 @@ RSpec.describe "Summary lists of sales and purchases", type: :request do
 
       get routes.reports_sales_list_path
       expect(text("[data-filer]").sole).to eq("Bayanihan Corp. (registered) · TIN 000-111-222-00000 · 1 Demo Street")
-      expect(text("[data-list-row] td").first(7)).to eq([ "May 2026", "No TIN", "Northwind", "50.00", "0.00", "1,000.00", "0.00" ])
+      expect(text("[data-list-row] td").first(7)).to eq([ "May 2026", "No TIN", "Northwind", "50.00", "0.00", "1,000.00", "120.00" ])
       expect(text("[data-list-row] td").last(2)).to eq([ "120.00", "1,050.00" ])
       expect(text("[data-missing-tin]").sole).to include("No TIN for Northwind.")
       expect(text("[data-uncoded]").sole).to include("50.00")
@@ -82,7 +82,7 @@ RSpec.describe "Summary lists of sales and purchases", type: :request do
       document("bill", supplier, 1_000_00, input, "6000")
 
       get routes.reports_purchases_list_path
-      expect(css_select("thead th").map { |cell| cell.text.squish }).to eq([ "Month", "TIN", "Seller", "Address", "Exempt", "Zero-rated", "Services", "Capital goods", "Other goods", "Not set", "Final VAT withheld", "Creditable input tax", "Non-creditable input tax", "Total purchases" ])
+      expect(css_select("thead th").map { |cell| cell.text.squish }).to eq([ "Month", "TIN", "Seller", "Address", "Exempt", "Zero-rated", "Services", "Capital goods", "Other goods", "Not set", "Creditable input tax", "Total purchases" ])
       expect(text("[data-list-row] td")).to include("2 Made-up Road Quezon City 1100", "120.00", "1,000.00")
       expect(text("[data-codes-not-set]").sole).to include("INX doesn't say")
 
