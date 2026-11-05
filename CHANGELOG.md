@@ -6,11 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-05
+
+Tagged but not published to RubyGems.
+
 ### Added
 
 - A purchases tax code can say what its lines are bought as: services, capital goods or other goods (`purchase_type`, "Bought as" on its form, and in `GET /tax_codes`). It starts unset.
 - Summary lists of sales and purchases, for the Philippines' SLSP: a row per customer or supplier per month, on screen, in CSV and Excel, and in the API (`sales_list`, `purchases_list`). The downloads have columns for final VAT withheld and non-creditable input tax, at zero; the pages leave them out. A line goes by its tax code; one with no code counts as exempt, with the amount flagged. Each list shows any difference from the tax summary, and flags a missing TIN or a purchases code with no type. They go by posting date, with a notice on cash-basis books. There's no DAT file or importation list. The fields follow RR 16-2005, but we couldn't find the BIR's record layout, so the column order isn't confirmed.
 - The demo's Demo Pilipinas Inc. buys capital goods, on a purchases code of their own, so its purchases list splits them from the services. Its 2550Q includes that code under domestic purchases, and its figures match the summary lists.
+
+### Fixed
+
+- The 2307 page's missing TIN message no longer ends in two full stops when the last supplier's name ends in one.
 
 ## [0.4.0] - 2026-11-04
 
@@ -162,7 +170,8 @@ First release.
 - Web pages for all of the above, styled with Tailwind CSS v4 and following the host's light/dark theme.
 - Set-based posting and batched balance reads for large ledgers; `perf/benchmark.rb` to measure them.
 
-[Unreleased]: https://github.com/tibomogul/tudla_accounting/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/tibomogul/tudla_accounting/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/tibomogul/tudla_accounting/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/tibomogul/tudla_accounting/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/tibomogul/tudla_accounting/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/tibomogul/tudla_accounting/compare/v0.1.0...v0.2.0
