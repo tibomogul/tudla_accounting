@@ -19,7 +19,7 @@ RSpec.describe "Attaching a receipt", type: :system do
 
     visit entry_path(entry)
     attach_file "Attach receipts or documents", file_fixture("receipt.pdf")
-    click_button "Attach"
+    click_button_and_reload "Attach"
 
     expect(page).to have_content("receipt.pdf attached.")
     within("[data-attachment]") { expect(page).to have_link("receipt.pdf", href: entry_attachment_path(entry, entry.attachments.first)) }

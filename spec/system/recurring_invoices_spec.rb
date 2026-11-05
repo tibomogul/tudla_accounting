@@ -28,7 +28,7 @@ RSpec.describe "Setting up a recurring invoice", type: :system do
     expect(page).to have_css("[data-document-lines-target=total]", exact_text: "1,100.00")
 
     choose "Approved invoices, emailed to the customer"
-    click_button "Save recurring invoice"
+    click_button_and_reload "Save recurring invoice"
     expect(page).to have_content("Recurring invoice saved.")
     template = TudlaAccounting::RecurringInvoice.find_by!(name: "Retainer")
     expect(template).to have_attributes(issue: "email", total: Money.new(1_100_00, "AUD"))

@@ -45,7 +45,7 @@ RSpec.describe "Writing an invoice", type: :system do
     all("button[aria-label='Remove line']").last.click
     within("tfoot") { expect(page).to have_content("2,272.73").and have_content("2,500.00") }
 
-    click_button "Save and approve"
+    click_button_and_reload "Save and approve"
     expect(page).to have_content("Invoice INV-0001 approved and posted.")
     within("[data-document]") { expect(page).to have_content("Consulting").and have_content("2,500.00") }
   end
@@ -127,7 +127,7 @@ RSpec.describe "Writing an invoice", type: :system do
     select "WC100 (5%)", from: "Withheld"
     within("tfoot") { expect(page).to have_content("Less tax withheld 500.00").and have_content("Amount payable 9,500.00") }
 
-    click_button "Save and approve"
+    click_button_and_reload "Save and approve"
     expect(page).to have_content("approved and posted.")
     within("[data-document]") { expect(page).to have_content("Less tax withheld, WC100 (5%)").and have_content("9,500.00") }
   end

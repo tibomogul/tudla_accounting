@@ -217,6 +217,7 @@ RSpec.describe "USAGE.md, in the UI", type: :system do
       TudlaAccounting::AccountsCreator.call([ { code: "2300", name: "Withholding payable", category: "liability" } ], organization)
       visit current_path
       click_link "New withholding code"
+      expect(page).to have_current_path(new_withholding_code_path)
       fill_in "Code", with: "WC120"
       fill_in "Name", with: "Contractors"
       fill_in "Rate (%)", with: "2"
@@ -289,7 +290,7 @@ RSpec.describe "USAGE.md, in the UI", type: :system do
       click_link "Pay run"
       expect(page).to have_current_path(new_pay_run_path, ignore_query: true)
       fill_in "Due by", with: today + 60
-      click_button "Show bills"
+      click_button_and_reload "Show bills"
       expect(page).to have_checked_field("Pay BILL-0001")
       wait_for_confirm
       click_button "Pay the chosen bills"

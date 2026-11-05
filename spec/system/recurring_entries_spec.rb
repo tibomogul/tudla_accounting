@@ -26,7 +26,7 @@ RSpec.describe "Setting up a recurring entry", type: :system do
     within(line(2)) { select "6200 - Cleaning", from: "Account"; fill_in "Debit", with: "100" }
     expect(page).to have_css("[data-entry-lines-target=status]", exact_text: "Balanced: debits equal credits (1,100.00).")
 
-    click_button "Save recurring entry"
+    click_button_and_reload "Save recurring entry"
     expect(page).to have_content("Recurring entry saved.")
     expect(TudlaAccounting::RecurringEntry.find_by!(name: "Rent").lines.map { |l| [ l.account.code, l.amount_cents ] })
       .to eq([ [ "6100", 1000_00 ], [ "1010", 1100_00 ], [ "6200", 100_00 ] ])
