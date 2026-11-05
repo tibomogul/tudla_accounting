@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- A `tax_registration` setting for what printed documents say about tax. `TaxRegistration.australia(abn)` heads an invoice "Tax invoice", prints your ABN, calls the tax GST, and warns about an ABN that's missing or fails its check digits. The README lists what we couldn't confirm with the ATO.
+
 ### Changed
 
 - The README gathers what the BIR hasn't confirmed for Philippine filings into one list, and adds that putting capital goods on the 2550Q's item 44A is our reading of the form.

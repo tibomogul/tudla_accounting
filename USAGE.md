@@ -71,6 +71,7 @@ The rest of the settings (receivables and payables, cash accounts, exchange rate
 To send invoices, statements and payment receipts to customers and suppliers, also set:
 
 - `document_header`: who printed documents are from, such as the organization's name and address;
+- `tax_registration`: for Australian tax invoices, `->(organization) { TudlaAccounting::TaxRegistration.australia(organization.abn) }`;
 - `document_mail_from` and `document_mail_reply_to`: the addresses emails go from and are answered to. Emails go through the host's own ActionMailer setup, in the background, so the host's Active Job backend must run jobs;
 - `reminder_days`: the days after the due date to remind customers of overdue invoices, such as `[7, 14, 30]`. Without it, no reminders go out.
 

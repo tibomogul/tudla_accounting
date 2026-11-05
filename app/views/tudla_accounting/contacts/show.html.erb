@@ -20,6 +20,11 @@
   <% end %>
 <% end %>
 
+<% registration = TudlaAccounting.configuration.tax_registration_for(@contact.organization) %>
+<% if registration&.fails_check?(@contact.tax_number) %>
+  <div class="tc-alert tc-alert-warning mb-4" role="alert" data-tax-number-warning><%= @contact.tax_number %> doesn't pass the <%= registration.label %> check, so it prints as a tax number. A number from another country can stay as it is.</div>
+<% end %>
+
 <div class="grid gap-6 lg:grid-cols-3">
   <section class="tc-card tc-card-body space-y-2 text-sm" aria-label="Details" data-details>
     <% { "Email" => (@contact.email && mail_to(@contact.email, class: "underline")), "Phone" => @contact.phone, "Tax number" => @contact.tax_number,

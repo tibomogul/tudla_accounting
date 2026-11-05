@@ -83,6 +83,8 @@ invoice.void!(on: Date.current, reason: "Issued twice") # reverses its entry
 
 `approve!` numbers a draft in its kind's own run (`document_number_format`) and posts its entry, dated `issued_on`, with the document as its source: the total to the receivable (or payable) account's sub-account in its currency (`Account.for_role_in_currency!`), each line's net amount and tax to its accounts on the other side (the other way round for a credit note). A foreign document's amounts are converted at its rate line by line, the total being their sum, and the total goes to the sub-account in its currency (made as e.g. `1100-EUR` the first time) with its foreign amount, so revaluation and the aging report see it; `amount_due` is in its currency, `amount_due_in_base` in the organization's. A credit note is in the currency of what it credits. They are paid by payments in their currency (see [Payments](#payments)). An invoice or bill opens a receivable or payable for its contact, due on `due_on`; a credit note opens a credit, applied straight away to the invoice or bill it credits (`credited_document`) as far as that is still owed. The engine maps its own documents to these roles, whatever `carrying_amount_sources` says, so they work alongside a host's own sources. If the entry can't be posted (a closed period, say), nothing is numbered or posted. An approved document doesn't change: `void!` reverses its entry (refused while payments or credit notes are applied to it), and reversing the entry on its own page voids it too. Only drafts can be deleted. Documents are on the audit trail (`document.created`, `.updated`, `.deleted`, `.approved`, `.voided`), and keep their contacts, accounts and tax codes from being deleted.
 
+With the `tax_registration` setting, printed documents say how the organization is registered, whether on the page, as a PDF or by email. For Australia, `TaxRegistration.australia(abn)` heads an invoice "Tax invoice" and a draft "Draft tax invoice", prints your ABN on invoices and credit notes, and calls the tax GST, with "No GST" on a line that has no tax code and a zero-rate code's name, such as "GST-free", on a line under one. The page warns if your ABN is missing or fails the check digits, without stopping you approving the invoice. A contact's number prints as an ABN once it passes that check, and otherwise as a tax number, with a warning on the contact's page, because a foreign customer's number can be right and still fail. Passing only means the number is well formed, not that it's registered; [ABN Lookup](https://abr.business.gov.au) says that. `document_header` is still the place for your name and address, so take any ABN out of it to avoid printing it twice. A credit note keeps its title, and recipient-created tax invoices aren't supported.
+
 The **Sales** and **Purchases** pages list them, searched by number, reference or contact, by kind and status (draft, awaiting payment, part paid, overdue, paid, void), with what is still owed (each in its currency; the total in the organization's), and download as CSV. The form fills in the contact's payment terms, default account and tax code, and adds up the lines as they're typed. Each document's page prints (or saves as a PDF) as the document itself, headed by the `document_header` setting, and shows the payments and credits applied to it; an approved invoice or bill offers a credit note copying its lines. Drafting needs `:record`; approving and voiding need `:post`.
 
 ### PDFs
@@ -307,6 +309,15 @@ Reports → Certificates to suppliers (2307) lists a certificate for each suppli
 - **Not confirmed.** The fields, the column order and whether an Excel file can be filed: see [what to confirm](#philippine-filings-what-to-confirm).
 
 Withholding on advance payments and on journal entries isn't supported, and payroll, final withholding and government VAT withholding are out of scope.
+
+#### Australian tax invoices: what to confirm
+
+We worked from search summaries of the ATO's tax invoice page and GSTR 2013/1, because the ATO's site refused our direct requests. Check these with an accountant or registered BAS agent before relying on them.
+
+- **The title.** The ATO says a document must be intended as a tax invoice, and we couldn't confirm whether it requires those words. "Tax invoice" is the safe reading.
+- **Mixed invoices.** An invoice must make clear which items are taxable. Each line shows its tax code, the name of a zero-rate code, or "No GST", which we believe does this. So name a zero-rate code clearly, such as "GST-free".
+- **Credit notes.** We haven't checked what an adjustment note must show, or whether a credit note meets it.
+- **Rounding.** The ATO has a total invoice rule and a taxable sale rule. The engine works out tax per line under the `rounding` setting, and we haven't checked that against either.
 
 #### Philippine filings: what to confirm
 
@@ -655,6 +666,7 @@ TudlaAccounting.configure do |config|
   # Invoices, bills and credit notes (the engine's own documents)
   config.document_number_format = { "sales_invoice" => "%<number>05d" } # over INV-0001, CN-0001, BILL-0001, SC-0001; or ->(document) { ... }
   config.document_header = ->(organization) { "#{organization.name}\n#{organization.address}" } # who a printed document is from
+  config.tax_registration = ->(organization) { TudlaAccounting::TaxRegistration.australia(organization.abn) } # or TaxRegistration.new(label:, number:, tax_name:, invoice_title:, check:); what's printed about tax
   config.books_header = ->(organization) { "#{organization.name}\nTIN: #{organization.tin}   |   #{organization.address}" } # heads the books of accounts' pages; the document_header if unset
   config.withholding_agent = ->(organization) { { tin: organization.tin, name: organization.name, address: organization.address, zip: "1223", signatory_name: "Maria Santos", signatory_title: "Finance Manager", signatory_tin: "000-000-000-000" } } # your details on BIR Form 2307; only the name if unset
 

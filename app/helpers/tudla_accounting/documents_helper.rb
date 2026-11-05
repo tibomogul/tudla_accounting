@@ -30,6 +30,15 @@ module TudlaAccounting
     end
 
     # "1" for 1.0000, "2.5" for 2.5000 ("2,5" in comma books).
+    # A line's tax as it prints. With a tax registration it must say clearly which lines
+    # are taxed, so a code without tax goes by its name, and no code says so.
+    def document_line_tax(line, registration)
+      return line.tax_code&.label unless registration
+      return "No #{registration.tax_name}" unless line.tax_code
+
+      line.tax_code.standard? ? line.tax_code.label : line.tax_code.name
+    end
+
     def document_quantity(quantity)
       tc_number(quantity)
     end

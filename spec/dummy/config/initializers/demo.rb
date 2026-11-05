@@ -19,9 +19,11 @@ TudlaAccounting.configure do |config|
     case organization.name
     when Demo::EuroSeeder::NAME then "#{organization.name}\nDemostraße 1, 10115 Berlin\nUSt-IdNr. DE123456789"
     when Demo::PesoSeeder::NAME then "#{organization.name}\n1 Ayala Avenue, Makati City 1226\nTIN 000-123-456-000"
-    else "#{organization.name}\n1 Demo Street, Sydney NSW 2000\nABN 12 345 678 901"
+    else "#{organization.name}\n1 Demo Street, Sydney NSW 2000"
     end
   end
+  # Demo Co's books are Australian. The ABN is made up, and only its check digits are right.
+  config.tax_registration = ->(organization) { TudlaAccounting::TaxRegistration.australia("99 000 000 000") if organization.name == Demo::Seeder::NAME }
   config.withholding_agent = ->(organization) { organization.name == Demo::PesoSeeder::NAME ? Demo::PesoSeeder::WITHHOLDING_AGENT : {} }
 end
 

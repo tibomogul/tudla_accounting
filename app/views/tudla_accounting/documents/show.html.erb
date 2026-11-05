@@ -36,6 +36,15 @@
   <% if @document.void? %><span class="tc-muted">Voided <%= tc_date(@document.voided_on) %><%= ": “#{@document.void_reason}”" if @document.void_reason %></span><% end %>
 </div>
 
+<% registration = @document.tax_registration %>
+<% if registration && @document.sales? %>
+  <% if registration.number.nil? %>
+    <div class="tc-alert tc-alert-warning mb-4 print:hidden" role="alert" data-tax-registration-warning>This document doesn't show your <%= registration.label %>. Add it to the tax_registration setting.</div>
+  <% elsif registration.fails_check?(registration.number) %>
+    <div class="tc-alert tc-alert-warning mb-4 print:hidden" role="alert" data-tax-registration-warning>Your <%= registration.label %>, <%= registration.number %>, doesn't pass the <%= registration.label %> check. Correct it in the tax_registration setting.</div>
+  <% end %>
+<% end %>
+
 <%= render "document", document: @document %>
 
 <% if @dimension_values.any? %>

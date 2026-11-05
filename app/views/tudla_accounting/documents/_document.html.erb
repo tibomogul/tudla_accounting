@@ -1,11 +1,13 @@
 <%# locals: (document:) %>
 <%# The document as it prints: on paper (or a PDF) it is all that shows. %>
 <% currency = document.currency %>
+<% registration = document.tax_registration %>
+<% tax_name = registration&.tax_name || "Tax" %>
 <article class="tc-card tc-card-body space-y-6" data-document aria-label="<%= document.title %>">
   <header class="flex flex-wrap justify-between gap-6">
-    <div class="whitespace-pre-line text-sm"><%= TudlaAccounting.configuration.document_header_for(document.organization) %></div>
+    <div class="whitespace-pre-line text-sm"><%= TudlaAccounting.configuration.document_header_for(document.organization) %><% if document.sales? && registration&.number %><p data-seller-tax-number><%= registration.label %> <%= registration.number %></p><% end %></div>
     <div class="text-right">
-      <h2 class="text-2xl font-bold tracking-tight"><%= document.draft? ? "Draft #{document.kind_label.downcase}" : document.kind_label %><%= " (void)" if document.void? %></h2>
+      <h2 class="text-2xl font-bold tracking-tight"><%= document.printed_title(registration) %><%= " (void)" if document.void? %></h2>
       <dl class="mt-2 grid grid-cols-[auto_auto] justify-end gap-x-4 gap-y-1 text-sm">
         <% if document.number_label %><dt class="tc-muted">Number</dt><dd><%= document.number_label %></dd><% end %>
         <dt class="tc-muted">Date</dt><dd><%= tc_date(document.issued_on) %></dd>
@@ -20,12 +22,12 @@
     <p class="tc-muted"><%= document.sales? ? "To" : "From" %></p>
     <p class="font-semibold"><%= document.contact.name %></p>
     <% if document.contact.full_address %><p class="whitespace-pre-line"><%= document.contact.full_address %></p><% end %>
-    <% if document.contact.tax_number %><p>Tax number <%= document.contact.tax_number %></p><% end %>
+    <% if document.contact.tax_number %><p><%= registration ? registration.contact_label(document.contact.tax_number) : "Tax number" %> <%= document.contact.tax_number %></p><% end %>
   </section>
 
   <table class="tc-table">
     <thead>
-      <tr><th>Description</th><th class="tc-num">Quantity</th><th class="tc-num">Unit price</th><th>Tax</th><th class="tc-num">Amount (<%= currency %>)</th></tr>
+      <tr><th>Description</th><th class="tc-num">Quantity</th><th class="tc-num">Unit price</th><th><%= tax_name %></th><th class="tc-num">Amount (<%= currency %>)</th></tr>
     </thead>
     <tbody>
       <% document.lines.each do |line| %>
@@ -33,14 +35,14 @@
           <td><%= line.description %></td>
           <td class="tc-num"><%= document_quantity(line.quantity) %></td>
           <td class="tc-num"><%= tc_money(line.unit_price) %></td>
-          <td><%= line.tax_code&.label %></td>
+          <td><%= document_line_tax(line, registration) %></td>
           <td class="tc-num"><%= tc_money(line.amount) %></td>
         </tr>
       <% end %>
     </tbody>
     <tfoot>
-      <tr><td colspan="4" class="text-right"><%= document.tax_inclusive? ? "Total excluding tax" : "Subtotal" %></td><td class="tc-num"><%= tc_money(document.subtotal) %></td></tr>
-      <tr><td colspan="4" class="text-right">Tax<%= " included" if document.tax_inclusive? %></td><td class="tc-num"><%= tc_money(document.tax) %></td></tr>
+      <tr><td colspan="4" class="text-right"><%= document.tax_inclusive? ? "Total excluding #{registration ? tax_name : "tax"}" : "Subtotal" %></td><td class="tc-num"><%= tc_money(document.subtotal) %></td></tr>
+      <tr><td colspan="4" class="text-right"><%= tax_name %><%= " included" if document.tax_inclusive? %></td><td class="tc-num"><%= tc_money(document.tax) %></td></tr>
       <tr class="font-semibold"><td colspan="4" class="text-right">Total</td><td class="tc-num"><%= tc_money(document.total) %></td></tr>
       <% if document.withheld_cents.positive? %>
         <% document.lines.select(&:withholding_code).group_by(&:withholding_code).each do |code, lines| %>

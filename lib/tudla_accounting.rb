@@ -74,7 +74,7 @@ module TudlaAccounting
                   :due_date_method, :related_party_method, :forex_rate_provider,
                   :parent_controller, :current_organization, :current_actor, :authorize,
                   :cash_account_codes, :tax_basis, :organization_label, :entry_number_format,
-                  :attachment_content_types, :attachment_max_size, :document_header, :books_header, :withholding_agent,
+                  :attachment_content_types, :attachment_max_size, :document_header, :books_header, :withholding_agent, :tax_registration,
                   :api_rate_limit, :api_rate_limit_store, :pdf_browser_options, :pdf_paper, :pdf_stylesheet,
                   :document_mailer, :document_mail_from, :document_mail_reply_to
     attr_reader :number_format
@@ -139,6 +139,9 @@ module TudlaAccounting
       # Without one, the document_header.
       @books_header = nil
       @withholding_agent = nil
+      # How an organization is registered for tax, on its printed documents: a callable
+      # giving a TaxRegistration, or nil to leave them as they are.
+      @tax_registration = nil
       # How many requests an API token may make a minute (nil for no limit), counted in
       # api_rate_limit_store (an ActiveSupport::Cache store; Rails.cache when nil, which
       # must count across processes, as Solid Cache and Redis do, to limit them all).
@@ -281,6 +284,9 @@ module TudlaAccounting
       name = organization.respond_to?(:name) && organization.name.present? ? organization.name : TudlaAccounting.organization_label(organization)
       { name: name, tin: nil, address: nil, zip: nil, signatory_name: nil, signatory_tin: nil, signatory_title: nil }.merge(withholding_agent&.call(organization).to_h)
     end
+
+    # The tax_registration setting's TaxRegistration for an organization, or nil.
+    def tax_registration_for(organization) = tax_registration&.call(organization)
 
     # The run of numbers posted entries are numbered in, each counted from 1:
     # :organization (one run, the default), :financial_year (restarting each year; the
