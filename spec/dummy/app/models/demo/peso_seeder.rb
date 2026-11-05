@@ -111,7 +111,7 @@ class Demo::PesoSeeder < Demo::EuroSeeder
 
   # A 2550Q with its sales and purchases boxes mapped to the VAT codes, and last quarter's
   # filed. The form has no line of its own for capital goods up to ₱1 million, so they're
-  # with the domestic purchases.
+  # with the domestic purchases: our reading of the form, not confirmed by the BIR.
   def add_tax_return
     form = TudlaAccounting::TaxReturnForm.from_template!(organization, "ph_2550q")
     [ [ "31A", "tax_code_base", @gst ], [ "31B", "tax_code_tax", @gst ], [ "32A", "tax_code_base", @zero ],

@@ -606,12 +606,7 @@ Where a customer or the books must withhold tax from a payment, as the Philippin
 - A **payment received** can list what the customer withheld, as their certificate gives it. The cash and the tax together settle the invoice.
 - **Reports** list the tax by code and month, by supplier (QAP) and by customer (SAWT, only amounts with the certificate marked received), and make each supplier's BIR Form 2307.
 
-Check these with an accountant before relying on them; we couldn't confirm them in BIR issuances:
-
-- that the tax is worked out on the amount before VAT;
-- when a 2307 is due;
-- the QAP's and SAWT's columns;
-- whether the BIR accepts a rebuilt 2307.
+We couldn't confirm several of these points in BIR issuances, including the withholding base, when a 2307 is due, and the report columns. Check the README's [list of what to confirm](README.md#philippine-filings-what-to-confirm) with an accountant or your RDO before relying on them.
 
 **In the UI:**
 
@@ -619,7 +614,7 @@ Check these with an accountant before relying on them; we couldn't confirm them 
 - Purchases → New bill has a Withheld column on each line, and the totals show the amount payable.
 - Sales → Payments received → Record a payment has rows for what the customer withheld. Started from an invoice, the cash comes down by the tax as you type it, until you change the cash yourself. Tax certificates, from Payments received, lists the amounts to chase and marks them received.
 - Reports → Withholding summary, Tax withheld from suppliers (QAP), Tax withheld from you (SAWT), and Certificates to suppliers (2307).
-- Reports → Summary list of sales, and Summary list of purchases, for the BIR's SLSP. To split purchases into services, capital goods and other goods, choose "Bought as" on each purchases tax code (Setup → Tax codes). Check the unconfirmed points in the README before relying on them; these lists prepare the filing, and aren't a DAT file.
+- Reports → Summary list of sales, and Summary list of purchases, for the BIR's SLSP. To split purchases into services, capital goods and other goods, choose "Bought as" on each purchases tax code (Setup → Tax codes). These lists prepare the filing, and aren't a DAT file.
 
 **In the console:**
 

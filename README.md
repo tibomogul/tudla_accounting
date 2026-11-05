@@ -304,9 +304,20 @@ Reports → Certificates to suppliers (2307) lists a certificate for each suppli
 - **Columns.** Exempt, zero-rated and VATable sales with output tax; for purchases, exempt, zero-rated, then services, capital goods and other goods by the tax code's `purchase_type` (a Not set column appears for a code without one), with input tax, the seller's address and the total. Final VAT withheld and non-creditable input tax aren't recorded: the downloads have their columns at zero, and the pages leave them out.
 - **What it reads.** Posted lines by posting month, as the tax summary does on the accrual basis, so a void or credit note counts in its own month, and a row can be negative. A line on an invoice or bill with no tax code counts as exempt, and the page says how much. Tax-coded lines on other entries share a "No contact" row. Each list shows any difference from the tax summary; on cash-basis books the page warns that it won't match the return.
 - **What isn't here.** There's no DAT file, because we couldn't find the record layout (the annexes to RMC 24-2002), and no importation list, because the books hold no customs data. Every contact with a sale is listed, without the older rules' split of regular and casual buyers. The filer's details come from `withholding_agent`, and appear on the page but not in the downloads.
-- **Not confirmed.** The fields come from an unofficial copy of RR 16-2005 §4.114-3, written when VAT was 10%, as amended by RR 1-2012. We couldn't confirm the column order, whether an Excel file can still be filed rather than a validated DAT file, or what RMC 98-2026 says. Check with your RDO.
+- **Not confirmed.** The fields, the column order and whether an Excel file can be filed: see [what to confirm](#philippine-filings-what-to-confirm).
 
-Check these with an accountant before relying on them, because we couldn't confirm them in BIR issuances: that the tax is worked out on the amount before VAT, when a 2307 is due, the QAP's and SAWT's columns, and whether a rebuilt 2307 is accepted. Withholding on advance payments and on journal entries isn't supported, and payroll, final withholding and government VAT withholding are out of scope.
+Withholding on advance payments and on journal entries isn't supported, and payroll, final withholding and government VAT withholding are out of scope.
+
+#### Philippine filings: what to confirm
+
+We couldn't confirm these in BIR issuances, so check them with an accountant or your RDO before relying on them.
+
+- **Withholding base.** That the tax is worked out on the amount before VAT. Commentary mostly says so, but one source disagrees.
+- **Form 2307.** When it's due, and whether the BIR accepts a rebuilt form.
+- **QAP and SAWT.** The columns come from secondary sources, not the BIR's specification.
+- **SLSP.** The fields come from an unofficial copy of RR 16-2005 §4.114-3, written when VAT was 10%. We've read RR 1-2012, which amends it, only in excerpts, because the BIR's copy couldn't be fetched. We couldn't confirm the column order or whether an Excel file can still be filed rather than a validated DAT file; recent guides say validated DAT only. One site names RMC 98-2026, which we haven't read.
+- **Form 2550Q.** The form has no line of its own for capital goods up to ₱1 million, so the demo puts them on item 44A with domestic purchases. That's our reading of the form's layout. Nothing works out deferred input tax on capital goods over ₱1 million (items 39B and 52B). Check the box names against the current form too.
+- **DAT files.** There are none for the SLSP, QAP or SAWT. The SLSP's needs its record layout, in the annexes to RMC 24-2002, or possibly the BIR's RELIEF job aid; we've found neither.
 
 In `Entry.create_from_ruby_hash`, a line with `tax_code: "GST"` is taxed: its amount excludes the tax, and a line for the tax is added on the code's account, on the same side, so the other lines must include it (e.g. receivable 110, sales 100 with GST). With `tax_inclusive: true` (on the line or the whole hash) the amount includes the tax and is split instead, leaving the totals unchanged. Taxed lines and tax lines are tagged with the code (`tax_role` base or tax), and reversals keep the tags. Tax is always in the organization's currency: on a line with a foreign amount it is worked out on the converted amount and posted without a foreign amount (an inclusive line's foreign amount is split the same way), and a tax account held in another currency is refused.
 

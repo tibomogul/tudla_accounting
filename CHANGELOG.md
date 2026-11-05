@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The README gathers what the BIR hasn't confirmed for Philippine filings into one list, and adds that putting capital goods on the 2550Q's item 44A is our reading of the form.
+
 ## [0.5.0] - 2026-11-05
 
 Tagged but not published to RubyGems.
