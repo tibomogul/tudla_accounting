@@ -4,8 +4,8 @@ require "csv"
 # dimension, a couple of hundred posted entries up to today, a few drafts, the first half
 # of last year closed, a bank statement for the operating account, recurring entries,
 # this year's budget, customers with invoices on account and their payments (the engine's
-# contacts, invoices and payments) and a recurring invoice, a supplier's bills, and a BAS with last quarter's
-# filed. Returns the organization; running it again returns the existing one, only
+# contacts, invoices and payments) and a recurring invoice, a supplier's bills, GST-free sales, equipment bills, a payroll
+# with tax withheld, and a BAS with last quarter's filed. Returns the organization; running it again returns the existing one, only
 # adding the years' periods up to this one if the year has turned since it was seeded.
 #
 # The name is the demo's identity: an organization someone else names "Demo Co" is
@@ -61,8 +61,13 @@ class Demo::Seeder
     @organization = Organization.create!(name: NAME, currency: CURRENCY)
     create_periods
     create_accounts
+    # Here, not in create_accounts, which the other demos' books share.
+    accounts["2300"] = TudlaAccounting::Account.create!(organization: organization, parent: accounts["2000"], code: "2300", name: "PAYG withholding", category: "liability")
     @gst = TudlaAccounting::TaxCode.create!(organization: organization, code: "GST", name: "GST", rate: "0.1", kind: :sales, account: accounts["2200"])
     @gstp = TudlaAccounting::TaxCode.create!(organization: organization, code: "GSTP", name: "GST on purchases", rate: "0.1", kind: :purchases, account: accounts["2200"])
+    @export = TudlaAccounting::TaxCode.create!(organization: organization, code: "EXP", name: "GST-free export", rate: "0", kind: :sales)
+    @gst_free = TudlaAccounting::TaxCode.create!(organization: organization, code: "FRE", name: "GST-free", rate: "0", kind: :sales)
+    @capital = TudlaAccounting::TaxCode.create!(organization: organization, code: "GSTC", name: "GST on capital purchases", rate: "0.1", kind: :purchases, account: accounts["2200"])
     department = TudlaAccounting::Dimension.create!(organization: organization, code: "DEPT", name: "Department")
     @teams = %w[SALES ENG OPS ADMIN].map { |code| department.dimension_values.create!(code: code, name: code.capitalize) }
 
@@ -81,6 +86,8 @@ class Demo::Seeder
     add_budget
     add_customer_accounts
     add_supplier_bills
+    add_equipment_bills
+    add_wages_with_tax_withheld
     add_tax_return
   end
 
@@ -199,7 +206,9 @@ class Demo::Seeder
       (0..2).map { |month| [ start.next_month(month) + (index * 6).days, customer ] }.select { |date, _| date <= today }
     end
     # Approved in date order, so they are numbered in it.
-    invoices.sort_by(&:first).each do |date, customer|
+    (invoices + gst_free_sales).sort_by(&:first).each do |date, customer, tax_code, description|
+      next gst_free_sale(customer, date, tax_code, description) if tax_code
+
       invoice = consulting_invoice(customer, date, hours.rand(4..20)).approve!
       paid_on = date + 25
       next if customer.name == "Umbrella" || paid_on > today
@@ -210,6 +219,29 @@ class Demo::Seeder
     end
     consulting_invoice(customers.third, today, 6)
     add_recurring_invoice(customers.first)
+  end
+
+  # The first of the month that ended last quarter, and of this month, so the BAS filed
+  # and the one being worked on both have them.
+  def tax_activity_dates = [ today.beginning_of_quarter.prev_month, today.beginning_of_month ]
+
+  # An export and a domestic sale with no GST on each date, for the BAS's G2 and G3.
+  def gst_free_sales
+    overseas = gst_free_customer("Kyoto Trading KK", "1 Made-up Street\nKyoto, Japan", @export)
+    college = gst_free_customer("Harbour Training College", "2 Made-up Street\nSydney NSW 2000", @gst_free)
+    tax_activity_dates.flat_map { |date| [ [ date, overseas, @export, "Consulting for use overseas" ], [ date, college, @gst_free, "Accredited training course" ] ] }
+  end
+
+  def gst_free_customer(name, address, tax_code)
+    TudlaAccounting::Contact.create!(organization: organization, name: name, kind: "customer", email: "accounts@#{name.parameterize}.example", address: address,
+                                     default_account: accounts["4010"], default_tax_code: tax_code)
+  end
+
+  def gst_free_sale(customer, date, tax_code, description)
+    invoice = TudlaAccounting::Document.create!(organization: organization, kind: "sales_invoice", contact: customer, issued_on: date, due_on: date,
+                                                lines_attributes: [ { description: description, quantity: 1, unit_price_cents: 2_000_00, account: accounts["4010"], tax_code: tax_code } ]).approve!
+    TudlaAccounting::Payment.record!(organization: organization, kind: "received", contact: customer, account: accounts["1011"], paid_on: date,
+                                     amount_cents: invoice.total_cents, reference: "EFT #{invoice.number_label}", applications: [ { document: invoice, amount_cents: invoice.total_cents } ])
   end
 
   # Northwind's support retainer from next month, drafts to check, tagged ENG.
@@ -240,15 +272,42 @@ class Demo::Seeder
     end
   end
 
-  # A BAS mapped to the GST code and the wages account, with last quarter's filed.
+  # New laptops on each date, for the BAS's G10, not yet paid.
+  def add_equipment_bills
+    supplier = TudlaAccounting::Contact.create!(organization: organization, name: "Metro Office Equipment", kind: "supplier", payment_terms_days: 14,
+                                                default_account: accounts["1500"], default_tax_code: @capital)
+    tax_activity_dates.each do |date|
+      TudlaAccounting::Document.create!(organization: organization, kind: "bill", contact: supplier, issued_on: date, due_on: supplier.due_on(date), reference: "ME-#{date.strftime('%y%m')}",
+                                        tax_inclusive: true, lines_attributes: [ { description: "Laptops", quantity: 2, unit_price_cents: 2_750_00, account: accounts["1500"], tax_code: @capital } ]).approve!
+    end
+  end
+
+  # A month's payroll on each date, with tax withheld, for the BAS's W1 and W2. No payment
+  # to the ATO, because an account part nets it off the amount withheld.
+  def add_wages_with_tax_withheld
+    tax_activity_dates.each do |date|
+      post(date) do |entry|
+        entry.particulars = "Payroll – #{date.strftime('%B')}"
+        line(entry, accounts["6040"], :debit, 8_000_00)
+        line(entry, accounts["1011"], :credit, 6_400_00)
+        line(entry, accounts["2300"], :credit, 1_600_00)
+      end
+    end
+  end
+
+  # A BAS mapped to the demo's tax codes, wages and PAYG withholding accounts, with last quarter's filed.
   def add_tax_return
     bas = TudlaAccounting::TaxReturnForm.from_template!(organization, "au_bas")
     box = ->(label) { bas.boxes.find_by!(label: label) }
-    box.call("G1").parts.create!(source: "tax_code_gross", tax_code: @gst)
-    box.call("1A").parts.create!(source: "tax_code_tax", tax_code: @gst)
+    [ @gst, @export, @gst_free ].each { |code| box.call("G1").parts.create!(source: "tax_code_gross", tax_code: code) }
+    box.call("G2").parts.create!(source: "tax_code_gross", tax_code: @export)
+    box.call("G3").parts.create!(source: "tax_code_gross", tax_code: @gst_free)
+    box.call("G10").parts.create!(source: "tax_code_gross", tax_code: @capital)
     box.call("G11").parts.create!(source: "tax_code_gross", tax_code: @gstp)
-    box.call("1B").parts.create!(source: "tax_code_tax", tax_code: @gstp)
+    box.call("1A").parts.create!(source: "tax_code_tax", tax_code: @gst)
+    [ @gstp, @capital ].each { |code| box.call("1B").parts.create!(source: "tax_code_tax", tax_code: code) }
     box.call("W1").parts.create!(source: "account", account: accounts["6040"])
+    box.call("W2").parts.create!(source: "account", account: accounts["2300"])
     quarter = today.beginning_of_quarter.prev_day.beginning_of_quarter
     months = [ quarter, quarter.end_of_quarter ].map { |date| TudlaAccounting::Period.leaf_periods_for_date(organization, date.in_time_zone(zone).change(hour: 12)).first }
     TudlaAccounting::FiledTaxReturn.file!(bas.reload, from: months.first.from_date, thru: months.last.thru_date)

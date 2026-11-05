@@ -11,7 +11,7 @@ RSpec.describe Demo::Seeder do
     expect(Organization.where(name: "Demo Co").count).to eq(1)
 
     entries = TudlaAccounting::Entry.where(organization: organization)
-    expect(entries.where.not(posted_at: nil).count).to eq(54) # 30, the owner's capital, 12 invoices on account with 9 payments, and 2 bills
+    expect(entries.where.not(posted_at: nil).count).to eq(66) # 30, the owner's capital, 12 invoices on account with 9 payments, 2 bills, 4 GST-free sales with their payments, 2 equipment bills and 2 payrolls
     expect(entries.where(posted_at: nil).count).to eq(3)
     expect(entries.maximum(:transacted_at)).to be <= Time.current
     expect(entries.pluck(:particulars)).to include(a_string_starting_with("Invoice "))
@@ -85,7 +85,7 @@ RSpec.describe Demo::Seeder do
 
     aging = TudlaAccounting::AgingReportGenerator.call(organization: organization, report_type: :receivable, as_of_date: Date.current)
     expect(aging[:summary].values.map { |party| party[:related_party].name }).to contain_exactly("Globex", "Umbrella")
-    expect(TudlaAccounting::PartyStatement.parties(organization, :receivable).map(&:name)).to eq(%w[Globex Initech Northwind Umbrella])
+    expect(TudlaAccounting::PartyStatement.parties(organization, :receivable).map(&:name)).to eq([ "Globex", "Harbour Training College", "Initech", "Kyoto Trading KK", "Northwind", "Umbrella" ])
     northwind = TudlaAccounting::Contact.find_by!(organization: organization, name: "Northwind")
     statement = TudlaAccounting::PartyStatement.call(organization: organization, type: :receivable, party: northwind, from: Date.new(2026, 3, 1), thru: Date.current)
     expect(statement.lines.map(&:kind)).to eq(%w[Invoice Payment Invoice Payment Invoice Payment])
@@ -96,15 +96,15 @@ RSpec.describe Demo::Seeder do
     organization = described_class.call(entries: 30)
 
     contacts = TudlaAccounting::Contact.where(organization: organization).order(:name)
-    expect(contacts.map { |contact| [ contact.name, contact.kind ] }).to eq([ %w[Cloudware supplier], %w[Globex customer], %w[Initech customer], %w[Northwind customer], %w[Umbrella customer] ])
+    expect(contacts.map { |contact| [ contact.name, contact.kind ] }).to eq([ %w[Cloudware supplier], %w[Globex customer], [ "Harbour Training College", "customer" ], %w[Initech customer], [ "Kyoto Trading KK", "customer" ], [ "Metro Office Equipment", "supplier" ], %w[Northwind customer], %w[Umbrella customer] ])
     documents = TudlaAccounting::Document.where(organization: organization)
-    expect(documents.sales.approved.order(:number).pluck(:number_label)).to eq((1..12).map { |number| format("INV-%04d", number) })
+    expect(documents.sales.approved.order(:number).pluck(:number_label)).to eq((1..16).map { |number| format("INV-%04d", number) })
     expect(documents.sales.approved.order(:number).pluck(:issued_on)).to eq(documents.sales.approved.order(:issued_on, :number).pluck(:issued_on)) # in date order
     expect(documents.where(status: "draft").sole).to have_attributes(kind: "sales_invoice", issued_on: Date.current, contact: contacts.find_by!(name: "Initech"))
-    expect(documents.purchases.approved.map(&:total)).to eq([ Money.new(165_00, "USD") ] * 2)
+    expect(documents.purchases.approved.map(&:total)).to match_array([ Money.new(165_00, "USD"), Money.new(5_500_00, "USD") ] * 2)
     paid = documents.sales.approved.with_open_cents.to_a.group_by(&:payment_status)
     expect(paid.keys).to contain_exactly("paid", "part_paid", "unpaid")
-    expect(TudlaAccounting::Payment.where(organization: organization).received.count).to eq(9)
+    expect(TudlaAccounting::Payment.where(organization: organization).received.count).to eq(13)
   end
 
   it "sets up a BAS, with last quarter's filed as the books still give it" do
@@ -115,6 +115,13 @@ RSpec.describe Demo::Seeder do
     expect(filed.thru_date.to_date).to eq(Date.new(2026, 3, 31))
     expect(filed.figures.to_h { |box| [ box["label"], box["cents"] ] }.values_at("G1", "1A")).to all(be_positive)
     expect(filed.changes).to be_empty
+    figures = filed.figures.to_h { |box| [ box["label"], box["cents"] ] }
+    expect(figures.values_at("G2", "G3")).to eq([ 2_000_00, 2_000_00 ])
+    expect(figures["G10"]).to eq(5_500_00)
+    expect(figures["W2"]).to eq(1_600_00)
+    expect(figures.values_at("W5", "4")).to eq([ 1_600_00, 1_600_00 ])
+    expect(figures["9"]).to eq(figures["8A"] - figures["8B"])
+    expect(figures["8A"]).to eq(figures["1A"] + 1_600_00)
   end
 
   it "attaches the landlord's receipt to the latest rent payments" do

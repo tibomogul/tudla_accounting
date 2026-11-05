@@ -9,10 +9,10 @@ module TudlaAccounting
   module TaxReturnTemplates
     TEMPLATES = {
       "au_bas" => {
-        title: "Australia: Business activity statement (GST and PAYG withholding)",
+        title: "Australia: Business activity statement (GST, PAYG withholding and instalments)",
         name: "BAS",
         boxes: [
-          { label: "G1", name: "Total sales (including any GST)", whole_units: true },
+          { label: "G1", name: "Total sales (including any GST; answer Yes to the form's question at G1)", whole_units: true },
           { label: "G2", name: "Export sales", whole_units: true },
           { label: "G3", name: "Other GST-free sales", whole_units: true },
           { label: "G10", name: "Capital purchases (including any GST)", whole_units: true },
@@ -21,7 +21,16 @@ module TudlaAccounting
           { label: "1B", name: "GST on purchases", whole_units: true },
           { label: "W1", name: "Total salary, wages and other payments", whole_units: true },
           { label: "W2", name: "Amount withheld from payments shown at W1", whole_units: true },
-          { label: "Net GST", name: "GST payable (1A less 1B; negative is a refund)", whole_units: true, boxes: { "1A" => 1, "1B" => -1 } }
+          { label: "W4", name: "Amount withheld where no ABN is quoted", whole_units: true },
+          { label: "W3", name: "Other amounts withheld", whole_units: true },
+          { label: "W5", name: "Total amounts withheld (W2 + W4 + W3)", whole_units: true, boxes: { "W2" => 1, "W4" => 1, "W3" => 1 } },
+          { label: "Net GST", name: "GST payable (1A less 1B; negative is a refund)", whole_units: true, boxes: { "1A" => 1, "1B" => -1 } },
+          { label: "4", name: "PAYG tax withheld (from W5)", whole_units: true, boxes: { "W5" => 1 } },
+          { label: "5A", name: "PAYG income tax instalment", whole_units: true },
+          { label: "5B", name: "Credit from PAYG income tax instalment variation", whole_units: true },
+          { label: "8A", name: "Total owed to the ATO (1A + 4 + 5A; add any other labels your statement has)", whole_units: true, boxes: { "1A" => 1, "4" => 1, "5A" => 1 } },
+          { label: "8B", name: "Total owed by the ATO (1B + 5B; add any other labels your statement has)", whole_units: true, boxes: { "1B" => 1, "5B" => 1 } },
+          { label: "9", name: "Payment or refund (8A less 8B; negative is a refund)", whole_units: true, boxes: { "8A" => 1, "8B" => -1 } }
         ]
       },
       "uk_vat" => {

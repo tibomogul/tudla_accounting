@@ -53,7 +53,8 @@ RSpec.describe TudlaAccounting::TaxReturnCalculator, type: :service do
   it "fills a BAS from its tax codes, accounts and boxes, dropping the cents" do
     expect(figures(bas)).to eq(
       "G1" => aud(1_400), "G2" => aud(300), "G3" => aud(0), "G10" => aud(0), "G11" => aud(55), "1A" => aud(100), "1B" => aud(5),
-      "W1" => aud(2_000), "W2" => aud(400), "Net GST" => aud(95)
+      "W1" => aud(2_000), "W2" => aud(400), "W4" => aud(0), "W3" => aud(0), "W5" => aud(400), "Net GST" => aud(95),
+      "4" => aud(400), "5A" => aud(0), "5B" => aud(0), "8A" => aud(500), "8B" => aud(5), "9" => aud(495)
     )
   end
 

@@ -36,13 +36,13 @@ RSpec.describe "Tax returns", type: :request do
     get routes.tax_return_forms_path
     expect(response.body).to include("None yet.")
     get routes.new_tax_return_form_path
-    expect(css_select("select[name=template] option").map(&:text)).to include("Australia: Business activity statement (GST and PAYG withholding)")
+    expect(css_select("select[name=template] option").map(&:text)).to include("Australia: Business activity statement (GST, PAYG withholding and instalments)")
 
     post routes.tax_return_forms_path, params: { template: "au_bas", tax_return_form: { name: "" } }
     expect(response).to redirect_to(routes.tax_return_form_path(form))
     expect(flash[:notice]).to eq("Tax return BAS added. Add the tax codes and accounts that fill its boxes.")
     get routes.tax_return_form_path(form)
-    expect(css_select("tr[data-box] td:first-child").map { |cell| cell.text.squish }).to eq(%w[G1 G2 G3 G10 G11 1A 1B W1 W2] + [ "Net GST" ])
+    expect(css_select("tr[data-box] td:first-child").map { |cell| cell.text.squish }).to eq(%w[G1 G2 G3 G10 G11 1A 1B W1 W2 W4 W3 W5] + [ "Net GST" ] + %w[4 5A 5B 8A 8B 9])
     expect(css_select("tr[data-box='Net GST'] td")[2].css("div").map(&:text)).to eq([ "The box 1A", "less The box 1B" ])
 
     get routes.edit_tax_return_form_box_path(form, box("1A"))
@@ -139,10 +139,10 @@ RSpec.describe "Tax returns", type: :request do
                                                          details: [ { account_code: "1100", amount: "AUD 110.00" }, { account_code: "4000", amount: "AUD 100.00", tax_code: "GST" } ])
     entry.post(entry.transacted_at)
     get routes.filed_tax_return_path(filed)
-    expect(css_select("[data-changed]").first.text.squish).to start_with("2 boxes no longer agree with the books") # 1A, and the net GST from it
+    expect(css_select("[data-changed]").first.text.squish).to start_with("4 boxes no longer agree with the books") # 1A, and the net GST, 8A and 9 from it
     expect(css_select("tr[data-box='1A'] td").map { |cell| cell.text.squish }).to eq([ "1A", "GST on sales", "100.00", "110.00", "10.00" ])
     get routes.filed_tax_returns_path
-    expect(css_select("tr[data-filed-return] td").map { |cell| cell.text.squish }).to eq([ "BAS", "1 Mar 2026 to 31 Mar 2026", "Accrual", "20 Mar 2026 by Demo user", "2 boxes changed" ])
+    expect(css_select("tr[data-filed-return] td").map { |cell| cell.text.squish }).to eq([ "BAS", "1 Mar 2026 to 31 Mar 2026", "Accrual", "20 Mar 2026 by Demo user", "4 boxes changed" ])
 
     post routes.withdraw_filed_tax_return_path(filed), params: { reason: "" }
     expect(flash[:alert]).to eq("Say why it is withdrawn")
