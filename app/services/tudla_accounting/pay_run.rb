@@ -13,6 +13,10 @@ module TudlaAccounting
   # Amounts are in the account's currency, and so must the bills be; a foreign account's
   # payments are at exchange_rate (the date's when not given). With an idempotency_key,
   # each supplier's payment is keyed "<key>:<supplier id>", so the run is made only once.
+  # A supplier whose default withholding code is withheld on payment (Contact#
+  # payment_withholding_code, such as Australia's no-ABN withholding) has the tax withheld
+  # from what is paid of its bills: the bills are settled by the cash and the tax, and
+  # the cash is what is paid less the tax.
   # PayRun.due lists the bills it could pay: approved, with something still owed, in a
   # currency, due by a date.
   class PayRun
@@ -26,7 +30,7 @@ module TudlaAccounting
       bills = Document.approved.where(organization: organization, kind: "bill", currency: (currency unless currency == organization.currency))
       bills = bills.where(due_on: ..due_by) if due_by
       bills = bills.where(contact: contact) if contact
-      bills.with_open_cents.includes(:contact).to_a.select { |bill| bill.amount_due.positive? }
+      bills.with_open_cents.includes(contact: :default_withholding_code).to_a.select { |bill| bill.amount_due.positive? }
            .sort_by { |bill| [ bill.contact.name.downcase, bill.contact_id, bill.due_on || Date::Infinity.new, bill.id ] }
     end
 
@@ -55,8 +59,10 @@ module TudlaAccounting
     private
 
     def pay(supplier, bills)
+      settled = bills.sum { |bill| bill.fetch(:amount_cents) }
+      withholdings = (code = supplier.payment_withholding_code) ? [ { code: code, base_cents: settled, withheld_cents: code.withheld_cents(settled) } ] : []
       Payment.record!(organization: @organization, kind: "paid", contact: supplier, account: @account, paid_on: @paid_on, reference: @reference,
-                      exchange_rate: @exchange_rate, amount_cents: bills.sum { |bill| bill.fetch(:amount_cents) }, applications: bills,
+                      exchange_rate: @exchange_rate, amount_cents: settled - withholdings.sum { |withholding| withholding[:withheld_cents] }, applications: bills, withholdings: withholdings,
                       idempotency_key: (@idempotency_key && "#{@idempotency_key}:#{supplier.id}"))
     rescue ArgumentError => e
       raise ArgumentError, "#{supplier.name}: #{e.message.downcase_first}"

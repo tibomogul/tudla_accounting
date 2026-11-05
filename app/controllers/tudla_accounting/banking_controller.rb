@@ -59,7 +59,7 @@ module TudlaAccounting
     # The approved invoices and bills with something still owed (the latest
     # OPEN_DOCUMENTS), that a statement line can be recorded as paying.
     def open_documents
-      organization_scope(Document).approved.where(kind: %w[sales_invoice bill]).with_open_cents.includes(:contact).order(issued_on: :desc, id: :desc)
+      organization_scope(Document).approved.where(kind: %w[sales_invoice bill]).with_open_cents.includes(contact: :default_withholding_code).order(issued_on: :desc, id: :desc)
         .limit(OPEN_DOCUMENTS).to_a.select { |document| document.amount_due.positive? }
     end
 

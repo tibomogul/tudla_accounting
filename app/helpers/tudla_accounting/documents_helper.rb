@@ -63,5 +63,24 @@ module TudlaAccounting
     def document_price(line)
       line.unit_price_cents.to_i.positive? ? tc_amount_field(line.unit_price) : ""
     end
+
+    # The code withheld from a payment of an open bill (see Contact#payment_withholding_code).
+    def payment_withholding_code_for(document)
+      document.contact.payment_withholding_code if document.purchases?
+    end
+
+    # The cash that pays off an open document: what is owed, less any tax withheld on payment.
+    def cash_due_cents(document)
+      owed = document.amount_due.cents
+      (code = payment_withholding_code_for(document)) ? owed - code.withheld_cents(owed) : owed
+    end
+
+    # "BILL-0004 Acme ($1,000.00 owed)", with the cash after the tax when some is withheld.
+    def open_document_label(document)
+      owed = "#{tc_money_text(document.amount_due)} owed"
+      code = payment_withholding_code_for(document)
+      owed << ", #{tc_money_text(Money.new(cash_due_cents(document), document.currency))} after #{code.code}" if code
+      "#{document.number_label} #{document.contact.name} (#{owed})"
+    end
   end
 end

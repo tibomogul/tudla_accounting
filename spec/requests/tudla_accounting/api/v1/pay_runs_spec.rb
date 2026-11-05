@@ -45,7 +45,7 @@ RSpec.describe "JSON API: the supplier pay run", type: :request do
   it "lists the bills due from an account, by supplier, due by a date or one supplier's" do
     data = call(:get, routes.api_v1_pay_run_path(account_code: "1000", due_by: "2026-04-30"))["data"]
     expect(data).to include("account_code" => "1000", "currency" => "AUD")
-    expect(data["bills"].map { |bill| bill.values_at("document_id", "due_on", "amount_due") }).to eq([ [ hosting.id, "2026-04-20", "110.00" ], [ paper.id, "2026-04-10", "30.00" ] ])
+    expect(data["bills"].map { |bill| bill.values_at("document_id", "due_on", "amount_due", "withholding_code") }).to eq([ [ hosting.id, "2026-04-20", "110.00", nil ], [ paper.id, "2026-04-10", "30.00", nil ] ])
     expect(data["bills"].first).to include("number" => hosting.number_label, "contact" => { "id" => cloudware.id, "name" => "Cloudware" }, "total" => "110.00")
 
     expect(call(:get, routes.api_v1_pay_run_path(account_code: "1000", contact_id: cloudware.id))["data"]["bills"].map { |bill| bill["document_id"] }).to eq([ hosting.id, licences.id ])

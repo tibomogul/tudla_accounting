@@ -28,7 +28,7 @@ RSpec.describe "Tax withheld when paying a supplier", type: :request do
   def field(name) = css_select("[name='#{name}']").first
 
   def bill
-    TudlaAccounting::Document.create!(organization: organization, kind: "bill", contact: supplier, issued_on: Date.new(2026, 4, 1),
+    TudlaAccounting::Document.create!(organization: organization, kind: "bill", contact: supplier, issued_on: Date.new(2026, 4, 1), due_on: Date.new(2026, 4, 30),
                                       lines_attributes: [ { description: "Repairs", unit_price_cents: 1_000_00, account: account("6000") } ]).approve!
   end
 
@@ -83,5 +83,37 @@ RSpec.describe "Tax withheld when paying a supplier", type: :request do
     get routes.new_payment_path(document_id: bill.id)
     expect(field("payment[withholdings][0][base]")["value"]).to be_nil
     expect(field("payment[amount]")["value"]).to eq("1000.00")
+  end
+
+  it "withholds it in a pay run, from what is paid of the supplier's bills" do
+    owed = bill
+    plain = TudlaAccounting::Contact.create!(organization: organization, name: "Ledger & Co", kind: "supplier")
+    other = TudlaAccounting::Document.create!(organization: organization, kind: "bill", contact: plain, issued_on: Date.new(2026, 4, 1), due_on: Date.new(2026, 4, 30),
+                                              lines_attributes: [ { description: "Books", unit_price_cents: 200_00, account: account("6000") } ]).approve!
+    get routes.new_pay_run_path(account_id: account("1010").id, due_by: "2026-05-31")
+    expect(text("tbody[data-supplier] [data-withholding]")).to eq([ "· NOABN (47%) is withheld from what is paid" ])
+
+    post routes.pay_run_path, params: { pay_run: { account_id: account("1010").id, due_by: "2026-05-31", paid_on: "2026-04-15", reference: "Pay run",
+                                                   pay: { owed.id.to_s => "1", other.id.to_s => "1" }, amounts: { owed.id.to_s => "1000.00", other.id.to_s => "200.00" } } }
+    expect(flash[:notice]).to eq("Paid 2 suppliers $730.00 in all, after withholding $470.00 in tax.")
+    paid = TudlaAccounting::Payment.where(organization: organization).to_h { |payment| [ payment.contact.name, [ payment.amount_cents, payment.withheld_cents ] ] }
+    expect(paid).to eq("Handy Repairs" => [ 530_00, 470_00 ], "Ledger & Co" => [ 200_00, 0 ])
+    expect([ owed, other ].map { |document| document.reload.payment_status }).to eq(%w[paid paid])
+    expect(TudlaAccounting::WithheldTax.where(organization: organization).sole).to have_attributes(contact: supplier, base_cents: 1_000_00, withheld_cents: 470_00)
+  end
+
+  it "withholds it when a bank line is recorded as paying the bill, the line being the cash after the tax" do
+    owed = bill
+    lines = [ -530_00, -300_00 ].each_with_index.map do |cents, index|
+      TudlaAccounting::BankStatementLine.create!(organization: organization, account: account("1010"), occurred_on: Date.new(2026, 4, 12), description: "HANDY REPAIRS",
+                                                 amount_cents: cents, currency: "AUD", external_id: index.to_s)
+    end
+    get routes.banking_account_path(account("1010"))
+    expect(text("select#document_id_#{lines.first.id} option")).to eq([ "BILL-0001 Handy Repairs ($1,000.00 owed, $530.00 after NOABN)" ])
+
+    post routes.record_payment_bank_statement_line_path(lines.last), params: { document_id: owed.id }
+    expect(TudlaAccounting::Payment.last).to have_attributes(amount_cents: 300_00, withheld_cents: 266_04)
+    expect(owed.reload.amount_due.cents).to eq(1_000_00 - 566_04)
+    expect(TudlaAccounting::WithheldTax.where(organization: organization).sole).to have_attributes(base_cents: 566_04, withheld_cents: 266_04)
   end
 end

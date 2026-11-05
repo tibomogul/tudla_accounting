@@ -73,4 +73,14 @@ RSpec.describe TudlaAccounting::WithholdingCode do
     contact.update!(default_withholding_code: nil)
     expect(code.destroy).to be_truthy
   end
+
+  it "splits a cash payment into what it was withheld from and the tax, and is a supplier's payment code only when active and withheld on payment" do
+    noabn = build(code: "NOABN", rate: "0.47", withheld_on: "payment").tap(&:save!)
+    expect([ 530_00, 300_00, 1 ].map { |cash| noabn.split_cash(cash) }).to eq([ [ 1_000_00, 470_00 ], [ 566_04, 266_04 ], [ 2, 1 ] ])
+    supplier = TudlaAccounting::Contact.create!(organization: organization, name: "Handy Repairs", kind: "supplier", default_withholding_code: noabn)
+    expect(supplier.payment_withholding_code).to eq(noabn)
+    noabn.update!(active: false)
+    expect(supplier.reload.payment_withholding_code).to be_nil
+    expect(supplier.tap { |contact| contact.update!(default_withholding_code: build.tap(&:save!)) }.payment_withholding_code).to be_nil
+  end
 end

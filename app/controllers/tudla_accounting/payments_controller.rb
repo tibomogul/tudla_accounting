@@ -120,8 +120,7 @@ module TudlaAccounting
     # Paying a bill of a supplier whose default code is withheld on payment: the tax on what's
     # owed, and the cash less it.
     def start_withholding(bill)
-      code = @payment.contact.default_withholding_code
-      return unless code&.on_payment? && code.active?
+      code = @payment.contact.payment_withholding_code or return
 
       withheld = code.withheld_cents(bill.amount_due.cents)
       @withholding_start = { withholding_code_id: code.id.to_s, base: helpers.tc_amount_field(bill.amount_due), withheld: helpers.tc_amount_field(Money.new(withheld, bill.currency)) }

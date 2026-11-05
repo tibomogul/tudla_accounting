@@ -48,7 +48,8 @@ module TudlaAccounting
 
         def bill_json(bill)
           { document_id: bill.id, number: bill.number_label, reference: bill.reference, contact: { id: bill.contact_id, name: bill.contact.name },
-            issued_on: date(bill.issued_on), due_on: date(bill.due_on), total: amount(bill.total), amount_due: amount(bill.amount_due) }
+            issued_on: date(bill.issued_on), due_on: date(bill.due_on), total: amount(bill.total), amount_due: amount(bill.amount_due),
+            withholding_code: bill.contact.payment_withholding_code&.code }
         end
 
         # The payments an earlier run with this Idempotency-Key made (none without one),

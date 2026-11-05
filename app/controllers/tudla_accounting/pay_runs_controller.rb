@@ -65,7 +65,8 @@ module TudlaAccounting
     def notice(result)
       payments = result.payments
       total = payments.sum(Money.new(0, @currency), &:amount)
-      text = +"Paid #{helpers.pluralize(payments.size, 'supplier')} #{helpers.tc_money_text(total)} in all."
+      withheld = payments.sum(Money.new(0, @currency), &:withheld)
+      text = +"Paid #{helpers.pluralize(payments.size, 'supplier')} #{helpers.tc_money_text(total)} in all#{", after withholding #{helpers.tc_money_text(withheld)} in tax" if withheld.positive?}."
       text << " Emailing payment notices to #{result.emailed.map { |payment| payment.contact.name }.to_sentence}." if result.emailed.any?
       text << " Not emailed, as they have no email address: #{result.no_address.map { |payment| payment.contact.name }.to_sentence}." if result.no_address.any?
       text

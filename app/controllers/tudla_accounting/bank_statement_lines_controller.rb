@@ -42,21 +42,34 @@ module TudlaAccounting
     end
 
     # Records the line as a payment of an open invoice (money in) or bill (money out), as
-    # far as it is owed, the rest a credit for the contact, and matches it.
+    # far as it is owed, the rest a credit for the contact, and matches it. A supplier whose
+    # tax is withheld on payment (Contact#payment_withholding_code) was paid the line's
+    # amount after the tax, so the bill is settled by both.
     def record_payment
       document = organization_scope(Document).approved.find(params.require(:document_id))
       raise ArgumentError, "Choose #{@line.amount_cents.positive? ? 'an invoice' : 'a bill'}" unless document.kind == (@line.amount_cents.positive? ? "sales_invoice" : "bill")
 
       cents = @line.amount_cents.abs
+      withholdings = withheld_from(document, cents)
+      settled = cents + withholdings.sum { |withholding| withholding[:withheld_cents] }
       payment = Payment.record!(organization: accounting_organization, kind: document.sales? ? "received" : "paid", contact: document.contact, account: @line.account,
                                 paid_on: @line.occurred_on, amount_cents: cents, reference: (@line.reference || @line.description).to_s.first(255), bank_line: @line,
-                                applications: [ { document: document, amount_cents: [ cents, document.amount_due.cents ].min } ])
+                                applications: [ { document: document, amount_cents: [ settled, document.amount_due.cents ].min } ], withholdings: withholdings)
       done "Recorded #{payment.title.downcase_first} for #{document.number_label} and matched it."
     rescue ArgumentError, ActionController::ParameterMissing => e
       done alert: "No payment was recorded: #{e.message.downcase_first}."
     end
 
     private
+
+    # The tax withheld from a supplier paid cash_cents for a bill, under its code withheld
+    # on payment: from the amount the cash is that amount less the tax of.
+    def withheld_from(document, cash_cents)
+      code = (document.contact.payment_withholding_code if document.purchases?) or return []
+
+      base, withheld = code.split_cash(cash_cents)
+      [ { code: code, base_cents: base, withheld_cents: withheld } ]
+    end
 
     def set_line
       @line = organization_scope(BankStatementLine).find(params[:id])

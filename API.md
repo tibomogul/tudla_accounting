@@ -156,7 +156,7 @@ end
 
 ### The pay run
 
-`GET /pay_run?account_code=1000`: the approved bills with something owed that a pay run from that bank account could pay, in its currency, by supplier then due date. Filters: `due_by` (a date; all of them without it) and `contact_id` (one supplier's).
+`GET /pay_run?account_code=1000`: the approved bills with something owed that a pay run from that bank account could pay, in its currency, by supplier then due date. Filters: `due_by` (a date; all of them without it) and `contact_id` (one supplier's). A bill's `withholding_code` is the code withheld when its supplier is paid (the supplier's default, when it's active and withheld on payment), or null.
 
 ```json
 { "data": { "account_code": "1000", "currency": "AUD",
@@ -254,7 +254,7 @@ A refund pays a credit back: `kind` `refund` (money back to a customer) or `supp
   "bills": [ { "document_id": 12 }, { "document_id": 13, "amount": "20.00" } ] }
 ```
 
-A bill's `amount` is what is paid of it, all that is owed when not given, in the account's currency (the bills must be in it too); for an account held in another currency than the organization's, `exchange_rate` gives the rate (the day's when not given). With `"email": true` each supplier's payment notice is emailed. It answers `{ "data": { "payments": [ ... ], "emailed_ids": [ 31 ], "no_address_ids": [ 32 ] } }`: the payments as `GET /payments/:id` gives them, and which notices were emailed or not for want of an address. With an `Idempotency-Key`, a retry answers with the payments the first made and the notices emailed (`no_address_ids` empty).
+A bill's `amount` is what is paid of it, all that is owed when not given, in the account's currency (the bills must be in it too); for an account held in another currency than the organization's, `exchange_rate` gives the rate (the day's when not given). A supplier whose default withholding code is withheld on payment (such as `NOABN`) has the tax withheld from what is paid of its bills: the bills are settled by the cash and the tax, and the payment's `amount` is the cash. With `"email": true` each supplier's payment notice is emailed. It answers `{ "data": { "payments": [ ... ], "emailed_ids": [ 31 ], "no_address_ids": [ 32 ] } }`: the payments as `GET /payments/:id` gives them, and which notices were emailed or not for want of an address. With an `Idempotency-Key`, a retry answers with the payments the first made and the notices emailed (`no_address_ids` empty).
 
 ### Recurring invoices
 

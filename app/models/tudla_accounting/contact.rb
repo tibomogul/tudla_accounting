@@ -58,6 +58,13 @@ module TudlaAccounting
     def customer? = kind.in?(%w[customer both])
     def supplier? = kind.in?(%w[supplier both])
 
+    # The code withheld from what is paid to this supplier (its default withholding code,
+    # when that is active and withheld on payment), or nil.
+    def payment_withholding_code
+      code = default_withholding_code
+      code if code&.active? && code.on_payment?
+    end
+
     # The receivable and payable types it is a party to: as a customer, a supplier, or both.
     def party_types
       [ (:receivable if customer?), (:payable if supplier?) ].compact

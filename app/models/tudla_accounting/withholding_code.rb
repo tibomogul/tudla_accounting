@@ -46,6 +46,15 @@ module TudlaAccounting
       (BigDecimal(base_cents) * rate).round(0, TudlaAccounting.configuration.rounding).to_i
     end
 
+    # What a cash payment of cash_cents was withheld from, and the tax withheld, as
+    # [base_cents, withheld_cents]: the base the tax on which leaves cash_cents, or, when
+    # rounding leaves no such base, the nearest, with the tax the difference.
+    def split_cash(cash_cents)
+      guess = (BigDecimal(cash_cents) / (1 - rate)).round.to_i
+      base = [ guess, guess - 1, guess + 1 ].find { |cents| cents - withheld_cents(cents) == cash_cents } || guess
+      [ base, base - cash_cents ]
+    end
+
     def used? = posted? || Contact.where(default_withholding_code_id: id).exists? || DocumentLine.where(withholding_code_id: id).exists?
 
     def withheld_on_label = WITHHELD_ON.fetch(withheld_on)
