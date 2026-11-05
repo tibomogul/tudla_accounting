@@ -72,13 +72,13 @@
   <section class="tc-card overflow-x-auto mt-6" aria-labelledby="withheld-heading" data-withheld-taxes>
     <h2 id="withheld-heading" class="tc-card-body tc-card-title pb-0">Tax withheld</h2>
     <table class="tc-table">
-      <thead><tr><th>Code</th><th class="tc-num">Income</th><th class="tc-num">Tax withheld</th><th>Certificate</th></tr></thead>
+      <thead><tr><th>Code</th><th class="tc-num"><%= money_in ? "Income" : "Withheld from" %></th><th class="tc-num">Tax withheld</th><% if money_in %><th>Certificate</th><% end %></tr></thead>
       <tbody>
         <% @payment.withheld_taxes.reject(&:reversal).sort_by(&:id).each do |row| %>
           <tr><td><%= row.withholding_code.label %></td>
             <td class="tc-num"><%= tc_money(Money.new(row.base_cents, accounting_organization.currency)) %></td>
             <td class="tc-num"><%= tc_money(Money.new(row.withheld_cents, accounting_organization.currency)) %></td>
-            <td><%= render "tudla_accounting/withholding_certificates/mark", row: row %></td></tr>
+            <% if money_in %><td><%= render "tudla_accounting/withholding_certificates/mark", row: row %></td><% end %></tr>
         <% end %>
       </tbody>
     </table>

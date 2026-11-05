@@ -15,7 +15,8 @@
 <% end %>
 
 <% if @payment.contact %>
-  <% withholding = received && payment_withholding_codes.any? %>
+  <% withholding_codes = received ? payment_withholding_codes : supplier_withholding_codes %>
+  <% withholding = withholding_codes.any? %>
   <% cash_follows_tax = withholding && action_name == "new" && @payment.amount_cents.to_i.positive? %>
   <%= form_with url: payments_path, scope: :payment, class: "space-y-4",
                 data: (withholding ? { controller: "withheld-cash", withheld_cash_exponent_value: Money::Currency.new(@currency).exponent, withheld_cash_started_value: cash_follows_tax } : {}) do |form| %>
@@ -28,7 +29,7 @@
       <div><%= form.label :paid_on, "Date", class: "tc-label" %><%= form.date_field :paid_on, value: @payment.paid_on, required: true, class: "tc-input" %></div>
       <div><%= form.label :account_id, received ? "Into" : "From", class: "tc-label" %>
         <%= form.select :account_id, payment_accounts(@currency).map { |account| [ account.code_with_name, account.id ] }, { selected: @payment.account_id, include_blank: "Choose an account" }, class: "tc-input", required: true %></div>
-      <div><%= form.label :amount, "#{withholding ? 'Cash received' : 'Amount'} (#{@currency})", class: "tc-label" %>
+      <div><%= form.label :amount, "#{withholding ? (received ? 'Cash received' : 'Cash paid') : 'Amount'} (#{@currency})", class: "tc-label" %>
         <%= form.text_field :amount, value: (@payment.amount_cents.to_i.positive? ? tc_amount_field(@payment.amount) : params.dig(:payment, :amount)), inputmode: "decimal", required: true, class: "tc-input tc-num",
                             data: (withholding ? { withheld_cash_target: "cash", action: "input->withheld-cash#cashTyped" } : {}) %></div>
       <div><%= form.label :reference, class: "tc-label" %><%= form.text_field :reference, value: @payment.reference, placeholder: "Bank reference", class: "tc-input" %></div>
@@ -36,7 +37,7 @@
     </div>
 
     <% if withholding %>
-      <%= render "withholdings", codes: payment_withholding_codes, contact: @payment.contact, currency: @currency, cash_follows_tax: cash_follows_tax %>
+      <%= render "withholdings", codes: withholding_codes, contact: @payment.contact, currency: @currency, cash_follows_tax: cash_follows_tax, received: received, start: @withholding_start %>
     <% end %>
 
     <div class="tc-card overflow-x-auto">

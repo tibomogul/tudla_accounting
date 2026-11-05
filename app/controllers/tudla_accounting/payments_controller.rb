@@ -46,6 +46,7 @@ module TudlaAccounting
                                                  account_id: default_account_id(@currency))
       @applied = document ? { document.id => document.amount_due.cents } : {}
       @payment.amount_cents = @applied.values.sum if document
+      start_withholding(document) if document&.purchases?
       @open = open_documents(@payment, @currency)
     end
 
@@ -116,12 +117,23 @@ module TudlaAccounting
 
     private
 
+    # Paying a bill of a supplier whose default code is withheld on payment: the tax on what's
+    # owed, and the cash less it.
+    def start_withholding(bill)
+      code = @payment.contact.default_withholding_code
+      return unless code&.on_payment? && code.active?
+
+      withheld = code.withheld_cents(bill.amount_due.cents)
+      @withholding_start = { withholding_code_id: code.id.to_s, base: helpers.tc_amount_field(bill.amount_due), withheld: helpers.tc_amount_field(Money.new(withheld, bill.currency)) }
+      @payment.amount_cents -= withheld
+    end
+
     # The rows of the form's tax withheld that have an amount typed.
     def typed_withholdings(rows, cents)
       (rows&.values || []).filter_map do |row|
-        next if row[:withheld].blank?
+        next if row[:withheld].blank? && row[:base].blank?
 
-        { code: organization_scope(WithholdingCode).find_by(id: row[:withholding_code_id]), withheld_cents: cents.call(row[:withheld], "tax withheld"),
+        { code: organization_scope(WithholdingCode).find_by(id: row[:withholding_code_id]), withheld_cents: (cents.call(row[:withheld], "tax withheld") if row[:withheld].present?),
           base_cents: (cents.call(row[:base], "income") if row[:base].present?) }
       end
     end
