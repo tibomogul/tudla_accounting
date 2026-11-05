@@ -10,7 +10,9 @@ module TudlaAccounting
   # tax_basis setting): a code's net amount, its tax, or the two together, positive for
   # sales on a sales code and purchases on a purchases code. Account parts take the
   # account's movement (its sub-accounts' included) from what was posted in the span, on
-  # its natural side, whatever the basis. Box parts take an earlier box's figure as
+  # its natural side, whatever the basis. Credits parts take only what was credited to
+  # it, less reversals of those credits, so that paying the tax over doesn't reduce the
+  # amount withheld. Box parts take an earlier box's figure as
   # reported, so after its cents were dropped. A box in whole units drops its cents
   # (towards zero).
   class TaxReturnCalculator
@@ -46,6 +48,7 @@ module TudlaAccounting
     def value(part, figures)
       case part.source
       when "account" then movement(part.account)
+      when "account_credits" then credits(part.account)
       when "box" then figures.fetch(part.from_box_id)
       else
         row = @codes[part.tax_code_id]
@@ -60,6 +63,14 @@ module TudlaAccounting
       sums = Detail.joins(:entry).where(account_id: account.subtree_ids, tudla_accounting_entries: { posted_at: @from..@thru }).group(:tally).sum(:amount_cents)
       debits = sums.fetch(Detail::TALLY_DEBIT, 0) - sums.fetch(Detail::TALLY_CREDIT, 0)
       money(account.debit_balance? ? debits : -debits)
+    end
+
+    # Credits to the account and those beneath it in the span. A reversal's debit undoes an
+    # earlier credit, so it comes off; its credit undoes a payment out, so it doesn't count.
+    def credits(account)
+      lines = Detail.joins(:entry).where(account_id: account.subtree_ids, tudla_accounting_entries: { posted_at: @from..@thru })
+      reversals = Entry.where(organization: @organization, related_type: Entry.name).where("particulars LIKE ?", "#{Entry::REVERSAL_PREFIX}%").select(:id)
+      money(lines.where(tally: Detail::TALLY_CREDIT).where.not(entry_id: reversals).sum(:amount_cents) - lines.where(tally: Detail::TALLY_DEBIT, entry_id: reversals).sum(:amount_cents))
     end
 
     def whole(amount)

@@ -11,7 +11,7 @@ RSpec.describe Demo::Seeder do
     expect(Organization.where(name: "Demo Co").count).to eq(1)
 
     entries = TudlaAccounting::Entry.where(organization: organization)
-    expect(entries.where.not(posted_at: nil).count).to eq(66) # 30, the owner's capital, 12 invoices on account with 9 payments, 2 bills, 4 GST-free sales with their payments, 2 equipment bills and 2 payrolls
+    expect(entries.where.not(posted_at: nil).count).to eq(67) # 30, the owner's capital, 12 invoices on account with 9 payments, 2 bills, 4 GST-free sales with their payments, 2 equipment bills, 2 payrolls and a payment to the ATO
     expect(entries.where(posted_at: nil).count).to eq(3)
     expect(entries.maximum(:transacted_at)).to be <= Time.current
     expect(entries.pluck(:particulars)).to include(a_string_starting_with("Invoice "))
@@ -122,6 +122,8 @@ RSpec.describe Demo::Seeder do
     expect(figures.values_at("W5", "4")).to eq([ 1_600_00, 1_600_00 ])
     expect(figures["9"]).to eq(figures["8A"] - figures["8B"])
     expect(figures["8A"]).to eq(figures["1A"] + 1_600_00)
+    now = TudlaAccounting::TaxReturnCalculator.call(filed.form, from: Time.current.beginning_of_quarter, thru: Time.current.end_of_quarter)
+    expect(now[:boxes].find { |row| row.box.label == "W2" }.amount).to eq(Money.new(1_600_00, "USD")) # with the ATO paid this month
   end
 
   it "attaches the landlord's receipt to the latest rent payments" do

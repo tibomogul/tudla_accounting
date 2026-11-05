@@ -282,8 +282,8 @@ class Demo::Seeder
     end
   end
 
-  # A month's payroll on each date, with tax withheld, for the BAS's W1 and W2. No payment
-  # to the ATO, because an account part nets it off the amount withheld.
+  # A month's payroll on each date, with tax withheld, for the BAS's W1 and W2, and last
+  # quarter's tax paid to the ATO this month, which W2 leaves out.
   def add_wages_with_tax_withheld
     tax_activity_dates.each do |date|
       post(date) do |entry|
@@ -292,6 +292,11 @@ class Demo::Seeder
         line(entry, accounts["1011"], :credit, 6_400_00)
         line(entry, accounts["2300"], :credit, 1_600_00)
       end
+    end
+    post(tax_activity_dates.last) do |entry|
+      entry.particulars = "PAYG withholding paid to the ATO"
+      line(entry, accounts["2300"], :debit, 1_600_00)
+      line(entry, accounts["1011"], :credit, 1_600_00)
     end
   end
 
@@ -307,7 +312,7 @@ class Demo::Seeder
     box.call("1A").parts.create!(source: "tax_code_tax", tax_code: @gst)
     [ @gstp, @capital ].each { |code| box.call("1B").parts.create!(source: "tax_code_tax", tax_code: code) }
     box.call("W1").parts.create!(source: "account", account: accounts["6040"])
-    box.call("W2").parts.create!(source: "account", account: accounts["2300"])
+    box.call("W2").parts.create!(source: "account_credits", account: accounts["2300"])
     quarter = today.beginning_of_quarter.prev_day.beginning_of_quarter
     months = [ quarter, quarter.end_of_quarter ].map { |date| TudlaAccounting::Period.leaf_periods_for_date(organization, date.in_time_zone(zone).change(hour: 12)).first }
     TudlaAccounting::FiledTaxReturn.file!(bas.reload, from: months.first.from_date, thru: months.last.thru_date)

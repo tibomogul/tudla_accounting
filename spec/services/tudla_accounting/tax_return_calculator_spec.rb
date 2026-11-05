@@ -58,6 +58,42 @@ RSpec.describe TudlaAccounting::TaxReturnCalculator, type: :service do
     )
   end
 
+  context "with tax withheld paid over and reversed" do
+    let(:form) do
+      TudlaAccounting::TaxReturnForm.create!(organization: organization, name: "Withheld").tap do |form|
+        form.boxes.create!(label: "Credits", name: "Withheld", position: 1, parts_attributes: [ { source: "account_credits", account_id: account("2300").id } ])
+        form.boxes.create!(label: "Movement", name: "Owing", position: 2, parts_attributes: [ { source: "account", account_id: account("2300").id } ])
+      end
+    end
+
+    def reverse(particulars) = TudlaAccounting::Entry.find_by!(organization: organization, particulars: particulars).reverse!(on: Date.new(2026, 3, 20))
+
+    before { book("Paid to the ATO", 3, [ { account_code: "2300", amount: "AUD -150.00" }, { account_code: "1000", amount: "AUD -150.00" } ]) }
+
+    it "leaves a payment out of the credits, though it reduces the movement" do
+      expect(figures(form)).to eq("Credits" => aud(400), "Movement" => aud(250))
+    end
+
+    it "takes a reversed credit off the credits" do
+      book("Mistaken wages", 3, [ { account_code: "6040", amount: "AUD 60.00" }, { account_code: "2300", amount: "AUD 60.00" } ])
+      expect(figures(form)["Credits"]).to eq(aud(460))
+      reverse("Mistaken wages")
+      expect(figures(form)).to eq("Credits" => aud(400), "Movement" => aud(250))
+    end
+
+    it "doesn't count a reversed payment as tax withheld" do
+      reverse("Paid to the ATO")
+      expect(figures(form)).to eq("Credits" => aud(400), "Movement" => aud(400))
+    end
+
+    it "needs an account, and describes the part" do
+      part = form.boxes.first.parts.build(source: "account_credits")
+      expect(part).not_to be_valid
+      expect(part.errors[:account]).to be_present
+      expect(form.boxes.first.parts.first.description).to eq("Credits to the account 2300 - PAYG withholding")
+    end
+  end
+
   it "shows each box's parts, signed, and keeps cents unless the box drops them" do
     form = TudlaAccounting::TaxReturnForm.create!(organization: organization, name: "Test")
     sales = form.boxes.create!(label: "S", name: "Sales tax", position: 1, parts_attributes: [ { source: "tax_code_tax", tax_code_id: gst.id } ])

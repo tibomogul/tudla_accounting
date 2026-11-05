@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_04_110000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_05_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -679,7 +679,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_110000) do
     t.index ["from_box_id"], name: "index_tudla_accounting_tax_return_box_parts_on_from_box"
     t.index ["tax_code_id"], name: "index_tudla_accounting_tax_return_box_parts_on_tax_code"
     t.check_constraint "sign = ANY (ARRAY[1, '-1'::integer])", name: "tudla_accounting_tax_return_box_parts_sign"
-    t.check_constraint "source::text ~~ 'tax_code_%'::text AND tax_code_id IS NOT NULL AND account_id IS NULL AND from_box_id IS NULL OR source::text = 'account'::text AND account_id IS NOT NULL AND tax_code_id IS NULL AND from_box_id IS NULL OR source::text = 'box'::text AND from_box_id IS NOT NULL AND tax_code_id IS NULL AND account_id IS NULL", name: "tudla_accounting_tax_return_box_parts_one_source"
+    t.check_constraint "source::text ~~ 'tax_code_%'::text AND tax_code_id IS NOT NULL AND account_id IS NULL AND from_box_id IS NULL OR (source::text = ANY (ARRAY['account'::character varying, 'account_credits'::character varying]::text[])) AND account_id IS NOT NULL AND tax_code_id IS NULL AND from_box_id IS NULL OR source::text = 'box'::text AND from_box_id IS NOT NULL AND tax_code_id IS NULL AND account_id IS NULL", name: "tudla_accounting_tax_return_box_parts_one_source"
   end
 
   create_table "tudla_accounting_tax_return_boxes", force: :cascade do |t|
