@@ -83,6 +83,7 @@ module TudlaAccounting
 
       if withholding_code.organization != organization then errors.add(:withholding_code, "must belong to the same organization")
       elsif !document.purchases? then errors.add(:withholding_code, "can only be on a bill or supplier credit; record what a customer withholds on their payment")
+      elsif withholding_code.on_payment? then errors.add(:withholding_code, "#{withholding_code.code} is withheld when the supplier is paid; record it on the payment")
       elsif withholding_code.payable_account.nil? then errors.add(:withholding_code, "#{withholding_code.code} has no account for tax withheld from suppliers")
       elsif !withholding_code.active? && will_save_change_to_withholding_code_id? then errors.add(:withholding_code, "#{withholding_code.code} is inactive")
       end

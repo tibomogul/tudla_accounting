@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_05_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_06_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -737,11 +737,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_05_100000) do
     t.bigint "payable_account_id"
     t.decimal "rate", precision: 9, scale: 6, null: false
     t.datetime "updated_at", null: false
+    t.string "withheld_on", default: "approval", null: false
     t.index ["creditable_account_id"], name: "index_tudla_accounting_withholding_codes_on_creditable_account"
     t.index ["organization_type", "organization_id", "code"], name: "tudla_accounting_withholding_codes_unique_key", unique: true
     t.index ["payable_account_id"], name: "index_tudla_accounting_withholding_codes_on_payable_account"
     t.check_constraint "payable_account_id IS NOT NULL OR creditable_account_id IS NOT NULL", name: "tudla_accounting_withholding_codes_account_given"
     t.check_constraint "rate > 0::numeric AND rate < 1::numeric", name: "tudla_accounting_withholding_codes_rate_range"
+    t.check_constraint "withheld_on::text = ANY (ARRAY['approval'::character varying, 'payment'::character varying]::text[])", name: "tudla_accounting_withholding_codes_withheld_on"
   end
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"

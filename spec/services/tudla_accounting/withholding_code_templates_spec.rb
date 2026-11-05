@@ -10,8 +10,9 @@ RSpec.describe TudlaAccounting::WithholdingCodeTemplates do
   def account(code) = TudlaAccounting::Account.find_by!(organization: organization, code: code)
   def codes = TudlaAccounting::WithholdingCode.where(organization: organization)
 
-  it "offers the Philippine list" do
-    expect(described_class.choices).to eq([ [ "Philippines: expanded withholding tax, common payments (BIR Form 1601-EQ, January 2019)", "ph_expanded" ] ])
+  it "offers the Philippine and Australian lists" do
+    expect(described_class.choices).to eq([ [ "Philippines: expanded withholding tax, common payments (BIR Form 1601-EQ, January 2019)", "ph_expanded" ],
+                                            [ "Australia: PAYG withholding where no ABN is quoted", "au_no_abn" ] ])
   end
 
   it "adds the 20 codes with the published rates and the accounts given" do

@@ -7,8 +7,9 @@ module TudlaAccounting
       # Recording one (create) and voiding it need :post. An Idempotency-Key makes a
       # retried create return the payment the first recorded. A refund (kind refund or
       # supplier_refund) names the credit it pays back: refund_of { payment_id } or
-      # { document_id } (a credit note). A customer's payment can list the tax they withheld:
-      # withholdings [{ code, withheld, base }], base worked out from the rate when not given.
+      # { document_id } (a credit note). A customer's payment can list the tax they withheld,
+      # and a payment to a supplier the tax withheld under a code withheld on payment:
+      # withholdings [{ code, withheld, base }], either worked out from the other at the rate.
       class PaymentsController < BaseController
         include Representation
 
@@ -60,9 +61,9 @@ module TudlaAccounting
         def withholdings(currency)
           Array.wrap(body[:withholdings]).each_with_index.map do |withholding, index|
             label = "Withholding #{index + 1}"
-            raise ArgumentError, "#{label} must be an object with code and withheld" unless withholding.is_a?(Hash)
+            raise ArgumentError, "#{label} must be an object with code, and withheld or base" unless withholding.is_a?(Hash)
 
-            { code: withholding_code_by_code(withholding[:code], label), withheld_cents: cents(withholding[:withheld], "#{label}'s withheld", currency: currency),
+            { code: withholding_code_by_code(withholding[:code], label), withheld_cents: withholding[:withheld].presence && cents(withholding[:withheld], "#{label}'s withheld", currency: currency),
               base_cents: withholding[:base].presence && cents(withholding[:base], "#{label}'s base", currency: currency) }
           end
         end

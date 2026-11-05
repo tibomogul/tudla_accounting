@@ -35,6 +35,12 @@ module TudlaAccounting
             end
           end
         end
+      },
+      # Withheld from a payment to a supplier who hasn't quoted an ABN, at the top marginal
+      # rate (47% since 1 July 2017, as the ATO's pages give it).
+      "au_no_abn" => {
+        title: "Australia: PAYG withholding where no ABN is quoted",
+        codes: [ { code: "NOABN", name: "No ABN quoted", rate: BigDecimal("0.47"), withheld_on: "payment" } ]
       }
     }.freeze
 
@@ -46,13 +52,16 @@ module TudlaAccounting
     end
 
     # Adds the template's codes the organization doesn't have yet, all or none, each with
-    # the accounts given (one or both); the number added. ArgumentError when they won't do.
+    # the accounts given (one or both; a code withheld on payment takes only the payable
+    # one); the number added. ArgumentError when they won't do.
     def add!(organization, key, payable_account: nil, creditable_account: nil)
       template = TEMPLATES.fetch(key.to_s) { raise ArgumentError, "Unknown withholding code template #{key.inspect}; expected one of #{TEMPLATES.keys.join(', ')}" }
       existing = WithholdingCode.where(organization: organization).pluck(:code).to_set
       missing = template[:codes].reject { |code| existing.include?(code[:code]) }
       WithholdingCode.transaction do
-        missing.each { |code| WithholdingCode.create!(organization: organization, payable_account: payable_account, creditable_account: creditable_account, **code) }
+        missing.each do |code|
+          WithholdingCode.create!(organization: organization, payable_account: payable_account, creditable_account: (creditable_account unless code[:withheld_on] == "payment"), **code)
+        end
       end
       missing.size
     rescue ActiveRecord::RecordInvalid => e

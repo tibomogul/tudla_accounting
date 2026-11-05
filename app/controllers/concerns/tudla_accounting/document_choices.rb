@@ -38,7 +38,7 @@ module TudlaAccounting
       return WithholdingCode.none if record.sales?
 
       used = record.lines.filter_map(&:withholding_code_id)
-      codes = organization_scope(WithholdingCode).where.not(payable_account_id: nil)
+      codes = organization_scope(WithholdingCode).on_approval.where.not(payable_account_id: nil)
       codes.active.or(codes.where(id: used)).order(:code)
     end
   end

@@ -272,10 +272,25 @@ RSpec.describe "JSON API: recording in the books", type: :request do
       code
       attempt = ->(withholdings) { call(:post, routes.api_v1_payments_path, { kind: "received", contact_id: northwind.id, account_code: "1000", paid_on: "2026-03-20", amount: "980.00", withholdings: withholdings }) }
       attempt.call([ "WC160" ])
-      expect(response.parsed_body["error"]["message"]).to eq("Withholding 1 must be an object with code and withheld")
+      expect(response.parsed_body["error"]["message"]).to eq("Withholding 1 must be an object with code, and withheld or base")
       attempt.call([ { code: "NOPE", withheld: "1.00" } ])
       expect(response.parsed_body["error"]["message"]).to eq("Withholding 1: there is no withholding code NOPE")
       expect(attempt.call([ { code: "WC160", withheld: "20.00", base: "900.00" } ])["data"]["withheld_taxes"].sole["base"]).to eq("900.00")
+    end
+  end
+
+  describe "tax withheld when a supplier is paid" do
+    before { TudlaAccounting::AccountsCreator.call([ { code: "2350", name: "No-ABN withholding", category: "liability" } ], organization) }
+
+    let!(:code) { TudlaAccounting::WithholdingCode.create!(organization: organization, code: "NOABN", name: "No ABN quoted", rate: "0.47", payable_account: account("2350"), withheld_on: "payment") }
+
+    it "works the tax out from the base, and lists the code's timing" do
+      supplier = TudlaAccounting::Contact.create!(organization: organization, name: "Handy Repairs", kind: "supplier")
+      data = call(:post, routes.api_v1_payments_path, { kind: "paid", contact_id: supplier.id, account_code: "1000", paid_on: "2026-04-02", amount: "530.00",
+                                                        withholdings: [ { code: "NOABN", base: "1000.00" } ] })["data"]
+      expect(data).to include("amount" => "530.00", "withheld" => "470.00", "unapplied" => "1000.00")
+      expect(data["withheld_taxes"].sole).to include("code" => "NOABN", "base" => "1000.00", "withheld" => "470.00")
+      expect(call(:get, routes.api_v1_withholding_codes_path)["data"].sole).to include("code" => "NOABN", "withheld_on" => "payment")
     end
   end
 

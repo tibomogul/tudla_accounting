@@ -125,7 +125,8 @@ module TudlaAccounting
       end
 
       def withholding_code_json(code)
-        { id: code.id, code: code.code, name: code.name, rate: code.rate.to_s("F"), payable_account_code: code.payable_account&.code, creditable_account_code: code.creditable_account&.code, active: code.active? }
+        { id: code.id, code: code.code, name: code.name, rate: code.rate.to_s("F"), payable_account_code: code.payable_account&.code, creditable_account_code: code.creditable_account&.code,
+          withheld_on: code.withheld_on, active: code.active? }
       end
 
       def period_json(period)

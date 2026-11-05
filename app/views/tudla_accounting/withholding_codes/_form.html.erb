@@ -17,6 +17,10 @@
                  choices: [ [ "None", "" ] ] + postable_account_choices(creditable_accounts, selected: form.object.creditable_account_id),
                  hint: "The asset it is claimed from" %>
   </div>
+  <div class="max-w-sm">
+    <%= tc_field form, :withheld_on, as: :select, label: "When it is withheld from suppliers", choices: TudlaAccounting::WithholdingCode::WITHHELD_ON.invert.to_a,
+                 hint: "On approval, it goes on bill lines; on payment, on the payment (no-ABN withholding), for suppliers only" %>
+  </div>
   <label class="flex items-center gap-2 text-sm"><%= form.check_box :active %> Active (offered for new bills and payments)</label>
   <div class="flex flex-wrap gap-2">
     <%= form.submit "Save withholding code", class: "tc-btn" %>

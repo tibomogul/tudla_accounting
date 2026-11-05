@@ -22,12 +22,22 @@ module TudlaAccounting
   #   Payment.record!(organization:, kind: "refund", contact: northwind, account: bank,
   #                   paid_on: Date.current, amount_cents: 50_00, refund_of: credit_note)
   #
-  # A customer may withhold tax from what they pay (kind received only): withholdings lists
+  # A customer may withhold tax from what they pay (kind received): withholdings lists
   # each amount, with its code, what the certificate says was withheld and the income it
   # was withheld from (worked out from the rate when not given), in the payment's currency.
   # amount_cents stays the cash received. The tax posts to the code's creditable account,
   # and the receivable is credited with both, which is what can be applied. Each amount
   # keeps a WithheldTax row, for marking its certificate received and for the reports.
+  #
+  # A payment to a supplier (kind paid) withholds the same way under a code withheld on
+  # payment, such as Australia's no-ABN withholding: the tax is worked out from the amount
+  # it is withheld from when not given, posts to the code's payable account, and the
+  # payable is debited with the cash and the tax.
+  #
+  #   Payment.record!(organization:, kind: "paid", contact: handyman, account: bank,
+  #                   paid_on: Date.current, amount_cents: 530_00,
+  #                   withholdings: [ { code: noabn, base_cents: 1_000_00 } ],
+  #                   applications: [ { document: bill, amount_cents: 1_000_00 } ])
   #
   #   Payment.record!(organization:, kind: "received", contact: northwind, account: bank,
   #                   paid_on: Date.current, amount_cents: 11_000_00,
@@ -85,7 +95,8 @@ module TudlaAccounting
     # Records a payment and posts it, applying it to documents ([{ document:, amount_cents: }],
     # each an approved invoice or bill of the contact's), and with bank_line (a statement
     # line on the account) matches it to that line; a refund names the credit it pays back
-    # (refund_of); a customer's payment can list the tax they withheld (withholdings). All
+    # (refund_of); a customer's payment, or ours to a supplier, can list the tax withheld
+    # from it (withholdings). All
     # or nothing; ArgumentError when it can't be recorded.
     def self.record!(applications: [], bank_line: nil, refund_of: nil, withholdings: [], **attributes)
       payment = new(attributes)
@@ -114,12 +125,14 @@ module TudlaAccounting
     attr_writer :refund_of
     attr_reader :withholdings
 
-    # [{ code:, withheld_cents:, base_cents: }], the base worked out from the rate when not
-    # given.
+    # [{ code:, withheld_cents:, base_cents: }], either worked out from the other at the
+    # code's rate when not given.
     def withholdings=(given)
       @withholdings = given.map do |withholding|
-        code, withheld = withholding.values_at(:code, :withheld_cents)
+        code = withholding[:code]
+        withheld = withholding[:withheld_cents].presence
         base = withholding[:base_cents].presence
+        withheld ||= code.withheld_cents(base) if code && base
         base ||= (BigDecimal(withheld) / code.rate).round.to_i if code && withheld
         { code: code, withheld_cents: withheld, base_cents: base }
       end
@@ -269,7 +282,8 @@ module TudlaAccounting
     # The bank account against the receivable (a customer's payment or refund) or payable
     # (a supplier's) account, or its sub-account in a foreign payment's currency, both lines
     # then with the foreign amount; a refund's related to the credit it pays back. Tax
-    # withheld is a line of its own, and the receivable is credited with it too.
+    # withheld is a line of its own (a customer's debited to the creditable account, ours
+    # credited to the payable one), and the receivable or payable takes it too.
     def build_entry(documents)
       control = Account.for_role_in_currency!(organization, sales? ? :receivable : :payable, self[:currency])
       at = ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].local(paid_on.year, paid_on.month, paid_on.day)
@@ -285,14 +299,15 @@ module TudlaAccounting
         line.build_foreign_exchange(other_currency: currency, other_currency_cents: on_control ? settled_cents : amount_cents, rate: exchange_rate) if foreign?
       end
       withheld_lines.each do |code, withheld|
-        posting.details.build(account: code.creditable_account, tally: Detail::TALLY_DEBIT, amount_cents: withheld, currency: organization.currency, description: code.label)
+        account, tally = received? ? [ code.creditable_account, Detail::TALLY_DEBIT ] : [ code.payable_account, Detail::TALLY_CREDIT ]
+        posting.details.build(account: account, tally: tally, amount_cents: withheld, currency: organization.currency, description: code.label)
       end
       posting
     end
 
     def record_withheld_taxes(posting)
       Array(withholdings).each do |withholding|
-        WithheldTax.create!(organization: organization, contact: contact, withholding_code: withholding[:code], entry: posting, payment: self, direction: "by_customer", on: paid_on,
+        WithheldTax.create!(organization: organization, contact: contact, withholding_code: withholding[:code], entry: posting, payment: self, direction: (received? ? "by_customer" : "from_supplier"), on: paid_on,
                             base_cents: in_base_cents(withholding[:base_cents]), withheld_cents: in_base_cents(withholding[:withheld_cents]))
       end
     end
@@ -320,14 +335,19 @@ module TudlaAccounting
     def withholdings_fit
       return if withholdings.blank?
 
-      errors.add(:base, "Only a payment received from a customer can have tax withheld") unless received?
+      return errors.add(:base, "Only a payment received from a customer or made to a supplier can have tax withheld") unless kind.in?(%w[received paid])
+
       withholdings.each do |withholding|
         code, withheld, base = withholding.values_at(:code, :withheld_cents, :base_cents)
         next errors.add(:base, "Choose a withholding code for the tax withheld") unless code
 
         errors.add(:base, "#{code.code} isn't a withholding code of this organization's") if code.organization != organization
         errors.add(:base, "#{code.code} is inactive") unless code.active?
-        errors.add(:base, "#{code.code} has no account for tax withheld from you") unless code.creditable_account
+        if received?
+          errors.add(:base, "#{code.code} has no account for tax withheld from you") unless code.creditable_account
+        elsif !code.on_payment?
+          errors.add(:base, "#{code.code} is withheld when the bill is approved, not on the payment")
+        end
         errors.add(:base, "The tax withheld under #{code.code} must be more than zero") unless withheld.to_i.positive?
         errors.add(:base, "Give the income #{code.code} was withheld from") unless base.to_i.positive?
         errors.add(:base, "The tax withheld under #{code.code} is more than the income it was withheld from") if base.to_i.positive? && withheld.to_i > base.to_i

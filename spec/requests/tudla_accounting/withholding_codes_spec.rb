@@ -37,14 +37,14 @@ RSpec.describe "Withholding codes", type: :request do
     expect(response).to redirect_to(routes.withholding_codes_path)
     expect(flash[:notice]).to eq("Withholding code WC010 (10%) was added.")
     get routes.withholding_codes_path
-    expect(rows).to eq([ [ "WC010", "Professionals", "10%", "2300 - Withholding payable", "None", "" ] ])
+    expect(rows).to eq([ [ "WC010", "Professionals", "10%", "2300 - Withholding payable", "None", "Bill approved", "" ] ])
 
     get routes.edit_withholding_code_path(code)
     expect(css_select("form[data-controller=confirm]").size).to eq(1)
     patch routes.withholding_code_path(code), params: { withholding_code: { rate_percent: "15", creditable_account_id: account("1200").id, active: "0" } }
     expect(flash[:notice]).to eq("Withholding code WC010 (15%) was saved.")
     get routes.withholding_codes_path
-    expect(rows).to eq([ [ "WC010", "Professionals", "15%", "2300 - Withholding payable", "1200 - Creditable tax", "Inactive" ] ])
+    expect(rows).to eq([ [ "WC010", "Professionals", "15%", "2300 - Withholding payable", "1200 - Creditable tax", "Bill approved", "Inactive" ] ])
 
     get routes.activity_path(kind: "withholding_code")
     expect(css_select("tbody td:last-child").map { |cell| cell.text.squish }).to eq([ "Changed WC010 (15%): rate, active, creditable account", "Added the withholding code WC010 (10%)" ])
@@ -54,6 +54,19 @@ RSpec.describe "Withholding codes", type: :request do
     expect(flash[:notice]).to eq("Withholding code WC010 was deleted.")
     get routes.activity_path(kind: "withholding_code")
     expect(css_select("tbody td:last-child").first.text.squish).to eq("Deleted the withholding code WC010 (15%)")
+  end
+
+  it "adds a code withheld when the supplier is paid, which bills leave to the payment" do
+    get routes.new_withholding_code_path
+    expect(css_select("#withholding_code_withheld_on option").map(&:text)).to eq([ "When the bill is approved", "When the supplier is paid" ])
+    post routes.withholding_codes_path, params: { withholding_code: { code: "NOABN", name: "No ABN quoted", rate_percent: "47", payable_account_id: account("2300").id, withheld_on: "payment", active: "1" } }
+    expect(code("NOABN")).to have_attributes(withheld_on: "payment", rate: BigDecimal("0.47"))
+    get routes.withholding_codes_path
+    expect(rows.sole).to eq([ "NOABN", "No ABN quoted", "47%", "2300 - Withholding payable", "None", "Supplier paid", "" ])
+
+    supplier = TudlaAccounting::Contact.create!(organization: organization, name: "Handy Repairs", kind: "supplier", default_withholding_code: code("NOABN"))
+    get routes.new_document_path(kind: "bill", contact_id: supplier.id)
+    expect(css_select("select[name$='[withholding_code_id]']")).to be_empty
   end
 
   it "shows what is wrong with a code, and keeps one in use" do

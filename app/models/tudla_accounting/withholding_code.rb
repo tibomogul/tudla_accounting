@@ -6,8 +6,15 @@ module TudlaAccounting
   # account (a liability) for tax withheld from suppliers, owed to the tax authority, and
   # the creditable account (an asset) for tax customers withhold, claimed against income
   # tax. WithholdingCodeTemplates has a starter list.
+  #
+  # withheld_on says when tax is withheld from a supplier: on approval of their bill (a
+  # bill line's code, as in the Philippines), or on payment (a supplier payment's
+  # withholdings, as for Australia's no-ABN withholding). A code withheld on payment is for
+  # suppliers only.
   class WithholdingCode < ApplicationRecord
     include PercentRate
+
+    WITHHELD_ON = { "approval" => "When the bill is approved", "payment" => "When the supplier is paid" }.freeze
 
     belongs_to :organization, polymorphic: true
     belongs_to :payable_account, class_name: "TudlaAccounting::Account", optional: true
@@ -19,6 +26,7 @@ module TudlaAccounting
     validates :code, :name, presence: true
     validates :code, uniqueness: { scope: %i[organization_type organization_id] }
     validates :rate, numericality: { greater_than: 0, less_than: 1 }
+    validates :withheld_on, inclusion: { in: WITHHELD_ON.keys }
     validate :accounts_fit
     validate :unchanged_once_posted, on: :update
     before_destroy :ensure_unused, prepend: true
@@ -28,6 +36,10 @@ module TudlaAccounting
     after_destroy { audit("withholding_code.deleted") }
 
     scope :active, -> { where(active: true) }
+    scope :on_approval, -> { where(withheld_on: "approval") }
+    scope :on_payment, -> { where(withheld_on: "payment") }
+
+    def on_payment? = withheld_on == "payment"
 
     # The tax on base_cents at this code's rate, rounded to the cent the configured way.
     def withheld_cents(base_cents)
@@ -35,6 +47,8 @@ module TudlaAccounting
     end
 
     def used? = posted? || Contact.where(default_withholding_code_id: id).exists? || DocumentLine.where(withholding_code_id: id).exists?
+
+    def withheld_on_label = WITHHELD_ON.fetch(withheld_on)
     def posted? = WithheldTax.where(withholding_code_id: id).exists?
 
     private
@@ -53,12 +67,17 @@ module TudlaAccounting
     # Reports read the rate and the accounts from the code, so what has been posted under
     # it fixes them.
     def unchanged_once_posted
-      fields = %w[code rate payable_account_id creditable_account_id].select { |field| will_save_change_to_attribute?(field) }
+      fields = %w[code rate payable_account_id creditable_account_id withheld_on].select { |field| will_save_change_to_attribute?(field) }
       errors.add(:base, "Tax has been posted under #{code_was}, so its #{fields.map { |field| field.delete_suffix('_id').humanize(capitalize: false) }.to_sentence} can't change; add a new code instead") if fields.any? && posted?
     end
 
     def accounts_fit
-      errors.add(:base, "Choose an account for tax withheld from suppliers, for tax customers withhold, or both") unless payable_account || creditable_account
+      if on_payment?
+        errors.add(:payable_account, "is needed: tax withheld when a supplier is paid is owed in it") unless payable_account
+        errors.add(:creditable_account, "must be none: tax withheld when a supplier is paid is for suppliers only") if creditable_account
+      else
+        errors.add(:base, "Choose an account for tax withheld from suppliers, for tax customers withhold, or both") unless payable_account || creditable_account
+      end
       account_fits(:payable_account, Account::CATEGORY_LIABILITY, "a liability")
       account_fits(:creditable_account, Account::CATEGORY_ASSET, "an asset")
     end

@@ -9,7 +9,7 @@
 <% else %>
   <div class="tc-card overflow-x-auto">
     <table class="tc-table">
-      <thead><tr><th>Code</th><th>Name</th><th class="tc-num">Rate</th><th>Withheld from suppliers</th><th>Withheld by customers</th><th></th></tr></thead>
+      <thead><tr><th>Code</th><th>Name</th><th class="tc-num">Rate</th><th>Withheld from suppliers</th><th>Withheld by customers</th><th>Withheld when</th><th></th></tr></thead>
       <tbody>
         <% @withholding_codes.each do |code| %>
           <tr>
@@ -18,6 +18,7 @@
             <td class="tc-num"><%= code.rate_percent %>%</td>
             <td><%= code.payable_account&.code_with_name || tag.span("None", class: "tc-muted") %></td>
             <td><%= code.creditable_account&.code_with_name || tag.span("None", class: "tc-muted") %></td>
+            <td><%= code.on_payment? ? "Supplier paid" : "Bill approved" %></td>
             <td class="text-right"><% unless code.active? %><%= tc_badge "Inactive" %><% end %></td>
           </tr>
         <% end %>

@@ -196,7 +196,7 @@ RSpec.describe "JSON API: reading the books", type: :request do
 
     expect(api_get(routes.api_v1_tax_codes_path)["data"]).to eq([ { "id" => gst.id, "code" => "GST", "name" => "GST", "kind" => "sales", "treatment" => "standard", "purchase_type" => nil, "rate" => "0.1", "account_code" => "2200", "active" => true } ])
     withholding = TudlaAccounting::WithholdingCode.create!(organization: organization, code: "WC010", name: "Professionals", rate: "0.1", payable_account: TudlaAccounting::Account.find_by!(organization: organization, code: "2200"))
-    expect(api_get(routes.api_v1_withholding_codes_path)["data"]).to eq([ { "id" => withholding.id, "code" => "WC010", "name" => "Professionals", "rate" => "0.1", "payable_account_code" => "2200", "creditable_account_code" => nil, "active" => true } ])
+    expect(api_get(routes.api_v1_withholding_codes_path)["data"]).to eq([ { "id" => withholding.id, "code" => "WC010", "name" => "Professionals", "rate" => "0.1", "payable_account_code" => "2200", "creditable_account_code" => nil, "withheld_on" => "approval", "active" => true } ])
     periods = api_get(routes.api_v1_periods_path, per_page: 200)["data"]
     expect(periods.size).to eq(13)
     expect(periods.find { |period| period["kind"] == "year" }).to include("from_date" => "2026-01-01", "thru_date" => "2026-12-31", "closed" => false)

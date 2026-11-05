@@ -148,7 +148,7 @@ RSpec.describe TudlaAccounting::Payment, "tax a customer withheld" do
     expect(message.call(withholdings: [ { code: code, withheld_cents: 1_00, base_cents: 0 } ])).to include("Give the income WC160 was withheld from")
     expect(message.call(withholdings: [ { code: code, withheld_cents: 10_00, base_cents: 1_00 } ])).to include("is more than the income")
     expect { described_class.record!(organization: organization, kind: "paid", contact: customer, account: account("1010"), paid_on: Date.new(2026, 3, 20), amount_cents: 1_00, withholdings: [ { code: code, withheld_cents: 1 } ]) }
-      .to raise_error(ArgumentError, /Only a payment received from a customer can have tax withheld/)
+      .to raise_error(ArgumentError, /WC160 is withheld when the bill is approved, not on the payment/)
     expect(rows).to be_empty
     expect(described_class.where(organization: organization)).to be_empty
   end

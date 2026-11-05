@@ -50,7 +50,7 @@ module TudlaAccounting
         @document.due_on = @document.contact&.due_on(today)
         @document.currency = @document.contact&.[](:currency)
         @document.lines.build(quantity: 1, account: @document.contact&.default_account, tax_code: @document.contact&.default_tax_code,
-                              withholding_code: (@document.contact&.default_withholding_code if @document.purchases?))
+                              withholding_code: (@document.contact&.default_withholding_code if @document.purchases? && !@document.contact&.default_withholding_code&.on_payment?))
       end
     end
 
