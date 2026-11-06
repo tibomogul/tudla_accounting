@@ -6,6 +6,7 @@ module TudlaAccounting
     def index
       @withholding = organization_scope(WithholdingCode).exists?
       @withheld_on_payment = organization_scope(WithholdingCode).on_payment.exists?
+      @taxable_payments = organization_scope(Contact).where(taxable_payments: true).exists?
     end
 
     def balance_sheet
@@ -88,6 +89,16 @@ module TudlaAccounting
 
       respond_with_table("payee-payments-#{span_name}") { Reports::Tables.payee_payments(@report) }
     end
+
+    # What was paid to the contacts marked taxable_payments, by payee, over a run of months
+    # (the last financial year by default), for a taxable payments report such as the TPAR.
+    def taxable_payments
+      return respond_with_table("taxable-payments") unless month_range(last_year: true)
+
+      @report = Reports::TaxablePayments.new(accounting_organization, from: @from, thru: @thru)
+      respond_with_table("taxable-payments-#{span_name}") { Reports::Tables.taxable_payments(@report) }
+    end
+
     def sawt = withholding_list(:sawt)
 
     # What was sold to each customer or bought from each supplier, month by month, over a

@@ -56,6 +56,15 @@ RSpec.describe TudlaAccounting::ContactImporter do
     expect { described_class.call(organization, file([ [ "Name", "Default withholding code" ], [ "Initech", "NOPE" ] ]), ".csv") }.to raise_error(ArgumentError, /no withholding code has the code NOPE/)
   end
 
+  it "marks contacts for taxable payments by yes or no, leaving them as they are when blank" do
+    described_class.call(organization, file([ [ "Name", "Taxable payments" ], [ "Builder", "Yes" ], [ "Cleaner", "y" ], [ "Shop", "" ] ]), ".csv")
+    expect(contacts.map { |contact| [ contact.name, contact.taxable_payments ] }).to eq([ [ "Builder", true ], [ "Cleaner", true ], [ "Shop", false ] ])
+    described_class.call(organization, file([ [ "Name", "Taxable payments" ], [ "Builder", "no" ], [ "Cleaner", "" ] ]), ".csv")
+    expect(contacts.map(&:taxable_payments)).to eq([ false, true, false ])
+    expect { described_class.call(organization, file([ [ "Name", "Taxable payments" ], [ "Shop", "maybe" ] ]), ".csv") }
+      .to raise_error(ArgumentError, "Row 2: taxable payments must be yes or no, not maybe")
+  end
+
   it "imports nothing when a row is wrong, saying which" do
     expect { described_class.call(organization, file([ [ "Email" ] ]), ".csv") }.to raise_error(ArgumentError, "The file has no Name column")
     expect do

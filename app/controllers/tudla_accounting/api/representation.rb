@@ -44,7 +44,7 @@ module TudlaAccounting
 
       def contact_json(contact)
         contact.slice(:id, :name, :kind, :email, :phone, :address, :postal_code, :tax_number, :payment_terms_days, :currency, :notes)
-          .merge(default_account_code: contact.default_account&.code, default_tax_code: contact.default_tax_code&.code, default_withholding_code: contact.default_withholding_code&.code, active: contact.active?,
+          .merge(default_account_code: contact.default_account&.code, default_tax_code: contact.default_tax_code&.code, default_withholding_code: contact.default_withholding_code&.code, active: contact.active?, taxable_payments: contact.taxable_payments?,
                  created_at: time(contact.created_at), updated_at: time(contact.updated_at))
       end
 

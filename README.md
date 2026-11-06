@@ -334,6 +334,16 @@ We worked from search summaries of the ATO's pages, because the ATO's site refus
 - **5A and 5B.** These come from the ATO's notice, not your ledger, so map an account if you post them, or adjust the figures when you lodge.
 - **Simpler BAS.** One source says businesses under $10 million in turnover can report only G1, 1A and 1B. We haven't confirmed that on the ATO's site.
 
+#### Australian taxable payments annual report (TPAR): what to confirm
+
+Tick **Report what we pay them as taxable payments** on each contractor's contact (`Contact#taxable_payments`; the contacts import takes a Taxable payments column, yes or no). The Taxable payments, by payee report (`Reports::TaxablePayments`, under Reports once a contact is marked) lists what was paid to each in a run of months, the last financial year by default, on screen, in CSV and Excel, and in the API (`taxable_payments`). The gross paid includes GST and any no-ABN tax withheld. The GST is each bill's, in proportion to what the payment paid of it, so a payment applied to no bill has none and its payee is flagged, as is one with no ABN or no address. A voided payment counts in the month it was voided. We worked from search summaries, not the ATO's own pages, so check these with an accountant or registered tax agent:
+
+- **Who has to lodge.** We read that it's businesses in building and construction, cleaning, couriers, road freight, IT, and security, investigation or surveillance, paying contractors for those services. The engine doesn't decide: you mark the contacts.
+- **Goods and services.** We read that payments only for materials aren't reported, and a mixed payment is reported in full unless the labour is incidental. A marked contact's payments all count; leave a goods-only supplier unmarked, and adjust a mixed one by hand.
+- **The fields and the file.** The report has the payee's ABN, name, address and phone, the gross paid, the GST and the tax withheld. We haven't seen the ATO's current specification, so the columns may not be all it asks for, and the engine makes no file to lodge.
+- **The deadline.** We found 28 August in secondary sources only.
+- **Refunds from contractors** aren't taken off.
+
 #### Australian no-ABN withholding: what to confirm
 
 The Payments with tax withheld, by payee report (`Reports::PayeePayments`, under Reports once a code is withheld on payment) lists each supplier's gross payments and the tax withheld when they were paid, for the last financial year by default, on screen and in CSV and Excel. It's the list for the year-end report to the ATO, and it flags a payee with no address. Each payee's payment summary is a PDF from the list, one payee's or all of them, a page each: the payer (the document header, and the ABN from `tax_registration`), the payee's name and address, the months, the gross payment and tax by code, each payment and void, and a blank line to sign. It's your own statement from your records, not a copy of an ATO form, since we haven't seen the ATO's current payment summary. The gross payment is what the supplier was paid before the tax. As with the BAS, we worked from search summaries, not the ATO's own pages. Check these with an accountant or registered tax agent:

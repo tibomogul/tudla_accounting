@@ -1,0 +1,40 @@
+<%= tc_page_header "Taxable payments, by payee", subtitle: (@report ? "#{tc_date(@from.from_date)} to #{tc_date(@thru.thru_date)}" : nil) do %>
+  <% if @report %>
+    <%= render "withholding_form", url: reports_taxable_payments_path %>
+    <%= render "download" %>
+  <% end %>
+<% end %>
+
+<% if @report.nil? %>
+  <%= render "no_periods" %>
+<% elsif !@report.any_payees_marked? %>
+  <div class="tc-card tc-card-body text-center">
+    <p class="tc-muted">No contacts are marked for taxable payments yet. Tick "Report what we pay them as taxable payments" on each contractor's contact.</p>
+  </div>
+<% else %>
+  <p class="tc-hint mb-4">What was paid to the contacts marked for taxable payments, for Australia's taxable payments annual report (TPAR). The gross paid includes GST and any tax withheld. The GST is each bill's, in proportion to what was paid of it. A voided payment counts in the month it was voided.</p>
+  <% payees = @report.payees %>
+  <% { "No ABN for" => payees.select(&:missing_tax_number?), "No address for" => payees.select(&:missing_address?) }.each do |lead, missing| %>
+    <% if missing.any? %><div class="tc-alert tc-alert-warning mb-4" role="alert" data-missing><%= lead %> <%= missing.map { |payee| payee.contact.name }.to_sentence %>. Add it on the contact before reporting.</div><% end %>
+  <% end %>
+  <% unapplied = payees.reject { |payee| payee.unapplied.zero? } %>
+  <% if unapplied.any? %>
+    <div class="tc-alert tc-alert-warning mb-4" role="alert" data-unapplied>Some of what was paid to <%= unapplied.map { |payee| payee.contact.name }.to_sentence %> wasn't applied to a bill, so it has no GST here. Apply it to the bills it paid, or check the GST by hand.</div>
+  <% end %>
+  <section class="tc-card overflow-x-auto mb-4" aria-label="Payees">
+    <table class="tc-table">
+      <thead><tr><th>ABN</th><th>Payee</th><th>Address</th><th class="tc-num">Payments</th><th class="tc-num">Gross paid</th><th class="tc-num">GST</th><th class="tc-num">Tax withheld</th></tr></thead>
+      <tbody>
+        <% if payees.empty? %><tr><td colspan="7" class="tc-muted text-center">Nothing paid to them in these months.</td></tr><% end %>
+        <% payees.each do |payee| %>
+          <tr data-payee-row><td class="whitespace-nowrap"><%= payee.contact.tax_number || tag.span("No ABN", class: "tc-negative") %></td>
+            <td><%= link_to payee.contact.name, contact_path(payee.contact), class: "underline" %></td>
+            <td class="text-sm"><%= payee.contact.full_address ? simple_format(payee.contact.full_address, {}, wrapper_tag: "span") : tag.span("No address", class: "tc-negative") %></td>
+            <td class="tc-num"><%= payee.payments %></td><td class="tc-num"><%= tc_money(payee.gross) %></td><td class="tc-num"><%= tc_money(payee.gst) %></td><td class="tc-num"><%= tc_money(payee.withheld) %></td></tr>
+        <% end %>
+        <tr class="font-semibold"><td colspan="4">Total</td><td class="tc-num" data-total="gross"><%= tc_money(@report.total(:gross)) %></td><td class="tc-num" data-total="gst"><%= tc_money(@report.total(:gst)) %></td>
+          <td class="tc-num" data-total="withheld"><%= tc_money(@report.total(:withheld)) %></td></tr>
+      </tbody>
+    </table>
+  </section>
+<% end %>

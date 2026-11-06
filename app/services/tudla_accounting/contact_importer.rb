@@ -6,12 +6,15 @@ module TudlaAccounting
   # heading in any case: Name (needed), Kind (customer, supplier or both; customer if
   # blank), Email, Phone, Address, Postal code, Tax number, Payment terms (days), Currency (its code;
   # blank for the organization's), Default account (its code), Default tax code (its
-  # code), Default withholding code (its code), Notes. Other columns are left out.
+  # code), Default withholding code (its code), Taxable payments (yes or no; left as it is
+  # when blank), Notes. Other columns are left out.
   #
   #   ContactImporter.call(organization, upload.path, ".csv") # => { added: 12, updated: 3 }
   class ContactImporter
     COLUMNS = { "name" => :name, "kind" => :kind, "email" => :email, "phone" => :phone, "address" => :address, "postal code" => :postal_code, "tax number" => :tax_number,
-                "payment terms" => :payment_terms_days, "currency" => :currency, "default account" => :default_account, "default tax code" => :default_tax_code, "default withholding code" => :default_withholding_code, "notes" => :notes }.freeze
+                "payment terms" => :payment_terms_days, "currency" => :currency, "default account" => :default_account, "default tax code" => :default_tax_code, "default withholding code" => :default_withholding_code, "taxable payments" => :taxable_payments,
+                "notes" => :notes }.freeze
+    YES_NO = { "yes" => true, "y" => true, "true" => true, "1" => true, "no" => false, "n" => false, "false" => false, "0" => false }.freeze
 
     def self.call(...) = new(...).call
 
@@ -39,6 +42,10 @@ module TudlaAccounting
           contact.name = row[:name] if contact.new_record? # one already here keeps its spelling
           contact.assign_attributes(row.slice(:email, :phone, :address, :postal_code, :tax_number, :payment_terms_days, :currency, :notes).compact)
           contact.kind = row[:kind].downcase if row[:kind].present?
+          if row[:taxable_payments].present?
+            flag = YES_NO[row[:taxable_payments].downcase]
+            flag.nil? ? problems << "Row #{number}: taxable payments must be yes or no, not #{row[:taxable_payments]}" : contact.taxable_payments = flag
+          end
           { default_account: accounts, default_tax_code: tax_codes, default_withholding_code: withholding_codes }.each do |field, by_code|
             next if row[field].blank?
 

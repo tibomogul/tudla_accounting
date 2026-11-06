@@ -45,12 +45,12 @@ RSpec.describe "Contacts", type: :request do
     get routes.new_contact_path
     expect(css_select("#contact_default_withholding_code_id option").map(&:text)).to eq([ "None", "WC010 (10%) Professionals" ])
 
-    post routes.contacts_path, params: { contact: { name: "Ledger & Co", kind: "supplier", default_withholding_code_id: code.id } }
-    expect(contact("Ledger & Co").default_withholding_code).to eq(code)
+    post routes.contacts_path, params: { contact: { name: "Ledger & Co", kind: "supplier", default_withholding_code_id: code.id, taxable_payments: "1" } }
+    expect(contact("Ledger & Co")).to have_attributes(default_withholding_code: code, taxable_payments: true)
     get routes.contact_path(contact("Ledger & Co"))
-    expect(css_select("[data-details]").text.squish).to include("Default withholding codeWC010 (10%)")
+    expect(css_select("[data-details]").text.squish).to include("Default withholding codeWC010 (10%)", "Taxable paymentsReported")
     get routes.contacts_path(format: :csv)
-    expect(CSV.parse(response.body).last[-2]).to eq("WC010")
+    expect(CSV.parse(response.body).last[-3]).to eq("WC010")
 
     code.update!(active: false)
     get routes.edit_contact_path(contact("Ledger & Co"))
@@ -110,8 +110,8 @@ RSpec.describe "Contacts", type: :request do
 
     get routes.contacts_path(format: :csv, kind: "supplier")
     csv = CSV.parse(response.body)
-    expect(csv).to eq([ [ "Name", "Kind", "Email", "Phone", "Address", "Tax number", "Payment terms", "Default account", "Default tax code", "Active", "Notes", "Currency", "Default withholding code", "Postal code" ],
-                        [ "Globex", "supplier", "globex@test", nil, nil, nil, nil, nil, nil, "yes", nil, "AUD", nil, nil ] ])
+    expect(csv).to eq([ [ "Name", "Kind", "Email", "Phone", "Address", "Tax number", "Payment terms", "Default account", "Default tax code", "Active", "Notes", "Currency", "Default withholding code", "Postal code", "Taxable payments" ],
+                        [ "Globex", "supplier", "globex@test", nil, nil, nil, nil, nil, nil, "yes", nil, "AUD", nil, nil, "no" ] ])
 
     upload = ->(text, name = "contacts.csv") { Rack::Test::UploadedFile.new(StringIO.new(text), "text/csv", original_filename: name) }
     post routes.import_contacts_path, params: { file: upload.call("Name,Payment terms\nInitech,14\nglobex,7\n") }

@@ -101,6 +101,18 @@ module TudlaAccounting
                     Table.total([ nil, "Total", nil, nil, nil, report.total_gross, report.total_withheld, nil ]) ])
       end
 
+      # A row per payee, with what a taxable payments report asks for: its ABN (tax number),
+      # name and address, and the gross paid, the GST in it and the tax withheld.
+      def taxable_payments(report)
+        body = report.payees.each_with_index.map do |payee, index|
+          contact = payee.contact
+          notes = [ ("No ABN" if payee.missing_tax_number?), ("No address" if payee.missing_address?), ("#{AmountParser.text(payee.unapplied)} paid on no bill, so no GST" unless payee.unapplied.zero?) ].compact
+          [ index + 1, contact.tax_number, contact.name, contact.address, contact.postal_code, contact.phone, payee.gross, payee.gst, payee.withheld, notes.join("; ").presence ]
+        end
+        Table.new([ [ "No.", "ABN", "Payee", "Address", "Postal code", "Phone", "Gross paid", "GST", "Tax withheld", "Note" ], *body,
+                    Table.total([ nil, nil, "Total", nil, nil, nil, report.total(:gross), report.total(:gst), report.total(:withheld), nil ]) ])
+      end
+
       # A row per contact per month, then the total and any difference from the tax summary.
       # Final VAT withheld and non-creditable input tax aren't recorded, so stay at zero.
       def summary_list(report, side)

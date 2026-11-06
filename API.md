@@ -100,7 +100,7 @@ end
 ```json
 { "id": 3, "name": "Northwind", "kind": "both", "email": "ap@northwind.test", "phone": null, "address": "1 Main St\nSydney",
   "postal_code": "2000", "tax_number": "51 824 753 556", "payment_terms_days": 30, "currency": "AUD", "notes": null,
-  "default_account_code": "4010", "default_tax_code": "GST", "default_withholding_code": null, "active": true, "created_at": "...", "updated_at": "..." }
+  "default_account_code": "4010", "default_tax_code": "GST", "default_withholding_code": null, "active": true, "taxable_payments": false, "created_at": "...", "updated_at": "..." }
 ```
 
 ### Invoices, bills and credit notes
@@ -207,7 +207,7 @@ Idempotency-Key: shop-order-1042
 
 ### Contacts
 
-`POST /contacts` and `PATCH /contacts/:id` (`record`) take `name`, `kind` (customer, supplier, both), `email`, `phone`, `address`, `postal_code`, `tax_number`, `payment_terms_days`, `currency`, `notes`, `active`, `default_account_code`, `default_tax_code` and `default_withholding_code`. A `PATCH` changes only the fields sent; `null` clears one. `currency` (an ISO code) is the one their new invoices and bills start in; it reads as the organization's when none is set, and `null` sets it back to that.
+`POST /contacts` and `PATCH /contacts/:id` (`record`) take `name`, `kind` (customer, supplier, both), `email`, `phone`, `address`, `postal_code`, `tax_number`, `payment_terms_days`, `currency`, `notes`, `active`, `taxable_payments` (whether what's paid to them goes on the taxable payments report), `default_account_code`, `default_tax_code` and `default_withholding_code`. A `PATCH` changes only the fields sent; `null` clears one. `currency` (an ISO code) is the one their new invoices and bills start in; it reads as the organization's when none is set, and `null` sets it back to that.
 
 ### Invoices, bills and credit notes
 
@@ -284,6 +284,7 @@ A bill's `amount` is what is paid of it, all that is owed when not given, in the
 | `sales_list`, `purchases_list` | `from_id`, `thru_id` (this quarter by default): a row per customer or supplier per month, exempt, zero-rated and VATable, purchases split by the tax code's `purchase_type`, with the tax, then the total and any difference from the tax summary. For the Philippines' SLSP; the columns follow RR 16-2005, and the BIR's column order isn't confirmed. |
 | `withholding`, `qap`, `sawt` | `from_id`, `thru_id` (this quarter by default): the tax withheld by code and month, by supplier and code, and by customer and code with certificates received. Their columns aren't from a BIR specification, so check them before filing |
 | `payee_payments` | `from_id`, `thru_id` (the last financial year by default): each payee's gross payments and the tax withheld under codes withheld on payment, with their address, for the year-end report of tax withheld where no ABN was quoted |
+| `taxable_payments` | `from_id`, `thru_id` (the last financial year by default): what was paid to the contacts marked `taxable_payments`, by payee, with the GST in it and the tax withheld, for Australia's TPAR |
 | `cash_flow` | `from_id`, `thru_id` (the start of the year to this month by default), `method` (direct or indirect); needs the `cash_account_codes` setting |
 
 A period id that isn't one of the organization's gets `404`.

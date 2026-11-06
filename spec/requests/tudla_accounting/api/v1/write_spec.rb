@@ -148,8 +148,8 @@ RSpec.describe "JSON API: recording in the books", type: :request do
       call(:patch, routes.api_v1_contact_path(data["id"]), { default_withholding_code: "NOPE" })
       expect(response.parsed_body["error"]["message"]).to eq("Default_withholding_code: there is no withholding code NOPE")
 
-      changed = call(:patch, routes.api_v1_contact_path(data["id"]), { phone: "02 9999 0000", default_tax_code: nil, active: false, currency: "eur" })["data"]
-      expect(changed).to include("phone" => "02 9999 0000", "default_tax_code" => nil, "default_account_code" => "4000", "active" => false, "email" => "ap@globex.test", "currency" => "EUR")
+      changed = call(:patch, routes.api_v1_contact_path(data["id"]), { phone: "02 9999 0000", default_tax_code: nil, active: false, currency: "eur", taxable_payments: true })["data"]
+      expect(changed).to include("phone" => "02 9999 0000", "default_tax_code" => nil, "default_account_code" => "4000", "active" => false, "email" => "ap@globex.test", "currency" => "EUR", "taxable_payments" => true)
       expect(call(:patch, routes.api_v1_contact_path(data["id"]), { currency: nil })["data"]["currency"]).to eq("AUD")
       call(:patch, routes.api_v1_contact_path(data["id"]), { currency: 7 })
       expect(json["error"]).to include("details" => { "currency" => [ "is not a known currency code" ] })

@@ -78,7 +78,7 @@ module TudlaAccounting
     end
 
     def contact_params
-      permitted = params.require(:contact).permit(:name, :kind, :email, :phone, :address, :postal_code, :tax_number, :payment_terms_days, :currency, :default_account_id, :default_tax_code_id, :default_withholding_code_id, :active, :notes)
+      permitted = params.require(:contact).permit(:name, :kind, :email, :phone, :address, :postal_code, :tax_number, :payment_terms_days, :currency, :default_account_id, :default_tax_code_id, :default_withholding_code_id, :taxable_payments, :active, :notes)
       permitted[:default_account_id] = organization_scope(Account).find(permitted[:default_account_id]).id if permitted[:default_account_id].present?
       permitted[:default_tax_code_id] = organization_scope(TaxCode).find(permitted[:default_tax_code_id]).id if permitted[:default_tax_code_id].present?
       permitted[:default_withholding_code_id] = organization_scope(WithholdingCode).find(permitted[:default_withholding_code_id]).id if permitted[:default_withholding_code_id].present?
@@ -86,10 +86,10 @@ module TudlaAccounting
     end
 
     def contacts_table(contacts)
-      Reports::Table.new([ [ "Name", "Kind", "Email", "Phone", "Address", "Tax number", "Payment terms", "Default account", "Default tax code", "Active", "Notes", "Currency", "Default withholding code", "Postal code" ],
+      Reports::Table.new([ [ "Name", "Kind", "Email", "Phone", "Address", "Tax number", "Payment terms", "Default account", "Default tax code", "Active", "Notes", "Currency", "Default withholding code", "Postal code", "Taxable payments" ],
                            *contacts.includes(:default_account, :default_tax_code, :default_withholding_code).map do |contact|
                              [ contact.name, contact.kind, contact.email, contact.phone, contact.address, contact.tax_number, contact.payment_terms_days,
-                               contact.default_account&.code, contact.default_tax_code&.code, contact.active? ? "yes" : "no", contact.notes, contact.currency, contact.default_withholding_code&.code, contact.postal_code ]
+                               contact.default_account&.code, contact.default_tax_code&.code, contact.active? ? "yes" : "no", contact.notes, contact.currency, contact.default_withholding_code&.code, contact.postal_code, contact.taxable_payments? ? "yes" : "no" ]
                            end ])
     end
 

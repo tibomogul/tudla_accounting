@@ -26,6 +26,8 @@
       <div class="sm:col-span-2"><%= tc_field form, :default_withholding_code_id, as: :select, label: "Default withholding code",
                         choices: [ [ "None", "" ] ] + withholding_codes.map { |code| [ "#{code.label} #{code.name}", code.id ] }, hint: "Starts the lines of their bills; none for a supplier nothing is withheld from" %></div>
     <% end %>
+    <div class="sm:col-span-4"><label class="flex items-center gap-2 text-sm"><%= form.check_box :taxable_payments %> Report what we pay them as taxable payments</label>
+      <p class="tc-hint">For a contractor whose services go on a taxable payments report, such as Australia's TPAR.</p></div>
   </fieldset>
   <div class="tc-card tc-card-body grid gap-4">
     <%= tc_field form, :notes, as: :text_area, rows: 3 %>

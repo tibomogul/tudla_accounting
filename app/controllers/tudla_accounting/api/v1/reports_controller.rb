@@ -14,12 +14,12 @@ module TudlaAccounting
       #   cash_flow                           from_id, thru_id (the start of the year to this month by default),
       #                                       method (direct or indirect)
       #   withholding, qap, sawt              from_id, thru_id (this quarter by default)
-      #   payee_payments                      from_id, thru_id (the last financial year by default)
+      #   payee_payments, taxable_payments    from_id, thru_id (the last financial year by default)
       #   sales_list, purchases_list          from_id, thru_id (this quarter by default)
       class ReportsController < BaseController
         include ReportPeriods
 
-        REPORTS = %w[balance_sheet profit_and_loss trial_balance receivables payables tax general_ledger cash_flow withholding qap sawt payee_payments sales_list purchases_list].freeze
+        REPORTS = %w[balance_sheet profit_and_loss trial_balance receivables payables tax general_ledger cash_flow withholding qap sawt payee_payments taxable_payments sales_list purchases_list].freeze
 
         def show
           report = params[:report].presence_in(REPORTS) or raise ActiveRecord::RecordNotFound
@@ -68,6 +68,7 @@ module TudlaAccounting
         def withholding_table = withholding_report&.then { |report| Reports::Tables.withholding_summary(report) }
         def qap_table = withholding_report&.then { |report| Reports::Tables.qap(report) }
         def sawt_table = withholding_report&.then { |report| Reports::Tables.sawt(report) }
+        def taxable_payments_table = month_range(last_year: true) && Reports::Tables.taxable_payments(Reports::TaxablePayments.new(accounting_organization, from: @from, thru: @thru))
         def payee_payments_table = month_range(last_year: true) && Reports::Tables.payee_payments(Reports::PayeePayments.new(accounting_organization, from: @from, thru: @thru))
 
         def sales_list_table = summary_list_table(:sales)
