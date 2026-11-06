@@ -5,7 +5,7 @@ require "csv"
 # of last year closed, a bank statement for the operating account, recurring entries,
 # this year's budget, customers with invoices on account and their payments (the engine's
 # contacts, invoices and payments) and a recurring invoice, a supplier's bills, GST-free sales, equipment bills, a payroll
-# with tax withheld, and a BAS with last quarter's filed. Returns the organization; running it again returns the existing one, only
+# with tax withheld, a supplier with no ABN paid with tax withheld, and a BAS with last quarter's filed. Returns the organization; running it again returns the existing one, only
 # adding the years' periods up to this one if the year has turned since it was seeded.
 #
 # The name is the demo's identity: an organization someone else names "Demo Co" is
@@ -63,6 +63,8 @@ class Demo::Seeder
     create_accounts
     # Here, not in create_accounts, which the other demos' books share.
     accounts["2300"] = TudlaAccounting::Account.create!(organization: organization, parent: accounts["2000"], code: "2300", name: "PAYG withholding", category: "liability")
+    accounts["2350"] = TudlaAccounting::Account.create!(organization: organization, parent: accounts["2000"], code: "2350", name: "No-ABN withholding", category: "liability")
+    accounts["6050"] = TudlaAccounting::Account.create!(organization: organization, parent: accounts["6000"], code: "6050", name: "Contractors", category: "expense")
     @gst = TudlaAccounting::TaxCode.create!(organization: organization, code: "GST", name: "GST", rate: "0.1", kind: :sales, account: accounts["2200"])
     @gstp = TudlaAccounting::TaxCode.create!(organization: organization, code: "GSTP", name: "GST on purchases", rate: "0.1", kind: :purchases, account: accounts["2200"])
     @export = TudlaAccounting::TaxCode.create!(organization: organization, code: "EXP", name: "GST-free export", rate: "0", kind: :sales)
@@ -88,6 +90,7 @@ class Demo::Seeder
     add_supplier_bills
     add_equipment_bills
     add_wages_with_tax_withheld
+    add_no_abn_supplier
     add_tax_return
   end
 
@@ -300,6 +303,25 @@ class Demo::Seeder
     end
   end
 
+  # A gardener who hasn't quoted an ABN: tax at 47% withheld when paid, for the BAS's W4
+  # and the year-end list by payee. Bills last year and on each date, all paid but this
+  # month's, which a pay run would pay with the tax withheld.
+  def add_no_abn_supplier
+    TudlaAccounting::WithholdingCodeTemplates.add!(organization, "au_no_abn", payable_account: accounts["2350"])
+    noabn = TudlaAccounting::WithholdingCode.find_by!(organization: organization, code: "NOABN")
+    gardener = TudlaAccounting::Contact.create!(organization: organization, name: "Greenleaf Gardening", kind: "supplier", payment_terms_days: 7, address: "3 Made-up Street\nSydney NSW",
+                                                postal_code: "2000", default_account: accounts["6050"], default_withholding_code: noabn)
+    last_year = [ Date.new(years.first, 9, 1), Date.new(years.first, 11, 1) ]
+    (last_year + tax_activity_dates).each_with_index do |date, index|
+      bill = TudlaAccounting::Document.create!(organization: organization, kind: "bill", contact: gardener, issued_on: date, due_on: gardener.due_on(date), reference: "GG-#{date.strftime('%y%m')}",
+                                               lines_attributes: [ { description: "Grounds upkeep, #{date.strftime('%B')}", quantity: 1, unit_price_cents: 1_000_00, account: accounts["6050"] } ]).approve!
+      next if date == tax_activity_dates.last
+
+      TudlaAccounting::Payment.record!(organization: organization, kind: "paid", contact: gardener, account: accounts["1011"], paid_on: date + 3, reference: "EFT GG-#{index + 1}",
+                                       amount_cents: 530_00, withholdings: [ { code: noabn, base_cents: 1_000_00 } ], applications: [ { document: bill, amount_cents: 1_000_00 } ])
+    end
+  end
+
   # A BAS mapped to the demo's tax codes, wages and PAYG withholding accounts, with last quarter's filed.
   def add_tax_return
     bas = TudlaAccounting::TaxReturnForm.from_template!(organization, "au_bas")
@@ -313,6 +335,7 @@ class Demo::Seeder
     [ @gstp, @capital ].each { |code| box.call("1B").parts.create!(source: "tax_code_tax", tax_code: code) }
     box.call("W1").parts.create!(source: "account", account: accounts["6040"])
     box.call("W2").parts.create!(source: "account_credits", account: accounts["2300"])
+    box.call("W4").parts.create!(source: "account_credits", account: accounts["2350"])
     quarter = today.beginning_of_quarter.prev_day.beginning_of_quarter
     months = [ quarter, quarter.end_of_quarter ].map { |date| TudlaAccounting::Period.leaf_periods_for_date(organization, date.in_time_zone(zone).change(hour: 12)).first }
     TudlaAccounting::FiledTaxReturn.file!(bas.reload, from: months.first.from_date, thru: months.last.thru_date)
