@@ -11,7 +11,7 @@ RSpec.describe Demo::Seeder do
     expect(Organization.where(name: "Demo Co").count).to eq(1)
 
     entries = TudlaAccounting::Entry.where(organization: organization)
-    expect(entries.where.not(posted_at: nil).count).to eq(74) # 30, the owner's capital, 12 invoices on account with 9 payments, 2 bills, 4 GST-free sales with their payments, 2 equipment bills, 2 payrolls, a payment to the ATO, and 4 gardener's bills with 3 payments
+    expect(entries.where.not(posted_at: nil).count).to eq(78) # 30, the owner's capital, 12 invoices on account with 9 payments, 2 bills, 4 GST-free sales with their payments, 2 equipment bills, 2 payrolls, a payment to the ATO, 4 gardener's bills with 3 payments, and 2 electrician's bills paid
     expect(entries.where(posted_at: nil).count).to eq(3)
     expect(entries.maximum(:transacted_at)).to be <= Time.current
     expect(entries.pluck(:particulars)).to include(a_string_starting_with("Invoice "))
@@ -96,12 +96,12 @@ RSpec.describe Demo::Seeder do
     organization = described_class.call(entries: 30)
 
     contacts = TudlaAccounting::Contact.where(organization: organization).order(:name)
-    expect(contacts.map { |contact| [ contact.name, contact.kind ] }).to eq([ %w[Cloudware supplier], %w[Globex customer], [ "Greenleaf Gardening", "supplier" ], [ "Harbour Training College", "customer" ], %w[Initech customer], [ "Kyoto Trading KK", "customer" ], [ "Metro Office Equipment", "supplier" ], %w[Northwind customer], %w[Umbrella customer] ])
+    expect(contacts.map { |contact| [ contact.name, contact.kind ] }).to eq([ [ "Bright Spark Electrical", "supplier" ], %w[Cloudware supplier], %w[Globex customer], [ "Greenleaf Gardening", "supplier" ], [ "Harbour Training College", "customer" ], %w[Initech customer], [ "Kyoto Trading KK", "customer" ], [ "Metro Office Equipment", "supplier" ], %w[Northwind customer], %w[Umbrella customer] ])
     documents = TudlaAccounting::Document.where(organization: organization)
     expect(documents.sales.approved.order(:number).pluck(:number_label)).to eq((1..16).map { |number| format("INV-%04d", number) })
     expect(documents.sales.approved.order(:number).pluck(:issued_on)).to eq(documents.sales.approved.order(:issued_on, :number).pluck(:issued_on)) # in date order
     expect(documents.where(status: "draft").sole).to have_attributes(kind: "sales_invoice", issued_on: Date.current, contact: contacts.find_by!(name: "Initech"))
-    expect(documents.purchases.approved.map(&:total)).to match_array(([ Money.new(165_00, "USD"), Money.new(5_500_00, "USD") ] * 2) + ([ Money.new(1_000_00, "USD") ] * 4))
+    expect(documents.purchases.approved.map(&:total)).to match_array(([ Money.new(165_00, "USD"), Money.new(5_500_00, "USD") ] * 2) + ([ Money.new(1_000_00, "USD") ] * 4) + ([ Money.new(2_200_00, "USD") ] * 2))
     paid = documents.sales.approved.with_open_cents.to_a.group_by(&:payment_status)
     expect(paid.keys).to contain_exactly("paid", "part_paid", "unpaid")
     expect(TudlaAccounting::Payment.where(organization: organization).received.count).to eq(13)
@@ -127,7 +127,7 @@ RSpec.describe Demo::Seeder do
     expect(now[:boxes].find { |row| row.box.label == "W2" }.amount).to eq(Money.new(1_600_00, "USD")) # with the ATO paid this month
   end
 
-  it "pays a supplier with no ABN with tax withheld, for the year-end list by payee, and leaves this month's bill for a pay run" do
+  it "pays a supplier with no ABN with tax withheld, for the year-end list by payee, and leaves this month's bill for a pay run; it and the electrician are on the TPAR" do
     organization = described_class.call(entries: 30)
 
     gardener = TudlaAccounting::Contact.find_by!(organization: organization, name: "Greenleaf Gardening")
@@ -138,6 +138,9 @@ RSpec.describe Demo::Seeder do
     expect(last_year.checks("from_supplier").map(&:difference)).to all(be_zero)
     due = TudlaAccounting::PayRun.due(organization, currency: "USD").select { |bill| bill.contact == gardener }
     expect(due.map(&:issued_on)).to eq([ Date.new(2026, 6, 1) ])
+    tpar = TudlaAccounting::Reports::TaxablePayments.new(organization, from: last_year.from, thru: last_year.thru)
+    expect(tpar.payees.map { |payee| [ payee.contact.name, payee.contact.tax_number, payee.gross.cents, payee.gst.cents, payee.withheld.cents ] })
+      .to eq([ [ "Bright Spark Electrical", "51 824 753 556", 4_400_00, 400_00, 0 ], [ "Greenleaf Gardening", nil, 2_000_00, 0, 940_00 ] ])
   end
 
   it "attaches the landlord's receipt to the latest rent payments" do

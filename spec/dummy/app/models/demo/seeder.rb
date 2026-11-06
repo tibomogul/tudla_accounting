@@ -5,7 +5,7 @@ require "csv"
 # of last year closed, a bank statement for the operating account, recurring entries,
 # this year's budget, customers with invoices on account and their payments (the engine's
 # contacts, invoices and payments) and a recurring invoice, a supplier's bills, GST-free sales, equipment bills, a payroll
-# with tax withheld, a supplier with no ABN paid with tax withheld, and a BAS with last quarter's filed. Returns the organization; running it again returns the existing one, only
+# with tax withheld, a supplier with no ABN paid with tax withheld, an electrician, both on the TPAR, and a BAS with last quarter's filed. Returns the organization; running it again returns the existing one, only
 # adding the years' periods up to this one if the year has turned since it was seeded.
 #
 # The name is the demo's identity: an organization someone else names "Demo Co" is
@@ -91,6 +91,7 @@ class Demo::Seeder
     add_equipment_bills
     add_wages_with_tax_withheld
     add_no_abn_supplier
+    add_electrician
     add_tax_return
   end
 
@@ -310,7 +311,7 @@ class Demo::Seeder
     TudlaAccounting::WithholdingCodeTemplates.add!(organization, "au_no_abn", payable_account: accounts["2350"])
     noabn = TudlaAccounting::WithholdingCode.find_by!(organization: organization, code: "NOABN")
     gardener = TudlaAccounting::Contact.create!(organization: organization, name: "Greenleaf Gardening", kind: "supplier", payment_terms_days: 7, address: "3 Made-up Street\nSydney NSW",
-                                                postal_code: "2000", default_account: accounts["6050"], default_withholding_code: noabn)
+                                                postal_code: "2000", default_account: accounts["6050"], default_withholding_code: noabn, taxable_payments: true)
     last_year = [ Date.new(years.first, 9, 1), Date.new(years.first, 11, 1) ]
     (last_year + tax_activity_dates).each_with_index do |date, index|
       bill = TudlaAccounting::Document.create!(organization: organization, kind: "bill", contact: gardener, issued_on: date, due_on: gardener.due_on(date), reference: "GG-#{date.strftime('%y%m')}",
@@ -319,6 +320,19 @@ class Demo::Seeder
 
       TudlaAccounting::Payment.record!(organization: organization, kind: "paid", contact: gardener, account: accounts["1011"], paid_on: date + 3, reference: "EFT GG-#{index + 1}",
                                        amount_cents: 530_00, withholdings: [ { code: noabn, base_cents: 1_000_00 } ], applications: [ { document: bill, amount_cents: 1_000_00 } ])
+    end
+  end
+
+  # An electrician with an ABN, on the TPAR with the gardener: two jobs last year with GST,
+  # paid in full.
+  def add_electrician
+    electrician = TudlaAccounting::Contact.create!(organization: organization, name: "Bright Spark Electrical", kind: "supplier", payment_terms_days: 14, tax_number: "51 824 753 556",
+                                                   address: "4 Made-up Street\nSydney NSW", postal_code: "2000", default_account: accounts["6050"], default_tax_code: @gstp, taxable_payments: true)
+    [ Date.new(years.first, 8, 1), Date.new(years.first, 10, 1) ].each_with_index do |date, index|
+      bill = TudlaAccounting::Document.create!(organization: organization, kind: "bill", contact: electrician, issued_on: date, due_on: electrician.due_on(date), reference: "BSE-#{index + 1}",
+                                               lines_attributes: [ { description: "Electrical work", quantity: 1, unit_price_cents: 2_000_00, account: accounts["6050"], tax_code: @gstp } ]).approve!
+      TudlaAccounting::Payment.record!(organization: organization, kind: "paid", contact: electrician, account: accounts["1011"], paid_on: date + 10, reference: "EFT BSE-#{index + 1}",
+                                       amount_cents: bill.total_cents, applications: [ { document: bill, amount_cents: bill.total_cents } ])
     end
   end
 
