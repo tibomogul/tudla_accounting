@@ -1,0 +1,36 @@
+<%= tc_page_header "Payments with tax withheld, by payee", subtitle: (@report ? "#{tc_date(@from.from_date)} to #{tc_date(@thru.thru_date)}" : nil) do %>
+  <% if @report %>
+    <%= render "withholding_form", url: reports_payee_payments_path %>
+    <%= render "download" %>
+  <% end %>
+<% end %>
+
+<% if @report.nil? %>
+  <%= render "no_periods" %>
+<% elsif !@report.any_codes? %>
+  <div class="tc-card tc-card-body text-center">
+    <p class="tc-muted">No withholding codes are withheld when a supplier is paid.<% if tc_can?(:administer) %> <%= link_to "Add one", withholding_codes_path, class: "underline" %>, such as Australia's no-ABN withholding.<% end %></p>
+  </div>
+<% else %>
+  <p class="tc-hint mb-4">Tax withheld under codes withheld when the supplier is paid, such as when no ABN is quoted. The gross payment is what was paid before the tax. A voided payment counts in the month it was voided.</p>
+  <% missing = @report.missing_addresses %>
+  <% if missing.any? %>
+    <div class="tc-alert tc-alert-warning mb-4" role="alert" data-missing-address>No address for <%= missing.to_sentence.delete_suffix(".") %>. Add it on the contact before reporting.</div>
+  <% end %>
+  <section class="tc-card overflow-x-auto mb-4" aria-label="Payees">
+    <table class="tc-table">
+      <thead><tr><th>Payee</th><th>Address</th><th>Code</th><th class="tc-num">Gross payment</th><th class="tc-num">Tax withheld</th></tr></thead>
+      <tbody>
+        <% if @report.payees.empty? %><tr><td colspan="5" class="tc-muted text-center">Nothing withheld in these months.</td></tr><% end %>
+        <% @report.payees.each do |payee| %>
+          <tr data-payee-row><td><%= link_to payee.contact.name, contact_path(payee.contact), class: "underline" %></td>
+            <td class="text-sm"><%= payee.contact.full_address ? simple_format(payee.contact.full_address, {}, wrapper_tag: "span") : tag.span("No address", class: "tc-negative") %></td>
+            <td class="font-mono"><%= payee.codes.map(&:code).join(", ") %></td>
+            <td class="tc-num"><%= tc_money(payee.gross) %></td><td class="tc-num"><%= tc_money(payee.withheld) %></td></tr>
+        <% end %>
+        <tr class="font-semibold"><td colspan="3">Total</td><td class="tc-num" data-total="gross"><%= tc_money(@report.total_gross) %></td><td class="tc-num" data-total="withheld"><%= tc_money(@report.total_withheld) %></td></tr>
+      </tbody>
+    </table>
+  </section>
+  <%= render "withholding_checks", report: @report, direction: "from_supplier" %>
+<% end %>

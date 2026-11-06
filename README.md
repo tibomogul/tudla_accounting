@@ -330,9 +330,18 @@ We worked from search summaries of the ATO's pages, because the ATO's site refus
 - **G1 with or without GST.** The template reports G1 with GST, which the ATO's calculation worksheet method requires, and the form asks you to say so with Yes. The accounts method can also report it without GST. Map G1 to tax codes' net amounts and answer No if that's your choice.
 - **G2 and G3.** The ATO says exports at G2 also appear at G1, and we read G3 the same way, so map those codes to G1 too.
 - **G10 and G11.** Each needs its own tax code, since the box follows the code and not the account. A purchase with no tax code reaches no box, so give GST-free purchases a code too. Entries typed without a code, as most of the demo's expenses are, leave G11 short.
-- **W1 to W5.** Map W2 to `account_credits` on the withholding account, because `account` would net a payment to the ATO off it. W4 is only a box for now, because the engine doesn't yet withhold for a missing ABN.
+- **W1 to W5.** Map W2 to `account_credits` on the withholding account, because `account` would net a payment to the ATO off it. Map W4 the same way, to `account_credits` on the account the no-ABN code posts to, and keep that account apart from W2's so neither picks up the other.
 - **5A and 5B.** These come from the ATO's notice, not your ledger, so map an account if you post them, or adjust the figures when you lodge.
 - **Simpler BAS.** One source says businesses under $10 million in turnover can report only G1, 1A and 1B. We haven't confirmed that on the ATO's site.
+
+#### Australian no-ABN withholding: what to confirm
+
+The Payments with tax withheld, by payee report (`Reports::PayeePayments`, under Reports once a code is withheld on payment) lists each supplier's gross payments and the tax withheld when they were paid, for the last financial year by default, on screen and in CSV and Excel. It's the list for the year-end report to the ATO, and it flags a payee with no address. The gross payment is what the supplier was paid before the tax. As with the BAS, we worked from search summaries, not the ATO's own pages. Check these with an accountant or registered tax agent:
+
+- **The 47% rate.** An ATO search summary gave it, and the starter code uses it.
+- **The annual report's form and fields.** The report has the payee's name, address, gross payment and tax withheld. We haven't seen the ATO's form or its electronic format, so the columns may not be all it asks for, and the engine makes no file to lodge.
+- **The deadlines** for giving payees their payment summaries and lodging the annual report. We found dates in secondary sources only, so the engine doesn't state them.
+- **Small payments.** We read that there's no need to withhold below a threshold. The engine doesn't apply one: leave the tax blank on such a payment.
 
 #### Philippine filings: what to confirm
 

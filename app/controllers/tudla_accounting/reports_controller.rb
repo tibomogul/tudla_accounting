@@ -5,6 +5,7 @@ module TudlaAccounting
     GENERAL_LEDGER_PAGE = 500 # lines
     def index
       @withholding = organization_scope(WithholdingCode).exists?
+      @withheld_on_payment = organization_scope(WithholdingCode).on_payment.exists?
     end
 
     def balance_sheet
@@ -76,6 +77,15 @@ module TudlaAccounting
     # The suppliers tax was withheld from, or the customers who withheld it with their
     # certificates in, over a run of months (this quarter by default).
     def qap = withholding_list(:qap)
+
+    # The tax withheld from suppliers when they were paid, by payee, over a run of months
+    # (the last financial year by default), for the year-end report and payment summaries.
+    def payee_payments
+      return respond_with_table("payee-payments") unless month_range(last_year: true)
+
+      @report = Reports::PayeePayments.new(accounting_organization, from: @from, thru: @thru)
+      respond_with_table("payee-payments-#{span_name}") { Reports::Tables.payee_payments(@report) }
+    end
     def sawt = withholding_list(:sawt)
 
     # What was sold to each customer or bought from each supplier, month by month, over a

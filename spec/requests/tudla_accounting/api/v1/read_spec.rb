@@ -224,6 +224,7 @@ RSpec.describe "JSON API: reading the books", type: :request do
       expect(api_get(routes.api_v1_report_path("withholding"))["data"]["headings"]).to include("Tax withheld")
       expect(api_get(routes.api_v1_report_path("qap"), from_id: april.id, thru_id: april.id)["data"]["headings"]).to include("Payee")
       expect(api_get(routes.api_v1_report_path("sawt"))["data"]["headings"]).to include("Withholding agent")
+      expect(api_get(routes.api_v1_report_path("payee_payments"))["data"]["headings"]).to include("Payee", "Gross payment")
       expect(api_get(routes.api_v1_report_path("sales_list"))["data"]["headings"]).to include("Buyer", "Output tax")
       expect(api_get(routes.api_v1_report_path("purchases_list"))["data"]["headings"]).to include("Seller", "Capital goods")
       ledger = api_get(routes.api_v1_report_path("general_ledger"), from_id: april.id, thru_id: april.id, account: "4010")["data"]

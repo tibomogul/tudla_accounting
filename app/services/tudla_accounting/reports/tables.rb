@@ -90,6 +90,17 @@ module TudlaAccounting
         Table.new([ [ "No.", "TIN", who, "Code", "Rate %", "Income", "Tax withheld", "Note" ], *body, Table.total([ nil, nil, "Total", nil, nil, rows.sum(zero, &:base), rows.sum(zero, &:withheld), nil ]) ])
       end
 
+      # A row per payee, with what the year-end report needs: name and address, the gross
+      # payment and the tax withheld.
+      def payee_payments(report)
+        body = report.payees.each_with_index.map do |payee, index|
+          contact = payee.contact
+          [ index + 1, contact.name, contact.address, contact.postal_code, payee.codes.map(&:code).join(", "), payee.gross, payee.withheld, ("No address" if payee.missing_address?) ]
+        end
+        Table.new([ [ "No.", "Payee", "Address", "Postal code", "Code", "Gross payment", "Tax withheld", "Note" ], *body,
+                    Table.total([ nil, "Total", nil, nil, nil, report.total_gross, report.total_withheld, nil ]) ])
+      end
+
       # A row per contact per month, then the total and any difference from the tax summary.
       # Final VAT withheld and non-creditable input tax aren't recorded, so stay at zero.
       def summary_list(report, side)
