@@ -70,13 +70,13 @@ RSpec.describe "Payments with tax withheld, by payee", type: :request do
 
       get routes.reports_payee_payments_path
       expect(response.body).to include("1 Jan 2025 to 31 Dec 2025")
-      expect(cells("tr[data-payee-row]")).to eq([ "Handy Repairs | 1 Main St Springfield 2000 | NOABN | 1,500.00 | 705.00", "Odd Jobs | No address | NOABN | 200.00 | 94.00" ])
+      expect(cells("tr[data-payee-row]")).to eq([ "Handy Repairs | 1 Main St Springfield 2000 | NOABN | 1,500.00 | 705.00 | Payment summary", "Odd Jobs | No address | NOABN | 200.00 | 94.00 | Payment summary" ])
       expect(text("[data-total]")).to eq([ "1,700.00", "799.00" ])
       expect(text("[data-missing-address]")).to eq([ "No address for Odd Jobs. Add it on the contact before reporting." ])
       expect(cells("[data-withholding-check] tbody tr")).to eq([ "2350 - No-ABN withholding | 799.00 | 801.00 | 2.00" ])
 
       get routes.reports_payee_payments_path(from_id: month(2026, 1).id, thru_id: month(2026, 6).id)
-      expect(cells("tr[data-payee-row]")).to eq([ "Handy Repairs | 1 Main St Springfield 2000 | NOABN | 300.00 | 141.00" ])
+      expect(cells("tr[data-payee-row]")).to eq([ "Handy Repairs | 1 Main St Springfield 2000 | NOABN | 300.00 | 141.00 | Payment summary" ])
 
       get routes.reports_payee_payments_path(format: :csv)
       expect(response.headers["Content-Disposition"]).to include("payee-payments-2025-01-01-to-2025-12-31.csv")
@@ -84,6 +84,34 @@ RSpec.describe "Payments with tax withheld, by payee", type: :request do
       expect(csv.first).to eq([ "No.", "Payee", "Address", "Postal code", "Code", "Gross payment", "Tax withheld", "Note" ])
       expect(csv[2]).to eq([ "2", "Odd Jobs", nil, nil, "NOABN", "200.00", "94.00", "No address" ])
       expect(csv.last).to eq([ nil, "Total", nil, nil, nil, "1700.00", "799.00", nil ])
+    end
+
+    it "makes each payee's payment summary, or all of them, as a PDF listing its payments" do
+      TudlaAccounting.configuration.tax_registration = ->(_org) { TudlaAccounting::TaxRegistration.australia("51 824 753 556") }
+      first = pay(handy, Date.new(2025, 8, 2), 1_000_00)
+      first.update_column(:reference, "EFT 1001")
+      pay(handy, Date.new(2025, 11, 3), 500_00).void!(on: Date.new(2025, 11, 4), reason: "Paid twice")
+      pay(odd_jobs, Date.new(2025, 9, 9), 200_00)
+
+      get routes.reports_payee_payments_path
+      expect(css_select("a[aria-label='Payment summary for Handy Repairs']").first["href"]).to include(".pdf", "contact_id=#{handy.id}")
+      expect(text("a.tc-btn")).to include("All payment summaries")
+
+      get routes.reports_payee_payments_path(format: :pdf, contact_id: handy.id)
+      expect(response.headers["Content-Disposition"]).to include("payment-summary-Handy-Repairs-2025-01-01-to-2025-12-31.pdf")
+      pdf = PDF::Reader.new(StringIO.new(response.body))
+      expect(pdf.pages.size).to eq(1)
+      words = pdf.pages.map(&:text).join("\n").squish
+      expect(words).to include("Payment summary", "Acme", "ABN 51 824 753 556", "1 Jan 2025 to 31 Dec 2025", "Handy Repairs", "1 Main St", "No ABN quoted (47%)",
+                               "1,000.00", "470.00", "EFT 1001", "Payment voided", "(500.00)", "(235.00)", "Signed for the payer")
+      expect(words).not_to include("Odd Jobs")
+
+      get routes.reports_payee_payments_path(format: :pdf)
+      expect(response.headers["Content-Disposition"]).to include("payment-summary-all-payees-2025-01-01-to-2025-12-31.pdf")
+      expect(PDF::Reader.new(StringIO.new(response.body)).pages.size).to eq(2)
+
+      get routes.reports_payee_payments_path(format: :pdf, contact_id: 0)
+      expect(response).to have_http_status(:not_found)
     end
 
     it "shows nothing withheld, and the year to date when no earlier year has ended" do

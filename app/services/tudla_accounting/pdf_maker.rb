@@ -45,6 +45,12 @@ module TudlaAccounting
                                                                                                                 paper: { paper_width: 8.5, paper_height: 13 }, margin: 0.3)
     end
 
+    # A payment summary for each payee: what the payer paid it and withheld over the
+    # report's months, a page each. See Reports::PayeePayments.
+    def payment_summaries(report, payees)
+      render("tudla_accounting/reports/payment_summary", { report: report }, collection: payees, as: :payee, title: "Payment summary", organization: report.organization)
+    end
+
     # The PDF of a partial, in the PDF layout, for an organization's amounts.
     def render(partial, locals, title:, organization:, landscape: false, paper: nil, margin: 0.5, **options)
       raise Error, "PDFs need the ferrum gem" unless TudlaAccounting.pdf?

@@ -1,0 +1,56 @@
+<%# locals: (payee:, report:) %>
+<%# A payee's payment summary: what the payer paid it, and withheld from it when paying, over
+    the report's months, with each payment, a page each. It is the payer's own statement
+    from its records, not a copy of the tax authority's form. The signature is left blank. %>
+<% registration = report.payer_registration %>
+<% contact = payee.contact %>
+<article class="space-y-6 text-sm break-after-page last:break-after-auto" data-payment-summary aria-label="Payment summary for <%= contact.name %>">
+  <header class="flex flex-wrap justify-between gap-6">
+    <div>
+      <p class="tc-muted">Payer</p>
+      <p class="whitespace-pre-line"><%= TudlaAccounting.configuration.document_header_for(report.organization) %></p>
+      <% if registration&.number %><p><%= registration.label %> <%= registration.number %></p><% end %>
+    </div>
+    <div class="text-right">
+      <h2 class="text-2xl font-bold tracking-tight">Payment summary</h2>
+      <p>Tax withheld from payments to you</p>
+      <p class="tc-muted"><%= tc_date(report.from.from_date) %> to <%= tc_date(report.thru.thru_date) %></p>
+    </div>
+  </header>
+
+  <section aria-label="Payee">
+    <p class="tc-muted">Payee</p>
+    <p class="font-semibold"><%= contact.name %></p>
+    <% if contact.full_address %><p class="whitespace-pre-line"><%= contact.full_address %></p><% end %>
+  </section>
+
+  <table class="tc-table" data-summary-totals>
+    <thead><tr><th>Withheld as</th><th class="tc-num">Gross payment (<%= report.organization.currency %>)</th><th class="tc-num">Tax withheld (<%= report.organization.currency %>)</th></tr></thead>
+    <tbody>
+      <% report.qap.select { |row| row.contact == contact }.each do |row| %>
+        <tr><td><%= row.code.name %> (<%= row.code.rate_percent %>%)</td><td class="tc-num"><%= tc_money(row.base) %></td><td class="tc-num"><%= tc_money(row.withheld) %></td></tr>
+      <% end %>
+    </tbody>
+    <tfoot><tr class="font-semibold"><td>Total</td><td class="tc-num"><%= tc_money(payee.gross) %></td><td class="tc-num"><%= tc_money(payee.withheld) %></td></tr></tfoot>
+  </table>
+
+  <section aria-label="Payments">
+    <h3 class="font-semibold mb-2">Payments</h3>
+    <table class="tc-table" data-summary-payments>
+      <thead><tr><th>Date</th><th>Reference</th><th class="tc-num">Gross payment</th><th class="tc-num">Tax withheld</th></tr></thead>
+      <tbody>
+        <% report.amounts_for(contact).each do |amount| %>
+          <tr><td class="whitespace-nowrap"><%= tc_date(amount.on) %></td><td><%= amount.reversal ? "Payment voided" : amount.payment&.reference %></td>
+            <td class="tc-num"><%= tc_money(Money.new(amount.base_cents, report.organization.currency)) %></td><td class="tc-num"><%= tc_money(Money.new(amount.withheld_cents, report.organization.currency)) %></td></tr>
+        <% end %>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="grid grid-cols-3 gap-6 pt-8" aria-label="Signed for the payer">
+    <div class="border-t border-[var(--tc-border)] pt-1 tc-muted">Signed for the payer</div>
+    <div class="border-t border-[var(--tc-border)] pt-1 tc-muted">Name and position</div>
+    <div class="border-t border-[var(--tc-border)] pt-1 tc-muted">Date</div>
+  </section>
+  <p class="tc-hint">Prepared by the payer from its records. Keep it with your tax records.</p>
+</article>

@@ -13,6 +13,8 @@ module TudlaAccounting
     #
     #   report = PayeePayments.new(organization, from: july, thru: june)
     #   report.payees # => [#<Payee contact codes gross withheld>, ...], by name
+    #
+    # PdfMaker.payment_summaries makes a payment summary for each payee from it.
     class PayeePayments < Withholding
       Payee = Data.define(:contact, :codes, :gross, :withheld) do
         def missing_address? = contact.address.blank?
@@ -28,6 +30,14 @@ module TudlaAccounting
       def total_gross = payees.sum(money(0), &:gross)
       def total_withheld = payees.sum(money(0), &:withheld)
       def missing_addresses = payees.select(&:missing_address?).map { |payee| payee.contact.name }
+
+      # The amounts behind a payee's row, by date: each payment's (and each void's) WithheldTax.
+      def amounts_for(contact)
+        rows("from_supplier").where(contact: contact).includes(:payment, :withholding_code).order(:on, :id).to_a
+      end
+
+      # What a payment summary names the payer by: the tax_registration setting's number.
+      def payer_registration = TudlaAccounting.configuration.tax_registration_for(organization)
 
       private
 

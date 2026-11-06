@@ -84,6 +84,8 @@ module TudlaAccounting
       return respond_with_table("payee-payments") unless month_range(last_year: true)
 
       @report = Reports::PayeePayments.new(accounting_organization, from: @from, thru: @thru)
+      return payment_summaries if request.format.pdf?
+
       respond_with_table("payee-payments-#{span_name}") { Reports::Tables.payee_payments(@report) }
     end
     def sawt = withholding_list(:sawt)
@@ -228,6 +230,16 @@ module TudlaAccounting
 
       @report = Reports::Withholding.new(accounting_organization, from: @from, thru: @thru)
       respond_with_table("#{list}-#{span_name}", html: -> { render :withholding_list }) { Reports::Tables.public_send(list, @report) }
+    end
+
+    # The payees' payment summaries as a PDF: one payee's (contact_id), or all of them.
+    def payment_summaries
+      one = params[:contact_id].presence
+      chosen = one ? @report.payees.select { |payee| payee.contact.id.to_s == one } : @report.payees
+      return head(:not_found) if chosen.empty?
+
+      who = one ? chosen.first.contact.name : "all-payees"
+      send_pdf("payment-summary-#{who}-#{span_name}", fallback: reports_payee_payments_path(from_id: @from.id, thru_id: @thru.id)) { PdfMaker.payment_summaries(@report, chosen) }
     end
 
     def summary_list(side)
