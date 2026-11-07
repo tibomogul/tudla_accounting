@@ -73,7 +73,7 @@ RSpec.describe "Payments with tax withheld, by payee", type: :request do
       expect(cells("tr[data-payee-row]")).to eq([ "Handy Repairs | 1 Main St Springfield 2000 | NOABN | 1,500.00 | 705.00 | Payment summary", "Odd Jobs | No address | NOABN | 200.00 | 94.00 | Payment summary" ])
       expect(text("[data-total]")).to eq([ "1,700.00", "799.00" ])
       expect(text("[data-missing-address]")).to eq([ "No address for Odd Jobs. Add it on the contact before reporting." ])
-      expect(cells("[data-withholding-check] tbody tr")).to eq([ "2350 - No-ABN withholding | 799.00 | 801.00 | 2.00" ])
+      expect(cells("[data-withholding-check] tbody tr")).to eq([ "2350 - No-ABN withholding | 799.00 | 801.00 | 0.00 | 2.00" ])
 
       get routes.reports_payee_payments_path(from_id: month(2026, 1).id, thru_id: month(2026, 6).id)
       expect(cells("tr[data-payee-row]")).to eq([ "Handy Repairs | 1 Main St Springfield 2000 | NOABN | 300.00 | 141.00 | Payment summary" ])

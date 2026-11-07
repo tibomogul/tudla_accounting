@@ -34,7 +34,7 @@ module TudlaAccounting
           result = PayRun.call(organization: accounting_organization, account: account, paid_on: date_param(:paid_on) || raise(ArgumentError, "paid_on is missing"),
                                bills: bills, reference: body[:reference], email: boolean(body[:email]),
                                exchange_rate: body[:exchange_rate].presence && decimal(body[:exchange_rate], "exchange_rate"),
-                               idempotency_key: (idempotency_key && "#{idempotency_key}:pay_run"))
+                               idempotency_key: (idempotency_key && "#{idempotency_key}:pay_run"), skip_withholding: skipped_withholding)
           render_run(result.payments, emailed: result.emailed, no_address: result.no_address, status: :created)
         rescue ActiveRecord::RecordNotUnique
           existing = made.presence or raise
@@ -42,6 +42,15 @@ module TudlaAccounting
         end
 
         private
+
+        # The suppliers (contact ids) not to withhold from this time.
+        def skipped_withholding
+          ids = body[:skip_withholding]
+          return [] if ids.blank?
+          raise ArgumentError, "Give skip_withholding as a list of supplier ids" unless ids.is_a?(Array)
+
+          organization_scope(Contact).where(id: ids).pluck(:id)
+        end
 
         def paying_account(code) = code.present? ? account_by_code(code, "account_code") : raise(ArgumentError, "account_code is missing")
         def currency(account) = account.currency.presence || accounting_organization.currency

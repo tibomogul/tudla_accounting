@@ -16,7 +16,8 @@ module TudlaAccounting
   # A supplier whose default withholding code is withheld on payment (Contact#
   # payment_withholding_code, such as Australia's no-ABN withholding) has the tax withheld
   # from what is paid of its bills: the bills are settled by the cash and the tax, and
-  # the cash is what is paid less the tax.
+  # the cash is what is paid less the tax. skip_withholding names suppliers (their ids) to
+  # pay in full this time, such as one who has since quoted an ABN.
   # PayRun.due lists the bills it could pay: approved, with something still owed, in a
   # currency, due by a date.
   class PayRun
@@ -34,7 +35,7 @@ module TudlaAccounting
            .sort_by { |bill| [ bill.contact.name.downcase, bill.contact_id, bill.due_on || Date::Infinity.new, bill.id ] }
     end
 
-    def initialize(organization:, account:, paid_on:, bills:, reference: nil, exchange_rate: nil, email: false, idempotency_key: nil)
+    def initialize(organization:, account:, paid_on:, bills:, reference: nil, exchange_rate: nil, email: false, idempotency_key: nil, skip_withholding: [])
       @organization = organization
       @account = account
       @paid_on = paid_on
@@ -43,6 +44,7 @@ module TudlaAccounting
       @exchange_rate = exchange_rate
       @email = email
       @idempotency_key = idempotency_key
+      @skip_withholding = Array(skip_withholding).map(&:to_i).to_set
     end
 
     def call
@@ -60,7 +62,8 @@ module TudlaAccounting
 
     def pay(supplier, bills)
       settled = bills.sum { |bill| bill.fetch(:amount_cents) }
-      withholdings = (code = supplier.payment_withholding_code) ? [ { code: code, base_cents: settled, withheld_cents: code.withheld_cents(settled) } ] : []
+      code = supplier.payment_withholding_code unless @skip_withholding.include?(supplier.id)
+      withholdings = code ? [ { code: code, base_cents: settled, withheld_cents: code.withheld_cents(settled) } ] : []
       Payment.record!(organization: @organization, kind: "paid", contact: supplier, account: @account, paid_on: @paid_on, reference: @reference,
                       exchange_rate: @exchange_rate, amount_cents: settled - withholdings.sum { |withholding| withholding[:withheld_cents] }, applications: bills, withholdings: withholdings,
                       idempotency_key: (@idempotency_key && "#{@idempotency_key}:#{supplier.id}"))

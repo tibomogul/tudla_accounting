@@ -34,7 +34,7 @@ RSpec.describe TudlaAccounting::Reports::Withholding, type: :service do
 
   def remit(on, cents)
     entry = TudlaAccounting::Entry.create_from_ruby_hash(organization_type: "Organization", organization_id: organization.id, particulars: "Paid the BIR", transacted_at: on.in_time_zone.change(hour: 12).iso8601,
-                                                         details: [ { account_code: "2300", amount: "PHP -#{cents / 100}" }, { account_code: "1010", amount: "PHP -#{cents / 100}" } ])
+                                                         details: [ { account_code: "2300", amount: "PHP #{-cents / 100}" }, { account_code: "1010", amount: "PHP #{-cents / 100}" } ])
     entry.post(entry.transacted_at)
   end
 
@@ -68,16 +68,18 @@ RSpec.describe TudlaAccounting::Reports::Withholding, type: :service do
     paid.void!(on: Date.new(2026, 4, 3), reason: "Bounced")
 
     expect(first_quarter.checks("from_supplier").sole).to have_attributes(account: account("2300"), listed: php(400), movement: php(400), difference: php(0))
-    expect(second_quarter.checks("from_supplier").sole).to have_attributes(listed: php(-220), movement: php(-220), difference: php(0))
+    expect(second_quarter.checks("from_supplier").sole).to have_attributes(listed: php(-220), movement: php(-220), settled: php(0), difference: php(0))
     expect(first_quarter.checks("by_customer").sole).to have_attributes(account: account("1200"), listed: php(200), movement: php(200), difference: php(0))
-    expect(second_quarter.checks("by_customer").sole).to have_attributes(listed: php(-200), movement: php(-200), difference: php(0))
+    expect(second_quarter.checks("by_customer").sole).to have_attributes(listed: php(-200), movement: php(-200), settled: php(0), difference: php(0))
     expect(second_quarter.qap.sole).to have_attributes(contact: supplier, base: php(-11_000), withheld: php(-220))
   end
 
-  it "shows a payment to the tax authority as a difference from the account" do
+  it "expects a payment to the tax authority, leaving no difference, while tax entered by hand still shows" do
     bill(Date.new(2026, 1, 10))
     remit(Date.new(2026, 2, 10), 200_00)
-    expect(first_quarter.checks("from_supplier").sole).to have_attributes(listed: php(200), movement: php(0), difference: php(-200))
+    expect(first_quarter.checks("from_supplier").sole).to have_attributes(listed: php(200), movement: php(0), settled: php(200), difference: php(0))
+    remit(Date.new(2026, 3, 10), -50_00) # a credit to the account in an entry that withheld nothing
+    expect(first_quarter.checks("from_supplier").sole).to have_attributes(movement: php(50), settled: php(200), difference: php(50))
   end
 
   it "lists only marked certificates in the SAWT, saying what it leaves out" do
@@ -130,10 +132,12 @@ RSpec.describe TudlaAccounting::Reports::Withholding, type: :service do
         "Withheld from suppliers,WC120,Contractors,2.0,200.00,0.00,0.00,10000.00,200.00",
         "Withheld from suppliers,,Total,,200.00,500.00,0.00,15000.00,700.00",
         "Withheld from suppliers,2300,Withholding payable: account's movement,,,,,,700.00",
+        "Withheld from suppliers,2300,Withholding payable: paid to the tax authority,,,,,,0.00",
         "Withheld from suppliers,2300,Withholding payable: difference,,,,,,0.00",
         "Withheld by customers,WC120,Contractors,2.0,200.00,150.00,0.00,17500.00,350.00",
         "Withheld by customers,,Total,,200.00,150.00,0.00,17500.00,350.00",
         "Withheld by customers,1200,Creditable tax: account's movement,,,,,,350.00",
+        "Withheld by customers,1200,Creditable tax: claimed against tax due,,,,,,0.00",
         "Withheld by customers,1200,Creditable tax: difference,,,,,,0.00"
       ])
     end

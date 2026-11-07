@@ -71,7 +71,7 @@ RSpec.describe "Withholding reports", type: :request do
       expect(css_select("#thru_id option[selected]").first.text).to include("Jun 2026")
       expect(cells("[data-withholding-summary=from_supplier] tbody tr").first).to eq("WC120 Contractors 2% 200.00 0.00 0.00 10,000.00 200.00")
       expect(text("[data-total=by_customer]")).to eq([ "300.00" ])
-      expect(cells("[data-withholding-check=from_supplier] tbody tr")).to eq([ "2300 - Withholding payable 200.00 200.00 0.00" ])
+      expect(cells("[data-withholding-check=from_supplier] tbody tr")).to eq([ "2300 - Withholding payable 200.00 200.00 0.00 0.00" ])
 
       get routes.reports_withholding_path(from_id: month(1).id, thru_id: month(3).id)
       expect(text("[data-withholding-summary] p")).to eq([ "Nothing in these months.", "Nothing in these months." ])
@@ -102,7 +102,7 @@ RSpec.describe "Withholding reports", type: :request do
       expect(css_select("[data-reversed]")).to be_empty
       expect(css_select("[data-missing-tin]")).to be_empty
       expect(css_select("[data-not-listed] a").first["href"]).to eq(routes.withholding_certificates_path)
-      expect(cells("[data-withholding-check=by_customer] tbody tr")).to eq([ "1200 - Creditable tax 300.00 300.00 0.00" ])
+      expect(cells("[data-withholding-check=by_customer] tbody tr")).to eq([ "1200 - Creditable tax 300.00 300.00 0.00 0.00" ])
 
       get routes.reports_sawt_path(from_id: month(1).id, thru_id: month(3).id)
       expect(response.body).to include("No certificates marked received for these months.")

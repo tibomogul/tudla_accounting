@@ -181,9 +181,9 @@ Grouped in the suggested order. Items marked **(decide)** need a decision before
 
 ### Withholding, smaller items
 
-- [ ] Let a pay run skip withholding for one supplier.
+- [x] Let a pay run skip withholding for one supplier. A box beside the supplier; `skip_withholding` in `PayRun.call` and the API.
 - [ ] **(decide)** Whether the no-ABN code should skip small payments, once the ATO threshold rules are confirmed.
-- [ ] Let the withholding checks show payments to the tax office as expected, rather than as a difference.
+- [x] Let the withholding checks show payments to the tax office as expected, rather than as a difference. A "Paid to the tax authority" (or "Claimed against tax due") figure; reversals of withholding entries don't count in it.
 
 ### Not code: confirm with an adviser or the tax office
 

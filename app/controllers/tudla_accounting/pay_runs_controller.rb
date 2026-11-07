@@ -11,15 +11,17 @@ module TudlaAccounting
       load_bills(params)
       @selected = @bills.map(&:id).to_set
       @amounts = {}
+      @skipped = Set.new
       @pay_run = { paid_on: today, reference: "Pay run #{today.strftime('%-d %b %Y')}", email: true }
     end
 
     def create
-      permitted = params.require(:pay_run).permit(:account_id, :due_by, :contact_id, :paid_on, :reference, :exchange_rate, :email, pay: {}, amounts: {})
+      permitted = params.require(:pay_run).permit(:account_id, :due_by, :contact_id, :paid_on, :reference, :exchange_rate, :email, pay: {}, amounts: {}, withhold: {})
       load_bills(permitted)
       problems = []
       @selected = (permitted[:pay]&.to_h || {}).select { |_id, chosen| chosen == "1" }.keys.map(&:to_i).to_set
       @amounts = (permitted[:amounts]&.to_h || {}).transform_keys(&:to_i)
+      @skipped = (permitted[:withhold]&.to_h || {}).select { |_id, chosen| chosen == "0" }.keys.map(&:to_i).to_set
       @pay_run = { paid_on: permitted[:paid_on], reference: permitted[:reference], email: permitted[:email] == "1", exchange_rate: permitted[:exchange_rate] }
       paid_on = iso_date(permitted[:paid_on])
       problems << "Give the date it is paid" unless paid_on
@@ -33,7 +35,7 @@ module TudlaAccounting
       raise ArgumentError, problems.to_sentence if problems.any?
 
       result = PayRun.call(organization: accounting_organization, account: @account, paid_on: paid_on, bills: chosen, reference: permitted[:reference],
-                           exchange_rate: rate, email: @pay_run[:email])
+                           exchange_rate: rate, email: @pay_run[:email], skip_withholding: @skipped)
       redirect_to paid_payments_path, notice: notice(result)
     rescue ArgumentError => e
       @error = e.message

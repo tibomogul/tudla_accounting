@@ -59,6 +59,8 @@ module TudlaAccounting
 
       # A section a side: a row per code with its months, then the total and the accounts'
       # movement.
+      SETTLED = { "from_supplier" => "Paid to the tax authority", "by_customer" => "Claimed against tax due" }.freeze
+
       def withholding_summary(report)
         months = report.months
         blanks = Array.new(months.size)
@@ -66,6 +68,7 @@ module TudlaAccounting
           summary = report.summary(direction)
           checks = report.checks(direction).flat_map do |check|
             [ [ section, check.account.code, "#{check.account.name}: account's movement", nil, *blanks, nil, check.movement ],
+              [ section, check.account.code, "#{check.account.name}: #{SETTLED.fetch(direction).downcase_first}", nil, *blanks, nil, check.settled ],
               [ section, check.account.code, "#{check.account.name}: difference", nil, *blanks, nil, check.difference ] ]
           end
           [ *summary.map { |row| [ section, row.code.code, row.code.name, row.code.rate * 100, *row.months, row.base, row.withheld ] },

@@ -86,6 +86,17 @@ RSpec.describe "JSON API: the supplier pay run", type: :request do
     expect(count.call("many", [ hosting, *others ].map { |document| { document_id: document.id } })).to be <= few
   end
 
+  it "withholds under a supplier's no-ABN code, unless told to skip it" do
+    TudlaAccounting::AccountsCreator.call([ { code: "2350", name: "No-ABN withholding", category: "liability" } ], organization)
+    noabn = TudlaAccounting::WithholdingCode.create!(organization: organization, code: "NOABN", name: "No ABN quoted", rate: "0.47", payable_account: account("2350"), withheld_on: "payment")
+    [ cloudware, initech ].each { |supplier| supplier.update!(default_withholding_code: noabn) }
+    body = { account_code: "1000", paid_on: "2026-04-15", bills: [ { document_id: hosting.id }, { document_id: paper.id } ], skip_withholding: [ initech.id ] }
+
+    payments = call(:post, routes.api_v1_pay_runs_path, body)["data"]["payments"]
+    expect(payments.map { |payment| payment.values_at("amount", "withheld") }).to eq([ %w[58.30 51.70], %w[30.00 0.00] ])
+    expect(call(:post, routes.api_v1_pay_runs_path, body.merge(skip_withholding: initech.id))["error"]).to include("message" => "Give skip_withholding as a list of supplier ids")
+  end
+
   it "returns what the first made when a second run with its key raced it" do
     TudlaAccounting::PayRun.call(organization: organization, account: account("1000"), paid_on: Date.new(2026, 4, 15), bills: [ { document: paper, amount_cents: 10_00 } ],
                                  idempotency_key: "api:run-2:pay_run")

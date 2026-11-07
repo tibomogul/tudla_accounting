@@ -91,7 +91,8 @@ RSpec.describe "Tax withheld when paying a supplier", type: :request do
     other = TudlaAccounting::Document.create!(organization: organization, kind: "bill", contact: plain, issued_on: Date.new(2026, 4, 1), due_on: Date.new(2026, 4, 30),
                                               lines_attributes: [ { description: "Books", unit_price_cents: 200_00, account: account("6000") } ]).approve!
     get routes.new_pay_run_path(account_id: account("1010").id, due_by: "2026-05-31")
-    expect(text("tbody[data-supplier] [data-withholding]")).to eq([ "· NOABN (47%) is withheld from what is paid" ])
+    expect(text("tbody[data-supplier] [data-withholding]")).to eq([ "· withhold NOABN (47%) from what is paid" ])
+    expect(css_select("input[type=checkbox][name='pay_run[withhold][#{supplier.id}]']").sole["checked"]).to eq("checked")
 
     post routes.pay_run_path, params: { pay_run: { account_id: account("1010").id, due_by: "2026-05-31", paid_on: "2026-04-15", reference: "Pay run",
                                                    pay: { owed.id.to_s => "1", other.id.to_s => "1" }, amounts: { owed.id.to_s => "1000.00", other.id.to_s => "200.00" } } }
@@ -100,6 +101,19 @@ RSpec.describe "Tax withheld when paying a supplier", type: :request do
     expect(paid).to eq("Handy Repairs" => [ 530_00, 470_00 ], "Ledger & Co" => [ 200_00, 0 ])
     expect([ owed, other ].map { |document| document.reload.payment_status }).to eq(%w[paid paid])
     expect(TudlaAccounting::WithheldTax.where(organization: organization).sole).to have_attributes(contact: supplier, base_cents: 1_000_00, withheld_cents: 470_00)
+  end
+
+  it "pays a supplier in full in a pay run when told not to withhold this time, keeping the choice when it can't pay" do
+    owed = bill
+    run = { account_id: account("1010").id, due_by: "2026-05-31", reference: "Pay run", pay: { owed.id.to_s => "1" }, amounts: { owed.id.to_s => "1000.00" },
+            withhold: { supplier.id.to_s => "0" } }
+    post routes.pay_run_path, params: { pay_run: run.merge(paid_on: "") }
+    expect(css_select("input[type=checkbox][name='pay_run[withhold][#{supplier.id}]']").sole["checked"]).to be_nil
+
+    post routes.pay_run_path, params: { pay_run: run.merge(paid_on: "2026-04-15") }
+    expect(flash[:notice]).to eq("Paid 1 supplier $1,000.00 in all.")
+    expect(TudlaAccounting::Payment.where(organization: organization).sole).to have_attributes(amount_cents: 1_000_00, withheld_cents: 0)
+    expect(TudlaAccounting::WithheldTax.where(organization: organization)).to be_empty
   end
 
   it "withholds it when a bank line is recorded as paying the bill, the line being the cash after the tax" do

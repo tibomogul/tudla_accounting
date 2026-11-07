@@ -19,6 +19,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- A pay run can pay a supplier in full this time instead of withholding under its no-ABN code: untick the box beside the supplier, or pass `skip_withholding` (supplier ids) to `PayRun.call` or `POST /pay_runs`.
+- The withholding checks show what was paid to the tax authority (or creditable tax claimed against tax due) as its own figure, from entries that withheld nothing, so a payment of the tax no longer shows as a difference.
 - Every lookup in the engine's controllers, views and helpers goes through `organization_scope` (now a view helper too), and a spec fails for one that doesn't. The line editor's tax codes no longer offer another organization's code that a line names.
 - Entries have `kind`: `realized_exchange`, `revaluation` or `revaluation_reversal` for the entries the engine posts by itself, null otherwise, filled for older ones by a migration from their particulars. Exchange differences and revaluations are recognised by it rather than by their wording, so running the revaluation again after renaming an account no longer posts it twice. The API's entries show it.
 - Entries have `reversal_of_id`: the entry a reversal reverses, set by `Entry#reverse!` and filled for older reversals by a migration from their "Reversal of: " particulars. Reversals are recognised by it, not by their wording, in `Entry#reversal`, the tax return's `account_credits`, the cash-basis tax summary and the SLSP, and an entry can be reversed only once, in the database too (a unique index). The API's entries show it as `reversal_of_entry_id`.

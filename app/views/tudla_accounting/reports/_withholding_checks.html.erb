@@ -4,14 +4,14 @@
 <% if checks.any? %>
   <section class="tc-card overflow-x-auto mb-6" aria-label="Against the accounts" data-withholding-check="<%= direction %>">
     <table class="tc-table">
-      <thead><tr><th>Account</th><th class="tc-num">Tax withheld here</th><th class="tc-num">Account's movement</th><th class="tc-num">Difference</th></tr></thead>
+      <thead><tr><th>Account</th><th class="tc-num">Tax withheld here</th><th class="tc-num">Account's movement</th><th class="tc-num"><%= TudlaAccounting::Reports::Tables::SETTLED.fetch(direction) %></th><th class="tc-num">Difference</th></tr></thead>
       <tbody>
         <% checks.each do |check| %>
-          <tr><td><%= check.account.code_with_name %></td><td class="tc-num"><%= tc_money(check.listed) %></td><td class="tc-num"><%= tc_money(check.movement) %></td>
+          <tr><td><%= check.account.code_with_name %></td><td class="tc-num"><%= tc_money(check.listed) %></td><td class="tc-num"><%= tc_money(check.movement) %></td><td class="tc-num"><%= tc_money(check.settled) %></td>
             <td class="tc-num <%= "tc-negative" unless check.difference.zero? %>"><%= tc_money(check.difference) %></td></tr>
         <% end %>
       </tbody>
     </table>
-    <p class="tc-card-body tc-hint">A difference is usually a payment to the tax authority, or tax entered by hand or on an advance, which these figures leave out.</p>
+    <p class="tc-card-body tc-hint"><%= TudlaAccounting::Reports::Tables::SETTLED.fetch(direction) %> is what took the account down in entries that withheld nothing, as a payment of the tax does. A difference left is usually tax entered by hand or on an advance, which these figures leave out.</p>
   </section>
 <% end %>

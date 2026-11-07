@@ -9,9 +9,11 @@ module TudlaAccounting
     #
     # Reversals and supplier credits count in the months they were dated, so an earlier
     # quarter stays as it was, and a list can show a negative for one. What nets to nothing
-    # is left out. checks compares the rows with the movement on the codes' accounts: a
-    # difference is usually a payment to the tax authority, or tax entered by hand, which
-    # the rows don't include.
+    # is left out. checks compares the rows with the movement on the codes' accounts. What
+    # takes the account down in entries that withheld nothing (a payment to the tax
+    # authority, or creditable tax claimed against tax due) is expected, and shown apart as
+    # settled; a difference left is tax entered by hand, or on an advance, which the rows
+    # don't include.
     #
     #   report = Withholding.new(organization, from: january, thru: march)
     #   report.summary("from_supplier") # => [#<SummaryRow code months base withheld>, ...]
@@ -19,8 +21,8 @@ module TudlaAccounting
     class Withholding
       SummaryRow = Data.define(:code, :months, :base, :withheld)
       ListRow = Data.define(:contact, :code, :base, :withheld)
-      Check = Data.define(:account, :listed, :movement) do
-        def difference = movement - listed
+      Check = Data.define(:account, :listed, :movement, :settled) do
+        def difference = movement - listed + settled
       end
       ACCOUNTS = { "from_supplier" => :payable_account, "by_customer" => :creditable_account }.freeze
 
@@ -70,7 +72,8 @@ module TudlaAccounting
         attribute = ACCOUNTS.fetch(direction)
         codes.values.select(&attribute).group_by(&attribute).sort_by { |account, _| account.code }.map do |account, held|
           code_ids = held.map(&:id)
-          Check.new(account: account, listed: money(rows(direction).where(withholding_code_id: code_ids).sum(:withheld_cents)), movement: movement(account))
+          Check.new(account: account, listed: money(rows(direction).where(withholding_code_id: code_ids).sum(:withheld_cents)), movement: movement(account),
+                    settled: settled(account))
         end
       end
 
@@ -105,6 +108,17 @@ module TudlaAccounting
         sums = Detail.joins(:entry).where(account_id: account.subtree_ids, tudla_accounting_entries: { posted_at: from.from_date..thru.thru_date }).group(:tally).sum(:amount_cents)
         debits = sums.fetch(Detail::TALLY_DEBIT, 0) - sums.fetch(Detail::TALLY_CREDIT, 0)
         money(account.debit_balance? ? debits : -debits)
+      end
+
+      # What took the account down in the months in entries that withheld nothing (nor
+      # reverse one that did): paid to the tax authority, or claimed against tax due.
+      # Positive.
+      def settled(account)
+        withheld = WithheldTax.where(organization: organization).select(:entry_id)
+        withholding = Entry.where(id: withheld).or(Entry.where(reversal_of_id: withheld)).select(:id)
+        lines = Detail.joins(:entry).where(account_id: account.subtree_ids, tudla_accounting_entries: { posted_at: from.from_date..thru.thru_date })
+                      .where.not(entry_id: withholding)
+        money(lines.where(tally: account.debit_balance? ? Detail::TALLY_CREDIT : Detail::TALLY_DEBIT).sum(:amount_cents))
       end
 
       def money(cents) = Money.new(cents, organization.currency)
