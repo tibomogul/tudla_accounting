@@ -109,7 +109,7 @@ module TudlaAccounting
       # invoices and bills are paid). The report can choose either.
       @tax_basis = :accrual
       # How error messages and warnings name an organization (one with no account marked
-      # for a role, say), e.g. ->(organization) { organization.name }
+      # for a role, say): text, or a callable, e.g. ->(organization) { organization.name }
       @organization_label = ->(organization) { "#{organization.class.name} #{organization.id}" }
       # Which run of numbers a posted entry is numbered in; see entry_number_series=.
       @entry_number_series = :organization
@@ -127,20 +127,23 @@ module TudlaAccounting
       # How approved invoices, bills and credit notes are numbered, each kind in its own run
       # from 1; see document_number_format=.
       @document_number_format = DOCUMENT_NUMBER_FORMAT
-      # What a printed invoice or credit note says about who it's from: a callable given the
-      # organization, returning text (lines break where it has newlines), e.g.
+      # What a printed invoice or credit note says about who it's from: text (lines break
+      # where it has newlines), or a callable given the organization returning it, e.g.
       #   ->(organization) { [ organization.name, organization.address, "ABN #{organization.abn}" ].join("\n") }
       # Without one, the organization's name (or organization_label).
       @document_header = nil
       # The heading of each printed page of the books of accounts (Reports::BooksOfAccounts):
-      # a callable given the organization, returning text, its first line the registered
-      # name, e.g. for the BIR's loose-leaf books
+      # text, its first line the registered name, or a callable given the organization
+      # returning it, e.g. for the BIR's loose-leaf books
       #   ->(organization) { "#{organization.name}\nTIN: #{organization.tin}   |   #{organization.address}" }
       # Without one, the document_header.
       @books_header = nil
+      # Who signs the tax certificates issued to suppliers (see withholding_agent_for): a
+      # hash, or a callable given the organization returning one.
       @withholding_agent = nil
-      # How an organization is registered for tax, on its printed documents: a callable
-      # giving a TaxRegistration, or nil to leave them as they are.
+      # How an organization is registered for tax, on its printed documents: a
+      # TaxRegistration, or a callable given the organization returning one; nil leaves
+      # them as they are.
       @tax_registration = nil
       # Which country's tax pieces an organization has: a country code ("PH" for the
       # BIR's books, summary lists, withholding forms and the purchase type on tax codes;
@@ -178,6 +181,27 @@ module TudlaAccounting
       @number_format = nil
     end
 
+    # The settings that can differ by organization. Each takes a value, or a callable given
+    # the organization returning one, and is read through for_organization (or its own
+    # *_for method). The others are the app's: a value, or for a few a callable given what
+    # they're about (current_organization, current_actor and authorize the controller;
+    # entry_number_series and entry_number_format the entry; document_number_format the
+    # document).
+    PER_ORGANIZATION = %i[organization_label cash_account_codes number_format country document_header books_header
+                          withholding_agent tax_registration document_mail_from document_mail_reply_to].freeze
+
+    # A per-organization setting's value for an organization: the setting, or what its
+    # callable gives for the organization.
+    def for_organization(setting, organization)
+      raise ArgumentError, "#{setting} isn't a per-organization setting; they are #{PER_ORGANIZATION.join(', ')}" unless PER_ORGANIZATION.include?(setting)
+
+      value = public_send(setting)
+      value.respond_to?(:call) ? value.call(organization) : value
+    end
+
+    # The organization_label setting's name for an organization.
+    def organization_label_for(organization) = for_organization(:organization_label, organization).to_s
+
     NUMBER_FORMATS = %i[point comma].freeze
 
     # How the pages write numbers, and read those typed into them: :point ("1,234.56") or
@@ -194,10 +218,10 @@ module TudlaAccounting
 
     # An organization's number format: :point, :comma, or nil for its currency's marks.
     def number_format_for(organization)
-      format = number_format.respond_to?(:call) ? number_format.call(organization) : number_format
+      format = for_organization(:number_format, organization)
       return if format.blank?
 
-      format.to_s.to_sym.presence_in(NUMBER_FORMATS) or raise ArgumentError, "number_format gave #{format.inspect} for #{organization_label.call(organization)}; expected :point, :comma or nil"
+      format.to_s.to_sym.presence_in(NUMBER_FORMATS) or raise ArgumentError, "number_format gave #{format.inspect} for #{organization_label_for(organization)}; expected :point, :comma or nil"
     end
 
     # The days after an invoice's due date at which its customer is emailed a reminder,
@@ -242,10 +266,7 @@ module TudlaAccounting
     end
 
     # A from or reply-to setting's address for an organization, or nil.
-    def document_mail_address(setting, organization)
-      value = public_send(setting)
-      (value.respond_to?(:call) ? value.call(organization) : value).presence
-    end
+    def document_mail_address(setting, organization) = for_organization(setting, organization).presence
 
     DOCUMENT_NUMBER_FORMAT = { "sales_invoice" => "INV-%<number>04d", "sales_credit" => "CN-%<number>04d",
                                "bill" => "BILL-%<number>04d", "supplier_credit" => "SC-%<number>04d" }.freeze
@@ -274,30 +295,30 @@ module TudlaAccounting
 
     # The document_header setting's text for an organization.
     def document_header_for(organization)
-      return document_header.call(organization).to_s if document_header
+      return for_organization(:document_header, organization).to_s if document_header
 
-      organization.respond_to?(:name) && organization.name.present? ? organization.name : TudlaAccounting.organization_label(organization)
+      organization.respond_to?(:name) && organization.name.present? ? organization.name : organization_label_for(organization)
     end
 
     # The books_header setting's text for an organization.
     def books_header_for(organization)
-      books_header ? books_header.call(organization).to_s : document_header_for(organization)
+      books_header ? for_organization(:books_header, organization).to_s : document_header_for(organization)
     end
 
     # Who signs the tax certificates issued to suppliers: the withholding_agent setting's
     # details for an organization (tin, name, address, zip, signatory_name, signatory_tin,
     # signatory_title), by default only its name.
     def withholding_agent_for(organization)
-      name = organization.respond_to?(:name) && organization.name.present? ? organization.name : TudlaAccounting.organization_label(organization)
-      { name: name, tin: nil, address: nil, zip: nil, signatory_name: nil, signatory_tin: nil, signatory_title: nil }.merge(withholding_agent&.call(organization).to_h)
+      name = organization.respond_to?(:name) && organization.name.present? ? organization.name : organization_label_for(organization)
+      { name: name, tin: nil, address: nil, zip: nil, signatory_name: nil, signatory_tin: nil, signatory_title: nil }.merge(for_organization(:withholding_agent, organization).to_h)
     end
 
     # The tax_registration setting's TaxRegistration for an organization, or nil.
-    def tax_registration_for(organization) = tax_registration&.call(organization)
+    def tax_registration_for(organization) = for_organization(:tax_registration, organization)
 
     # The country setting's code for an organization, upper case, or nil.
     def country_for(organization)
-      (country.respond_to?(:call) ? country.call(organization) : country).presence&.to_s&.upcase
+      for_organization(:country, organization).presence&.to_s&.upcase
     end
 
     # Whether an organization sees a country's reports: when it's that country's, or when
@@ -352,7 +373,7 @@ module TudlaAccounting
     def cash_account_codes_for(organization)
       raise ArgumentError, "an organization is required" if organization.nil?
 
-      codes = cash_account_codes.respond_to?(:call) ? cash_account_codes.call(organization) : cash_account_codes
+      codes = for_organization(:cash_account_codes, organization)
       Array(codes).filter_map { |code| code.to_s.presence }
     end
 
@@ -438,7 +459,7 @@ module TudlaAccounting
 
   # The organization_label setting's name for an organization.
   def self.organization_label(organization)
-    configuration.organization_label.call(organization)
+    configuration.organization_label_for(organization)
   end
 
   def self.configure

@@ -652,7 +652,10 @@ The generator writes `config/initializers/tudla_accounting.rb` with every settin
 
 ### Configuration
 
-Configure the engine in an initializer, e.g. `config/initializers/tudla_accounting.rb`:
+Configure the engine in an initializer, e.g. `config/initializers/tudla_accounting.rb`.
+
+Some settings can differ by organization: `organization_label`, `cash_account_codes`, `number_format`, `country`, `document_header`, `books_header`, `withholding_agent`, `tax_registration`, `document_mail_from` and `document_mail_reply_to` (`TudlaAccounting::Configuration::PER_ORGANIZATION`). Each takes a value, for an app with one set of books or the same answer for all, or a callable given the organization returning one, and `config.for_organization(setting, organization)` reads either. The rest are the app's: one value, except that a few take a callable given what they're about (`current_organization`, `current_actor` and `authorize` the controller; `entry_number_series` and `entry_number_format` the entry; `document_number_format` the document).
+
 
 ```ruby
 TudlaAccounting.configure do |config|
@@ -666,14 +669,14 @@ TudlaAccounting.configure do |config|
                                           # (default_currency, rounding_mode, locale_backend) stay the host app's
   config.rounding = BigDecimal::ROUND_HALF_UP # how the engine rounds tax, line amounts, conversions and imports
   config.time_zone = "UTC"                # zone PeriodCreator builds periods in; plain Dates are read in it
-  config.number_format = nil              # how pages write and read numbers: :point (1,234.56), :comma (1.234,56),
-                                          # or ->(organization) { ... } giving either; nil for the currency's own marks
+  config.number_format = nil              # per organization: how pages write and read numbers, :point (1,234.56) or
+                                          # :comma (1.234,56); nil for the currency's own marks
   # Retained earnings, receivables, payables and exchange gains are accounts marked by
   # role in each organization's chart (see account roles), not settings.
-  config.cash_account_codes = %w[1010]    # the cash flow statement's default cash, with sub-accounts;
-  # or a callable given the organization, for books whose charts differ (a bookkeeper's clients):
+  config.cash_account_codes = %w[1010]    # per organization: the cash flow statement's default cash, with sub-accounts;
+  # a callable for books whose charts differ (a bookkeeper's clients):
   # config.cash_account_codes = ->(organization) { organization.cash_account_codes }
-  config.organization_label = ->(organization) { organization.name } # names it in errors (default: class and id)
+  config.organization_label = ->(organization) { organization.name } # per organization: names it in errors (default: class and id)
 
   # Journal numbers, given when entries are posted (see numbers and references)
   config.entry_number_series = :organization # or :financial_year, or ->(entry) { "series" }
@@ -701,6 +704,7 @@ TudlaAccounting.configure do |config|
 
   # Invoices, bills and credit notes (the engine's own documents)
   config.document_number_format = { "sales_invoice" => "%<number>05d" } # over INV-0001, CN-0001, BILL-0001, SC-0001; or ->(document) { ... }
+  # Per organization, each a value or a callable given the organization:
   config.document_header = ->(organization) { "#{organization.name}\n#{organization.address}" } # who a printed document is from
   config.tax_registration = ->(organization) { TudlaAccounting::TaxRegistration.australia(organization.abn) } # or TaxRegistration.new(label:, number:, tax_name:, invoice_title:, check:); what's printed about tax
   config.books_header = ->(organization) { "#{organization.name}\nTIN: #{organization.tin}   |   #{organization.address}" } # heads the books of accounts' pages; the document_header if unset
@@ -713,8 +717,8 @@ TudlaAccounting.configure do |config|
   config.pdf_stylesheet = nil             # found among the host's assets as tailwind.css; or a path, or ->{ css }
 
   # Emailing documents to customers and suppliers (sent through the host's ActionMailer setup)
-  config.document_mail_from = ->(organization) { "#{organization.name} <accounts@example.com>" } # or text; the ActionMailer default if nil
-  config.document_mail_reply_to = "accounts@example.com"
+  config.document_mail_from = ->(organization) { "#{organization.name} <accounts@example.com>" } # per organization; the ActionMailer default if nil
+  config.document_mail_reply_to = "accounts@example.com" # per organization
   config.document_email_templates = { invoice: { subject: "Invoice %{number} from %{organization}" } } # over the defaults
   config.document_mailer = "TudlaAccounting::DocumentMailer" # or one of the host's: delivery(delivery, pdf:, filename:)
   config.reminder_days = [ 7, 14, 30 ]   # days after the due date to remind customers of overdue invoices (none by default)

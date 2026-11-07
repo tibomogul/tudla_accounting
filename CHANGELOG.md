@@ -19,6 +19,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Every setting that can differ by organization (`Configuration::PER_ORGANIZATION`) takes either a value or a callable given the organization, read through `config.for_organization(setting, organization)`. `document_header`, `books_header`, `withholding_agent`, `tax_registration` and `organization_label` took only a callable before; a value now works for an app with one set of books. The README says which settings are per organization.
 - The engine no longer sets money-rails' defaults (`default_currency`, `rounding_mode`, `locale_backend`) for the whole app: they stay the host app's. It rounds with its own `rounding` setting (`TudlaAccounting.money(amount, currency)`) and writes numbers in each currency's or organization's marks. `TudlaAccounting.apply_money_settings!` is gone; a host that relied on the engine setting Money's default currency should set it in its own money-rails initializer.
 - The engine no longer adds its own spec factories to a host app's FactoryBot paths, where they could clash with the host's factories (such as `:organization`).
 - The API's payments list (`GET /payments`) and a pay run's response load what each payment was applied to for the whole page at once, rather than six queries a payment. `Payment.preload_applications` does the same for any list of payments.

@@ -1,4 +1,5 @@
 require "rails_helper"
+require_relative "../../support/configuration"
 
 RSpec.describe TudlaAccounting::Configuration do
   subject(:config) { described_class.new }
@@ -59,6 +60,36 @@ RSpec.describe TudlaAccounting::Configuration do
 
     it "needs the organization" do
       expect { config.cash_account_codes_for(nil) }.to raise_error(ArgumentError, "an organization is required")
+    end
+  end
+
+  describe "#for_organization" do
+    include_context "with isolated TudlaAccounting configuration"
+
+    let(:organization) { Struct.new(:id, :name, :currency).new(7, "Acme", "AUD") }
+    let(:values) do
+      { organization_label: "Acme Pty Ltd", cash_account_codes: %w[1010], number_format: :comma, country: "AU", document_header: "Acme\n1 Demo Street",
+        books_header: "ACME", withholding_agent: { tin: "1" }, tax_registration: TudlaAccounting::TaxRegistration.australia("51 824 753 556"),
+        document_mail_from: "accounts@acme.test", document_mail_reply_to: "help@acme.test" }
+    end
+
+    it "reads every per-organization setting the same whether given a value or a callable" do
+      expect(values.keys).to match_array(described_class::PER_ORGANIZATION)
+      read = lambda do
+        [ TudlaAccounting.organization_label(organization), config.cash_account_codes_for(organization), config.number_format_for(organization), config.country_for(organization),
+          config.document_header_for(organization), config.books_header_for(organization), config.withholding_agent_for(organization)[:tin],
+          config.tax_registration_for(organization), config.document_mail_address(:document_mail_from, organization), config.document_mail_address(:document_mail_reply_to, organization) ]
+      end
+      TudlaAccounting.configuration = config
+      values.each { |setting, value| config.public_send(:"#{setting}=", value) }
+      as_values = read.call
+      values.each { |setting, value| config.public_send(:"#{setting}=", ->(org) { value if org.name == "Acme" }) }
+      expect(read.call).to eq(as_values)
+      expect(as_values).to eq([ "Acme Pty Ltd", %w[1010], :comma, "AU", "Acme\n1 Demo Street", "ACME", "1", values[:tax_registration], "accounts@acme.test", "help@acme.test" ])
+    end
+
+    it "refuses a setting that isn't per organization" do
+      expect { config.for_organization(:rounding, organization) }.to raise_error(ArgumentError, /rounding isn't a per-organization setting/)
     end
   end
 

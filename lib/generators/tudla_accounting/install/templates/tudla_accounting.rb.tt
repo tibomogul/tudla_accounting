@@ -1,4 +1,7 @@
-# TudlaAccounting settings. See the engine's README for what each one does.
+# TudlaAccounting settings. See the engine's README for what each one does. Settings
+# that can differ by organization (TudlaAccounting::Configuration::PER_ORGANIZATION:
+# cash_account_codes, number_format, country, document_header and others) take a value,
+# or a callable given the organization returning one.
 TudlaAccounting.configure do |config|
   # --- Pages (mounted at <%= options[:mount_path] %>) ---
   # Engine controllers inherit from this controller, so its login and helpers apply.
@@ -19,7 +22,7 @@ TudlaAccounting.configure do |config|
   # in the account form, a Role column in the chart import, or AccountsCreator's role:.
   # config.tax_basis = :cash # tax summary counts tax as invoices and bills are paid (default :accrual)
   # config.cash_account_codes = %w[1010] # cash for the cash flow statement (with sub-accounts)
-  # or a callable given the organization, when charts differ (a bookkeeper's clients):
+  # or, when charts differ (a bookkeeper's clients):
   # config.cash_account_codes = ->(organization) { organization.cash_account_codes }
   # config.organization_label = ->(organization) { organization.name } # names it in errors (default: class and id)
   # Journal numbers, given as entries are posted: one run per organization by default,
