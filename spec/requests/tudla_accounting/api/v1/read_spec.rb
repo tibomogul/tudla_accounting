@@ -164,6 +164,23 @@ RSpec.describe "JSON API: reading the books", type: :request do
     expect(json.dig("error", "message")).to eq("Updated_since must be an ISO 8601 time")
   end
 
+  it "lists payments in the same queries however many there are" do
+    count = lambda do
+      queries = 0
+      counter = ->(*, payload) { queries += 1 unless payload[:name].in?(%w[SCHEMA TRANSACTION]) || payload[:cached] }
+      ActiveSupport::Notifications.subscribed(counter, "sql.active_record") { api_get(routes.api_v1_payments_path) }
+      queries
+    end
+    receive = ->(cents, applications = []) { TudlaAccounting::Payment.record!(organization: organization, kind: "received", contact: northwind, account: account("1000"), paid_on: Date.new(2026, 4, 10), amount_cents: cents, applications: applications) }
+    receive.call(100_00, [ { document: invoice!, amount_cents: 100_00 } ])
+    few = count.call
+    2.times { receive.call(100_00, [ { document: invoice!, amount_cents: 100_00 } ]) }
+    overpaid = receive.call(50_00)
+    TudlaAccounting::Payment.record!(organization: organization, kind: "refund", contact: northwind, account: account("1000"), paid_on: Date.new(2026, 4, 12), amount_cents: 50_00, refund_of: overpaid)
+    expect(count.call).to be <= few
+    expect(json["data"].map { |row| [ row["kind"], row["applied"].size, row.dig("refund_of", "payment_id") ] }).to eq([ [ "received", 1, nil ], [ "received", 1, nil ], [ "received", 1, nil ], [ "received", 1, nil ], [ "refund", 0, overpaid.id ] ])
+  end
+
   it "shows contacts, invoices with what is owed, payments with what they paid, tax codes and periods" do
     invoice = invoice!
     payment = TudlaAccounting::Payment.record!(organization: organization, kind: "received", contact: northwind, account: account("1000"), paid_on: Date.new(2026, 4, 10),

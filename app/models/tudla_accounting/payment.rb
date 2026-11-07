@@ -174,7 +174,20 @@ module TudlaAccounting
 
     # [document, payment (a refund) or entry, amount, allocation] for each allocation of
     # it, in order; none on a refund.
-    def applications = self.class.applications_for([ self ]).fetch(self)
+    def applications = @applications || self.class.applications_for([ self ]).fetch(self)
+
+    # Loads every payment's applications at once (a page of the API's list, say), so each
+    # one's #applications needs no query; reload forgets them. Returns the payments.
+    def self.preload_applications(payments)
+      payments = payments.to_a
+      applications_for(payments).each { |payment, made| payment.instance_variable_set(:@applications, made) }
+      payments
+    end
+
+    def reload(...)
+      @applications = nil
+      super
+    end
 
     # Each payment's applications (see #applications), in a few queries however many
     # payments there are: { payment => [[target, amount, allocation], ...] }.

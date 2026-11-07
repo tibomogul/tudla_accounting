@@ -5,7 +5,18 @@ module TudlaAccounting
     # dates are ISO 8601 ("2026-03-31") and times ISO 8601 with their offset. Accounts, tax
     # codes and dimension values are named by their codes.
     module Representation
+      # What payment_json reads beyond a payment's own columns.
+      PAYMENT_INCLUDES = [ :organization, :contact, :account, { withheld_taxes: %i[withholding_code organization],
+                                                                entry: [ { details: { carrying_amount: :forex } }, { related: :source } ] } ].freeze
+
       private
+
+      # A list of payments, loaded for payment_json in the same few queries however many.
+      def payments_for_json(payments)
+        payments = payments.to_a
+        ActiveRecord::Associations::Preloader.new(records: payments, associations: PAYMENT_INCLUDES).call
+        Payment.preload_applications(payments)
+      end
 
       def amount(money) = money && Reports::Table.csv_cell(money)
       def time(value) = value&.iso8601

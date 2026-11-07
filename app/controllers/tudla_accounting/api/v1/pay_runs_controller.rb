@@ -64,7 +64,7 @@ module TudlaAccounting
         def emailed(payments) = Delivery.where(subject: payments).map(&:subject)
 
         def render_run(payments, emailed:, no_address: [], status: :ok)
-          render json: { data: { payments: payments.map { |payment| payment_json(payment) }, emailed_ids: emailed.map(&:id).uniq, no_address_ids: no_address.map(&:id) } },
+          render json: { data: { payments: payments_for_json(payments).map { |payment| payment_json(payment) }, emailed_ids: emailed.map(&:id).uniq, no_address_ids: no_address.map(&:id) } },
                  status: status
         end
       end

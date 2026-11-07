@@ -16,13 +16,13 @@ module TudlaAccounting
         permits :post, only: %i[create void]
 
         def index
-          payments = organization_scope(Payment).includes(:organization, :contact, :account, withheld_taxes: %i[withholding_code organization], entry: { details: :carrying_amount }).order(:paid_on, :id)
+          payments = organization_scope(Payment).order(:paid_on, :id)
           payments = payments.where(kind: params[:kind]) if params[:kind].present?
           payments = payments.where(status: params[:status]) if params[:status].present?
           payments = payments.where(contact_id: params[:contact_id]) if params[:contact_id].present?
           payments = payments.where(paid_on: date_param(:from)..) if params[:from].present?
           payments = payments.where(paid_on: ..date_param(:to)) if params[:to].present?
-          render_page(updated_since(payments)) { |payment| payment_json(payment) }
+          render_page(updated_since(payments), with_page: ->(records) { payments_for_json(records) }) { |payment| payment_json(payment) }
         end
 
         def show

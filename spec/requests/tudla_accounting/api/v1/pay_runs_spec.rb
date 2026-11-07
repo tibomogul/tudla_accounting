@@ -72,6 +72,20 @@ RSpec.describe "JSON API: the supplier pay run", type: :request do
     expect(TudlaAccounting::Payment.count).to eq(2)
   end
 
+  it "shows the payments a run made in the same queries however many there are" do
+    count = lambda do |key, bills|
+      call(:post, routes.api_v1_pay_runs_path, { account_code: "1000", paid_on: "2026-04-15", bills: bills }, key: key)
+      queries = 0
+      counter = ->(*, payload) { queries += 1 unless payload[:name].in?(%w[SCHEMA TRANSACTION]) || payload[:cached] }
+      ActiveSupport::Notifications.subscribed(counter, "sql.active_record") { call(:post, routes.api_v1_pay_runs_path, { account_code: "1000", paid_on: "2026-04-15", bills: bills }, key: key) }
+      expect(response.headers["Idempotent-Replayed"]).to eq("true")
+      queries
+    end
+    few = count.call("one", [ { document_id: paper.id } ])
+    others = Array.new(3) { |index| bill(TudlaAccounting::Contact.create!(organization: organization, name: "Supplier #{index}", kind: "supplier"), 10_00, due: Date.new(2026, 4, 10)) }
+    expect(count.call("many", [ hosting, *others ].map { |document| { document_id: document.id } })).to be <= few
+  end
+
   it "returns what the first made when a second run with its key raced it" do
     TudlaAccounting::PayRun.call(organization: organization, account: account("1000"), paid_on: Date.new(2026, 4, 15), bills: [ { document: paper, amount_cents: 10_00 } ],
                                  idempotency_key: "api:run-2:pay_run")

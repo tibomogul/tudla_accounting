@@ -129,6 +129,8 @@ Grouped in the suggested order. Items marked **(decide)** need a decision before
 - [x] Make `ReportPeriods#month_range(last_year:)` and `year_to_date` find the year by walking up the period tree, with a spec for books with quarters (they compare `root_id`).
 - [x] ~~Cap `WithholdingCode#split_cash`'s base at the amount due when matching a bank line.~~ Not a bug on recheck: tax withheld on payment is on the whole payment, so cash beyond the bill is still a payment to the supplier and taxed; it stays on them as an unapplied credit, as `Payment.record!` allows.
 
+- [x] Load the payments API list's applications for the whole page (`GET /payments` ran six queries a payment, `POST /pay_runs` the same for each payment made), with a query-count spec.
+
 ### 1. Jurisdiction
 
 - [ ] **(decide)** A jurisdiction setting per organization, or optional country add-ons that register their own pieces — or the first as a step towards the second.

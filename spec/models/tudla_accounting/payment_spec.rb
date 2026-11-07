@@ -44,6 +44,16 @@ RSpec.describe TudlaAccounting::Payment do
     expect(TudlaAccounting::AuditEvent.find_by!(action: "payment.recorded").details).to eq("amount_cents" => 150_00, "documents" => %w[INV-0001 INV-0002])
   end
 
+  it "preloads the applications of many payments, and forgets them on reload" do
+    first = document
+    payment = record(amount_cents: 100_00)
+    other = record(amount_cents: 20_00, applications: [ { document: first, amount_cents: 20_00 } ])
+    expect(described_class.preload_applications([ payment, other ])).to eq([ payment, other ])
+    TudlaAccounting::Allocator.allocate!(payment.entry, first.entry, amount_cents: 30_00)
+    expect([ payment.applications, other.applications.map { |doc, amount, _| [ doc, amount ] } ]).to eq([ [], [ [ first, aud(20) ] ] ]) # as preloaded
+    expect(payment.reload.applications.map { |doc, amount, _| [ doc, amount ] }).to eq([ [ first, aud(30) ] ])
+  end
+
   it "posts money paid against payables, and leaves an unapplied payment as a credit" do
     supplier = TudlaAccounting::Contact.create!(organization: organization, name: "Acme", kind: "supplier")
     bill = document("bill", 40_00, contact: supplier)
