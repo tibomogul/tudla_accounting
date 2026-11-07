@@ -260,8 +260,7 @@ RSpec.describe TudlaAccounting::Allocator, type: :service do
       expect(odd.details.filter_map(&:carrying_amount)).to be_empty
     end
 
-    it "books the exchange difference on a foreign credit paid back at another rate, and moves the foreign bank balance" do
-      bank = create(:tudla_accounting_bank_account_balance, account: account("1001"), currency: "EUR", balance_cents: 500_00)
+    it "books the exchange difference on a foreign credit paid back at another rate" do
       paid = post([ [ "1000", :debit, 160 ], [ "1100-EUR", :credit, 160, [ 100, "1.60" ] ] ], at: on(3, 10), particulars: "Payment EUR",
                   source: Payment.create!(customer: globex))
       back = post([ [ "1100-EUR", :debit, 170, [ 100, "1.70" ] ], [ "1001", :credit, 170 ] ], at: on(3, 20), particulars: "Refund EUR",
@@ -270,10 +269,8 @@ RSpec.describe TudlaAccounting::Allocator, type: :service do
       expect(TudlaAccounting::Allocation.find_by!(from: open_item(paid)).realized_entry.particulars).to eq("Realized exchange loss on Refund EUR")
       expect(balance("4950")).to eq(aud(-10))
       expect(balance("1100-EUR")).to eq(aud(0))
-      expect(bank.reload.balance_cents).to eq(400_00)
 
       back.reload.reverse!(on: Date.new(2026, 3, 25))
-      expect(bank.reload.balance_cents).to eq(500_00)
       expect(balance("4950")).to eq(aud(0))
       expect(open_item(paid).amount_cents).to eq(-160_00)
     end

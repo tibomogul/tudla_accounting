@@ -19,15 +19,12 @@ module TudlaAccounting
     end
 
     # For a credit (payment, disbursement or credit note) that has just been reversed:
-    # takes it off what it was applied to and undoes its change to a foreign-currency
-    # bank balance.
+    # takes it off what it was applied to.
     def undo_credit(on)
-      _checker, bank_sign = credit_side
       credit = credit_line&.carrying_amount
       return unless credit
 
       credit.allocations_from.active.each { |allocation| Allocator.unallocate!(allocation, at: on) }
-      adjust_foreign_bank_account_balance(-bank_sign * credit_foreign_cents) if credit_foreign_cents
     end
 
     def call
@@ -40,17 +37,14 @@ module TudlaAccounting
       end
     end
 
-    # For a refund that has just been reversed: takes it off the credit it used up and
-    # undoes its change to a foreign-currency bank balance.
+    # For a refund that has just been reversed: takes it off the credit it used up.
     def undo_refund(at)
-      _type, checker, bank_sign = refund_side
+      _type, checker = refund_side
       line = @entry.details.find { |d| checker.call(detail: d) }
       refund = line&.carrying_amount
       return unless refund
 
       refund.allocations_to.active.each { |allocation| Allocator.unallocate!(allocation, at: at) }
-      fx = line.foreign_exchange || @entry.details.filter_map(&:foreign_exchange).first
-      adjust_foreign_bank_account_balance(-bank_sign * fx.other_currency_cents) if fx
     end
 
     private
@@ -119,12 +113,11 @@ module TudlaAccounting
     end
 
     # A payment, disbursement or credit note opens a credit for the customer or supplier on
-    # its receivable or payable line (a negative carrying amount), moves a foreign-currency
-    # bank balance by the foreign amount paid, and is applied to the invoice or bill it is
-    # related to, as far as that is still owed. Whatever is left stays as a credit to apply
-    # later (see Allocator).
+    # its receivable or payable line (a negative carrying amount), and is applied to the
+    # invoice or bill it is related to, as far as that is still owed. Whatever is left stays
+    # as a credit to apply later (see Allocator).
     def open_credit(type)
-      checker, bank_sign = credit_side
+      checker = credit_side
       line = credit_line
       return unless line && (type == :receivable ? line.credit? : line.debit?)
 
@@ -134,7 +127,6 @@ module TudlaAccounting
       if fx
         credit.create_forex!(other_currency_amount_cents: -fx.other_currency_cents, other_currency: fx.other_currency,
                              transaction_rate: fx.rate, conversion_date: @entry.transacted_at)
-        adjust_foreign_bank_account_balance(bank_sign * fx.other_currency_cents) if @side_effects
       end
 
       charge = related_charge(checker)
@@ -145,17 +137,15 @@ module TudlaAccounting
     end
 
     # A refund pays a credit back (to a customer, or by a supplier): it opens a charge on its
-    # receivable or payable line, like an invoice or bill, moves a foreign-currency bank
-    # balance, and uses up the credit it is related to, as far as that is left.
+    # receivable or payable line, like an invoice or bill, and uses up the credit it is related to, as far as that is left.
     def open_refund
-      type, checker, bank_sign = refund_side
+      type, checker = refund_side
       line = @entry.details.find { |d| checker.call(detail: d) }
       return unless line && (type == :receivable ? line.debit? : line.credit?)
 
       credit = related_credit(checker)
       fx = line.foreign_exchange || @entry.details.filter_map(&:foreign_exchange).first
       refund = create_carrying_amount(line, type, fx: fx, party: credit&.related_party)
-      adjust_foreign_bank_account_balance(bank_sign * fx.other_currency_cents) if fx && @side_effects
 
       if @side_effects && credit&.amount_cents&.negative? && credit.related_party == refund.related_party && !credit.detail.entry.reversal
         Allocator.allocate!(credit, refund, at: @entry.posted_at || @entry.transacted_at)
@@ -165,8 +155,8 @@ module TudlaAccounting
 
     def refund_side
       case CarryingAmountRole.call(entry: @entry)
-      when :refund then [ :receivable, receivable_checker, -1 ]
-      when :supplier_refund then [ :payable, payable_checker, 1 ]
+      when :refund then [ :receivable, receivable_checker ]
+      when :supplier_refund then [ :payable, payable_checker ]
       end
     end
 
@@ -180,18 +170,14 @@ module TudlaAccounting
 
     def credit_side
       case CarryingAmountRole.call(entry: @entry)
-      when :receipt, :credit_note then [ receivable_checker, 1 ]
-      when :disbursement, :supplier_credit then [ payable_checker, -1 ]
+      when :receipt, :credit_note then receivable_checker
+      when :disbursement, :supplier_credit then payable_checker
       end
     end
 
     def credit_line
-      checker, = credit_side
+      checker = credit_side
       checker && @entry.details.find { |d| checker.call(detail: d) }
-    end
-
-    def credit_foreign_cents
-      (credit_line.foreign_exchange || @entry.details.filter_map(&:foreign_exchange).first)&.other_currency_cents
     end
 
     # The invoice or bill this entry is related to, if it opened one.
@@ -200,18 +186,6 @@ module TudlaAccounting
       return unless related.is_a?(TudlaAccounting::Entry)
 
       related.details.find { |d| checker.call(detail: d) }&.carrying_amount
-    end
-
-    # Money received into / paid out of a non-base-currency bank account also
-    # moves that account's balance in its own currency.
-    def adjust_foreign_bank_account_balance(foreign_cents)
-      bank_detail = @entry.details.find { |d| d.account.bank_account_balance.present? }
-      return unless bank_detail
-
-      bank_account_balance = bank_detail.account.bank_account_balance
-      return if bank_account_balance.currency == TudlaAccounting.configuration.base_currency
-
-      bank_account_balance.update!(balance_cents: bank_account_balance.balance_cents + foreign_cents)
     end
   end
 end

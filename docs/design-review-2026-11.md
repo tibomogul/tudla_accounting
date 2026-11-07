@@ -147,7 +147,7 @@ Grouped in the suggested order. Items marked **(decide)** need a decision before
 - [ ] Make every setting accept either a value or a callable given the organization, consistently, and document which is which.
 - [x] Stop `apply_money_settings!` overwriting the host's MoneyRails defaults; pass the currency and rounding explicitly instead. The dummy app now sets its own different defaults (yen, rounding down, the i18n backend), so the suite checks the engine doesn't depend on them.
 - [x] Stop `engine.rb` adding `spec/factories` to FactoryBot's paths in host apps. The dummy app adds them now.
-- [ ] Remove `BankAccountBalance` and its posting (taking the `base_currency` comparison with it), with a migration dropping the table.
+- [x] Remove `BankAccountBalance` and its posting (taking the `base_currency` comparison with it), with a migration dropping the table.
 
 ### 3. Reversals
 

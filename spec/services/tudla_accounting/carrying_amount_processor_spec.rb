@@ -11,9 +11,6 @@ RSpec.describe TudlaAccounting::CarryingAmountProcessor, type: :service do
   let(:expense_account) { create(:tudla_accounting_account, code: "5000", category: :expense, organization: organization) }
   let(:cash_account) { create(:tudla_accounting_account, code: "1000", category: :asset, organization: organization) }
   let(:foreign_currency_cash_account) { create(:tudla_accounting_account, code: "1001", category: :asset, organization: organization, parent: cash_account) }
-  let(:foreign_currency_physical_bank_account) do
-    create(:tudla_accounting_bank_account_balance, account: foreign_currency_cash_account, currency: "EUR", balance_cents: 10_000_00)
-  end
 
   def detail(account, amount_cents, tally, fx: nil)
     attrs = { account: account, amount_cents: amount_cents, tally: tally, currency: organization.currency, organization: organization }
@@ -222,18 +219,6 @@ RSpec.describe TudlaAccounting::CarryingAmountProcessor, type: :service do
       expect(carrying_amount.forex.other_currency_amount_cents).to eq(5_000)
       expect(credit).to have_attributes(amount_cents: 0, credit?: true) # all of it applied
     end
-
-    it "increases the balance of a foreign currency bank account it is deposited into" do
-      foreign_currency_physical_bank_account
-      payment_entry = create_entry("Payment in EUR", [
-        detail(foreign_currency_cash_account, 7_700, "debit"),
-        detail(receivable_account, 7_700, "credit", fx: { other_currency: "EUR", other_currency_cents: 5_000, rate: 1.54 })
-      ], source: Payment.create!, related: invoice_entry)
-
-      described_class.call(entry: payment_entry)
-
-      expect(foreign_currency_physical_bank_account.reload.balance_cents).to eq(10_050_00)
-    end
   end
 
   context "when a disbursement is made on a foreign exchange payable" do
@@ -259,20 +244,7 @@ RSpec.describe TudlaAccounting::CarryingAmountProcessor, type: :service do
       expect(carrying_amount.forex.other_currency_amount_cents).to eq(5_000_00)
     end
 
-    it "decreases the balance of a foreign currency bank account it is withdrawn from" do
-      foreign_currency_physical_bank_account
-      disbursement_entry = create_entry("Disbursement in EUR", [
-        detail(foreign_currency_cash_account, 7_700_00, "credit"),
-        detail(payable_account, 7_700_00, "debit", fx: { other_currency: "EUR", other_currency_cents: 5_000_00, rate: 1.54 })
-      ], source: Disbursement.create!, related: bill_entry)
-
-      described_class.call(entry: disbursement_entry)
-
-      expect(foreign_currency_physical_bank_account.reload.balance_cents).to eq(5_000_00)
-    end
-
-    it "does not fail when withdrawing from a foreign currency bank account without a foreign exchange detail" do
-      foreign_currency_physical_bank_account
+    it "applies a disbursement from a foreign currency bank account without a foreign exchange detail at the booked rate" do
       disbursement_entry = create_entry("Disbursement", [
         detail(foreign_currency_cash_account, 7_700_00, "credit"),
         detail(payable_account, 7_700_00, "debit")
@@ -283,7 +255,6 @@ RSpec.describe TudlaAccounting::CarryingAmountProcessor, type: :service do
 
       expect(carrying_amount.amount_cents).to eq(7_300_00)
       expect(carrying_amount.forex.other_currency_amount_cents).to eq(10_000_00)
-      expect(foreign_currency_physical_bank_account.reload.balance_cents).to eq(10_000_00)
     end
   end
 end

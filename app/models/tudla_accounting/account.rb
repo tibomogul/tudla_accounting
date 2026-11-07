@@ -139,7 +139,6 @@ module TudlaAccounting
     has_many :entries, through: :details, class_name: "TudlaAccounting::Entry"
     belongs_to :contra_account, class_name: "TudlaAccounting::Account", optional: true
     has_one :contra_for, class_name: "TudlaAccounting::Account", foreign_key: :contra_account_id
-    has_one :bank_account_balance, class_name: "TudlaAccounting::BankAccountBalance", dependent: :destroy
 
     # Where its cash movements go in the cash flow statement. Blank inherits; see
     # cash_flow_section.

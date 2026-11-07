@@ -42,7 +42,6 @@ RSpec.describe TudlaAccounting::Account, type: :model do
     it { expect(described_class.reflect_on_association(:entries).macro).to eq(:has_many) }
     it { expect(described_class.reflect_on_association(:contra_account).macro).to eq(:belongs_to) }
     it { expect(described_class.reflect_on_association(:contra_for).macro).to eq(:has_one) }
-    it { expect(described_class.reflect_on_association(:bank_account_balance).macro).to eq(:has_one) }
   end
 
   describe "#debit_balance?" do

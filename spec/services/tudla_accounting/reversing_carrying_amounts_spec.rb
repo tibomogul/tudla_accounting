@@ -112,17 +112,6 @@ RSpec.describe "Reversing receivables and payables", type: :service do
     expect(realized.reversal_blocker).to eq("Reverse the payment this exchange difference came from instead")
   end
 
-  it "undoes a foreign payment's change to a foreign-currency bank balance" do
-    bank = create(:tudla_accounting_bank_account_balance, account: account("1001"), currency: "EUR", balance_cents: 1_000_00)
-    inv = post([ [ "1100-EUR", :debit, 154, [ 100, "1.54" ] ], [ "4000", :credit, 154 ] ], at: on(3, 1), source: Invoice.create!(due_date: on(4, 1)))
-    payment = post([ [ "1001", :debit, 154 ], [ "1100-EUR", :credit, 154, [ 100, "1.54" ] ] ], at: on(3, 10), source: Payment.create!, related: inv)
-    expect(bank.reload.balance_cents).to eq(1_100_00)
-
-    payment.reverse!(on: on(3, 20))
-
-    expect(bank.reload.balance_cents).to eq(1_000_00)
-  end
-
   it "works the same way for bills and disbursements" do
     bill = post([ [ "5000", :debit, 300 ], [ "2100-AUD", :credit, 300 ] ], at: on(3, 1), particulars: "Bill", source: Bill.create!(due_date: on(4, 1)))
     disbursement = post([ [ "2100-AUD", :debit, 300 ], [ "1000", :credit, 300 ] ], at: on(3, 10), source: Disbursement.create!, related: bill)

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_07_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_08_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -146,16 +146,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_07_100000) do
     t.index ["account_id"], name: "index_tudla_accounting_balances_on_account_id"
     t.index ["organization_type", "organization_id"], name: "index_tudla_accounting_balances_on_organization"
     t.index ["period_id"], name: "index_tudla_accounting_balances_on_period_id"
-  end
-
-  create_table "tudla_accounting_bank_account_balances", force: :cascade do |t|
-    t.bigint "account_id", null: false
-    t.bigint "balance_cents"
-    t.datetime "created_at", null: false
-    t.string "currency"
-    t.string "name"
-    t.datetime "updated_at", null: false
-    t.index ["account_id"], name: "tudla_accounting_bank_account_balances_unique_key", unique: true
   end
 
   create_table "tudla_accounting_bank_matches", force: :cascade do |t|
@@ -755,7 +745,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_07_100000) do
   add_foreign_key "tudla_accounting_allocations", "tudla_accounting_entries", column: "realized_entry_id"
   add_foreign_key "tudla_accounting_balances", "tudla_accounting_accounts", column: "account_id"
   add_foreign_key "tudla_accounting_balances", "tudla_accounting_periods", column: "period_id"
-  add_foreign_key "tudla_accounting_bank_account_balances", "tudla_accounting_accounts", column: "account_id"
   add_foreign_key "tudla_accounting_bank_matches", "tudla_accounting_bank_statement_lines", column: "bank_statement_line_id"
   add_foreign_key "tudla_accounting_bank_matches", "tudla_accounting_details", column: "detail_id"
   add_foreign_key "tudla_accounting_bank_rules", "tudla_accounting_accounts", column: "account_id"
