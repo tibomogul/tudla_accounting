@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_08_200000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_08_210000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -423,6 +423,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_08_200000) do
   create_table "tudla_accounting_entries", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "idempotency_key"
+    t.string "kind"
     t.bigint "number"
     t.string "number_series", default: "", null: false
     t.bigint "organization_id", null: false
@@ -447,6 +448,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_08_200000) do
     t.index ["source_type", "source_id"], name: "index_tudla_accounting_entries_on_source"
     t.index ["transacted_at"], name: "index_tudla_accounting_entries_on_transacted_at"
     t.check_constraint "(posted_at IS NULL) = (number IS NULL)", name: "tudla_accounting_entries_numbered_when_posted"
+    t.check_constraint "kind::text = ANY (ARRAY['realized_exchange'::character varying, 'revaluation'::character varying, 'revaluation_reversal'::character varying]::text[])", name: "tudla_accounting_entries_kind"
   end
 
   create_table "tudla_accounting_filed_tax_returns", force: :cascade do |t|

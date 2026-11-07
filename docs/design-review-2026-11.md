@@ -153,7 +153,7 @@ Grouped in the suggested order. Items marked **(decide)** need a decision before
 
 - [x] Add `reversal_of_id` to entries, with a migration filling it from the existing "Reversal of: " particulars. Unique, so an entry is reversed once in the database too.
 - [x] Change `posted_reversal`, `account_credits`, the realized gain lookup and the SLSP to use the column, and drop the LIKE queries. The cash-basis tax summary used it too. The realized gain lookup goes through `Entry#reversal`, which now reads the column.
-- [ ] Mark realized exchange differences (and revaluations) by a column too. They are still recognised by their particulars (`CarryingAmountProcessor::REALIZED_PREFIX`): `Entry#realized_exchange?`, and `AllocationBackfill` linking older payments' differences.
+- [x] Mark realized exchange differences (and revaluations) by a column too. `Entry#kind` (`realized_exchange`, `revaluation`, `revaluation_reversal`); a revaluation run again after an account was renamed no longer posts twice. `Entry#realized_exchange?` and `AllocationBackfill` read it; the particulars are only wording now.
 
 ### 4. Front-end lock-in
 

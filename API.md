@@ -80,7 +80,7 @@ end
 ```json
 { "id": 81, "number": "#42", "status": "posted", "particulars": "Invoice INV-0001 – Northwind", "reference": "INV-0001",
   "transacted_at": "2026-04-01T00:00:00+10:00", "posted_at": "2026-04-01T00:00:00+10:00", "reverse_on": null,
-  "related_entry_id": null, "reversal_of_entry_id": null, "source": { "type": "document", "id": 7 }, "idempotency_key": null, "currency": "AUD",
+  "related_entry_id": null, "reversal_of_entry_id": null, "kind": null, "source": { "type": "document", "id": 7 }, "idempotency_key": null, "currency": "AUD",
   "lines": [
     { "account_code": "1100", "debit": "275.00", "credit": null, "description": null, "tax_code": null, "tax_role": null, "foreign": null, "dimensions": {} },
     { "account_code": "4010", "debit": null, "credit": "250.00", "description": "Consulting", "tax_code": "GST", "tax_role": "base", "foreign": null, "dimensions": { "DEPT": "SALES" } },
@@ -89,7 +89,7 @@ end
   "created_at": "...", "updated_at": "..." }
 ```
 
-`number` is null for a draft. `reversal_of_entry_id` is the entry a reversal reverses (null for any other). `source` says what the entry was posted for: `{ "type": "document" }` (an invoice, bill or credit note), `"payment"`, `"recurring_entry"`, or a host app's own model (its class name, underscored), or null. A line in a foreign currency has `"foreign": { "currency": "EUR", "amount": "100.00", "rate": "1.65" }`.
+`number` is null for a draft. `reversal_of_entry_id` is the entry a reversal reverses (null for any other). `kind` marks the entries the engine posts by itself: `realized_exchange` (a payment's exchange difference), `revaluation` and `revaluation_reversal` (the period-end revaluation); null for every other. `source` says what the entry was posted for: `{ "type": "document" }` (an invoice, bill or credit note), `"payment"`, `"recurring_entry"`, or a host app's own model (its class name, underscored), or null. A line in a foreign currency has `"foreign": { "currency": "EUR", "amount": "100.00", "rate": "1.65" }`.
 
 ### Contacts
 

@@ -36,7 +36,7 @@ module TudlaAccounting
         charge&.recompute! # its stored amount still counts every old payment in full
         if charge&.amount_cents&.positive?
           allocation = Allocator.allocate!(credit, charge, at: entry.transacted_at, backfill: true)
-          realized = Entry.where(related: entry).where("particulars LIKE ?", "#{CarryingAmountProcessor::REALIZED_PREFIX}%").order(:id).first
+          realized = Entry.where(related: entry, kind: "realized_exchange").order(:id).first
           allocation.update!(realized_entry: realized) if realized
           if (reversal = entry.reversal)
             allocation.update!(reversed_at: reversal.transacted_at)

@@ -12,6 +12,10 @@ module TudlaAccounting
     include Attachable
 
     REVERSAL_PREFIX = "Reversal of: ".freeze
+    # What an entry the engine posts by itself is (nil for every other): a payment's
+    # realized exchange difference (Allocator), or a period-end revaluation and its
+    # reversal (RevaluationEntryGenerator).
+    KINDS = %w[realized_exchange revaluation revaluation_reversal].freeze
 
     # The entry a reversal reverses (reverse!), and the posted entry that reverses this
     # one; preload posted_reversal to read many entries' reversals at once (see reversal).
@@ -23,6 +27,7 @@ module TudlaAccounting
     normalizes :reference, with: ->(reference) { reference.strip.presence }
 
     validates :particulars, presence: true
+    validates :kind, inclusion: { in: KINDS }, allow_nil: true
     validates :reference, length: { maximum: 255 }
     validate :reverse_on_after_date
     validate :has_one_currency?
@@ -72,9 +77,7 @@ module TudlaAccounting
     end
 
     # A realized exchange gain or loss posted with a payment.
-    def realized_exchange?
-      related.is_a?(self.class) && particulars.start_with?(CarryingAmountProcessor::REALIZED_PREFIX)
-    end
+    def realized_exchange? = kind == "realized_exchange"
 
     # Why reverse! would be refused, or nil if it can be reversed.
     def reversal_blocker

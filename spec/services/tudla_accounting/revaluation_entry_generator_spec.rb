@@ -58,11 +58,11 @@ RSpec.describe TudlaAccounting::RevaluationEntryGenerator, type: :service do
 
     revaluation, reversal = run
 
-    expect(revaluation).to have_attributes(particulars: "Revaluation of Accounts Receivable - EUR", related: invoice,
+    expect(revaluation).to have_attributes(particulars: "Revaluation of Accounts Receivable - EUR", related: invoice, kind: "revaluation",
                                            transacted_at: Time.zone.local(2026, 3, 31), posted_at: Time.zone.local(2026, 3, 31))
     expect(revaluation.details.map { |d| [ d.account.code, d.tally, d.amount ] }).to contain_exactly([ "1100-EUR", "debit", aud(6) ], [ "4900", "credit", aud(6) ])
     expect(reversal.details.map { |d| [ d.account.code, d.tally, d.amount ] }).to contain_exactly([ "1100-EUR", "credit", aud(6) ], [ "4900", "debit", aud(6) ])
-    expect(reversal).to have_attributes(particulars: "Reversal of Revaluation of Accounts Receivable - EUR", transacted_at: Time.zone.local(2026, 4, 1))
+    expect(reversal).to have_attributes(particulars: "Reversal of Revaluation of Accounts Receivable - EUR", kind: "revaluation_reversal", transacted_at: Time.zone.local(2026, 4, 1))
 
     expect(balance("1100-EUR", march).ending_amount).to eq(aud(160))
     expect(balance("4900", march).ending_amount).to eq(aud(6))
@@ -119,6 +119,8 @@ RSpec.describe TudlaAccounting::RevaluationEntryGenerator, type: :service do
     eur_invoice(100, "1.54")
     eur_rate("1.60")
     run
+    expect { expect(run).to eq([]) }.not_to change(TudlaAccounting::Entry, :count)
+    account("1100-EUR").update!(name: "Debtors - EUR") # found by kind, not by its particulars
     expect { expect(run).to eq([]) }.not_to change(TudlaAccounting::Entry, :count)
   end
 

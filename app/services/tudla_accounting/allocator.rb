@@ -190,7 +190,7 @@ module TudlaAccounting
         details: [ { account_code: credit.detail.account.code, amount: "#{currency} #{AmountParser.text(difference)}" },
                    { account_code: gain_account.code, amount: "#{currency} #{AmountParser.text(gain)}" } ]
       )
-      entry.update!(related: credit_entry) # no source, so posting it opens or settles nothing
+      entry.update!(related: credit_entry, kind: "realized_exchange") # no source, so posting it opens or settles nothing
       entry.post(entry.transacted_at)
       entry
     end

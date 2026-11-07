@@ -66,7 +66,8 @@ RSpec.describe "Realized exchange gains and losses", type: :service do
     payment = receive_payment(inv, 100, "1.60")
 
     realized = TudlaAccounting::Entry.find_by(related: payment)
-    expect(realized).to have_attributes(particulars: "Realized exchange gain on Invoice 1001", transacted_at: payment.transacted_at, source: nil)
+    expect(realized).to have_attributes(particulars: "Realized exchange gain on Invoice 1001", kind: "realized_exchange", transacted_at: payment.transacted_at, source: nil)
+    expect(realized).to be_realized_exchange
     expect(realized.posted_at).to be_present
     expect(realized.details.map { |d| [ d.account.code, d.tally, d.amount ] }).to contain_exactly([ "1100-EUR", "debit", aud(6) ], [ "4950", "credit", aud(6) ])
 
