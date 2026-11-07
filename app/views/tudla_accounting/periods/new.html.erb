@@ -1,4 +1,4 @@
-<%= tc_page_header "New financial year", subtitle: "Creates the year and its twelve months, in #{TudlaAccounting.configuration.time_zone} time" %>
+<%= tc_page_header "New financial year", subtitle: "Creates the year and its twelve months, in #{TudlaAccounting.configuration.for_organization(:time_zone, accounting_organization)} time" %>
 
 <%= form_with scope: :year, url: periods_path, class: "tc-card tc-card-body space-y-4 max-w-xl" do |form| %>
   <% if @error %><div class="tc-alert tc-alert-danger" role="alert"><%= @error %></div><% end %>

@@ -75,13 +75,13 @@ module TudlaAccounting
     end
 
     def as_of_end
-      @as_of_date.in_time_zone(TudlaAccounting.configuration.time_zone).end_of_day
+      @as_of_date.in_time_zone(TudlaAccounting.zone(@organization)).end_of_day
     end
 
     def days_outstanding(carrying_amount)
       return 0 unless carrying_amount.due_date
 
-      (@as_of_date - carrying_amount.due_date.in_time_zone(TudlaAccounting.configuration.time_zone).to_date).to_i
+      (@as_of_date - carrying_amount.due_date.in_time_zone(TudlaAccounting.zone(@organization)).to_date).to_i
     end
 
     def bucket_for(days)

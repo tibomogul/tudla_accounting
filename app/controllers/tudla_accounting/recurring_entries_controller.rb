@@ -82,7 +82,7 @@ module TudlaAccounting
     end
 
     def today
-      ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].today
+      TudlaAccounting.zone(accounting_organization).today
     end
 
     def next_notice

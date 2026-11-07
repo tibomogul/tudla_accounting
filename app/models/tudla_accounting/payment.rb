@@ -306,7 +306,7 @@ module TudlaAccounting
     # credited to the payable one), and the receivable or payable takes it too.
     def build_entry(documents)
       control = Account.for_role_in_currency!(organization, sales? ? :receivable : :payable, self[:currency])
-      at = ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].local(paid_on.year, paid_on.month, paid_on.day)
+      at = TudlaAccounting.zone(organization).local(paid_on.year, paid_on.month, paid_on.day)
       numbers = refund? ? [ (refund_of.number_label if refund_of.is_a?(Document)) ].compact : documents.map(&:number_label)
       posting = Entry.new(organization: organization, source: self, transacted_at: at, reference: reference, related: (refund_of.entry if refund?),
                           particulars: "#{title}#{" (#{numbers.join(', ')})" if numbers.any?}")

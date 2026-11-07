@@ -4,7 +4,7 @@ module TudlaAccounting
       @account_count = organization_scope(Account).count
       @year_count = organization_scope(Period).roots.count
       @draft_count = organization_scope(Entry).where(posted_at: nil).count
-      today = ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].today
+      today = TudlaAccounting.zone(accounting_organization).today
       @recurring_due = organization_scope(RecurringEntry).active.where(next_on: ..today).count
       @recurring_problems = organization_scope(RecurringEntry).active.where.not(last_problem: nil).count
       @recurring_invoices_due = organization_scope(RecurringInvoice).active.where(next_on: ..today).count

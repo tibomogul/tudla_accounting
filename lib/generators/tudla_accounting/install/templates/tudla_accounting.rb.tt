@@ -16,7 +16,7 @@ TudlaAccounting.configure do |config|
 
   # --- Books ---
   config.base_currency = "USD"
-  config.time_zone = "UTC" # financial years and months are built in this zone
+  config.time_zone = "UTC" # financial years and months are built in this zone; per organization if they differ
   # The accounts the books treat specially (receivables, payables, retained earnings,
   # exchange gains and losses) are marked by role on each organization's own accounts:
   # in the account form, a Role column in the chart import, or AccountsCreator's role:.

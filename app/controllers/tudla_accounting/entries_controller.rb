@@ -101,7 +101,7 @@ module TudlaAccounting
 
     def day_start(date)
       date = date.to_date
-      ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].local(date.year, date.month, date.day)
+      TudlaAccounting.zone(accounting_organization).local(date.year, date.month, date.day)
     end
 
     # The form's lines, with separate debit and credit columns, as detail attributes, and

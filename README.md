@@ -654,7 +654,7 @@ The generator writes `config/initializers/tudla_accounting.rb` with every settin
 
 Configure the engine in an initializer, e.g. `config/initializers/tudla_accounting.rb`.
 
-Some settings can differ by organization: `organization_label`, `cash_account_codes`, `number_format`, `country`, `rounding`, `tax_basis`, `document_header`, `books_header`, `withholding_agent`, `tax_registration`, `pdf_paper`, `document_mail_from`, `document_mail_reply_to`, `document_email_templates` and `reminder_days` (`TudlaAccounting::Configuration::PER_ORGANIZATION`). Each takes a value, for an app with one set of books or the same answer for all, or a callable given the organization returning one, and `config.for_organization(setting, organization)` reads either. The rest are the app's: one value, except that a few take a callable given what they're about (`current_organization`, `current_actor` and `authorize` the controller; `entry_number_series` and `entry_number_format` the entry; `document_number_format` the document).
+Some settings can differ by organization: `organization_label`, `cash_account_codes`, `number_format`, `country`, `time_zone`, `rounding`, `tax_basis`, `document_header`, `books_header`, `withholding_agent`, `tax_registration`, `pdf_paper`, `document_mail_from`, `document_mail_reply_to`, `document_email_templates` and `reminder_days` (`TudlaAccounting::Configuration::PER_ORGANIZATION`). Each takes a value, for an app with one set of books or the same answer for all, or a callable given the organization returning one, and `config.for_organization(setting, organization)` reads either. The rest are the app's: one value, except that a few take a callable given what they're about (`current_organization`, `current_actor` and `authorize` the controller; `entry_number_series` and `entry_number_format` the entry; `document_number_format` the document).
 
 
 ```ruby
@@ -669,7 +669,8 @@ TudlaAccounting.configure do |config|
                                           # (default_currency, rounding_mode, locale_backend) stay the host app's
   config.rounding = BigDecimal::ROUND_HALF_UP # per organization: how the engine rounds tax, line amounts, conversions and imports
   config.tax_basis = :accrual             # per organization: when the tax summary counts tax by default, or :cash
-  config.time_zone = "UTC"                # zone PeriodCreator builds periods in; plain Dates are read in it
+  config.time_zone = "UTC"                # per organization: where its months and years start and end, and what day it is;
+                                          # plain Dates are read in it. Keep an organization's once it has periods
   config.number_format = nil              # per organization: how pages write and read numbers, :point (1,234.56) or
                                           # :comma (1.234,56); nil for the currency's own marks
   # Retained earnings, receivables, payables and exchange gains are accounts marked by

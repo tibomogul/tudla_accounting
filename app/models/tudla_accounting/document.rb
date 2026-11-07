@@ -244,7 +244,7 @@ module TudlaAccounting
 
     private
 
-    def zone = ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone]
+    def zone = TudlaAccounting.zone(organization)
     def money(cents) = Money.new(cents, currency)
 
     def live_lines = lines.reject(&:marked_for_destruction?)

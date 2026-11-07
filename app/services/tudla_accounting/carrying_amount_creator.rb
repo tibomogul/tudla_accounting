@@ -26,7 +26,7 @@ module TudlaAccounting
 
     def initialize(organization:, date_prior:, sales_account_code:, purchase_account_code:, source: nil)
       @organization = organization
-      @date_prior = date_prior.in_time_zone(TudlaAccounting.configuration.time_zone)
+      @date_prior = date_prior.in_time_zone(TudlaAccounting.zone(@organization))
       @offset_codes = { "receivable" => sales_account_code, "payable" => purchase_account_code }
       @source = source
       check_settings!

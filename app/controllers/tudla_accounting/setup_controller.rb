@@ -60,7 +60,7 @@ module TudlaAccounting
 
     def revaluation
       month = organization_scope(Period).find(params.require(:period_id))
-      period_end = month.thru_date.in_time_zone(TudlaAccounting.configuration.time_zone).to_date
+      period_end = month.thru_date.in_time_zone(TudlaAccounting.zone(accounting_organization)).to_date
       entries = RevaluationEntryGenerator.call(accounting_organization, period_end, period_end + 1)
       notice = entries.empty? ? "Nothing to revalue at #{helpers.tc_date(period_end)}." : "Posted #{entries.size} revaluation entries for #{helpers.tc_date(period_end)}."
       redirect_to entries_path(q: "Revaluation"), notice: notice

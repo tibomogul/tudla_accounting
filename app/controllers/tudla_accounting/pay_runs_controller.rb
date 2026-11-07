@@ -43,7 +43,7 @@ module TudlaAccounting
     private
 
     def today
-      ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].today
+      TudlaAccounting.zone(accounting_organization).today
     end
 
     # The account paid from (as a payment's by default), its currency, the date the

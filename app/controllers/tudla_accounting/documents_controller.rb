@@ -106,7 +106,7 @@ module TudlaAccounting
     def side_path(side) = side.to_s == "sales" ? sales_documents_path : purchase_documents_path
 
     def today
-      ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].today
+      TudlaAccounting.zone(accounting_organization).today
     end
 
     # The list narrowed to a kind, how it stands, a contact, and a number, reference or name.

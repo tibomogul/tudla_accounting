@@ -29,7 +29,6 @@ module TudlaAccounting
 
     before_destroy { throw :abort } # revoke it instead
 
-    scope :active, -> { where(revoked_at: nil).where("expires_on IS NULL OR expires_on >= ?", today) }
 
     # Makes a token; returns it and its secret, which isn't kept anywhere.
     def self.issue!(organization:, name:, permissions:, expires_on: nil)
@@ -45,17 +44,18 @@ module TudlaAccounting
       secret = secret.to_s
       return unless secret.start_with?(PREFIX) && secret.length < 200
 
-      token = active.find_by(token_digest: digest(secret))
-      token&.touch_last_used
+      token = find_by(token_digest: digest(secret))
+      return unless token&.active?
+
+      token.touch_last_used
       token
     end
 
     def self.digest(secret) = OpenSSL::Digest::SHA256.hexdigest(secret)
-    def self.today = ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].today
 
     def can?(permission) = permissions.include?(permission.to_s)
     def revoked? = revoked_at.present?
-    def expired? = expires_on.present? && expires_on < self.class.today
+    def expired? = expires_on.present? && expires_on < TudlaAccounting.zone(organization).today
     def active? = !revoked? && !expired?
 
     # "tudla_Ab3x…"

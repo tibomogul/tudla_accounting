@@ -25,7 +25,13 @@ module TudlaAccounting
 
     # Returns the root period, or nil (and logs) if any period fails validation.
     def call
-      from_date = ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].local(year, start_month, start_day)
+      zone = TudlaAccounting.zone(organization)
+      latest = TudlaAccounting::Period.roots.where(organization: organization).order(:from_date).last
+      if latest && latest.from_date.in_time_zone(zone) != latest.from_date.in_time_zone(zone).beginning_of_day
+        raise TudlaAccounting::PeriodInvalid, "The books' years start at midnight in another time zone than #{zone.tzinfo.name}: the time_zone setting changed after they were made"
+      end
+
+      from_date = zone.local(year, start_month, start_day)
       thru_date = (from_date.next_year - 1.day).end_of_day
       overlapping = TudlaAccounting::Period.roots.where(organization: organization).where("from_date <= ? AND thru_date >= ?", thru_date, from_date).exists?
       raise TudlaAccounting::PeriodInvalid, "The year overlaps an existing financial year" if overlapping

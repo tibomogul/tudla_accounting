@@ -95,7 +95,7 @@ module TudlaAccounting
       blocker = reversal_blocker
       raise ArgumentError, blocker if blocker
 
-      at = ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].local(on.year, on.month, on.day)
+      at = TudlaAccounting.zone(organization).local(on.year, on.month, on.day)
       transaction do
         reversing = self.class.new(organization: organization, related: self, transacted_at: at,
                                    particulars: "#{REVERSAL_PREFIX}#{particulars}", reference: reference)
@@ -351,7 +351,7 @@ module TudlaAccounting
     def reverse_on_after_date
       return unless reverse_on
 
-      if transacted_at && reverse_on <= transacted_at.in_time_zone(TudlaAccounting.configuration.time_zone).to_date
+      if transacted_at && reverse_on <= transacted_at.in_time_zone(TudlaAccounting.zone(organization)).to_date
         errors.add(:reverse_on, "must be after the entry's date")
       elsif CarryingAmountRole.call(entry: self)
         errors.add(:reverse_on, "can't be set on an invoice, bill, payment or credit")

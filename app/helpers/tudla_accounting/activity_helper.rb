@@ -124,7 +124,7 @@ module TudlaAccounting
     end
 
     def activity_time(event)
-      event.created_at.in_time_zone(TudlaAccounting.configuration.time_zone).strftime("%-d %b %Y %H:%M")
+      event.created_at.in_time_zone(TudlaAccounting.zone(accounting_organization)).strftime("%-d %b %Y %H:%M")
     end
 
     private

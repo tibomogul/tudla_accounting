@@ -16,7 +16,7 @@
           <td><code class="text-xs"><%= token.masked %></code></td>
           <td><%= token.permissions.join(", ") %></td>
           <td class="whitespace-nowrap"><%= tc_date(token.created_at) %><% if token.created_by %> <span class="tc-muted text-xs">by <%= token.created_by %></span><% end %></td>
-          <td class="whitespace-nowrap"><%= token.last_used_at ? token.last_used_at.in_time_zone(TudlaAccounting.configuration.time_zone).strftime("%-d %b %Y %H:%M") : "Never" %></td>
+          <td class="whitespace-nowrap"><%= token.last_used_at ? token.last_used_at.in_time_zone(TudlaAccounting.zone(accounting_organization)).strftime("%-d %b %Y %H:%M") : "Never" %></td>
           <td class="whitespace-nowrap"><%= tc_date(token.expires_on) || "—" %></td>
           <td>
             <% if token.revoked? %><%= tc_badge "Revoked #{tc_date(token.revoked_at)}", tone: :danger %>

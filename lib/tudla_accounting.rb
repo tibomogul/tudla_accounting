@@ -85,6 +85,9 @@ module TudlaAccounting
       # How amounts are rounded to the cent (tax, line amounts, conversions, imports): a
       # BigDecimal rounding mode, or a callable given the organization returning one.
       @rounding = BigDecimal::ROUND_HALF_UP
+      # The time zone the books are kept in, where months and years start and end and what
+      # day it is: a name ("Australia/Sydney"), or a callable given the organization
+      # returning one. Keep an organization's once it has periods: they were made in it.
       @time_zone = "UTC"
       @organization_class = "Organization"
       @carrying_amount_sources = {}
@@ -193,7 +196,7 @@ module TudlaAccounting
     # document).
     PER_ORGANIZATION = %i[organization_label cash_account_codes number_format country document_header books_header
                           withholding_agent tax_registration document_mail_from document_mail_reply_to
-                          rounding tax_basis pdf_paper reminder_days document_email_templates].freeze
+                          rounding tax_basis pdf_paper reminder_days document_email_templates time_zone].freeze
     TAX_BASES = %i[accrual cash].freeze
 
     # A per-organization setting's value for an organization: the setting, or what its
@@ -206,6 +209,13 @@ module TudlaAccounting
       raise ArgumentError, "the #{setting} setting is given the organization, and there is none here" if organization.nil?
 
       value.call(organization)
+    end
+
+    # The time zone an organization's books are kept in (TudlaAccounting.zone): where its
+    # months and years start and end, and what day it is there.
+    def time_zone_for(organization)
+      name = for_organization(:time_zone, organization)
+      ActiveSupport::TimeZone[name.to_s] or raise ArgumentError, "time_zone gave #{name.inspect} for #{organization_label_for(organization)}; expected a zone such as \"Australia/Sydney\""
     end
 
     # How an organization's amounts are rounded: a BigDecimal rounding mode.
@@ -390,7 +400,7 @@ module TudlaAccounting
       when :organization then ""
       when :financial_year
         year = Period.periods_for_date(entry.organization, entry.posted_at).roots.first
-        (year ? year.thru_date : entry.posted_at.in_time_zone(time_zone)).to_date.year.to_s
+        (year ? year.thru_date : entry.posted_at.in_time_zone(time_zone_for(entry.organization))).to_date.year.to_s
       else entry_number_series.call(entry).to_s
       end
     end
@@ -499,6 +509,9 @@ module TudlaAccounting
     cents = amount.to_d * currency.subunit_to_unit
     Money.new(cents.frac.zero? ? cents.to_i : cents.round(0, configuration.rounding_for(organization)).to_i, currency)
   end
+
+  # The time zone an organization's books are kept in (the time_zone setting).
+  def self.zone(organization) = configuration.time_zone_for(organization)
 
   # The organization_label setting's name for an organization.
   def self.organization_label(organization)

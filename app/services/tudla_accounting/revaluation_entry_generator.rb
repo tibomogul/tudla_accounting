@@ -39,7 +39,7 @@ module TudlaAccounting
     end
 
     def zone
-      ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone]
+      TudlaAccounting.zone(@organization)
     end
 
     def open_foreign_amounts

@@ -31,7 +31,7 @@ module TudlaAccounting
 
     # The hash Entry.create_from_ruby_hash takes for the entry on a date.
     def entry_hash(on:)
-      zone = ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone]
+      zone = TudlaAccounting.zone(organization)
       { organization_type: organization_type, organization_id: organization_id, particulars: particulars, reference: reference,
         transacted_at: zone.local(on.year, on.month, on.day).iso8601, tax_inclusive: tax_inclusive?,
         reverse_on: (on.next_month.beginning_of_month.iso8601 if reverse_next_month?),
@@ -42,7 +42,7 @@ module TudlaAccounting
     private
 
     def last_made_on
-      entries.maximum(:transacted_at)&.in_time_zone(TudlaAccounting.configuration.time_zone)&.to_date
+      entries.maximum(:transacted_at)&.in_time_zone(TudlaAccounting.zone(organization))&.to_date
     end
 
     # The lines must make an entry that could be posted: balanced, at least one debit and

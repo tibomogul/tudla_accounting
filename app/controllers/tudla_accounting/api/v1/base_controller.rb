@@ -194,11 +194,11 @@ module TudlaAccounting
 
         # Today in the books' time zone.
         def today
-          ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].today
+          TudlaAccounting.zone(accounting_organization).today
         end
 
         def day_start(date)
-          ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].local(date.year, date.month, date.day)
+          TudlaAccounting.zone(accounting_organization).local(date.year, date.month, date.day)
         end
 
         # Records changed since a time, for syncing.

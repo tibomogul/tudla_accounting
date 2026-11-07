@@ -29,7 +29,7 @@ module TudlaAccounting
 
     def initialize(organization: nil, as_of: nil)
       @organization = organization
-      @as_of = as_of || ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].today
+      @as_of = as_of
     end
 
     # The reminders due, oldest due date first.
@@ -37,12 +37,12 @@ module TudlaAccounting
       first = @organization ? days_for(@organization).first : 1
       return [] unless first
 
-      invoices = Document.approved.where(kind: "sales_invoice", due_on: ..(@as_of - first)).with_open_cents.includes(:contact, :organization).order(:due_on, :id)
+      invoices = Document.approved.where(kind: "sales_invoice", due_on: ..(latest - first)).with_open_cents.includes(:contact, :organization).order(:due_on, :id)
       invoices = invoices.where(organization: @organization) if @organization
       invoices = invoices.to_a.select { |invoice| invoice.amount_due.positive? }
       reached = sent_days(invoices)
       invoices.filter_map do |invoice|
-        overdue = (@as_of - invoice.due_on).to_i
+        overdue = (today(invoice.organization) - invoice.due_on).to_i
         stage = days_for(invoice.organization).select { |day| day <= overdue }.max
         Reminder.new(invoice: invoice, days: stage, days_overdue: overdue) unless stage.nil? || (reached[invoice.id] && reached[invoice.id] >= stage)
       end
@@ -68,6 +68,11 @@ module TudlaAccounting
     end
 
     private
+
+    # The day it is in an organization's time zone (as_of if given), and the latest day it
+    # is in any of those run.
+    def today(organization) = @as_of || TudlaAccounting.zone(organization).today
+    def latest = @as_of || (@organization ? today(@organization) : Time.current.utc.to_date + 1)
 
     # Each organization's reminder_days, read once.
     def days_for(organization)

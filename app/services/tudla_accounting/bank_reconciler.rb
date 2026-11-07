@@ -134,7 +134,7 @@ module TudlaAccounting
       cents = rate ? TudlaAccounting.money(BigDecimal(foreign_cents) / 100 * rate, @organization.currency, @organization).cents : foreign_cents
 
       ActiveRecord::Base.transaction do
-        at = ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].local(line.occurred_on.year, line.occurred_on.month, line.occurred_on.day)
+        at = TudlaAccounting.zone(@organization).local(line.occurred_on.year, line.occurred_on.month, line.occurred_on.day)
         money_in = line.amount_cents.positive?
         entry = Entry.new(organization: @organization, transacted_at: at, particulars: particulars.presence || line.description)
         bank = entry_line(entry, self.account, money_in, cents, rate, foreign_cents)
@@ -242,11 +242,11 @@ module TudlaAccounting
     end
 
     def days_apart(line, detail)
-      (line.occurred_on - detail.entry.posted_at.in_time_zone(TudlaAccounting.configuration.time_zone).to_date).abs
+      (line.occurred_on - detail.entry.posted_at.in_time_zone(TudlaAccounting.zone(@organization)).to_date).abs
     end
 
     def end_of(date)
-      ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].local(date.year, date.month, date.day).end_of_day
+      TudlaAccounting.zone(@organization).local(date.year, date.month, date.day).end_of_day
     end
 
     def plain(cents)

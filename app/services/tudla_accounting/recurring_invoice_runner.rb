@@ -25,12 +25,12 @@ module TudlaAccounting
 
     def initialize(organization: nil, as_of: nil)
       @organization = organization
-      @as_of = as_of || ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].today
+      @as_of = as_of
       @result = Result.new(created: [], approved: [], emailed: [], problems: [])
     end
 
     def call
-      due = RecurringInvoice.active.where(next_on: ..@as_of)
+      due = RecurringInvoice.active.where(next_on: ..latest)
       due = due.where(organization: @organization) if @organization
       due.order(:next_on, :id).each { |template| run(template) }
       @result
@@ -38,9 +38,14 @@ module TudlaAccounting
 
     private
 
+    # The day it is in an organization's time zone (as_of if given), and the latest day it
+    # is in any of those run.
+    def today(organization) = @as_of || TudlaAccounting.zone(organization).today
+    def latest = @as_of || (@organization ? today(@organization) : Time.current.utc.to_date + 1)
+
     def run(template)
       template.with_lock do
-        while template.due?(@as_of)
+        while template.due?(today(template.organization))
           on = template.next_on
           invoice = make(template, on)
           break unless invoice

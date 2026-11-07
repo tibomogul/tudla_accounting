@@ -44,7 +44,7 @@ module TudlaAccounting
 
     def on
       date = params[:on].presence&.to_date || Date.current
-      ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].local(date.year, date.month, date.day)
+      TudlaAccounting.zone(accounting_organization).local(date.year, date.month, date.day)
     end
 
     # A typed amount is in the foreign currency when a foreign payment is applied to a

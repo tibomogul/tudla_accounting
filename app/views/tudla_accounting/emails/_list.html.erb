@@ -8,11 +8,11 @@
       <tbody>
         <% deliveries.each do |delivery| %>
           <tr data-delivery="<%= delivery.status %>">
-            <td class="whitespace-nowrap"><%= delivery.created_at.in_time_zone(TudlaAccounting.configuration.time_zone).strftime("%-d %b %Y %H:%M") %><% if delivery.requested_by %> <span class="tc-muted text-xs">by <%= delivery.requested_by %></span><% end %></td>
+            <td class="whitespace-nowrap"><%= delivery.created_at.in_time_zone(TudlaAccounting.zone(accounting_organization)).strftime("%-d %b %Y %H:%M") %><% if delivery.requested_by %> <span class="tc-muted text-xs">by <%= delivery.requested_by %></span><% end %></td>
             <td><%= delivery.to %><% if delivery.cc %> <span class="tc-muted text-xs">cc <%= delivery.cc %></span><% end %></td>
             <td><%= delivery.subject_line %></td>
             <td>
-              <% if delivery.sent? %><%= tc_badge "Sent #{delivery.sent_at.in_time_zone(TudlaAccounting.configuration.time_zone).strftime("%-d %b %H:%M")}", tone: :success %>
+              <% if delivery.sent? %><%= tc_badge "Sent #{delivery.sent_at.in_time_zone(TudlaAccounting.zone(accounting_organization)).strftime("%-d %b %H:%M")}", tone: :success %>
               <% elsif delivery.failed? %><%= tc_badge "Failed", tone: :danger %> <span class="text-xs text-[var(--tc-danger)]"><%= delivery.error %></span>
               <% else %><%= tc_badge "Sending", tone: :warning %>
               <% end %>

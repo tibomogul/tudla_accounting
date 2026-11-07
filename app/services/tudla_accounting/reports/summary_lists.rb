@@ -120,7 +120,7 @@ module TudlaAccounting
 
       # The month in the engine's time zone, as the periods have it.
       def month_sql
-        zone = ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].tzinfo.name
+        zone = TudlaAccounting.zone(@organization).tzinfo.name
         "to_char(tudla_accounting_entries.posted_at AT TIME ZONE 'UTC' AT TIME ZONE #{quote(zone)}, 'YYYY-MM')"
       end
 

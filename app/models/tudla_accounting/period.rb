@@ -117,7 +117,7 @@ module TudlaAccounting
     end
 
     def self.periods_for_date(org, date_or_time)
-      moment = date_or_time.instance_of?(Date) ? date_or_time.in_time_zone(TudlaAccounting.configuration.time_zone) : date_or_time
+      moment = date_or_time.instance_of?(Date) ? date_or_time.in_time_zone(TudlaAccounting.zone(org)) : date_or_time
       where(organization: org).includes_date?(moment)
     end
 

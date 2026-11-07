@@ -61,7 +61,7 @@ module TudlaAccounting
     # The charges and credits transacted by the end of thru, with what is needed to work out
     # what is outstanding, oldest first.
     def self.items(organization, type, thru)
-      carrying_amounts(organization, type).where(tudla_accounting_entries: { transacted_at: ..thru.in_time_zone(TudlaAccounting.configuration.time_zone).end_of_day })
+      carrying_amounts(organization, type).where(tudla_accounting_entries: { transacted_at: ..thru.in_time_zone(TudlaAccounting.zone(organization)).end_of_day })
                                           .with_outstanding.order("tudla_accounting_entries.transacted_at", :id)
     end
 
@@ -125,7 +125,7 @@ module TudlaAccounting
     # The run's charges, credits and reversals in date order, with the running balance,
     # and the adjustment that brings it to the closing balance.
     def activity(items)
-      run = from.in_time_zone(TudlaAccounting.configuration.time_zone).beginning_of_day..end_of(thru)
+      run = from.in_time_zone(TudlaAccounting.zone(organization)).beginning_of_day..end_of(thru)
       events = items.filter_map { |item| [ item.detail.entry.transacted_at, item, false ] if run.cover?(item.detail.entry.transacted_at) }
       events += items.filter_map do |item|
         reversal = item.detail.entry.reversal
@@ -159,7 +159,7 @@ module TudlaAccounting
     end
 
     def end_of(date)
-      date.in_time_zone(TudlaAccounting.configuration.time_zone).end_of_day
+      date.in_time_zone(TudlaAccounting.zone(organization)).end_of_day
     end
 
     def money(cents)

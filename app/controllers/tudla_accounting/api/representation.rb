@@ -22,7 +22,7 @@ module TudlaAccounting
       def time(value) = value&.iso8601
       # A date, or the day a time falls on in the books' time zone.
       def date(value)
-        value = value.in_time_zone(TudlaAccounting.configuration.time_zone) if value && !value.is_a?(Date)
+        value = value.in_time_zone(TudlaAccounting.zone(accounting_organization)) if value && !value.is_a?(Date)
         value&.to_date&.iso8601
       end
 

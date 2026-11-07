@@ -20,7 +20,7 @@ module TudlaAccounting
           raise ArgumentError, "#{target.title} isn't owed anything it could be applied to" unless credit.entry && Allocator.open_charges(credit.entry).include?(charge)
 
           day = date_param(:on) || Date.current
-          at = ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].local(day.year, day.month, day.day)
+          at = TudlaAccounting.zone(accounting_organization).local(day.year, day.month, day.day)
           Allocator.allocate!(credit.entry, charge, at: at, **amount_given(charge))
           render json: { data: credit.is_a?(Payment) ? payment_json(credit.reload) : document_json(organization_scope(Document).with_open_cents.find(credit.id)) }, status: :created
         end

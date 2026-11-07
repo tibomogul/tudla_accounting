@@ -61,7 +61,7 @@
 
   <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
     <% if accounting_organization %>
-      <p class="hidden print:block tc-muted text-xs mb-2"><%= accounting_organization.name %> · <%= accounting_organization.currency %> · printed <%= Time.current.in_time_zone(TudlaAccounting.configuration.time_zone).strftime("%-d %b %Y %H:%M") %></p>
+      <p class="hidden print:block tc-muted text-xs mb-2"><%= accounting_organization.name %> · <%= accounting_organization.currency %> · printed <%= Time.current.in_time_zone(TudlaAccounting.zone(accounting_organization)).strftime("%-d %b %Y %H:%M") %></p>
     <% end %>
     <div class="print:hidden"><%= render "tudla_accounting/shared/flash" %></div>
     <%= yield %>

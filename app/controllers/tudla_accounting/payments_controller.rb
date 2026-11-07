@@ -169,7 +169,7 @@ module TudlaAccounting
     def credit_path(credit) = credit.is_a?(Document) ? document_path(credit) : payment_path(credit)
 
     def today
-      ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].today
+      TudlaAccounting.zone(accounting_organization).today
     end
 
     # The contact's approved invoices (or bills) in the currency with something still owed,
