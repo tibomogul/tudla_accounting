@@ -82,6 +82,22 @@ RSpec.describe TudlaAccounting::Configuration do
     end
   end
 
+  describe "#country?" do
+    let(:organization) { Struct.new(:id, :name).new(7, "Acme") }
+
+    it "shows every country's reports without a country, and only that country's with one" do
+      expect(config.country_for(organization)).to be_nil
+      expect(config.country?(organization, "PH")).to be(true)
+      config.country = "au"
+      expect(config.country_for(organization)).to eq("AU")
+      expect([ config.country?(organization, :au), config.country?(organization, "PH") ]).to eq([ true, false ])
+      config.country = ->(org) { "PH" if org.name == "Acme" }
+      expect([ config.country?(organization, "AU"), config.country?(organization, "PH") ]).to eq([ false, true ])
+      config.country = ->(_org) { "" }
+      expect(config.country?(organization, "AU")).to be(true)
+    end
+  end
+
   describe "#dup" do
     it "copies the entry source registry, so the copy can change without affecting the original" do
       config.entry_sources["Invoice"] = ->(_record) { {} }

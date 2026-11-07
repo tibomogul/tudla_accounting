@@ -74,7 +74,7 @@ module TudlaAccounting
                   :due_date_method, :related_party_method, :forex_rate_provider,
                   :parent_controller, :current_organization, :current_actor, :authorize,
                   :cash_account_codes, :tax_basis, :organization_label, :entry_number_format,
-                  :attachment_content_types, :attachment_max_size, :document_header, :books_header, :withholding_agent, :tax_registration,
+                  :attachment_content_types, :attachment_max_size, :document_header, :books_header, :withholding_agent, :tax_registration, :country,
                   :api_rate_limit, :api_rate_limit_store, :pdf_browser_options, :pdf_paper, :pdf_stylesheet,
                   :document_mailer, :document_mail_from, :document_mail_reply_to
     attr_reader :number_format
@@ -142,6 +142,11 @@ module TudlaAccounting
       # How an organization is registered for tax, on its printed documents: a callable
       # giving a TaxRegistration, or nil to leave them as they are.
       @tax_registration = nil
+      # Which country's tax reports an organization sees: a country code ("PH" for the
+      # BIR's books, summary lists and withholding forms, "AU" for the ATO's payment
+      # summaries and TPAR), or a callable given the organization returning one. nil, or a
+      # callable returning nil, shows every country's reports.
+      @country = nil
       # How many requests an API token may make a minute (nil for no limit), counted in
       # api_rate_limit_store (an ActiveSupport::Cache store; Rails.cache when nil, which
       # must count across processes, as Solid Cache and Redis do, to limit them all).
@@ -287,6 +292,18 @@ module TudlaAccounting
 
     # The tax_registration setting's TaxRegistration for an organization, or nil.
     def tax_registration_for(organization) = tax_registration&.call(organization)
+
+    # The country setting's code for an organization, upper case, or nil.
+    def country_for(organization)
+      (country.respond_to?(:call) ? country.call(organization) : country).presence&.to_s&.upcase
+    end
+
+    # Whether an organization sees a country's reports: when it's that country's, or when
+    # it has no country.
+    def country?(organization, code)
+      chosen = country_for(organization)
+      chosen.nil? || chosen == code.to_s.upcase
+    end
 
     # The run of numbers posted entries are numbered in, each counted from 1:
     # :organization (one run, the default), :financial_year (restarting each year; the

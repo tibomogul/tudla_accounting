@@ -3,10 +3,16 @@ module TudlaAccounting
     include ReportPeriods
 
     GENERAL_LEDGER_PAGE = 500 # lines
+    # The general reports, then each country's for books that are that country's (or have
+    # no country): the Philippines' when it can have them, Australia's once they'd show
+    # something.
     def index
-      @withholding = organization_scope(WithholdingCode).exists?
-      @withheld_on_payment = organization_scope(WithholdingCode).on_payment.exists?
-      @taxable_payments = organization_scope(Contact).where(taxable_payments: true).exists?
+      settings = TudlaAccounting.configuration
+      @philippines = settings.country?(accounting_organization, "PH")
+      @withholding = @philippines && organization_scope(WithholdingCode).exists?
+      australia = settings.country?(accounting_organization, "AU")
+      @withheld_on_payment = australia && organization_scope(WithholdingCode).on_payment.exists?
+      @taxable_payments = australia && organization_scope(Contact).where(taxable_payments: true).exists?
     end
 
     def balance_sheet

@@ -1,6 +1,7 @@
 require "rails_helper"
 require_relative "../../support/sign_in"
 require_relative "../../support/entry_sources"
+require_relative "../../support/configuration"
 
 RSpec.describe "Report pages", type: :request do
   include ActiveSupport::Testing::TimeHelpers
@@ -26,6 +27,28 @@ RSpec.describe "Report pages", type: :request do
   it "lists the reports" do
     get routes.reports_path
     expect(css_select("a.tc-card p.font-semibold").map(&:text)).to eq([ "Balance sheet", "Profit and loss", "Trial balance", "Receivables aging", "Payables aging", "Tax return", "Statements", "Tax summary", "Profit and loss by dimension", "Cash flow", "Budgets", "General ledger", "Books of accounts", "Summary list of sales", "Summary list of purchases" ])
+  end
+
+  context "with a country" do
+    include_context "with isolated TudlaAccounting configuration"
+
+    let(:general) { [ "Balance sheet", "Profit and loss", "Trial balance", "Receivables aging", "Payables aging", "Tax return", "Statements", "Tax summary", "Profit and loss by dimension", "Cash flow", "Budgets", "General ledger" ] }
+    let(:philippine) { [ "Books of accounts", "Summary list of sales", "Summary list of purchases", "Withholding summary", "Tax withheld from suppliers (QAP)", "Certificates to suppliers (2307)", "Tax withheld from you (SAWT)" ] }
+    let(:australian) { [ "Payments with tax withheld, by payee", "Taxable payments, by payee" ] }
+
+    before do
+      TudlaAccounting::AccountsCreator.call([ { code: "2350", name: "Withholding", category: "liability" } ], organization)
+      TudlaAccounting::WithholdingCode.create!(organization: organization, code: "NOABN", name: "No ABN quoted", rate: "0.47", payable_account: account("2350"), withheld_on: "payment")
+      TudlaAccounting::Contact.create!(organization: organization, name: "Bright Spark", kind: "supplier", taxable_payments: true)
+    end
+
+    it "lists only that country's tax reports" do
+      { nil => general + philippine + australian, "PH" => general + philippine, "AU" => general + australian, "DE" => general }.each do |country, reports|
+        TudlaAccounting.configuration.country = ->(_organization) { country }
+        get routes.reports_path
+        expect(css_select("a.tc-card p.font-semibold").map(&:text)).to eq(reports)
+      end
+    end
   end
 
   it "asks for a financial year before showing statements" do

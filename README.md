@@ -702,6 +702,7 @@ TudlaAccounting.configure do |config|
   config.document_header = ->(organization) { "#{organization.name}\n#{organization.address}" } # who a printed document is from
   config.tax_registration = ->(organization) { TudlaAccounting::TaxRegistration.australia(organization.abn) } # or TaxRegistration.new(label:, number:, tax_name:, invoice_title:, check:); what's printed about tax
   config.books_header = ->(organization) { "#{organization.name}\nTIN: #{organization.tin}   |   #{organization.address}" } # heads the books of accounts' pages; the document_header if unset
+  config.country = ->(organization) { organization.country_code } # "PH" or "AU": which country's tax reports it sees; every country's when nil
   config.withholding_agent = ->(organization) { { tin: organization.tin, name: organization.name, address: organization.address, zip: "1223", signatory_name: "Maria Santos", signatory_title: "Finance Manager", signatory_tin: "000-000-000-000" } } # your details on BIR Form 2307; only the name if unset
 
   # PDFs (with the ferrum gem): Ferrum::Browser options, the paper, and the compiled stylesheet

@@ -24,6 +24,8 @@ TudlaAccounting.configure do |config|
   end
   # Demo Co's books are Australian. The ABN is made up, and only its check digits are right.
   config.tax_registration = ->(organization) { TudlaAccounting::TaxRegistration.australia("99 000 000 000") if organization.name == Demo::Seeder::NAME }
+  # Which country's reports each set of books sees: the BIR's or the ATO's, and neither for Demo GmbH.
+  config.country = ->(organization) { { Demo::Seeder::NAME => "AU", Demo::EuroSeeder::NAME => "DE", Demo::PesoSeeder::NAME => "PH" }[organization.name] }
   config.withholding_agent = ->(organization) { organization.name == Demo::PesoSeeder::NAME ? Demo::PesoSeeder::WITHHOLDING_AGENT : {} }
 end
 
