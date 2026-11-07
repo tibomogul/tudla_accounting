@@ -107,8 +107,7 @@ module TudlaAccounting
         documents = Document.quoted_table_name
         details = Detail.quoted_table_name
         Detail.joins(:entry).joins(<<~SQL.squish)
-          LEFT JOIN #{Entry.quoted_table_name} originals ON tudla_accounting_entries.source_id IS NULL
-            AND tudla_accounting_entries.related_type = #{quote(Entry.polymorphic_name)} AND originals.id = tudla_accounting_entries.related_id
+          LEFT JOIN #{Entry.quoted_table_name} originals ON originals.id = tudla_accounting_entries.reversal_of_id
           LEFT JOIN #{documents} ON #{documents}.id = CASE WHEN tudla_accounting_entries.source_type = #{quote(Document.polymorphic_name)} THEN tudla_accounting_entries.source_id
             WHEN originals.source_type = #{quote(Document.polymorphic_name)} THEN originals.source_id END
         SQL

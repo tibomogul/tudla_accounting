@@ -69,7 +69,7 @@ module TudlaAccounting
     # earlier credit, so it comes off; its credit undoes a payment out, so it doesn't count.
     def credits(account)
       lines = Detail.joins(:entry).where(account_id: account.subtree_ids, tudla_accounting_entries: { posted_at: @from..@thru })
-      reversals = Entry.where(organization: @organization, related_type: Entry.name).where("particulars LIKE ?", "#{Entry::REVERSAL_PREFIX}%").select(:id)
+      reversals = Entry.where(organization: @organization).where.not(reversal_of_id: nil).select(:id)
       money(lines.where(tally: Detail::TALLY_CREDIT).where.not(entry_id: reversals).sum(:amount_cents) - lines.where(tally: Detail::TALLY_DEBIT, entry_id: reversals).sum(:amount_cents))
     end
 

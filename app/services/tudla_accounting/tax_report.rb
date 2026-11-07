@@ -80,7 +80,7 @@ module TudlaAccounting
       @settled_entry_ids ||= begin
         taxed = taxed_lines.distinct.pluck(:entry_id)
         opened = CarryingAmount.joins(:detail).where(tudla_accounting_details: { entry_id: taxed }).distinct.pluck("tudla_accounting_details.entry_id")
-        reversals = Entry.where(id: taxed, related_type: Entry.name, related_id: opened).where("particulars LIKE ?", "#{Entry::REVERSAL_PREFIX}%").pluck(:id)
+        reversals = Entry.where(id: taxed, reversal_of_id: opened).pluck(:id)
         opened + reversals
       end
     end

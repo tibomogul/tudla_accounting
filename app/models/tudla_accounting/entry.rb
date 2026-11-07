@@ -13,10 +13,10 @@ module TudlaAccounting
 
     REVERSAL_PREFIX = "Reversal of: ".freeze
 
-    # The posted entry that reverses this one; preload it to read many entries' reversals
-    # at once (see reversal).
-    has_one :posted_reversal, -> { where.not(posted_at: nil).where("particulars LIKE ?", "#{REVERSAL_PREFIX}%") },
-            as: :related, class_name: "TudlaAccounting::Entry", inverse_of: false
+    # The entry a reversal reverses (reverse!), and the posted entry that reverses this
+    # one; preload posted_reversal to read many entries' reversals at once (see reversal).
+    belongs_to :reversal_of, class_name: "TudlaAccounting::Entry", optional: true, inverse_of: false
+    has_one :posted_reversal, -> { where.not(posted_at: nil) }, foreign_key: :reversal_of_id, class_name: "TudlaAccounting::Entry", inverse_of: false
 
     accepts_nested_attributes_for :details, allow_destroy: true
 
@@ -97,7 +97,7 @@ module TudlaAccounting
 
       at = TudlaAccounting.zone(organization).local(on.year, on.month, on.day)
       transaction do
-        reversing = self.class.new(organization: organization, related: self, transacted_at: at,
+        reversing = self.class.new(organization: organization, related: self, reversal_of: self, transacted_at: at,
                                    particulars: "#{REVERSAL_PREFIX}#{particulars}", reference: reference)
         details.each do |detail|
           line = reversing.details.build(account: detail.account, amount_cents: detail.amount_cents, currency: detail.currency,

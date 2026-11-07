@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_08_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_08_200000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -432,6 +432,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_08_100000) do
     t.string "reference"
     t.bigint "related_id"
     t.string "related_type"
+    t.bigint "reversal_of_id"
     t.date "reverse_on"
     t.bigint "source_id"
     t.string "source_type"
@@ -442,6 +443,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_08_100000) do
     t.index ["organization_type", "organization_id"], name: "index_tudla_accounting_entries_on_organization"
     t.index ["posted_at"], name: "index_tudla_accounting_entries_on_posted_at"
     t.index ["related_type", "related_id"], name: "index_tudla_accounting_entries_on_related"
+    t.index ["reversal_of_id"], name: "tudla_accounting_entries_reversal_of_unique_key", unique: true
     t.index ["source_type", "source_id"], name: "index_tudla_accounting_entries_on_source"
     t.index ["transacted_at"], name: "index_tudla_accounting_entries_on_transacted_at"
     t.check_constraint "(posted_at IS NULL) = (number IS NULL)", name: "tudla_accounting_entries_numbered_when_posted"
@@ -776,6 +778,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_08_100000) do
   add_foreign_key "tudla_accounting_documents", "tudla_accounting_documents", column: "credited_document_id"
   add_foreign_key "tudla_accounting_documents", "tudla_accounting_entries", column: "entry_id"
   add_foreign_key "tudla_accounting_documents", "tudla_accounting_recurring_invoices", column: "recurring_invoice_id", on_delete: :nullify
+  add_foreign_key "tudla_accounting_entries", "tudla_accounting_entries", column: "reversal_of_id"
   add_foreign_key "tudla_accounting_filed_tax_returns", "tudla_accounting_tax_return_forms", column: "form_id"
   add_foreign_key "tudla_accounting_foreign_exchanges", "tudla_accounting_details", column: "detail_id"
   add_foreign_key "tudla_accounting_payments", "tudla_accounting_accounts", column: "account_id"

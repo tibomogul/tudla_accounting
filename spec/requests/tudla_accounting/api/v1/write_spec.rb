@@ -58,7 +58,7 @@ RSpec.describe "JSON API: recording in the books", type: :request do
 
       reversal = call(:post, routes.reverse_api_v1_entry_path(data["id"]), { on: "2026-04-12" })["data"]
       expect(response).to have_http_status(:created)
-      expect(reversal).to include("particulars" => "Reversal of: Cash sale", "related_entry_id" => data["id"], "transacted_at" => "2026-04-12T00:00:00Z")
+      expect(reversal).to include("particulars" => "Reversal of: Cash sale", "related_entry_id" => data["id"], "reversal_of_entry_id" => data["id"], "transacted_at" => "2026-04-12T00:00:00Z")
       expect(call(:post, routes.reverse_api_v1_entry_path(data["id"]))["error"]["message"]).to eq("This entry has already been reversed")
 
       events = TudlaAccounting::AuditEvent.where(organization: organization, action: %w[entry.posted entry.reversed])

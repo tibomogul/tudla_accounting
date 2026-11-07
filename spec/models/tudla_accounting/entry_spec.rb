@@ -386,10 +386,25 @@ RSpec.describe TudlaAccounting::Entry, type: :model do
 
       reversal = entry.reverse!(on: Date.new(2026, 3, 1))
 
-      expect(reversal).to have_attributes(particulars: "Reversal of: Capital", related: entry, posted_at: Time.zone.local(2026, 3, 1))
+      expect(reversal).to have_attributes(particulars: "Reversal of: Capital", related: entry, reversal_of: entry, posted_at: Time.zone.local(2026, 3, 1))
       expect(reversal.details.map { |line| [ line.account.code, line.tally, line.amount_cents ] }).to contain_exactly([ "1000", "credit", 100_00 ], [ "3000", "debit", 100_00 ])
       expect(entry.reversal).to eq(reversal)
       expect(cash_balance).to eq(0)
+    end
+
+    it "knows its reversal by the link, not by the particulars" do
+      entry = draft
+      entry.post(entry.transacted_at)
+      lookalike = draft.tap { |other| other.update!(particulars: "Reversal of: Capital", related: entry) }
+      lookalike.post(lookalike.transacted_at)
+      expect(entry.reversal).to be_nil
+
+      reversal = entry.reverse!(on: Date.new(2026, 3, 1))
+      expect(TudlaAccounting::Entry.includes(:posted_reversal).find(entry.id).reversal).to eq(reversal)
+      spare = draft
+      savepoint = ->(&block) { TudlaAccounting::Entry.transaction(requires_new: true, &block) }
+      expect { savepoint.call { TudlaAccounting::Entry.where(id: reversal.id).update_all(reversal_of_id: nil) } }.to raise_error(ActiveRecord::StatementInvalid, /posted entry/i)
+      expect { savepoint.call { spare.update!(reversal_of: entry) } }.to raise_error(ActiveRecord::RecordNotUnique) # reversed once
     end
 
     it "mirrors foreign exchange on reversed lines" do

@@ -40,7 +40,7 @@ module TudlaAccounting
         source = entry.source_type && { type: entry.source_type.delete_prefix("TudlaAccounting::").underscore, id: entry.source_id }
         { id: entry.id, number: entry.number_label, status: entry.posted? ? "posted" : "draft", particulars: entry.particulars, reference: entry.reference,
           transacted_at: time(entry.transacted_at), posted_at: time(entry.posted_at), reverse_on: date(entry.reverse_on),
-          related_entry_id: (entry.related_id if entry.related_type == Entry.name), source: source, idempotency_key: entry.idempotency_key,
+          related_entry_id: (entry.related_id if entry.related_type == Entry.name), reversal_of_entry_id: entry.reversal_of_id, source: source, idempotency_key: entry.idempotency_key,
           currency: entry.details.first&.currency, lines: entry.details.map { |detail| line_json(detail) }, attachments: attachments_json(entry),
           created_at: time(entry.created_at), updated_at: time(entry.updated_at) }
       end
