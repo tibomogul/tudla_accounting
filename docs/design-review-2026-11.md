@@ -146,7 +146,7 @@ Grouped in the suggested order. Items marked **(decide)** need a decision before
 - [ ] Make `rounding`, `tax_basis`, `pdf_paper`, `reminder_days` and the email templates per organization.
 - [ ] Make every setting accept either a value or a callable given the organization, consistently, and document which is which.
 - [ ] Stop `apply_money_settings!` overwriting the host's MoneyRails defaults; pass the currency and rounding explicitly instead.
-- [ ] Stop `engine.rb` adding `spec/factories` to FactoryBot's paths in host apps.
+- [x] Stop `engine.rb` adding `spec/factories` to FactoryBot's paths in host apps. The dummy app adds them now.
 - [ ] Remove `BankAccountBalance` and its posting (taking the `base_currency` comparison with it), with a migration dropping the table.
 
 ### 3. Reversals

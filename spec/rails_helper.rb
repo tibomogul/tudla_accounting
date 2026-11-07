@@ -1,7 +1,7 @@
 require 'spec_helper'
 ENV['RAILS_ENV'] ||= 'test'
-# Load factory_bot_rails before the app boots so its railtie and the engine's
-# "tudla_accounting.factories" initializer register the engine's factory path.
+# Load factory_bot_rails before the app boots so its railtie picks up the factory path
+# the dummy app adds (config.factory_bot.definition_file_paths).
 require 'factory_bot_rails'
 require_relative '../spec/dummy/config/environment'
 require_relative 'rails_setup'

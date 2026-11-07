@@ -14,14 +14,6 @@ module TudlaAccounting
       g.factory_bot dir: "spec/factories"
     end
 
-    # Advanced FactoryBot Configuration
-    # We hook into the initializer to append the path relative to the Engine's root.
-    initializer "tudla_accounting.factories", after: "factory_bot.set_factory_paths" do
-      if defined?(FactoryBot)
-        FactoryBot.definition_file_paths << File.expand_path("../../../spec/factories", __FILE__)
-      end
-    end
-
     # Triggers aren't in schema.rb, so they go back in after every schema load.
     # Reports download as .xlsx when the host bundles caxlsx (TudlaAccounting.xlsx?).
     initializer "tudla_accounting.mime_types" do

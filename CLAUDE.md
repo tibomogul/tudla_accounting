@@ -108,7 +108,7 @@ Controllers in `app/controllers/tudla_accounting/api/v1/` build on `BaseControll
 - SolidCache hashes keys internally — don't query the DB by raw key name
 - Use `TudlaAccounting::Engine.routes.url_helpers` for engine route helpers in specs
 - Use `main_app.` prefix for host app routes within engine context
-- FactoryBot factories go in `spec/factories/`, auto-loaded via engine initializer
+- FactoryBot factories go in `spec/factories/`; the dummy app's `config/application.rb` adds the path (the engine doesn't, so host apps never load them)
 - `spec/integration/posting_concurrency_spec.rb` turns off transactional tests and uses real threads and PostgreSQL row locks; it deletes its own data afterwards. Any spec that holds a lock in a thread must release it in an `ensure`, or the cleanup blocks forever
 - PostgreSQL triggers (`TudlaAccounting::DatabaseProtection`) refuse updates and deletes of posted entries and their lines, posting into closed periods, and changes to audit events. Non-transactional specs must delete the audit events they create too. Specs that need to tamper with posted rows (or clean them up outside a transaction) must wrap it in `TudlaAccounting::DatabaseProtection.allowing_posted_changes { ... }`. `rails_helper` installs the triggers before the suite, since `schema.rb` can't hold them
 - `spec/rails_helper.rb` adds the engine's `db/migrate` to `DatabaseTasks.migrations_paths` so `maintain_test_schema!` sees engine migrations as applied; if specs report pending migrations after a schema change, rebuild the test DB (`RAILS_ENV=test bin/rails db:drop db:create db:schema:load`)

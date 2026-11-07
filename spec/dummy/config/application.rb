@@ -46,6 +46,10 @@ module Dummy
     config.x.sign_in_partial = nil
     config.x.sign_in_organizations = ->(organizations) { organizations }
 
+    # The engine's factories (spec/factories), for its specs and the demo's. The harness
+    # adds them, not the engine, so a host app's FactoryBot never sees them.
+    config.factory_bot.definition_file_paths << File.expand_path("../../factories", __dir__) if config.respond_to?(:factory_bot)
+
     # The demo (the Demo:: namespace in app/*/demo, its initializer, routes and seeds)
     # runs in development and in the demo's own specs (spec/dummy/spec, which set
     # TUDLA_DEMO=1). The engine's specs boot without it, so they see only the harness.
