@@ -8,7 +8,7 @@ module TudlaAccounting
 
     def index
       @tax_codes = organization_scope(TaxCode).includes(:account).order(:kind, :code)
-      @used = Detail.where(tax_code_id: @tax_codes.map(&:id)).distinct.pluck(:tax_code_id).to_set
+      @used = organization_scope(Detail).where(tax_code_id: @tax_codes.map(&:id)).distinct.pluck(:tax_code_id).to_set
     end
 
     def new

@@ -35,7 +35,7 @@ module TudlaAccounting
       render "tudla_accounting/shared/not_found", status: :not_found, formats: [ :html ]
     end
 
-    helper_method :accounting_organization, :tc_can?
+    helper_method :accounting_organization, :tc_can?, :organization_scope
 
     private
 

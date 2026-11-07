@@ -41,7 +41,7 @@
       <p class="tc-hint">Left blank, the date's rate is looked up, if there is one.</p>
     </div>
     <% if document.credit? %>
-      <% charges = TudlaAccounting::Document.where(organization: accounting_organization, kind: sales ? "sales_invoice" : "bill").approved.with_open_cents
+      <% charges = organization_scope(TudlaAccounting::Document).where(kind: sales ? "sales_invoice" : "bill").approved.with_open_cents
                      .where(contact: document.contact_id ? document.contact_id : contacts.select(:id)).order(issued_on: :desc).limit(200).includes(:contact).to_a %>
       <% charges = charges.select { |charge| charge.amount_due.positive? || charge.id == document.credited_document_id } %>
       <div class="sm:col-span-2"><%= tc_field form, :credited_document_id, as: :select, label: "Apply to",

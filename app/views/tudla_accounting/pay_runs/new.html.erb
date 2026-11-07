@@ -2,7 +2,7 @@
   <%= link_to "Purchases", purchase_documents_path, class: "tc-btn tc-btn-ghost" %>
 <% end %>
 
-<% suppliers = TudlaAccounting::Contact.where(organization: accounting_organization).suppliers.order(Arel.sql("LOWER(name)")) %>
+<% suppliers = organization_scope(TudlaAccounting::Contact).suppliers.order(Arel.sql("LOWER(name)")) %>
 <%= form_with url: new_pay_run_path, method: :get, class: "tc-card tc-card-body mb-4 flex flex-wrap items-end gap-3" do |form| %>
   <div><%= form.label :account_id, "Pay from", class: "tc-label" %>
     <%= form.select :account_id, bank_accounts.map { |account| [ "#{account.code_with_name}#{" (#{account.currency})" if account.currency.present? && account.currency != accounting_organization.currency}", account.id ] },

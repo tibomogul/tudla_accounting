@@ -73,7 +73,7 @@ module TudlaAccounting
       end
 
       def document_lines_json(document)
-        values = DimensionValue.where(id: document.lines.flat_map(&:dimension_value_ids)).includes(:dimension).index_by(&:id)
+        values = DimensionValue.where(dimension: organization_scope(Dimension), id: document.lines.flat_map(&:dimension_value_ids)).includes(:dimension).index_by(&:id)
         document.lines.map do |line|
           { description: line.description, quantity: line.quantity.to_s("F"), unit_price: amount(line.unit_price), amount: amount(line.amount),
             account_code: line.account.code, tax_code: line.tax_code&.code, tax: amount(Money.new(line.tax_cents, document.currency)),
@@ -85,7 +85,7 @@ module TudlaAccounting
       # Its schedule (day_of_month null for the month's last day), what it makes (issue:
       # draft, approve or email) and when it next does (next_on, null once it has run out).
       def recurring_invoice_json(template)
-        values = DimensionValue.where(id: template.lines.flat_map(&:dimension_value_ids)).includes(:dimension).index_by(&:id)
+        values = DimensionValue.where(dimension: organization_scope(Dimension), id: template.lines.flat_map(&:dimension_value_ids)).includes(:dimension).index_by(&:id)
         currency = template.organization.currency
         { id: template.id, name: template.name, contact: { id: template.contact_id, name: template.contact.name }, reference: template.reference,
           notes: template.notes, tax_inclusive: template.tax_inclusive?, due_days: template.due_days, issue: template.issue,

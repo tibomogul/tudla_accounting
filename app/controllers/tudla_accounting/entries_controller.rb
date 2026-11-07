@@ -17,7 +17,7 @@ module TudlaAccounting
       entries = entries.where(transacted_at: ...day_start(params[:thru]) + 1.day) if params[:thru].present?
       if params[:account_id].present?
         account = organization_scope(Account).find(params[:account_id])
-        entries = entries.where(id: Detail.where(account_id: account.subtree_ids).select(:entry_id))
+        entries = entries.where(id: organization_scope(Detail).where(account_id: account.subtree_ids).select(:entry_id))
       end
       @page = Paginator.new(entries, page: params[:page])
     end
@@ -82,7 +82,7 @@ module TudlaAccounting
     def search(entries, text)
       pattern = "%#{Entry.sanitize_sql_like(text)}%"
       found = entries.where("particulars ILIKE :pattern OR reference ILIKE :pattern", pattern: pattern)
-        .or(entries.where(id: Detail.where("description ILIKE ?", pattern).select(:entry_id)))
+        .or(entries.where(id: organization_scope(Detail).where("description ILIKE ?", pattern).select(:entry_id)))
       number = text[/\A[^\d\s]*(\d+)\z/, 1]
       number ? found.or(entries.where(number: number.to_i)) : found
     end

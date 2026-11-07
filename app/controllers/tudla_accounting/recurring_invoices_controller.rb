@@ -17,7 +17,7 @@ module TudlaAccounting
 
     def show
       @invoices = @recurring_invoice.invoices.order(issued_on: :desc, id: :desc).with_open_cents.limit(24).to_a
-      @dimension_values = DimensionValue.where(id: @recurring_invoice.lines.flat_map(&:dimension_value_ids)).includes(:dimension).index_by(&:id)
+      @dimension_values = DimensionValue.where(dimension: organization_scope(Dimension), id: @recurring_invoice.lines.flat_map(&:dimension_value_ids)).includes(:dimension).index_by(&:id)
     end
 
     # A new template, or (document_id) one copying an invoice's customer and lines.

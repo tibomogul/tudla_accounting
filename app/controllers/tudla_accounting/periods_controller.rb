@@ -9,7 +9,7 @@ module TudlaAccounting
     def show
       @year = organization_scope(Period).roots.find(params[:id])
       @months = @year.children.order(:from_date).to_a
-      @line_counts = Detail.joins(:balance).where(tudla_accounting_balances: { period_id: @months.map(&:id) })
+      @line_counts = organization_scope(Detail).joins(:balance).where(tudla_accounting_balances: { period_id: @months.map(&:id) })
         .group("tudla_accounting_balances.period_id").count
       # Months close in order: only the earliest open one can be closed, and only the latest
       # closed one reopened (while its year is open). See Period#close_blocker.

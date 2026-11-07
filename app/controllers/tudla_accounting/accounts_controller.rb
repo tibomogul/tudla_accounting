@@ -113,7 +113,7 @@ module TudlaAccounting
     # with nothing posted opens and closes where the one before it closed (the first at
     # the year's opening).
     def monthly_balances(months)
-      stored = Balance.where(account: @account, period: months).index_by(&:period_id)
+      stored = organization_scope(Balance).where(account: @account, period: months).index_by(&:period_id)
       running = @year_balance.starting_amount_cents
       months.map do |month|
         balance = stored[month.id] || Balance.new(account: @account, period: month, organization: accounting_organization, currency: accounting_organization.currency,
@@ -135,7 +135,7 @@ module TudlaAccounting
     def ledger
       from = params[:from].presence&.to_date
       thru = params[:thru].presence&.to_date
-      lines = Detail.joins(:entry, :balance)
+      lines = organization_scope(Detail).joins(:entry, :balance)
         .where(account_id: @account.subtree_ids, tudla_accounting_balances: { period_id: @year.subtree_ids })
         .includes(:account, :entry).order("tudla_accounting_entries.posted_at", :id).to_a
 

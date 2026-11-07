@@ -176,7 +176,7 @@ Grouped in the suggested order. Items marked **(decide)** need a decision before
 
 ### 7. Tenancy
 
-- [ ] Add a check that fails when an engine controller looks up a model without `organization_scope`.
+- [x] Add a check that fails when an engine controller looks up a model without `organization_scope`. `spec/integration/tenancy_spec.rb`, over controllers, views and helpers; 31 lookups were scoped or explained, and the line editor's tax codes were tightened.
 - [ ] **(decide)** Enforce tenancy in the database with PostgreSQL row-level security, or with scoped lookups by default.
 
 ### Withholding, smaller items

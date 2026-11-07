@@ -12,14 +12,14 @@ module TudlaAccounting
     # The accounts a line can choose: the active ones without sub-accounts, and any the
     # lines have already. lines: an entry's details, or a recurring entry's lines.
     def entry_account_options(lines)
-      postable_account_choices(TudlaAccounting::Account.where(organization: accounting_organization).order(:code), selected: lines.filter_map(&:account_id))
+      postable_account_choices(organization_scope(TudlaAccounting::Account).order(:code), selected: lines.filter_map(&:account_id))
     end
 
     # The tax codes a line can choose: the active ones, and any the lines have already. Each
     # carries its rate for the line editor's totals.
     def entry_tax_options(lines)
       used = lines.filter_map(&:tax_code_id)
-      TudlaAccounting::TaxCode.where(organization: accounting_organization).where(active: true).or(TudlaAccounting::TaxCode.where(id: used))
+      organization_scope(TudlaAccounting::TaxCode).where(active: true).or(organization_scope(TudlaAccounting::TaxCode).where(id: used))
         .order(:kind, :code).map { |code| [ code.label, code.id, { data: { rate: code.rate.to_s } } ] }
     end
 
@@ -27,7 +27,7 @@ module TudlaAccounting
     # and any the lines have already.
     def entry_dimensions(lines)
       used = lines.flat_map { |line| line.respond_to?(:tags) ? line.tags.map(&:dimension_value_id) : line.dimension_value_ids }
-      TudlaAccounting::Dimension.where(organization: accounting_organization).includes(:dimension_values).order(:code).filter_map do |dimension|
+      organization_scope(TudlaAccounting::Dimension).includes(:dimension_values).order(:code).filter_map do |dimension|
         values = dimension.dimension_values.select { |value| value.active? || used.include?(value.id) }
         [ dimension, values.map { |value| [ value.name, value.id ] } ] if (dimension.active? && values.any?) || values.any? { |value| used.include?(value.id) }
       end

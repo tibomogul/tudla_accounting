@@ -7,7 +7,7 @@ module TudlaAccounting
     before_action :set_line
 
     def match
-      details = Detail.where(account: @line.account, id: Array(params[:detail_ids]).compact_blank).includes(:entry).to_a
+      details = organization_scope(Detail).where(account: @line.account, id: Array(params[:detail_ids]).compact_blank).includes(:entry).to_a
       @reconciler.match!(@line, details)
       done "Matched #{@line.description}."
     rescue ArgumentError => e

@@ -20,8 +20,8 @@ module TudlaAccounting
           @page = Paginator.new(documents, page: params[:page])
           @documents = @page.records.with_open_cents.includes(:contact).to_a
           @reminders_due = ReminderRunner.due(organization: accounting_organization).size if side == "sales"
-          @emailed = Delivery.sent.where(subject_type: Document.name, subject_id: @documents.map(&:id)).distinct.pluck(:subject_id).to_set
-          @due = Money.new(Document.where(id: documents.select(:id)).open_base_cents_net, accounting_organization.currency)
+          @emailed = organization_scope(Delivery).sent.where(subject_type: Document.name, subject_id: @documents.map(&:id)).distinct.pluck(:subject_id).to_set
+          @due = Money.new(organization_scope(Document).where(id: documents.select(:id)).open_base_cents_net, accounting_organization.currency)
         end
         format.csv { send_data documents_table(documents).to_csv, filename: "#{side}.csv", type: "text/csv" }
       end
@@ -31,8 +31,8 @@ module TudlaAccounting
       respond_to do |format|
         format.html do
           @applied = applied(@document)
-          @deliveries = Delivery.where(subject: @document).newest_first.to_a
-          @dimension_values = DimensionValue.where(id: @document.lines.flat_map(&:dimension_value_ids)).includes(:dimension).index_by(&:id)
+          @deliveries = organization_scope(Delivery).where(subject: @document).newest_first.to_a
+          @dimension_values = DimensionValue.where(dimension: organization_scope(Dimension), id: @document.lines.flat_map(&:dimension_value_ids)).includes(:dimension).index_by(&:id)
         end
         format.pdf { send_pdf(@document.number_label || "draft-#{@document.kind.dasherize}-#{@document.id}", fallback: document_path(@document)) { PdfMaker.document(@document) } }
       end
@@ -125,8 +125,8 @@ module TudlaAccounting
     def by_status(documents, status)
       return documents.where(status: status) if %w[draft void].include?(status)
 
-      open = Document.with_open_cents.where(id: documents.approved.select(:id))
-      ids = Document.from(open, :tudla_accounting_documents)
+      open = organization_scope(Document).with_open_cents.where(id: documents.approved.select(:id))
+      ids = Document.from(open, :tudla_accounting_documents) # tenancy: from the scoped open documents above
       ids = case status
       when "unpaid" then ids.where("open_cents = total_cents - withheld_cents")
       when "part_paid" then ids.where("open_cents > 0 AND open_cents < total_cents - withheld_cents")
@@ -217,7 +217,7 @@ module TudlaAccounting
     end
 
     def documents_table(documents)
-      rows = Document.with_open_cents.where(id: documents.select(:id)).includes(:contact).order(issued_on: :desc, id: :desc).map do |document|
+      rows = organization_scope(Document).with_open_cents.where(id: documents.select(:id)).includes(:contact).order(issued_on: :desc, id: :desc).map do |document|
         [ document.kind_label, document.number_label, document.issued_on, document.contact.name, document.reference, document.due_on,
           document.subtotal, document.tax, document.total, document.amount_due, STATUSES.fetch(document.payment_status, document.payment_status.humanize),
           document.currency, document.amount_due_in_base, document.withheld ]

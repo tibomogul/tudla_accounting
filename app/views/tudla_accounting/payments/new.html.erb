@@ -2,7 +2,7 @@
 <% currencies = payment_currencies %>
 <%= tc_page_header (received ? "Record a payment received" : "Record a payment made") %>
 
-<% contacts = TudlaAccounting::Contact.where(organization: accounting_organization).active.then { |scope| received ? scope.customers : scope.suppliers }.order(Arel.sql("LOWER(name)")) %>
+<% contacts = organization_scope(TudlaAccounting::Contact).active.then { |scope| received ? scope.customers : scope.suppliers }.order(Arel.sql("LOWER(name)")) %>
 <%= form_with url: new_payment_path, method: :get, class: "tc-card tc-card-body mb-4 flex flex-wrap items-end gap-3" do |form| %>
   <%= hidden_field_tag :kind, @payment.kind %>
   <div class="grow"><%= form.label :contact_id, received ? "Customer" : "Supplier", class: "tc-label" %>

@@ -14,7 +14,7 @@ module TudlaAccounting
     end
 
     def show
-      @entries = Entry.where(source: @recurring_entry).includes(:details).order(transacted_at: :desc, id: :desc).limit(24)
+      @entries = organization_scope(Entry).where(source: @recurring_entry).includes(:details).order(transacted_at: :desc, id: :desc).limit(24)
     end
 
     # A new template, or (entry_id) one copying an entry's particulars and lines.

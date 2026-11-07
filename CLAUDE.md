@@ -68,6 +68,10 @@ docker compose exec rails bash -lc 'RAILS_ENV=test bin/rails db:migrate'        
 
 Why: Rails 8.1 does **not** auto-append engine migration paths to the host app's paths. The engine root's `bin/rails` (with `ENGINE_PATH` set) is the only context where both `db/migrate/` and `spec/dummy/db/migrate/` are visible together. Running `bin/rails db:migrate` from `spec/dummy/` will silently skip the engine migrations.
 
+### Tenancy
+
+Engine controllers, views and helpers look records up through `organization_scope(Model)` (the current organization's; a view helper too). `spec/integration/tenancy_spec.rb` fails for a query or named scope on an engine model there that isn't limited by `organization_scope` on the same line. One that is safe another way (it starts from records already scoped, or the model has no organization of its own) says why in a `# tenancy:` comment on that line or the one before.
+
 ### Money: one way in, one way out
 
 - **Reading:** every typed or given amount goes through `AmountParser` (`cents`, `decimal`); never `to_f`, `BigDecimal()` or `Money.from_amount` on raw input. Controllers use `amount_cents`/`typed_decimal` (`ApplicationController`), the API `cents`/`decimal` (`Api::V1::BaseController`); imports pass `round: true`.

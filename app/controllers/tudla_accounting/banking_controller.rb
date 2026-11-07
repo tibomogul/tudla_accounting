@@ -10,9 +10,9 @@ module TudlaAccounting
 
     def index
       @accounts = organization_scope(Account).where(category: [ Account::CATEGORY_ASSET, Account::CATEGORY_LIABILITY ]).order(:code)
-      @statements = BankStatementLine.where(account: @accounts).group(:account_id).pluck(:account_id, Arel.sql("COUNT(*)"), Arel.sql("MAX(occurred_on)"))
+      @statements = organization_scope(BankStatementLine).where(account: @accounts).group(:account_id).pluck(:account_id, Arel.sql("COUNT(*)"), Arel.sql("MAX(occurred_on)"))
         .to_h { |id, count, last| [ id, { count: count, last: last } ] }
-      @unmatched = BankStatementLine.where(account: @accounts).unmatched.group(:account_id).count
+      @unmatched = organization_scope(BankStatementLine).where(account: @accounts).unmatched.group(:account_id).count
     end
 
     def show

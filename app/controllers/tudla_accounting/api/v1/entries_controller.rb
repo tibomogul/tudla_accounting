@@ -24,7 +24,7 @@ module TudlaAccounting
           entries = entries.where(reference: params[:reference]) if params[:reference].present?
           if params[:account].present?
             account = organization_scope(Account).find_by!(code: params[:account])
-            entries = entries.where(id: Detail.where(account_id: account.subtree_ids).select(:entry_id))
+            entries = entries.where(id: organization_scope(Detail).where(account_id: account.subtree_ids).select(:entry_id))
           end
           render_page(updated_since(entries).order(:transacted_at, :id)) { |entry| entry_json(entry) }
         end

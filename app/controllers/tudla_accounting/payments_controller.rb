@@ -25,7 +25,7 @@ module TudlaAccounting
 
     def show
       respond_to do |format|
-        format.html { @deliveries = Delivery.where(subject: @payment).newest_first.to_a }
+        format.html { @deliveries = organization_scope(Delivery).where(subject: @payment).newest_first.to_a }
         format.pdf do
           raise ActiveRecord::RecordNotFound if @payment.refund? # a refund has no receipt or notice
           name = "#{@payment.received? ? 'receipt' : 'payment-notice'}-#{@payment.contact.name}-#{@payment.paid_on}"
