@@ -174,15 +174,22 @@ module TudlaAccounting
 
     # [document, payment (a refund) or entry, amount, allocation] for each allocation of
     # it, in order; none on a refund.
-    def applications
-      return [] if refund? || !credit
+    def applications = self.class.applications_for([ self ]).fetch(self)
 
-      allocations = credit.allocations_from.includes(to: { detail: :entry }).order(:allocated_at, :id).to_a
-      entry_ids = allocations.map { |allocation| allocation.to.detail.entry_id }
+    # Each payment's applications (see #applications), in a few queries however many
+    # payments there are: { payment => [[target, amount, allocation], ...] }.
+    def self.applications_for(payments)
+      ActiveRecord::Associations::Preloader.new(records: payments, associations: { entry: { details: :carrying_amount } }).call
+      credits = payments.reject(&:refund?).filter_map { |payment| [ payment, payment.credit ] if payment.credit }.to_h
+      allocations = Allocation.where(from: credits.values).includes(to: { detail: :entry }).order(:allocated_at, :id).group_by(&:from_id)
+      entry_ids = allocations.values.flatten.map { |allocation| allocation.to.detail.entry_id }
       sources = [ Document, Payment ].flat_map { |model| model.where(entry_id: entry_ids).to_a }.index_by(&:entry_id)
-      allocations.map do |allocation|
-        entry = allocation.to.detail.entry
-        [ sources[entry.id] || entry, money(foreign? ? allocation.other_currency_cents.to_i : allocation.amount_cents), allocation ]
+      payments.to_h do |payment|
+        made = allocations.fetch(credits[payment]&.id, []).map do |allocation|
+          entry = allocation.to.detail.entry
+          [ sources[entry.id] || entry, Money.new(payment.foreign? ? allocation.other_currency_cents.to_i : allocation.amount_cents, payment.currency), allocation ]
+        end
+        [ payment, made ]
       end
     end
 

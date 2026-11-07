@@ -234,6 +234,14 @@ measure("QAP and SAWT (year)") { [ withholding_year.qap, withholding_year.sawt, 
 filing_quarter = TudlaAccounting::FilingQuarters.new(organization).of(Date.new(2026, 4, 1))
 measure("supplier certificates (quarter)") { TudlaAccounting::Reports::SupplierCertificates.new(organization, filing_quarter).certificates.map(&:sheets) }
 puts format("  withheld rows: %d", TudlaAccounting::WithheldTax.where(organization: organization).count)
+# The payments above are all to customers (bills only get credit notes), so pay the 100 bills
+# approved for the withholding timing, for taxable payments to read.
+TudlaAccounting::Document.where(organization: organization, kind: "bill", contact: suppliers.last, issued_on: last_day).find_each do |bill|
+  TudlaAccounting::Payment.record!(organization: organization, kind: "paid", contact: bill.contact, account: banks.first, paid_on: last_day,
+                                   amount_cents: bill.amount_due.cents, applications: [ { document: bill, amount_cents: bill.amount_due.cents } ])
+end
+TudlaAccounting::Contact.where(id: suppliers.map(&:id)).update_all(taxable_payments: true)
+measure("taxable payments (year)") { TudlaAccounting::Reports::TaxablePayments.new(organization, from: months.first, thru: months.last).payees }
 measure("bank summary (one account)") { TudlaAccounting::BankReconciler.new(bank).summary(as_of: Date.new(2026, 12, 31)) }
 measure("bank suggestions (one account)") { TudlaAccounting::BankReconciler.new(bank).suggestions }
 differences = measure("balance check (differences)") { TudlaAccounting::BalanceRebuilder.new(organization).differences.size }

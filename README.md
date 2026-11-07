@@ -336,13 +336,13 @@ We worked from search summaries of the ATO's pages, because the ATO's site refus
 
 #### Australian taxable payments annual report (TPAR): what to confirm
 
-Tick **Report what we pay them as taxable payments** on each contractor's contact (`Contact#taxable_payments`; the contacts import takes a Taxable payments column, yes or no). The Taxable payments, by payee report (`Reports::TaxablePayments`, under Reports once a contact is marked) lists what was paid to each in a run of months, the last financial year by default, on screen, in CSV and Excel, and in the API (`taxable_payments`). The gross paid includes GST and any no-ABN tax withheld. The GST is each bill's, in proportion to what the payment paid of it, so a payment applied to no bill has none and its payee is flagged, as is one with no ABN or no address. A voided payment counts in the month it was voided. We worked from search summaries, not the ATO's own pages, so check these with an accountant or registered tax agent:
+Tick **Report what we pay them as taxable payments** on each contractor's contact (`Contact#taxable_payments`; the contacts import takes a Taxable payments column, yes or no). The Taxable payments, by payee report (`Reports::TaxablePayments`, under Reports once a contact is marked) lists what was paid to each in a run of months, the last financial year by default, on screen, in CSV and Excel, and in the API (`taxable_payments`). The gross paid includes GST and any no-ABN tax withheld. The GST is each bill's, in proportion to what the payment paid of it, at the bill's exchange rate, so a payment applied to no bill has none and its payee is flagged, as is one with no ABN or no address. A refund from the contractor is taken off, with the GST of the supplier credit it paid back (none when it returns an overpayment); a credit applied to a bill already lowers what was paid. A voided payment or refund counts in the month it was voided. We worked from search summaries, not the ATO's own pages, so check these with an accountant or registered tax agent:
 
 - **Who has to lodge.** We read that it's businesses in building and construction, cleaning, couriers, road freight, IT, and security, investigation or surveillance, paying contractors for those services. The engine doesn't decide: you mark the contacts.
 - **Goods and services.** We read that payments only for materials aren't reported, and a mixed payment is reported in full unless the labour is incidental. A marked contact's payments all count; leave a goods-only supplier unmarked, and adjust a mixed one by hand.
 - **The fields and the file.** The report has the payee's ABN, name, address and phone, the gross paid, the GST and the tax withheld. We haven't seen the ATO's current specification, so the columns may not be all it asks for, and the engine makes no file to lodge.
 - **The deadline.** We found 28 August in secondary sources only.
-- **Refunds from contractors** aren't taken off.
+- **Refunds from contractors.** We take them off in the month they're received, and couldn't confirm that's what the ATO expects.
 
 #### Australian no-ABN withholding: what to confirm
 

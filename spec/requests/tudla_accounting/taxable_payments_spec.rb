@@ -93,6 +93,48 @@ RSpec.describe "Taxable payments, by payee", type: :request do
       expect(csv.last).to eq([ nil, nil, "Total", nil, nil, nil, "3950.00", "250.00", "470.00", nil ])
     end
 
+    it "takes off a refund from the supplier with its credit's GST, and converts a foreign bill's GST at the bill's rate" do
+      TudlaAccounting::AccountsCreator.call([ { code: "1020", name: "Dollar account", category: "asset", currency: "USD" },
+                                              { code: "7900", name: "Exchange gains", category: "income", role: "realized_fx_gain" } ], organization)
+      paid = bill(builder, Date.new(2025, 3, 1), 1_000_00)
+      pay(builder, Date.new(2025, 3, 10), 1_100_00, applications: [ { document: paid, amount_cents: 1_100_00 } ])
+      credit = TudlaAccounting::Document.create!(organization: organization, kind: "supplier_credit", contact: builder, issued_on: Date.new(2025, 4, 1),
+                                                 lines_attributes: [ { description: "Overcharge", unit_price_cents: 100_00, account: account("6000"), tax_code: gst } ]).approve!
+      refund = TudlaAccounting::Payment.record!(organization: organization, kind: "supplier_refund", contact: builder, account: account("1010"), paid_on: Date.new(2025, 4, 5),
+                                                amount_cents: 110_00, refund_of: credit)
+      dollars = TudlaAccounting::Document.create!(organization: organization, kind: "bill", contact: cleaner, issued_on: Date.new(2025, 5, 1), currency: "USD", exchange_rate: "1.5",
+                                                  lines_attributes: [ { description: "Work", unit_price_cents: 100_00, account: account("6000"), tax_code: gst } ]).approve!
+      TudlaAccounting::Payment.record!(organization: organization, kind: "paid", contact: cleaner, account: account("1020"), paid_on: Date.new(2025, 5, 10), amount_cents: 110_00,
+                                       exchange_rate: "1.6", applications: [ { document: dollars, amount_cents: 110_00 } ])
+
+      get routes.reports_taxable_payments_path
+      expect(cells("tr[data-payee-row]")).to eq([ "51 824 753 556 | Bricks & Co | 1 Main St 2000 | 1 | 990.00 | 90.00 | 0.00",
+                                                  "No ABN | Sparkle Cleaning | No address | 1 | 176.00 | 15.00 | 0.00" ])
+
+      refund.void!(on: Date.new(2026, 2, 1), reason: "Bounced") # voided this year: it counts back this year
+      get routes.reports_taxable_payments_path(from_id: month(2026, 1).id, thru_id: month(2026, 6).id)
+      expect(cells("tr[data-payee-row]")).to eq([ "51 824 753 556 | Bricks & Co | 1 Main St 2000 | 0 | 110.00 | 10.00 | 0.00" ])
+    end
+
+    it "takes no more queries for more payments" do
+      count = lambda do
+        queries = 0
+        counter = ->(*, payload) { queries += 1 unless payload[:name].in?(%w[SCHEMA TRANSACTION]) || payload[:cached] }
+        ActiveSupport::Notifications.subscribed(counter, "sql.active_record") { get routes.reports_taxable_payments_path }
+        queries
+      end
+      paid = bill(builder, Date.new(2025, 3, 1), 1_000_00)
+      pay(builder, Date.new(2025, 3, 10), 1_100_00, applications: [ { document: paid, amount_cents: 1_100_00 } ])
+      few = count.call
+      3.times do |index|
+        supplier = contractor("Contractor #{index}")
+        paid = bill(supplier, Date.new(2025, 4, 1), 1_000_00)
+        pay(supplier, Date.new(2025, 4, 10), 600_00, applications: [ { document: paid, amount_cents: 600_00 } ])
+        pay(supplier, Date.new(2025, 4, 11), 500_00, applications: [ { document: paid, amount_cents: 500_00 } ])
+      end
+      expect(count.call).to be <= few
+    end
+
     it "counts a payment moved to another bill once, and shows nothing paid in an empty year" do
       first = bill(builder, Date.new(2025, 3, 1), 1_000_00)
       second = bill(builder, Date.new(2025, 3, 2), 1_000_00)
