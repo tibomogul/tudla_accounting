@@ -27,6 +27,7 @@ module TudlaAccounting
 
     TEMPLATES = {
       "ph_expanded" => {
+        country: "PH",
         title: "Philippines: expanded withholding tax, common payments (BIR Form 1601-EQ, January 2019)",
         codes: PHILIPPINE_PAYMENTS.flat_map do |payment, brackets|
           brackets.flat_map do |bracket, (individual, individual_rate, corporate, corporate_rate)|
@@ -39,6 +40,7 @@ module TudlaAccounting
       # Withheld from a payment to a supplier who hasn't quoted an ABN, at the top marginal
       # rate (47% since 1 July 2017, as the ATO's pages give it).
       "au_no_abn" => {
+        country: "AU",
         title: "Australia: PAYG withholding where no ABN is quoted",
         codes: [ { code: "NOABN", name: "No ABN quoted", rate: BigDecimal("0.47"), withheld_on: "payment" } ]
       }
@@ -46,9 +48,9 @@ module TudlaAccounting
 
     module_function
 
-    # [[title, key]] for a select.
-    def choices
-      TEMPLATES.map { |key, template| [ template[:title], key ] }
+    # [[title, key]] for a select: the organization's country's (Jurisdictions), or all.
+    def choices(organization = nil)
+      (organization ? Jurisdictions.templates_for(organization, TEMPLATES) : TEMPLATES).map { |key, template| [ template[:title], key ] }
     end
 
     # Adds the template's codes the organization doesn't have yet, all or none, each with

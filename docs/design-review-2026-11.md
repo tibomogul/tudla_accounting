@@ -133,9 +133,9 @@ Grouped in the suggested order. Items marked **(decide)** need a decision before
 
 ### 1. Jurisdiction
 
-- [ ] **(decide)** A jurisdiction setting per organization, or optional country add-ons that register their own pieces — or the first as a step towards the second.
-- [ ] Add the jurisdiction to the organization (a column or a per-organization callable).
-- [ ] Have the reports index, tax return templates, withholding code templates and contact form fields read it.
+- [x] **(decide)** A jurisdiction setting per organization, or optional country add-ons that register their own pieces — or the first as a step towards the second. Decided: the setting first, as a step towards add-ons.
+- [x] Add the jurisdiction to the organization (a column or a per-organization callable). The `country` setting, a code or a callable.
+- [x] Have the reports index, tax return templates, withholding code templates and contact form fields read it. `Jurisdictions` lists each country's features; the report pages and API reports are not found for another country, templates carry their country, and the TPAR and "Bought as" fields show only for their country or where already set.
 - [ ] Move the Philippine pieces (2307, QAP, SAWT, SLSP, `FilingQuarters`, `BspRatesJob`, books of accounts, `TaxCode#purchase_type`, the `withholding_agent` fields) behind it.
 - [ ] Move the Australian pieces (BAS template, NOABN code, payee list and payment summaries, TPAR, `Contact#taxable_payments`) behind it.
 - [ ] **(decide)** Keep the TPAR flag as it is, or record it per payment or per year so lodged years don't change.

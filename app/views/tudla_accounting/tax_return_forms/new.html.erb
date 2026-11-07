@@ -6,7 +6,7 @@
   <div class="tc-card tc-card-body grid gap-4">
     <div>
       <%= label_tag :template, "Start from", class: "tc-label" %>
-      <%= select_tag :template, options_for_select([ [ "Nothing: add the boxes yourself", "" ] ] + TudlaAccounting::TaxReturnTemplates.choices, @template), class: "tc-input" %>
+      <%= select_tag :template, options_for_select([ [ "Nothing: add the boxes yourself", "" ] ] + TudlaAccounting::TaxReturnTemplates.choices(accounting_organization), @template), class: "tc-input" %>
       <p class="tc-hint">A template lays out the boxes, their names and their totals of other boxes. You add the tax codes and accounts that fill the rest.
         Check the box names against the current form before filing.</p>
     </div>

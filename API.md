@@ -287,4 +287,4 @@ A bill's `amount` is what is paid of it, all that is owed when not given, in the
 | `taxable_payments` | `from_id`, `thru_id` (the last financial year by default): what was paid to the contacts marked `taxable_payments`, by payee, with the GST in it and the tax withheld, for Australia's TPAR |
 | `cash_flow` | `from_id`, `thru_id` (the start of the year to this month by default), `method` (direct or indirect); needs the `cash_account_codes` setting |
 
-A period id that isn't one of the organization's gets `404`.
+A period id that isn't one of the organization's gets `404`, and so does another country's report (`withholding`, `qap`, `sawt`, `sales_list` and `purchases_list` are the Philippines', `payee_payments` and `taxable_payments` Australia's) when the `country` setting gives the books a country.

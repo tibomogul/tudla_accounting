@@ -27,13 +27,15 @@
   </div>
 <% end %>
 
+<% templates = TudlaAccounting::WithholdingCodeTemplates.choices(accounting_organization) %>
+<% if templates.any? %>
 <%= form_with url: add_template_withholding_codes_path, class: "tc-card tc-card-body space-y-4 mt-6" do %>
   <h2 class="tc-card-title">Add a starter list</h2>
   <p class="tc-hint">Adds the codes you don't have yet, which you can then change or remove. Check their rates against the tax authority's current ones before relying on them.</p>
   <div class="grid gap-4 sm:grid-cols-3">
     <div>
       <%= label_tag :template, "List", class: "tc-label" %>
-      <%= select_tag :template, options_for_select(TudlaAccounting::WithholdingCodeTemplates.choices), class: "tc-input" %>
+      <%= select_tag :template, options_for_select(templates), class: "tc-input" %>
     </div>
     <div>
       <%= label_tag :payable_account_id, "Account for tax withheld from suppliers", class: "tc-label" %>
@@ -45,6 +47,7 @@
     </div>
   </div>
   <%= submit_tag "Add the list", class: "tc-btn tc-btn-secondary" %>
+<% end %>
 <% end %>
 
 <p class="mt-6"><%= link_to "← Back to setup", setup_path, class: "tc-btn tc-btn-ghost" %></p>

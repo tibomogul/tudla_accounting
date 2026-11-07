@@ -9,6 +9,7 @@ module TudlaAccounting
   module TaxReturnTemplates
     TEMPLATES = {
       "au_bas" => {
+        country: "AU",
         title: "Australia: Business activity statement (GST, PAYG withholding and instalments)",
         name: "BAS",
         boxes: [
@@ -34,6 +35,7 @@ module TudlaAccounting
         ]
       },
       "uk_vat" => {
+        country: "GB",
         title: "United Kingdom: VAT return (boxes 1 to 9)",
         name: "VAT return",
         boxes: [
@@ -52,6 +54,7 @@ module TudlaAccounting
       # or purchases; column B, their tax), then Part II's total payable, which starts
       # from it. Its schedules (Part V) are worked out off the books.
       "ph_2550q" => {
+        country: "PH",
         title: "Philippines: Quarterly VAT return (BIR Form 2550Q, April 2024)",
         name: "2550Q",
         boxes: [
@@ -115,9 +118,9 @@ module TudlaAccounting
       TEMPLATES.fetch(key.to_s) { raise ArgumentError, "Unknown tax return template #{key.inspect}; expected one of #{TEMPLATES.keys.join(', ')}" }
     end
 
-    # [[title, key]] for a select.
-    def choices
-      TEMPLATES.map { |key, template| [ template[:title], key ] }
+    # [[title, key]] for a select: the organization's country's (Jurisdictions), or all.
+    def choices(organization = nil)
+      (organization ? Jurisdictions.templates_for(organization, TEMPLATES) : TEMPLATES).map { |key, template| [ template[:title], key ] }
     end
   end
 end

@@ -142,10 +142,12 @@ module TudlaAccounting
       # How an organization is registered for tax, on its printed documents: a callable
       # giving a TaxRegistration, or nil to leave them as they are.
       @tax_registration = nil
-      # Which country's tax reports an organization sees: a country code ("PH" for the
-      # BIR's books, summary lists and withholding forms, "AU" for the ATO's payment
-      # summaries and TPAR), or a callable given the organization returning one. nil, or a
-      # callable returning nil, shows every country's reports.
+      # Which country's tax pieces an organization has: a country code ("PH" for the
+      # BIR's books, summary lists, withholding forms and the purchase type on tax codes;
+      # "AU" for the ATO's payment summaries, TPAR and its contact flag; templates by their
+      # own country), or a callable given the organization returning one. Jurisdictions
+      # lists them. Another country's report pages are not found. nil, or a callable
+      # returning nil, has every country's.
       @country = nil
       # How many requests an API token may make a minute (nil for no limit), counted in
       # api_rate_limit_store (an ActiveSupport::Cache store; Rails.cache when nil, which

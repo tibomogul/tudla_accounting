@@ -24,6 +24,13 @@ module TudlaAccounting
       self.accounting_permissions = accounting_permissions.merge(Array(only).to_h { |action| [ action.to_s, permission ] })
     end
 
+    # Actions that belong to one country (a Jurisdictions feature): not found for books
+    # of another country.
+    def self.for_country(feature, only:)
+      Jurisdictions.country(feature)
+      before_action(only: only) { raise ActiveRecord::RecordNotFound unless Jurisdictions.on?(accounting_organization, feature) }
+    end
+
     rescue_from ActiveRecord::RecordNotFound do # as a page, whatever was asked for (a PDF, a CSV...)
       render "tudla_accounting/shared/not_found", status: :not_found, formats: [ :html ]
     end

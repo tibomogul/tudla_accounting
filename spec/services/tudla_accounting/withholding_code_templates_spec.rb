@@ -1,4 +1,5 @@
 require "rails_helper"
+require_relative "../../support/configuration"
 
 RSpec.describe TudlaAccounting::WithholdingCodeTemplates do
   let(:organization) { create(:organization, currency: "PHP") }
@@ -13,6 +14,16 @@ RSpec.describe TudlaAccounting::WithholdingCodeTemplates do
   it "offers the Philippine and Australian lists" do
     expect(described_class.choices).to eq([ [ "Philippines: expanded withholding tax, common payments (BIR Form 1601-EQ, January 2019)", "ph_expanded" ],
                                             [ "Australia: PAYG withholding where no ABN is quoted", "au_no_abn" ] ])
+  end
+
+  context "with a country" do
+    include_context "with isolated TudlaAccounting configuration"
+
+    it "offers only that country's lists" do
+      TudlaAccounting.configuration.country = "AU"
+      expect(described_class.choices(organization)).to eq([ [ "Australia: PAYG withholding where no ABN is quoted", "au_no_abn" ] ])
+      expect(described_class.choices.size).to eq(2)
+    end
   end
 
   it "adds the 20 codes with the published rates and the accounts given" do

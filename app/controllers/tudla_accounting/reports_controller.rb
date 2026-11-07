@@ -3,16 +3,22 @@ module TudlaAccounting
     include ReportPeriods
 
     GENERAL_LEDGER_PAGE = 500 # lines
+
+    for_country :books_of_accounts, only: %i[books books_sample]
+    for_country :summary_lists, only: %i[sales_list purchases_list]
+    for_country :withholding_reports, only: %i[withholding qap sawt supplier_certificates]
+    for_country :payee_payments, only: :payee_payments
+    for_country :taxable_payments, only: :taxable_payments
+
     # The general reports, then each country's for books that are that country's (or have
-    # no country): the Philippines' when it can have them, Australia's once they'd show
-    # something.
+    # no country; see Jurisdictions): the Philippines' when it can have them, Australia's
+    # once they'd show something.
     def index
-      settings = TudlaAccounting.configuration
-      @philippines = settings.country?(accounting_organization, "PH")
-      @withholding = @philippines && organization_scope(WithholdingCode).exists?
-      australia = settings.country?(accounting_organization, "AU")
-      @withheld_on_payment = australia && organization_scope(WithholdingCode).on_payment.exists?
-      @taxable_payments = australia && organization_scope(Contact).where(taxable_payments: true).exists?
+      @books_of_accounts = Jurisdictions.on?(accounting_organization, :books_of_accounts)
+      @summary_lists = Jurisdictions.on?(accounting_organization, :summary_lists)
+      @withholding = Jurisdictions.on?(accounting_organization, :withholding_reports) && organization_scope(WithholdingCode).exists?
+      @withheld_on_payment = Jurisdictions.on?(accounting_organization, :payee_payments) && organization_scope(WithholdingCode).on_payment.exists?
+      @taxable_payments = Jurisdictions.on?(accounting_organization, :taxable_payments) && organization_scope(Contact).where(taxable_payments: true).exists?
     end
 
     def balance_sheet

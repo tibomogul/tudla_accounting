@@ -21,8 +21,14 @@ module TudlaAccounting
 
         REPORTS = %w[balance_sheet profit_and_loss trial_balance receivables payables tax general_ledger cash_flow withholding qap sawt payee_payments taxable_payments sales_list purchases_list].freeze
 
+        # The reports that belong to one country (Jurisdictions), not found for books of another.
+        COUNTRY_REPORTS = { "withholding" => :withholding_reports, "qap" => :withholding_reports, "sawt" => :withholding_reports, "payee_payments" => :payee_payments,
+                            "taxable_payments" => :taxable_payments, "sales_list" => :summary_lists, "purchases_list" => :summary_lists }.freeze
+
         def show
           report = params[:report].presence_in(REPORTS) or raise ActiveRecord::RecordNotFound
+          feature = COUNTRY_REPORTS[report]
+          raise ActiveRecord::RecordNotFound if feature && !Jurisdictions.on?(accounting_organization, feature)
           table = send(:"#{report}_table")
           return error(:no_periods, "The books have no periods for this report yet", :not_found) unless table
 
