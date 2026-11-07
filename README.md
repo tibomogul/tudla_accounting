@@ -662,7 +662,9 @@ TudlaAccounting.configure do |config|
   config.current_organization = ->(controller) { controller.send(:current_organization) }
   config.current_actor = ->(controller) { controller.send(:current_user) } # recorded on audit events (optional)
 
-  config.base_currency = "USD"
+  config.base_currency = "USD"           # the currency of books whose organization has none; money-rails' own defaults
+                                          # (default_currency, rounding_mode, locale_backend) stay the host app's
+  config.rounding = BigDecimal::ROUND_HALF_UP # how the engine rounds tax, line amounts, conversions and imports
   config.time_zone = "UTC"                # zone PeriodCreator builds periods in; plain Dates are read in it
   config.number_format = nil              # how pages write and read numbers: :point (1,234.56), :comma (1.234,56),
                                           # or ->(organization) { ... } giving either; nil for the currency's own marks

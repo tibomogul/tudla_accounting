@@ -28,9 +28,10 @@ module TudlaAccounting
       bank_matches.any?
     end
 
-    # "3 Mar 2026 Bank fee (5.00)"
+    # "3 Mar 2026 Bank fee (5.00)", in the currency's own marks.
     def label
-      "#{occurred_on.strftime('%-d %b %Y')} #{description} #{amount_cents.negative? ? "(#{amount.abs.format(symbol: false)})" : amount.format(symbol: false)}"
+      marks = NumberFormat.of_currency(amount.currency)
+      "#{occurred_on.strftime('%-d %b %Y')} #{description} #{amount_cents.negative? ? "(#{marks.number(amount.abs)})" : marks.number(amount)}"
     end
   end
 end

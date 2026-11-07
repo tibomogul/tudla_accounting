@@ -172,7 +172,7 @@ module TudlaAccounting
       whole, fraction = number_parts(body) if signs <= 1 && !(side == "CR" && signs.positive?)
       raise ArgumentError, "Row #{number} has an amount that can't be read: #{text}" unless whole || fraction
 
-      value = Money.from_amount(BigDecimal("#{whole.presence || 0}.#{fraction.presence || 0}"), @currency).cents
+      value = TudlaAccounting.money(BigDecimal("#{whole.presence || 0}.#{fraction.presence || 0}"), @currency).cents
       signs.positive? ? -value : value
     end
 

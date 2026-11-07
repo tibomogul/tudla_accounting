@@ -76,7 +76,7 @@ module TudlaAccounting
       end
 
       def on(month, day) = Date.new(year, month, day)
-      def amount(whole) = Money.from_amount(whole, currency)
+      def amount(whole) = TudlaAccounting.money(whole, currency)
     end
   end
 end

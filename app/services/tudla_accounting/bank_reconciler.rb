@@ -131,7 +131,7 @@ module TudlaAccounting
 
       foreign_cents = line.amount_cents.abs
       rate = foreign? ? rate_for(line, rate) : nil
-      cents = rate ? Money.from_amount(BigDecimal(foreign_cents) / 100 * rate, @organization.currency).cents : foreign_cents
+      cents = rate ? TudlaAccounting.money(BigDecimal(foreign_cents) / 100 * rate, @organization.currency).cents : foreign_cents
 
       ActiveRecord::Base.transaction do
         at = ActiveSupport::TimeZone[TudlaAccounting.configuration.time_zone].local(line.occurred_on.year, line.occurred_on.month, line.occurred_on.day)

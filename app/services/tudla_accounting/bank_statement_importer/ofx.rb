@@ -73,7 +73,7 @@ module TudlaAccounting
       def cents(text, where)
         text = text.to_s.strip
         text = text.tr(",", ".") if text.include?(",") && !text.include?(".") # a decimal comma
-        Money.from_amount(BigDecimal(text), @currency).cents
+        TudlaAccounting.money(BigDecimal(text), @currency).cents
       rescue ArgumentError, TypeError
         raise ArgumentError, "#{where} has an amount that can't be read: #{text}"
       end

@@ -98,7 +98,7 @@ RSpec.describe "USAGE.md" do
 
     # Running the books
     documents = TudlaAccounting::Document.where(organization: organization).order(:id)
-    expect(documents.map { |document| [ document.number_label, document.payment_status, document.amount_due.format ] })
+    expect(documents.map { |document| [ document.number_label, document.payment_status, TudlaAccounting::NumberFormat.of_currency(document.currency).number(document.amount_due, symbol: true) ] })
       .to eq([ [ "INV-0001", "paid", "$0.00" ], [ "BILL-0001", "paid", "$0.00" ], [ "INV-0002", "unpaid", "€1.000,00" ], [ "SC-0001", "paid", "$0.00" ], [ "INV-0003", "unpaid", "$550.00" ], [ "BILL-0002", "unpaid", "$1,080.00" ], [ "INV-0004", "paid", "$0.00" ] ])
     expect(documents.third.entry.details.map { |detail| detail.account.code }).to include("1100-EUR")
     expect(TudlaAccounting::Payment.where(organization: organization).order(:id).map { |payment| [ payment.kind, payment.amount_cents ] })

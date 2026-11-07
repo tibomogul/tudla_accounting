@@ -85,7 +85,7 @@ module TudlaAccounting
       end
 
       def money(value)
-        Money.from_amount(BigDecimal(value.to_s), @currency).cents
+        TudlaAccounting.money(BigDecimal(value.to_s), @currency).cents
       rescue ArgumentError, TypeError
         raise ArgumentError, "The statement has an amount that can't be read: #{value}"
       end

@@ -427,6 +427,15 @@ module TudlaAccounting
     self.configuration ||= Configuration.new
   end
 
+  # An amount as Money in the rounding setting's mode, rather than Money's global one,
+  # which is the host app's to set: the engine never changes money-rails' defaults.
+  def self.money(amount, currency)
+    raise ArgumentError, "currency is missing" if currency.blank?
+
+    currency = Money::Currency.wrap(currency)
+    Money.new((amount.to_d * currency.subunit_to_unit).round(0, configuration.rounding).to_i, currency)
+  end
+
   # The organization_label setting's name for an organization.
   def self.organization_label(organization)
     configuration.organization_label.call(organization)
@@ -435,7 +444,6 @@ module TudlaAccounting
   def self.configure
     init_config
     yield(configuration)
-    apply_money_settings!
   end
 
   # Registers how to turn a host-app record into an entry. The callable receives
@@ -470,18 +478,6 @@ module TudlaAccounting
       defaults[:idempotency_key] = "#{source_type}:#{source.id}" if source.id
     end
     TudlaAccounting::Entry.create_from_ruby_hash(defaults.merge(entry_hash))
-  end
-
-  # Pushes base_currency and rounding into money-rails (Money's global defaults).
-  # Runs after every configure and again once the host app has booted, because
-  # engine initializers load before the host's: settings made in a host
-  # initializer would otherwise never reach money-rails.
-  def self.apply_money_settings!
-    MoneyRails.configure do |money|
-      money.default_currency = Money::Currency.new(configuration.base_currency)
-      money.rounding_mode = configuration.rounding
-      money.locale_backend = :currency
-    end
   end
 end
 

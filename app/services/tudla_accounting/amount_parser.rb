@@ -59,7 +59,7 @@ module TudlaAccounting
         places = currency.exponent.zero? ? "none" : currency.exponent
         raise ArgumentError, "#{text} has too many decimal places for #{currency.iso_code}, which has #{places}"
       end
-      Money.from_amount(number, currency).cents
+      TudlaAccounting.money(number, currency).cents
     end
 
     # An amount as these read it back ("1234.50", "-1000" for the yen; "1234,50" in a comma
@@ -82,7 +82,7 @@ module TudlaAccounting
 
     # How to write one, when the format isn't the default: ", written like 1.234,56".
     private_class_method def hint(format)
-      format == POINT ? "" : ", written like #{format.number(Money.from_amount(1234.56, 'USD'))}"
+      format == POINT ? "" : ", written like #{format.number(TudlaAccounting.money(1234.56, 'USD'))}"
     end
   end
 end

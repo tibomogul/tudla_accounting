@@ -55,7 +55,7 @@ module TudlaAccounting
     def revalue(carrying_amount)
       forex = carrying_amount.forex
       rate = ForexRateRetriever.call(from: forex.other_currency, to: @organization.currency, date: @period_end)
-      value = Money.from_amount(Money.new(forex.other_currency_amount_cents, forex.other_currency).to_d * rate, @organization.currency)
+      value = TudlaAccounting.money(Money.new(forex.other_currency_amount_cents, forex.other_currency).to_d * rate, @organization.currency)
       change = value - Money.new(carrying_amount.amount_cents, @organization.currency) # change in the account's balance
       return [] if change.zero?
 

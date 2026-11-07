@@ -99,7 +99,7 @@ module TudlaAccounting
       book_cents = if settled_foreign.positive? && settled_foreign == remaining_foreign_cents
         remaining_cents
       else
-        Money.from_amount(Money.new(settled_foreign, foreign_currency).to_d * transaction_rate, currency).cents
+        TudlaAccounting.money(Money.new(settled_foreign, foreign_currency).to_d * transaction_rate, currency).cents
       end
       cash_for_settled = paid_foreign_cents.positive? ? (BigDecimal(cash_cents) * settled_foreign / paid_foreign_cents).round.to_i : cash_cents
 
