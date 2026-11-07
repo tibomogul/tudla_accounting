@@ -18,7 +18,7 @@ module TudlaAccounting
     Reminder = Struct.new(:invoice, :days, :days_overdue, keyword_init: true) do
       # "2nd reminder", by its place among the reminder days.
       def label
-        place = TudlaAccounting.configuration.reminder_days.index(days)
+        place = TudlaAccounting.configuration.reminder_days_for(invoice.organization).index(days)
         place ? "#{(place + 1).ordinalize} reminder" : "Reminder"
       end
     end
@@ -34,17 +34,17 @@ module TudlaAccounting
 
     # The reminders due, oldest due date first.
     def due
-      days = TudlaAccounting.configuration.reminder_days
-      return [] if days.empty?
+      first = @organization ? days_for(@organization).first : 1
+      return [] unless first
 
-      invoices = Document.approved.where(kind: "sales_invoice", due_on: ..(@as_of - days.first)).with_open_cents.includes(:contact).order(:due_on, :id)
+      invoices = Document.approved.where(kind: "sales_invoice", due_on: ..(@as_of - first)).with_open_cents.includes(:contact, :organization).order(:due_on, :id)
       invoices = invoices.where(organization: @organization) if @organization
       invoices = invoices.to_a.select { |invoice| invoice.amount_due.positive? }
       reached = sent_days(invoices)
       invoices.filter_map do |invoice|
         overdue = (@as_of - invoice.due_on).to_i
-        stage = days.select { |day| day <= overdue }.max
-        Reminder.new(invoice: invoice, days: stage, days_overdue: overdue) unless reached[invoice.id] && reached[invoice.id] >= stage
+        stage = days_for(invoice.organization).select { |day| day <= overdue }.max
+        Reminder.new(invoice: invoice, days: stage, days_overdue: overdue) unless stage.nil? || (reached[invoice.id] && reached[invoice.id] >= stage)
       end
     end
 
@@ -68,6 +68,11 @@ module TudlaAccounting
     end
 
     private
+
+    # Each organization's reminder_days, read once.
+    def days_for(organization)
+      (@days ||= {})[[ organization.class.name, organization.id ]] ||= TudlaAccounting.configuration.reminder_days_for(organization)
+    end
 
     # { invoice id => the latest reminder day sent or on its way }.
     def sent_days(invoices)

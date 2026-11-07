@@ -6,7 +6,7 @@ module TudlaAccounting
   #   AmountParser.cents("1,234.50", "AUD")        # => 123450
   #   AmountParser.cents("(5.00)", "AUD")          # => -500
   #   AmountParser.cents("10.005", "AUD")          # ArgumentError: too many decimal places
-  #   AmountParser.cents("10.005", "AUD", round: true) # => 1001 (an import)
+  #   AmountParser.cents("10.005", "AUD", round: organization) # => 1001 (an import, rounding half up)
   #   AmountParser.decimal("1.65")                 # => 1.65 (a rate, a quantity, a percentage)
   #   AmountParser.cents("1.234,50", "EUR", format: NumberFormat::STYLES[:comma]) # => 123450 (a page in comma books)
   #
@@ -19,8 +19,9 @@ module TudlaAccounting
   # default.
   #
   # An amount can't have more decimal places than its currency (cents for the dollar, none
-  # for the yen) unless round: is given, when it is rounded as the configured rounding
-  # says, as Money rounds; imports round, as bank and spreadsheet files carry extra places.
+  # for the yen) unless round: is given (the organization, or true for books with one
+  # rounding setting), when it is rounded as the organization's rounding setting says;
+  # imports round, as bank and spreadsheet files carry extra places.
   module AmountParser
     POINT = NumberFormat::STYLES.fetch(:point)
 
@@ -59,7 +60,7 @@ module TudlaAccounting
         places = currency.exponent.zero? ? "none" : currency.exponent
         raise ArgumentError, "#{text} has too many decimal places for #{currency.iso_code}, which has #{places}"
       end
-      TudlaAccounting.money(number, currency).cents
+      TudlaAccounting.money(number, currency, (round unless round == true || round == false)).cents
     end
 
     # An amount as these read it back ("1234.50", "-1000" for the yen; "1234,50" in a comma
@@ -82,7 +83,7 @@ module TudlaAccounting
 
     # How to write one, when the format isn't the default: ", written like 1.234,56".
     private_class_method def hint(format)
-      format == POINT ? "" : ", written like #{format.number(TudlaAccounting.money(1234.56, 'USD'))}"
+      format == POINT ? "" : ", written like #{format.number(Money.new(123_456, "USD"))}"
     end
   end
 end

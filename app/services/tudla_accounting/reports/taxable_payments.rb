@@ -99,7 +99,7 @@ module TudlaAccounting
       # cents in a payment's or document's currency, in the organization's at its rate, rounded.
       def base(record, cents)
         value = record.exchange_rate ? BigDecimal(cents) * record.exchange_rate : BigDecimal(cents)
-        value.round(0, TudlaAccounting.configuration.rounding).to_i
+        value.round(0, TudlaAccounting.configuration.rounding_for(@organization)).to_i
       end
 
       def money(cents) = Money.new(cents, organization.currency)

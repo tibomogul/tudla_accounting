@@ -48,7 +48,7 @@ module TudlaAccounting
     def tax_cents(amount_cents, inclusive: false)
       amount = BigDecimal(amount_cents)
       tax = inclusive ? amount * rate / (1 + rate) : amount * rate
-      tax.round(0, TudlaAccounting.configuration.rounding).to_i
+      tax.round(0, TudlaAccounting.configuration.rounding_for(organization)).to_i
     end
 
     def used?

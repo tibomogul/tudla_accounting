@@ -77,7 +77,7 @@ module TudlaAccounting
       if other_currency(row)
         carrying_amount.create_forex!(
           other_currency: other_currency(row),
-          other_currency_amount_cents: TudlaAccounting.money(decimal(row[:other_currency_amount], row), other_currency(row)).cents,
+          other_currency_amount_cents: TudlaAccounting.money(decimal(row[:other_currency_amount], row), other_currency(row), @organization).cents,
           transaction_rate: decimal(row[:transaction_rate], row),
           conversion_date: date(row[:conversion_date]) || date_prior.to_date
         )
@@ -101,7 +101,7 @@ module TudlaAccounting
     end
 
     def money(value, currency, row)
-      AmountParser.text(TudlaAccounting.money(decimal(value, row), currency))
+      AmountParser.text(TudlaAccounting.money(decimal(value, row), currency, @organization))
     end
 
     def decimal(value, row)

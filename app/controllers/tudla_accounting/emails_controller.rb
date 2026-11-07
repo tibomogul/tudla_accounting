@@ -72,7 +72,7 @@ module TudlaAccounting
       if params[:reminder].present?
         raise ActiveRecord::RecordNotFound unless @subject.overdue?(today)
 
-        days = TudlaAccounting.configuration.reminder_days.select { |day| day <= (today - @subject.due_on).to_i }.max
+        days = TudlaAccounting.configuration.reminder_days_for(accounting_organization).select { |day| day <= (today - @subject.due_on).to_i }.max
         @draft = EmailDraft.for_reminder(@subject, days: days)
         @title = "a reminder of #{@subject.title.downcase_first}"
         @target = { document_id: @subject.id, reminder: 1 }

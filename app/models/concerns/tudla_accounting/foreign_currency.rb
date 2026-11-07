@@ -19,7 +19,7 @@ module TudlaAccounting
 
     # An amount of its currency in the organization's, at its rate.
     def in_base_cents(cents)
-      foreign? ? (cents * exchange_rate).round(0, TudlaAccounting.configuration.rounding).to_i : cents
+      foreign? ? (cents * exchange_rate).round(0, TudlaAccounting.configuration.rounding_for(organization)).to_i : cents
     end
 
     private

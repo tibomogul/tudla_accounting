@@ -9,9 +9,10 @@ module TudlaAccounting
     # by NAME and MEMO, with CHECKNUM or REFNUM as its reference; LEDGERBAL as the closing
     # balance. One account's statement per file.
     class Ofx
-      def initialize(text, currency)
+      def initialize(text, currency, organization = nil)
         @text = text
         @currency = currency
+        @organization = organization
       end
 
       # { lines: [...], closing: { on:, cents: } or nil }, lines as BankStatementImporter
@@ -73,7 +74,7 @@ module TudlaAccounting
       def cents(text, where)
         text = text.to_s.strip
         text = text.tr(",", ".") if text.include?(",") && !text.include?(".") # a decimal comma
-        TudlaAccounting.money(BigDecimal(text), @currency).cents
+        TudlaAccounting.money(BigDecimal(text), @currency, @organization).cents
       rescue ArgumentError, TypeError
         raise ArgumentError, "#{where} has an amount that can't be read: #{text}"
       end

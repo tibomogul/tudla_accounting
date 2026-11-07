@@ -143,7 +143,7 @@ Grouped in the suggested order. Items marked **(decide)** need a decision before
 ### 2. Configuration and the host boundary
 
 - [ ] Make `time_zone` per organization, and use it for period boundaries, "today" and the SLSP months.
-- [ ] Make `rounding`, `tax_basis`, `pdf_paper`, `reminder_days` and the email templates per organization.
+- [x] Make `rounding`, `tax_basis`, `pdf_paper`, `reminder_days` and the email templates per organization. All five joined `PER_ORGANIZATION`; this also fixed `pdf_paper = :Letter`, which never worked.
 - [x] Make every setting accept either a value or a callable given the organization, consistently, and document which is which. `Configuration::PER_ORGANIZATION` and `for_organization`; the README lists them. Settings made per organization later join the list.
 - [x] Stop `apply_money_settings!` overwriting the host's MoneyRails defaults; pass the currency and rounding explicitly instead. The dummy app now sets its own different defaults (yen, rounding down, the i18n backend), so the suite checks the engine doesn't depend on them.
 - [x] Stop `engine.rb` adding `spec/factories` to FactoryBot's paths in host apps. The dummy app adds them now.

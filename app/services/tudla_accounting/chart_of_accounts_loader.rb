@@ -94,7 +94,7 @@ module TudlaAccounting
     end
 
     def amount_cents(value, code)
-      AmountParser.cents(value, organization.currency, round: true) || 0
+      AmountParser.cents(value, organization.currency, round: organization) || 0
     rescue ArgumentError
       raise ArgumentError, "Starting Balance #{value.inspect} for account #{code} is not a number"
     end

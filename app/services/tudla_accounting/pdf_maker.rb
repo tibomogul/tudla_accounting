@@ -57,17 +57,18 @@ module TudlaAccounting
 
       html = PdfViewsController.render(template: "tudla_accounting/pdf_views/page", layout: "tudla_accounting/pdf", assigns: { title: title, organization: organization },
                                        locals: { partial: partial, locals: locals, **options })
-      from_html(html, landscape: landscape, paper: paper, margin: margin)
+      from_html(html, landscape: landscape, paper: paper, margin: margin, organization: organization)
     end
 
-    def from_html(html, landscape: false, paper: nil, margin: 0.5)
+    # The PDF of a page's HTML, on the organization's paper (pdf_paper) unless paper: says.
+    def from_html(html, landscape: false, paper: nil, margin: 0.5, organization: nil)
       settings = TudlaAccounting.configuration
       browser = Ferrum::Browser.new(**{ timeout: 30 }.merge(settings.pdf_browser_options.to_h))
       begin
         page = browser.create_page
         page.network.blocklist = [ /./ ]
         page.content = html
-        page.pdf(encoding: :binary, **(paper || { format: settings.pdf_paper.to_sym }), landscape: landscape, print_background: true,
+        page.pdf(encoding: :binary, **(paper || { format: settings.pdf_paper_for(organization) }), landscape: landscape, print_background: true,
                  margin_top: margin, margin_bottom: margin, margin_left: margin, margin_right: margin)
       ensure
         browser.quit

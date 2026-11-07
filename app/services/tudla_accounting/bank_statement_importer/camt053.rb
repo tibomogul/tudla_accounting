@@ -10,9 +10,10 @@ module TudlaAccounting
     # name, with the end-to-end id as its reference; the CLBD balance as the closing
     # balance. Pending entries are left out. One account's statements per file.
     class Camt053
-      def initialize(text, currency)
+      def initialize(text, currency, organization = nil)
         @text = text
         @currency = currency
+        @organization = organization
       end
 
       def call
@@ -85,7 +86,7 @@ module TudlaAccounting
       end
 
       def money(value)
-        TudlaAccounting.money(BigDecimal(value.to_s), @currency).cents
+        TudlaAccounting.money(BigDecimal(value.to_s), @currency, @organization).cents
       rescue ArgumentError, TypeError
         raise ArgumentError, "The statement has an amount that can't be read: #{value}"
       end

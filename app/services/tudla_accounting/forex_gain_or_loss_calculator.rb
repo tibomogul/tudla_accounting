@@ -31,7 +31,7 @@ module TudlaAccounting
       rate = ForexRateRetriever.call(from: forex.other_currency, to: functional, date: @conversion_date)
 
       change = @amount * (rate - forex.transaction_rate) # in functional currency
-      TudlaAccounting.money(@carrying_amount.payable? ? -change : change, functional)
+      TudlaAccounting.money(@carrying_amount.payable? ? -change : change, functional, @carrying_amount.detail.organization)
     end
   end
 end

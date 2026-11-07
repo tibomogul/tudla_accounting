@@ -1,4 +1,4 @@
-<% days = TudlaAccounting.configuration.reminder_days %>
+<% days = TudlaAccounting.configuration.reminder_days_for(accounting_organization) %>
 <%= tc_page_header "Reminders due", subtitle: (days.any? ? "Overdue invoices reaching #{days.to_sentence} days past their due date" : "Reminders aren't set up") do %>
   <%= link_to "Sales", sales_documents_path, class: "tc-btn tc-btn-ghost" %>
   <% if tc_can?(:post) && @reminders.any? %>

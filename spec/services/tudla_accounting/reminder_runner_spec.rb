@@ -54,6 +54,23 @@ RSpec.describe TudlaAccounting::ReminderRunner, type: :service do
     expect(due(Date.new(2026, 6, 1))).to eq([])
   end
 
+  it "reminds each organization's customers on its own days" do
+    other = create(:organization, name: "Initech", currency: "AUD")
+    TudlaAccounting::PeriodCreator.call(other, 2026)
+    TudlaAccounting::AccountsCreator.call([ { code: "1100", name: "Receivables", category: "asset", role: "receivable" }, { code: "4000", name: "Sales", category: "income" } ], other)
+    TudlaAccounting::Document.create!(organization: other, kind: "sales_invoice", contact: TudlaAccounting::Contact.create!(organization: other, name: "Hooli"),
+                                      issued_on: Date.new(2026, 3, 1), due_on: Date.new(2026, 4, 1),
+                                      lines_attributes: [ { description: "Work", unit_price_cents: 100_00, account: TudlaAccounting::Account.find_by!(organization: other, code: "4000") } ]).approve!
+    invoice(northwind, Date.new(2026, 4, 1))
+    TudlaAccounting.configuration.reminder_days = ->(books) { books == organization ? [ 3 ] : [ 10 ] }
+
+    everyone = ->(as_of) { described_class.due(as_of: as_of).map { |reminder| [ reminder.invoice.organization.name, reminder.days, reminder.label ] } }
+    expect(everyone.call(Date.new(2026, 4, 5))).to eq([ [ "Acme", 3, "1st reminder" ] ])
+    expect(everyone.call(Date.new(2026, 4, 12))).to contain_exactly([ "Acme", 3, "1st reminder" ], [ "Initech", 10, "1st reminder" ])
+    TudlaAccounting.configuration.reminder_days = ->(books) { books == organization ? [] : [ 10 ] }
+    expect(due(Date.new(2026, 4, 12))).to eq([])
+  end
+
   it "sends each reminder once, with the invoice, skipping customers without an email address" do
     first = invoice(northwind, Date.new(2026, 4, 1))
     invoice(globex, Date.new(2026, 4, 1))
@@ -101,7 +118,10 @@ RSpec.describe TudlaAccounting::ReminderRunner, type: :service do
   end
 
   it "labels a reminder by its day's place, or plainly for one sent by hand" do
-    expect(described_class::Reminder.new(days: 14).label).to eq("2nd reminder")
-    expect(described_class::Reminder.new(days: nil).label).to eq("Reminder")
+    sent = invoice(globex, Date.new(2026, 3, 1))
+    expect(described_class::Reminder.new(invoice: sent, days: 14).label).to eq("2nd reminder")
+    expect(described_class::Reminder.new(invoice: sent, days: nil).label).to eq("Reminder")
+    TudlaAccounting.configuration.reminder_days = ->(books) { books == organization ? [ 14 ] : [] }
+    expect(described_class::Reminder.new(invoice: sent, days: 14).label).to eq("1st reminder")
   end
 end

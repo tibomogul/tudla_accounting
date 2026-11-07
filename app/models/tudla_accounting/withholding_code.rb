@@ -43,7 +43,7 @@ module TudlaAccounting
 
     # The tax on base_cents at this code's rate, rounded to the cent the configured way.
     def withheld_cents(base_cents)
-      (BigDecimal(base_cents) * rate).round(0, TudlaAccounting.configuration.rounding).to_i
+      (BigDecimal(base_cents) * rate).round(0, TudlaAccounting.configuration.rounding_for(organization)).to_i
     end
 
     # What a cash payment of cash_cents was withheld from, and the tax withheld, as

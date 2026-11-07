@@ -28,7 +28,7 @@ module TudlaAccounting
       @organization = organization
       @from = from
       @thru = thru
-      @basis = (basis || TudlaAccounting.configuration.tax_basis || :accrual).to_sym
+      @basis = (basis || TudlaAccounting.configuration.tax_basis_for(@organization)).to_sym
       raise ArgumentError, "basis must be one of #{BASES.join(', ')}" unless BASES.include?(@basis)
     end
 
@@ -97,7 +97,7 @@ module TudlaAccounting
         scope.each do |allocation|
           [ allocation.from, allocation.to ].each do |side|
             entry_totals.fetch(side.detail.entry_id, {}).each do |key, cents|
-              recognized[key] += sign * (BigDecimal(cents) * share(allocation, side)).round(0, TudlaAccounting.configuration.rounding).to_i
+              recognized[key] += sign * (BigDecimal(cents) * share(allocation, side)).round(0, TudlaAccounting.configuration.rounding_for(@organization)).to_i
             end
           end
         end

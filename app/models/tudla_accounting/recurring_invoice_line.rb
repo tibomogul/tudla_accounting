@@ -25,7 +25,7 @@ module TudlaAccounting
 
     # Quantity times unit price, rounded as an invoice's line is.
     def amount_cents
-      (quantity.to_d * unit_price_cents.to_i).round(0, TudlaAccounting.configuration.rounding).to_i
+      (quantity.to_d * unit_price_cents.to_i).round(0, TudlaAccounting.configuration.rounding_for(recurring_invoice.organization)).to_i
     end
 
     def unit_price = money(unit_price_cents)

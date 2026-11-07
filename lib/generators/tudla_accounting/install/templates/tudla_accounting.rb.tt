@@ -1,6 +1,6 @@
 # TudlaAccounting settings. See the engine's README for what each one does. Settings
 # that can differ by organization (TudlaAccounting::Configuration::PER_ORGANIZATION:
-# cash_account_codes, number_format, country, document_header and others) take a value,
+# rounding, tax_basis, cash_account_codes, number_format, country and others) take a value,
 # or a callable given the organization returning one.
 TudlaAccounting.configure do |config|
   # --- Pages (mounted at <%= options[:mount_path] %>) ---

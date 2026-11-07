@@ -41,7 +41,7 @@ module TudlaAccounting
     end
 
     def draft(kind, template, organization, party, values)
-      text = TudlaAccounting.configuration.document_email_templates.fetch(template)
+      text = TudlaAccounting.configuration.document_email_templates_for(organization).fetch(template)
       values = values.merge(organization: organization_name(organization), contact: PartyStatement.party_name(party))
       { kind: kind, to: (party.email if party.respond_to?(:email)), subject_line: fill(text[:subject], values), message: fill(text[:body], values) }
     end

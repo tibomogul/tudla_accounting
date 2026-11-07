@@ -237,7 +237,7 @@ Every amount and number people type, and the JSON API is given, is read one way 
 ```ruby
 TudlaAccounting::AmountParser.cents("1,234.50", "AUD")              # => 123450
 TudlaAccounting::AmountParser.cents("10.005", "AUD")                # ArgumentError: 10.005 has too many decimal places for AUD, which has 2
-TudlaAccounting::AmountParser.cents("10.005", "AUD", round: true)   # => 1001
+TudlaAccounting::AmountParser.cents("10.005", "AUD", round: organization) # => 1001, as its rounding setting says (true where rounding is one value)
 TudlaAccounting::AmountParser.decimal("1.65")                       # => 1.65, for rates, quantities and percentages
 ```
 
@@ -654,7 +654,7 @@ The generator writes `config/initializers/tudla_accounting.rb` with every settin
 
 Configure the engine in an initializer, e.g. `config/initializers/tudla_accounting.rb`.
 
-Some settings can differ by organization: `organization_label`, `cash_account_codes`, `number_format`, `country`, `document_header`, `books_header`, `withholding_agent`, `tax_registration`, `document_mail_from` and `document_mail_reply_to` (`TudlaAccounting::Configuration::PER_ORGANIZATION`). Each takes a value, for an app with one set of books or the same answer for all, or a callable given the organization returning one, and `config.for_organization(setting, organization)` reads either. The rest are the app's: one value, except that a few take a callable given what they're about (`current_organization`, `current_actor` and `authorize` the controller; `entry_number_series` and `entry_number_format` the entry; `document_number_format` the document).
+Some settings can differ by organization: `organization_label`, `cash_account_codes`, `number_format`, `country`, `rounding`, `tax_basis`, `document_header`, `books_header`, `withholding_agent`, `tax_registration`, `pdf_paper`, `document_mail_from`, `document_mail_reply_to`, `document_email_templates` and `reminder_days` (`TudlaAccounting::Configuration::PER_ORGANIZATION`). Each takes a value, for an app with one set of books or the same answer for all, or a callable given the organization returning one, and `config.for_organization(setting, organization)` reads either. The rest are the app's: one value, except that a few take a callable given what they're about (`current_organization`, `current_actor` and `authorize` the controller; `entry_number_series` and `entry_number_format` the entry; `document_number_format` the document).
 
 
 ```ruby
@@ -667,7 +667,8 @@ TudlaAccounting.configure do |config|
 
   config.base_currency = "USD"           # the currency of books whose organization has none; money-rails' own defaults
                                           # (default_currency, rounding_mode, locale_backend) stay the host app's
-  config.rounding = BigDecimal::ROUND_HALF_UP # how the engine rounds tax, line amounts, conversions and imports
+  config.rounding = BigDecimal::ROUND_HALF_UP # per organization: how the engine rounds tax, line amounts, conversions and imports
+  config.tax_basis = :accrual             # per organization: when the tax summary counts tax by default, or :cash
   config.time_zone = "UTC"                # zone PeriodCreator builds periods in; plain Dates are read in it
   config.number_format = nil              # per organization: how pages write and read numbers, :point (1,234.56) or
                                           # :comma (1.234,56); nil for the currency's own marks
@@ -713,15 +714,15 @@ TudlaAccounting.configure do |config|
 
   # PDFs (with the ferrum gem): Ferrum::Browser options, the paper, and the compiled stylesheet
   config.pdf_browser_options = { browser_path: "/usr/bin/chromium", timeout: 60 }
-  config.pdf_paper = :A4                  # or :Letter
+  config.pdf_paper = :A4                  # per organization: or :Letter, :A5...
   config.pdf_stylesheet = nil             # found among the host's assets as tailwind.css; or a path, or ->{ css }
 
   # Emailing documents to customers and suppliers (sent through the host's ActionMailer setup)
   config.document_mail_from = ->(organization) { "#{organization.name} <accounts@example.com>" } # per organization; the ActionMailer default if nil
   config.document_mail_reply_to = "accounts@example.com" # per organization
-  config.document_email_templates = { invoice: { subject: "Invoice %{number} from %{organization}" } } # over the defaults
+  config.document_email_templates = { invoice: { subject: "Invoice %{number} from %{organization}" } } # per organization; over the defaults
   config.document_mailer = "TudlaAccounting::DocumentMailer" # or one of the host's: delivery(delivery, pdf:, filename:)
-  config.reminder_days = [ 7, 14, 30 ]   # days after the due date to remind customers of overdue invoices (none by default)
+  config.reminder_days = [ 7, 14, 30 ]   # per organization: days after the due date to remind customers of overdue invoices (none by default)
 
   # The JSON API (see API.md): requests a minute per token (nil for no limit), and where they're counted
   config.api_rate_limit = 300

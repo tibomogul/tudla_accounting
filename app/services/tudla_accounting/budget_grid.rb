@@ -147,7 +147,7 @@ module TudlaAccounting
     end
 
     def cents_in(cell)
-      AmountParser.cents(cell, budget.organization.currency, round: true) || 0
+      AmountParser.cents(cell, budget.organization.currency, round: budget.organization) || 0
     rescue ArgumentError
       yield
       0

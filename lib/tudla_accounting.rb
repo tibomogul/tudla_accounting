@@ -82,6 +82,8 @@ module TudlaAccounting
 
     def initialize
       @base_currency = "USD"
+      # How amounts are rounded to the cent (tax, line amounts, conversions, imports): a
+      # BigDecimal rounding mode, or a callable given the organization returning one.
       @rounding = BigDecimal::ROUND_HALF_UP
       @time_zone = "UTC"
       @organization_class = "Organization"
@@ -106,7 +108,8 @@ module TudlaAccounting
       # (e.g. %w[1010] for a "Cash and bank" parent). The report can choose others.
       @cash_account_codes = []
       # When the tax summary counts tax: :accrual (as lines are posted) or :cash (as
-      # invoices and bills are paid). The report can choose either.
+      # invoices and bills are paid), or a callable given the organization returning
+      # either. The report can choose either.
       @tax_basis = :accrual
       # How error messages and warnings name an organization (one with no account marked
       # for a role, say): text, or a callable, e.g. ->(organization) { organization.name }
@@ -160,8 +163,9 @@ module TudlaAccounting
       # PDFs (with the ferrum gem; see TudlaAccounting.pdf?): options for Ferrum::Browser,
       # e.g. { browser_path: "/usr/bin/chromium", timeout: 60 } (and, in a container that
       # can't sandbox Chrome, browser_options: { "no-sandbox" => nil }); the paper size
-      # (:A4 or :Letter); and the compiled stylesheet with the engine's styles, a path or
-      # a callable returning the CSS, found among the host's assets as "tailwind.css" when nil.
+      # (:A4 or :Letter, or a callable given the organization returning it); and the
+      # compiled stylesheet with the engine's styles, a path or a callable returning the
+      # CSS, found among the host's assets as "tailwind.css" when nil.
       @pdf_browser_options = {}
       @pdf_paper = :A4
       @pdf_stylesheet = nil
@@ -188,7 +192,9 @@ module TudlaAccounting
     # entry_number_series and entry_number_format the entry; document_number_format the
     # document).
     PER_ORGANIZATION = %i[organization_label cash_account_codes number_format country document_header books_header
-                          withholding_agent tax_registration document_mail_from document_mail_reply_to].freeze
+                          withholding_agent tax_registration document_mail_from document_mail_reply_to
+                          rounding tax_basis pdf_paper reminder_days document_email_templates].freeze
+    TAX_BASES = %i[accrual cash].freeze
 
     # A per-organization setting's value for an organization: the setting, or what its
     # callable gives for the organization.
@@ -196,8 +202,33 @@ module TudlaAccounting
       raise ArgumentError, "#{setting} isn't a per-organization setting; they are #{PER_ORGANIZATION.join(', ')}" unless PER_ORGANIZATION.include?(setting)
 
       value = public_send(setting)
-      value.respond_to?(:call) ? value.call(organization) : value
+      return value unless value.respond_to?(:call)
+      raise ArgumentError, "the #{setting} setting is given the organization, and there is none here" if organization.nil?
+
+      value.call(organization)
     end
+
+    # How an organization's amounts are rounded: a BigDecimal rounding mode.
+    def rounding_for(organization) = for_organization(:rounding, organization)
+
+    # When an organization's tax summary counts tax by default: :accrual or :cash.
+    def tax_basis_for(organization)
+      basis = for_organization(:tax_basis, organization).presence || :accrual
+      basis.to_s.to_sym.presence_in(TAX_BASES) or raise ArgumentError, "tax_basis gave #{basis.inspect} for #{organization_label_for(organization)}; expected :accrual or :cash"
+    end
+
+    # The paper an organization's PDFs are printed on, as Ferrum names it (:A4, :letter...),
+    # whichever case the setting gives it in (:Letter, "a4").
+    def pdf_paper_for(organization)
+      paper = (for_organization(:pdf_paper, organization).presence || :A4).to_s
+      (paper.match?(/\A[aA]\d\z/) ? paper.upcase : paper.downcase).to_sym
+    end
+
+    # The days after the due date an organization's customers are reminded (see reminder_days=).
+    def reminder_days_for(organization) = self.class.reminder_days(for_organization(:reminder_days, organization))
+
+    # An organization's email templates (see document_email_templates=).
+    def document_email_templates_for(organization) = self.class.email_templates(for_organization(:document_email_templates, organization))
 
     # The organization_label setting's name for an organization.
     def organization_label_for(organization) = for_organization(:organization_label, organization).to_s
@@ -227,11 +258,16 @@ module TudlaAccounting
     # The days after an invoice's due date at which its customer is emailed a reminder,
     # e.g. [7, 14, 30]: whole days, kept in order. ReminderRunner (and SendRemindersJob,
     # which the host schedules) sends each reminder that is due, once.
+    # Or a callable given the organization, returning them.
     def reminder_days=(days)
+      @reminder_days = days.respond_to?(:call) ? days : self.class.reminder_days(days)
+    end
+
+    def self.reminder_days(days)
       days = Array(days).map { |day| Integer(day, exception: false) }
       raise ArgumentError, "reminder_days must be whole numbers of days, more than zero" unless days.all? { |day| day&.positive? }
 
-      @reminder_days = days.uniq.sort.freeze
+      days.uniq.sort.freeze
     end
 
     # The subject and message each kind of email starts with (they can be changed before
@@ -256,13 +292,18 @@ module TudlaAccounting
     }.freeze
 
     # Templates by kind (above), each { subject:, body: }, merged over the defaults; a kind
-    # given only a subject or body keeps the default other.
+    # given only a subject or body keeps the default other. Or a callable given the
+    # organization, returning them.
     def document_email_templates=(templates)
+      @document_email_templates = templates.respond_to?(:call) ? templates : self.class.email_templates(templates)
+    end
+
+    def self.email_templates(templates)
       templates = templates.to_h.transform_keys(&:to_s)
       unknown = templates.keys - DOCUMENT_EMAIL_TEMPLATES.keys
       raise ArgumentError, "unknown email template #{unknown.first.inspect}; expected one of #{DOCUMENT_EMAIL_TEMPLATES.keys.join(', ')}" if unknown.any?
 
-      @document_email_templates = DOCUMENT_EMAIL_TEMPLATES.merge(templates) { |_kind, default, given| default.merge(given.to_h.symbolize_keys) }.freeze
+      DOCUMENT_EMAIL_TEMPLATES.merge(templates) { |_kind, default, given| default.merge(given.to_h.symbolize_keys) }.freeze
     end
 
     # A from or reply-to setting's address for an organization, or nil.
@@ -450,11 +491,13 @@ module TudlaAccounting
 
   # An amount as Money in the rounding setting's mode, rather than Money's global one,
   # which is the host app's to set: the engine never changes money-rails' defaults.
-  def self.money(amount, currency)
+  # The organization's rounding setting applies only when the amount needs rounding.
+  def self.money(amount, currency, organization = nil)
     raise ArgumentError, "currency is missing" if currency.blank?
 
     currency = Money::Currency.wrap(currency)
-    Money.new((amount.to_d * currency.subunit_to_unit).round(0, configuration.rounding).to_i, currency)
+    cents = amount.to_d * currency.subunit_to_unit
+    Money.new(cents.frac.zero? ? cents.to_i : cents.round(0, configuration.rounding_for(organization)).to_i, currency)
   end
 
   # The organization_label setting's name for an organization.

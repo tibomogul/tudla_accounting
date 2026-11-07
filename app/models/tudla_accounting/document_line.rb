@@ -26,7 +26,7 @@ module TudlaAccounting
 
     # Sets amount_cents and tax_cents, with the document's amounts including the tax or not.
     def work_out(inclusive)
-      self.amount_cents = (quantity.to_d * unit_price_cents.to_i).round(0, TudlaAccounting.configuration.rounding).to_i
+      self.amount_cents = (quantity.to_d * unit_price_cents.to_i).round(0, TudlaAccounting.configuration.rounding_for(document.organization)).to_i
       self.tax_cents = tax_code ? tax_code.tax_cents(amount_cents, inclusive: inclusive) : 0
       self.withheld_cents = withholding_code ? withholding_code.withheld_cents(net_cents) : 0
     end

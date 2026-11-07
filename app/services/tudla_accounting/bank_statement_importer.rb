@@ -53,15 +53,16 @@ module TudlaAccounting
       @date_format = DATE_FORMATS.fetch(date_order.to_sym) { raise ArgumentError, "date_order must be :dmy or :mdy" }
       @decimal_mark = decimal_mark.to_s
       raise ArgumentError, "decimal_mark must be \".\" or \",\"" unless DECIMAL_MARKS.key?(@decimal_mark)
-      @currency = account.currency.presence || account.organization.currency
+      @organization = account.organization
+      @currency = account.currency.presence || @organization.currency
     end
 
     def call
       text = File.binread(@path)
       format = format_of(text)
       lines = case format
-      when :ofx then with_closing(Ofx.new(ofx_text(text), @currency).call)
-      when :camt053 then with_closing(Camt053.new(text, @currency).call)
+      when :ofx then with_closing(Ofx.new(ofx_text(text), @currency, @organization).call)
+      when :camt053 then with_closing(Camt053.new(text, @currency, @organization).call)
       else csv_lines
       end
       raise ArgumentError, "The statement has no transactions" if lines.empty?
@@ -172,7 +173,7 @@ module TudlaAccounting
       whole, fraction = number_parts(body) if signs <= 1 && !(side == "CR" && signs.positive?)
       raise ArgumentError, "Row #{number} has an amount that can't be read: #{text}" unless whole || fraction
 
-      value = TudlaAccounting.money(BigDecimal("#{whole.presence || 0}.#{fraction.presence || 0}"), @currency).cents
+      value = TudlaAccounting.money(BigDecimal("#{whole.presence || 0}.#{fraction.presence || 0}"), @currency, @organization).cents
       signs.positive? ? -value : value
     end
 

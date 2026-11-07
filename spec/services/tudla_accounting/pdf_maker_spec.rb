@@ -29,6 +29,12 @@ RSpec.describe TudlaAccounting::PdfMaker, type: :service do
                                       notes: "Pay to BSB 000-000", lines_attributes: [ { description: "Consulting – strategy", quantity: 2, unit_price_cents: cents / 2, account: account(kind == "bill" ? "6000" : "4000") } ]).approve!
   end
 
+  it "prints on the organization's paper" do
+    TudlaAccounting.configuration.pdf_paper = ->(org) { org == organization ? :Letter : :A4 }
+    pages = PDF::Reader.new(StringIO.new(described_class.document(invoice))).pages
+    expect(pages.first.attributes[:MediaBox]).to eq([ 0, 0, 612, 792 ])
+  end
+
   it "makes a tax invoice's PDF with the tax_registration setting's wording" do
     TudlaAccounting.configuration.document_header = ->(org) { "#{org.name} Pty Ltd" }
     TudlaAccounting.configuration.tax_registration = ->(_org) { TudlaAccounting::TaxRegistration.australia("51 824 753 556") }

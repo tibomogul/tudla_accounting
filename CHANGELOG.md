@@ -19,6 +19,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- `rounding`, `tax_basis`, `pdf_paper`, `reminder_days` and `document_email_templates` can differ by organization: each takes a value, as before, or a callable given the organization. Reminders go out on each organization's own days. `AmountParser.cents`' `round:` takes the organization whose rounding applies (or `true` where `rounding` is a value), and `TudlaAccounting.money` an organization, used only when an amount needs rounding.
 - Every setting that can differ by organization (`Configuration::PER_ORGANIZATION`) takes either a value or a callable given the organization, read through `config.for_organization(setting, organization)`. `document_header`, `books_header`, `withholding_agent`, `tax_registration` and `organization_label` took only a callable before; a value now works for an app with one set of books. The README says which settings are per organization.
 - The engine no longer sets money-rails' defaults (`default_currency`, `rounding_mode`, `locale_backend`) for the whole app: they stay the host app's. It rounds with its own `rounding` setting (`TudlaAccounting.money(amount, currency)`) and writes numbers in each currency's or organization's marks. `TudlaAccounting.apply_money_settings!` is gone; a host that relied on the engine setting Money's default currency should set it in its own money-rails initializer.
 - The engine no longer adds its own spec factories to a host app's FactoryBot paths, where they could clash with the host's factories (such as `:organization`).
@@ -26,6 +27,10 @@ All notable changes to this project are documented here. The format follows
 - Reports that start at the year to date or the last financial year find the year correctly in books whose months sit under quarters.
 - Taxable payments: refunds from a marked contractor are taken off, with the GST of the supplier credit refunded; a foreign bill's GST converts at the bill's exchange rate rather than the payment's; and the report takes the same few queries however many payments there are.
 - The README gathers what the BIR hasn't confirmed for Philippine filings into one list, and adds that putting capital goods on the 2550Q's item 44A is our reading of the form.
+
+### Fixed
+
+- `pdf_paper = :Letter`, as the README gives it, failed to make a PDF: Ferrum names it `:letter`. Paper names are now read in either case.
 
 ### Removed
 
