@@ -19,6 +19,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Reports that start at the year to date or the last financial year find the year correctly in books whose months sit under quarters.
 - Taxable payments: refunds from a marked contractor are taken off, with the GST of the supplier credit refunded; a foreign bill's GST converts at the bill's exchange rate rather than the payment's; and the report takes the same few queries however many payments there are.
 - The README gathers what the BIR hasn't confirmed for Philippine filings into one list, and adds that putting capital goods on the 2550Q's item 44A is our reading of the form.
 

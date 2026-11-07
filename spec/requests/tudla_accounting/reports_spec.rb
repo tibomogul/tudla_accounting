@@ -51,6 +51,23 @@ RSpec.describe "Report pages", type: :request do
     end
   end
 
+  it "picks the last year and the year to date by year in books split into quarters" do
+    travel_to Time.zone.local(2026, 5, 25, 9)
+    [ 2025, 2026 ].each do |number|
+      year = create(:tudla_accounting_period, organization: organization, from_date: Time.zone.local(number, 1, 1), thru_date: Date.new(number, 12, 31).end_of_day)
+      [ 1, 4, 7, 10 ].each do |first|
+        quarter = create(:tudla_accounting_period, organization: organization, parent: year, from_date: Time.zone.local(number, first, 1), thru_date: Date.new(number, first + 2, 1).end_of_month.end_of_day)
+        3.times { |index| create(:tudla_accounting_period, organization: organization, parent: quarter, from_date: Time.zone.local(number, first + index, 1), thru_date: Date.new(number, first + index, 1).end_of_month.end_of_day) }
+      end
+    end
+    get routes.reports_taxable_payments_path
+    expect(response.body).to include("1 Jan 2025 to 31 Dec 2025")
+    get routes.reports_cash_flow_path
+    expect(response.body).to include("1 Jan 2026 to 31 May 2026")
+  ensure
+    travel_back
+  end
+
   it "asks for a financial year before showing statements" do
     %i[reports_balance_sheet_path reports_profit_and_loss_path reports_trial_balance_path].each do |path|
       get routes.public_send(path)

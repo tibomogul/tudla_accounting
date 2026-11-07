@@ -122,12 +122,12 @@ Grouped in the suggested order. Items marked **(decide)** need a decision before
 
 ### Now: small fixes
 
-- [ ] Show the Philippine withholding reports (2307, QAP, SAWT, BIR summary lists, SLSP) only to books they apply to, not whenever any withholding code exists. A stopgap until the jurisdiction setting lands.
-- [ ] Batch `Reports::TaxablePayments`' queries so the count doesn't grow with payments, and add it to `perf/benchmark.rb`.
-- [ ] Convert TPAR's GST at the bill's exchange rate, not the payment's.
-- [ ] Deduct supplier refunds and credit notes from TPAR's gross and GST.
-- [ ] Make `ReportPeriods#month_range(last_year:)` and `year_to_date` find the year by walking up the period tree, with a spec for books with quarters.
-- [ ] Cap `WithholdingCode#split_cash`'s base at the amount due when matching a bank line.
+- [x] Show the Philippine withholding reports (2307, QAP, SAWT, BIR summary lists, SLSP) only to books they apply to, not whenever any withholding code exists. Done with a `country` setting (a code or a callable given the organization; every country's reports when nil), the first step of the jurisdiction work below.
+- [x] Batch `Reports::TaxablePayments`' queries so the count doesn't grow with payments, and add it to `perf/benchmark.rb` (`Payment.applications_for`; 13 queries for 100 payments). The benchmark never paid a bill, so it now pays the bills it approves for the withholding timing.
+- [x] Convert TPAR's GST at the bill's exchange rate, not the payment's.
+- [x] Deduct supplier refunds and credit notes from TPAR's gross and GST. A refund is taken off with the GST of the credit it paid back; a credit note applied to a bill already lowers what the payment paid.
+- [x] Make `ReportPeriods#month_range(last_year:)` and `year_to_date` find the year by walking up the period tree, with a spec for books with quarters (they compare `root_id`).
+- [x] ~~Cap `WithholdingCode#split_cash`'s base at the amount due when matching a bank line.~~ Not a bug on recheck: tax withheld on payment is on the whole payment, so cash beyond the bill is still a payment to the supplier and taxed; it stays on them as an unapplied credit, as `Payment.record!` allows.
 
 ### 1. Jurisdiction
 

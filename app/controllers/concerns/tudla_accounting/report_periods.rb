@@ -38,9 +38,9 @@ module TudlaAccounting
 
       current = @months.find { |month| month.includes_date?(Time.current) }
       default_thru = current || @months.last
-      ended = @months.select { |month| month.thru_date < default_thru.from_date && month.parent_id != default_thru.parent_id }.last if last_year
+      ended = @months.select { |month| month.thru_date < default_thru.from_date && month.root_id != default_thru.root_id }.last if last_year
       default_thru = ended if ended
-      default_from = year_to_date || last_year ? @months.find { |month| month.parent_id == default_thru.parent_id } : default_thru
+      default_from = year_to_date || last_year ? @months.find { |month| month.root_id == default_thru.root_id } : default_thru
       if quarter
         span = FilingQuarters.new(accounting_organization).of(default_thru.from_date.to_date)
         within = @months.select { |month| span.range.cover?(month.from_date.to_date) }
