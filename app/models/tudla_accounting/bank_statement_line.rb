@@ -6,7 +6,7 @@ module TudlaAccounting
   # currency. It is reconciled once it is matched to the posted ledger lines it stands
   # for (see BankReconciler).
   class BankStatementLine < ApplicationRecord
-    belongs_to :organization, polymorphic: true
+    include OrganizationOwned
     belongs_to :account, class_name: "TudlaAccounting::Account"
     has_many :bank_matches, class_name: "TudlaAccounting::BankMatch", dependent: :destroy
     has_many :details, through: :bank_matches, class_name: "TudlaAccounting::Detail"

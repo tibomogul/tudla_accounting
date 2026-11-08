@@ -16,7 +16,7 @@ module TudlaAccounting
     KINDS = %w[document reminder statement receipt payment_notice].freeze
     ADDRESS = URI::MailTo::EMAIL_REGEXP
 
-    belongs_to :organization, polymorphic: true
+    include OrganizationOwned
     belongs_to :subject, polymorphic: true
 
     normalizes :to, :cc, with: ->(addresses) { addresses.split(/[,;\s]+/).compact_blank.uniq.join(", ").presence }

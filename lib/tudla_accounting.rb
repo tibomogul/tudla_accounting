@@ -513,6 +513,13 @@ module TudlaAccounting
   # The time zone an organization's books are kept in (the time_zone setting).
   def self.zone(organization) = configuration.time_zone_for(organization)
 
+  # Limits lookups of the engine's models to one organization's books for the block, as
+  # each request to the engine's pages and API does (see OrganizationOwned); nil lifts
+  # the limit, for work across organizations inside such a request.
+  #
+  #   TudlaAccounting.with_organization(organization) { TudlaAccounting::Contact.find(id) }
+  def self.with_organization(organization, &) = TudlaAccounting::Current.set(organization: organization, &)
+
   # The organization_label setting's name for an organization.
   def self.organization_label(organization)
     configuration.organization_label_for(organization)

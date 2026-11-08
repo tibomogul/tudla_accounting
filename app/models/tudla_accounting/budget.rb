@@ -16,7 +16,7 @@ module TudlaAccounting
   class Budget < ApplicationRecord
     CATEGORIES = [ Account::CATEGORY_INCOME, Account::CATEGORY_EXPENSE ].freeze
 
-    belongs_to :organization, polymorphic: true
+    include OrganizationOwned
     belongs_to :period, class_name: "TudlaAccounting::Period"
     has_many :lines, class_name: "TudlaAccounting::BudgetLine", dependent: :delete_all
 

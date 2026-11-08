@@ -35,7 +35,7 @@ module TudlaAccounting
     # The fields an approved document can still change: how it stands, not what it says.
     STANDING = %w[status number number_label entry_id approved_at voided_on void_reason updated_at].freeze
 
-    belongs_to :organization, polymorphic: true
+    include OrganizationOwned
     belongs_to :contact, class_name: "TudlaAccounting::Contact"
     belongs_to :credited_document, class_name: "TudlaAccounting::Document", optional: true
     belongs_to :entry, class_name: "TudlaAccounting::Entry", optional: true

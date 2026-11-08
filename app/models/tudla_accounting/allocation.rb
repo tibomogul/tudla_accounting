@@ -7,7 +7,7 @@ module TudlaAccounting
   # other_currency_cents the foreign amount, when the credit is in a foreign currency.
   # Made and undone through TudlaAccounting::Allocator.
   class Allocation < ApplicationRecord
-    belongs_to :organization, polymorphic: true
+    include OrganizationOwned
     belongs_to :from, class_name: "TudlaAccounting::CarryingAmount"
     belongs_to :to, class_name: "TudlaAccounting::CarryingAmount"
     belongs_to :realized_entry, class_name: "TudlaAccounting::Entry", optional: true

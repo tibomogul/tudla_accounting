@@ -17,7 +17,7 @@ module TudlaAccounting
     # How often last_used_at is brought up to date, at most.
     TOUCH_EVERY = 1.minute
 
-    belongs_to :organization, polymorphic: true
+    include OrganizationOwned
 
     normalizes :name, with: ->(name) { name.squish }
     normalizes :permissions, with: ->(permissions) { PERMISSIONS & Array(permissions).map(&:to_s) }, apply_to_nil: true

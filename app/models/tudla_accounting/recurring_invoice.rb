@@ -20,7 +20,7 @@ module TudlaAccounting
       "email" => "Approved invoices, emailed to the customer"
     }.freeze
 
-    belongs_to :organization, polymorphic: true
+    include OrganizationOwned
     belongs_to :contact, class_name: "TudlaAccounting::Contact"
     has_many :lines, -> { order(:position, :id) }, class_name: "TudlaAccounting::RecurringInvoiceLine", dependent: :destroy, inverse_of: :recurring_invoice
     # Deleting the template leaves them, unlinked (the foreign key nullifies).

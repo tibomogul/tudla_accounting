@@ -4,7 +4,7 @@ module TudlaAccounting
   class Period < ApplicationRecord
     include DatetimeRange
     has_ancestry orphan_strategy: :restrict, cache_depth: true, counter_cache: true, ancestry_format: :materialized_path2
-    belongs_to :organization, polymorphic: true
+    include OrganizationOwned
 
     validates :from_date, :thru_date, presence: true
     validate :check_period_length

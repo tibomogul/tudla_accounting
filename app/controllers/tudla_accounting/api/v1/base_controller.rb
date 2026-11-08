@@ -55,8 +55,11 @@ module TudlaAccounting
 
         def authenticate
           secret = request.authorization.to_s[/\ABearer\s+(.+)\z/i, 1]
-          @api_token = ApiToken.authenticate(secret)
-          return Current.actor = @api_token if @api_token
+          @api_token = ApiToken.authenticate(secret) # before Current.organization: any organization's token
+          if @api_token
+            Current.organization = @api_token.organization # lookups from here on find only its books
+            return Current.actor = @api_token
+          end
 
           response.headers["WWW-Authenticate"] = %(Bearer realm="TudlaAccounting", error="invalid_token")
           error(:invalid_token, secret ? "The token is unknown, revoked or expired" : "Send an API token as Authorization: Bearer <token>", :unauthorized)

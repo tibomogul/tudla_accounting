@@ -12,7 +12,7 @@ module TudlaAccounting
     KINDS = { "customer" => "Customer", "supplier" => "Supplier", "both" => "Customer and supplier" }.freeze
     POSTAL_CODE_LENGTH = 12 # the longest that fits the box on a printed form
 
-    belongs_to :organization, polymorphic: true
+    include OrganizationOwned
     belongs_to :default_account, class_name: "TudlaAccounting::Account", optional: true
     belongs_to :default_tax_code, class_name: "TudlaAccounting::TaxCode", optional: true
     belongs_to :default_withholding_code, class_name: "TudlaAccounting::WithholdingCode", optional: true

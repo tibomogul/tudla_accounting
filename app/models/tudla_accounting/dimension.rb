@@ -5,7 +5,7 @@ module TudlaAccounting
   # values tag entry lines, at most one value of each dimension per line, and reports can
   # be broken down by them.
   class Dimension < ApplicationRecord
-    belongs_to :organization, polymorphic: true
+    include OrganizationOwned
     has_many :dimension_values, -> { order(:code) }, class_name: "TudlaAccounting::DimensionValue", dependent: :restrict_with_error,
                                                      inverse_of: :dimension
     has_many :tags, class_name: "TudlaAccounting::DetailTag", dependent: :restrict_with_error

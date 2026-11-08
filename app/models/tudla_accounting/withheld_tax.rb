@@ -12,7 +12,7 @@ module TudlaAccounting
   class WithheldTax < ApplicationRecord
     DIRECTIONS = %w[from_supplier by_customer].freeze
 
-    belongs_to :organization, polymorphic: true
+    include OrganizationOwned
     belongs_to :contact, class_name: "TudlaAccounting::Contact"
     belongs_to :withholding_code, class_name: "TudlaAccounting::WithholdingCode"
     belongs_to :entry, class_name: "TudlaAccounting::Entry"

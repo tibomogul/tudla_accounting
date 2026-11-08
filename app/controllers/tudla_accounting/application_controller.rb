@@ -50,8 +50,12 @@ module TudlaAccounting
       @accounting_organization = resolver.call(self)
     end
 
+    # Lookups of the engine's models are limited to these books from here on (see
+    # OrganizationOwned).
     def require_organization
-      render "tudla_accounting/shared/no_organization", status: :forbidden unless accounting_organization
+      return render("tudla_accounting/shared/no_organization", status: :forbidden) unless accounting_organization
+
+      Current.organization = accounting_organization
     end
 
     # Whoever the current_actor setting returns is recorded on audit events.

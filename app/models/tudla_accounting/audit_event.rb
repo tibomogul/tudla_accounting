@@ -10,7 +10,7 @@ module TudlaAccounting
   class AuditEvent < ApplicationRecord
     ACTIONS = TudlaAccounting::EVENTS
 
-    belongs_to :organization, polymorphic: true
+    include OrganizationOwned
     belongs_to :actor, polymorphic: true, optional: true
     belongs_to :subject, polymorphic: true, optional: true
 

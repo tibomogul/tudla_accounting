@@ -5,7 +5,7 @@ module TudlaAccounting
     TALLY_DEBIT = "debit".freeze
     TALLY_CREDIT = "credit".freeze
 
-    belongs_to :organization, polymorphic: true
+    include OrganizationOwned
     belongs_to :entry, class_name: "TudlaAccounting::Entry"
     belongs_to :account, class_name: "TudlaAccounting::Account"
 

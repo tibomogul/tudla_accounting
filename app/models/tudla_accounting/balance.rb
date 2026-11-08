@@ -2,7 +2,7 @@
 
 module TudlaAccounting
   class Balance < ApplicationRecord
-    belongs_to :organization, polymorphic: true
+    include OrganizationOwned
     belongs_to :account, class_name: "TudlaAccounting::Account"
     belongs_to :period, class_name: "TudlaAccounting::Period"
 

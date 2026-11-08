@@ -13,7 +13,7 @@ module TudlaAccounting
   class BankRule < ApplicationRecord
     DIRECTIONS = %w[in out].freeze
 
-    belongs_to :organization, polymorphic: true
+    include OrganizationOwned
     belongs_to :account, class_name: "TudlaAccounting::Account", optional: true
     belongs_to :counter_account, class_name: "TudlaAccounting::Account"
     belongs_to :tax_code, class_name: "TudlaAccounting::TaxCode", optional: true

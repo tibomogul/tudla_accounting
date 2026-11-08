@@ -72,6 +72,8 @@ Why: Rails 8.1 does **not** auto-append engine migration paths to the host app's
 
 Engine controllers, views and helpers look records up through `organization_scope(Model)` (the current organization's; a view helper too). `spec/integration/tenancy_spec.rb` fails for a query or named scope on an engine model there that isn't limited by `organization_scope` on the same line. One that is safe another way (it starts from records already scoped, or the model has no organization of its own) says why in a `# tenancy:` comment on that line or the one before.
 
+Behind that, each model with an organization includes `OrganizationOwned` (in place of `belongs_to :organization`): a default scope to `Current.organization`, which `ApplicationController#require_organization` and the API's `authenticate` set for the request. It is nil elsewhere (jobs, services, specs outside requests), where nothing is filtered, so services must still take and query by their organization. `spec/integration/organization_scoping_spec.rb` checks every such model includes it.
+
 ### Money: one way in, one way out
 
 - **Reading:** every typed or given amount goes through `AmountParser` (`cents`, `decimal`); never `to_f`, `BigDecimal()` or `Money.from_amount` on raw input. Controllers use `amount_cents`/`typed_decimal` (`ApplicationController`), the API `cents`/`decimal` (`Api::V1::BaseController`); imports pass `round: true`.

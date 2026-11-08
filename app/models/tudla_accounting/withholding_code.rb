@@ -16,7 +16,7 @@ module TudlaAccounting
 
     WITHHELD_ON = { "approval" => "When the bill is approved", "payment" => "When the supplier is paid" }.freeze
 
-    belongs_to :organization, polymorphic: true
+    include OrganizationOwned
     belongs_to :payable_account, class_name: "TudlaAccounting::Account", optional: true
     belongs_to :creditable_account, class_name: "TudlaAccounting::Account", optional: true
 

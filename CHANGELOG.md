@@ -19,6 +19,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- During each request to the engine's pages and JSON API, lookups of the engine's models find only the request's organization's records (a default scope to `TudlaAccounting::Current.organization`), so one that misses `organization_scope` can't reach another organization's books. Jobs, the console and the host's own code aren't limited. `TudlaAccounting.with_organization(organization) { ... }` limits lookups for a block, and `with_organization(nil)` lifts the limit.
 - The README names contacts, documents and payments as the way to track receivables and payables. The host's own records (`carrying_amount_sources`, `due_date_method`, `related_party_method`) stay supported as the secondary path, with a list of what works with them and what needs the engine's documents. It no longer mentions `BankAccountBalance`, removed in this release.
 - A pay run can pay a supplier in full this time instead of withholding under its no-ABN code: untick the box beside the supplier, or pass `skip_withholding` (supplier ids) to `PayRun.call` or `POST /pay_runs`.
 - The withholding checks show what was paid to the tax authority (or creditable tax claimed against tax due) as its own figure, from entries that withheld nothing, so a payment of the tax no longer shows as a difference.

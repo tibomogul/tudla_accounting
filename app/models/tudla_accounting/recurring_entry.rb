@@ -14,7 +14,7 @@ module TudlaAccounting
   class RecurringEntry < ApplicationRecord
     include RecurringSchedule
 
-    belongs_to :organization, polymorphic: true
+    include OrganizationOwned
     has_many :lines, -> { order(:id) }, class_name: "TudlaAccounting::RecurringEntryLine", dependent: :destroy, inverse_of: :recurring_entry
     has_many :entries, as: :source, class_name: "TudlaAccounting::Entry"
 

@@ -62,7 +62,7 @@ module TudlaAccounting
     }.freeze
     STANDING = %w[status entry_id voided_on void_reason updated_at].freeze
 
-    belongs_to :organization, polymorphic: true
+    include OrganizationOwned
     belongs_to :contact, class_name: "TudlaAccounting::Contact"
     belongs_to :account, class_name: "TudlaAccounting::Account"
     belongs_to :entry, class_name: "TudlaAccounting::Entry", optional: true

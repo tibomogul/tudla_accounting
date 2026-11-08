@@ -7,7 +7,7 @@ module TudlaAccounting
   #   form = TaxReturnForm.from_template!(organization, "au_bas") # the boxes, without their tax codes
   #   form.boxes.find_by!(label: "1A").parts.create!(source: "tax_code_tax", tax_code: gst)
   class TaxReturnForm < ApplicationRecord
-    belongs_to :organization, polymorphic: true
+    include OrganizationOwned
     has_many :boxes, -> { order(:position, :id) }, class_name: "TudlaAccounting::TaxReturnBox", foreign_key: :form_id, inverse_of: :form
     has_many :filed_returns, class_name: "TudlaAccounting::FiledTaxReturn", foreign_key: :form_id, inverse_of: :form
 

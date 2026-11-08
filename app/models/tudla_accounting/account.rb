@@ -2,7 +2,7 @@
 
 module TudlaAccounting
   class Account < ApplicationRecord
-    belongs_to :organization, polymorphic: true
+    include OrganizationOwned
     has_ancestry orphan_strategy: :restrict, cache_depth: true, ancestry_format: :materialized_path2
 
     CATEGORY_ASSET = "asset".freeze

@@ -177,7 +177,7 @@ Grouped in the suggested order. Items marked **(decide)** need a decision before
 ### 7. Tenancy
 
 - [x] Add a check that fails when an engine controller looks up a model without `organization_scope`. `spec/integration/tenancy_spec.rb`, over controllers, views and helpers; 31 lookups were scoped or explained, and the line editor's tax codes were tightened.
-- [ ] **(decide)** Enforce tenancy in the database with PostgreSQL row-level security, or with scoped lookups by default.
+- [x] **(decide)** Enforce tenancy in the database with PostgreSQL row-level security, or with scoped lookups by default. Scoped lookups by default, for requests only: `OrganizationOwned` scopes each model with an organization to `Current.organization`, set by the pages and the API; jobs and services still pass their organization. Row-level security stays a possible opt-in later, for raw SQL and consoles.
 
 ### Withholding, smaller items
 

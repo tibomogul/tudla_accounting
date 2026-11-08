@@ -16,7 +16,7 @@ module TudlaAccounting
   class TaxCode < ApplicationRecord
     include PercentRate
 
-    belongs_to :organization, polymorphic: true
+    include OrganizationOwned
     belongs_to :account, class_name: "TudlaAccounting::Account", optional: true
     has_many :details, class_name: "TudlaAccounting::Detail", dependent: :restrict_with_error
 

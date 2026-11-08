@@ -500,6 +500,8 @@ Each line's `amount` is a currency code and a number (`"USD 1100.00"`, `"USD -1,
 ### Multi-tenancy
 Accounts, periods, entries, lines and balances all belong to a polymorphic `organization`, provided by the host app. The organization must respond to `currency`, which is the currency its books are kept in.
 
+During each request to the engine's pages (the `current_organization` setting's organization) and its JSON API (the token's), lookups of the engine's models find only that organization's records, and new records start in it (`TudlaAccounting::Current.organization`, a default scope on each model that has an organization), so a lookup that misses the scope still can't reach another organization's books. Nothing is limited elsewhere: jobs, mailers, the console and the host's own code pass their organization, as before. `TudlaAccounting.with_organization(organization) { ... }` limits lookups for a block, for a job, say; `with_organization(nil) { ... }` lifts the limit, and `Model.unscoped` ignores it. The database itself doesn't enforce this: raw SQL isn't limited.
+
 ## Web pages
 
 Mounted at `/accounting` by the install generator (see [Integration](#integration-into-a-host-application)), the engine has pages for the organization returned by `current_organization`:

@@ -2,7 +2,7 @@
 
 module TudlaAccounting
   class Entry < ApplicationRecord
-    belongs_to :organization, polymorphic: true
+    include OrganizationOwned
     belongs_to :source, polymorphic: true, optional: true
     belongs_to :related, polymorphic: true, optional: true
 

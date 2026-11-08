@@ -11,7 +11,7 @@ module TudlaAccounting
   #   filed.changes # => [{ label: "1A", name: "GST on sales", filed: $1,000, now: $1,100 }]
   #   filed.withdraw!(reason: "Missed an invoice")
   class FiledTaxReturn < ApplicationRecord
-    belongs_to :organization, polymorphic: true
+    include OrganizationOwned
     belongs_to :form, class_name: "TudlaAccounting::TaxReturnForm"
 
     validates :basis, inclusion: { in: TaxReport::BASES.map(&:to_s) }

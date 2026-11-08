@@ -6,7 +6,7 @@ module TudlaAccounting
   # numbers are handed out one at a time, and a rolled-back transaction gives its number
   # back: no gaps.
   class Sequence < ApplicationRecord
-    belongs_to :organization, polymorphic: true
+    include OrganizationOwned
 
     # The next value of the organization's sequence of that name, starting at 1.
     def self.next!(organization, name)
