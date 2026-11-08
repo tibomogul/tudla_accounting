@@ -171,8 +171,8 @@ Grouped in the suggested order. Items marked **(decide)** need a decision before
 
 ### 6. Receivables and payables
 
-- [ ] **(decide)** Keep, deprecate or remove the host-records path (`register_entry_source`, `carrying_amount_sources`, `due_date_method`, `related_party_method`).
-- [ ] Document the outcome in the README, naming Contacts, Documents and Payments as the main path.
+- [x] **(decide)** Keep, deprecate or remove the host-records path (`register_entry_source`, `carrying_amount_sources`, `due_date_method`, `related_party_method`). Kept, as the secondary path: it's released (0.5.0), it shares `CarryingAmountProcessor` with the engine's documents so removing it saves little, and `register_entry_source` is still the way in for host records that aren't invoices (a till, payroll). New features are built for the engine's documents only.
+- [x] Document the outcome in the README, naming Contacts, Documents and Payments as the main path. "Receivables and payables" says which features work with host records and which need the engine's documents; the configuration example and "Entries from host-app records" point to it.
 
 ### 7. Tenancy
 

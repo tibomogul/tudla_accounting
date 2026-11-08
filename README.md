@@ -430,7 +430,12 @@ An OFX or CAMT file must be for one account and in the account's currency, and i
 A foreign-currency account's ledger lines are compared by their foreign amount, and it has no book balance in its own currency. An entry created from one of its statement lines is in the organization's currency, converted at the rate given (`create_entry!(line, account:, rate:)`, or the Rate field) or else the rate provider's rate for the line's date; the bank line carries the statement amount as its foreign amount, and so does the other line when its account is held in the same currency. Imports, matches and rules are on the audit trail. The **Banking** page does all of this per account: each line a rule suggests shows it with a Record button, Record N lines by their rules records them all, and Create a rule from it starts one from a line; **Bank rules** lists and edits them.
 
 ### Receivables and payables (carrying amounts)
-After posting, `CarryingAmountProcessor` keeps track of what's still owed. Posting an entry whose source is an invoice or bill opens a `CarryingAmount` on its receivable or payable line (on the account marked `receivable` or `payable`, or one beneath it), with a due date and any foreign-currency amount. Posting a payment, disbursement or credit note opens a **credit** for the customer or supplier: a carrying amount on its line with a negative amount. If money moves through a bank account held in another currency (`BankAccountBalance`), that balance is updated in its own currency.
+**Use the engine's [contacts](#contacts), [documents](#invoices-bills-and-credit-notes) and [payments](#payments)** to track what's owed: they need nothing set up beyond marking the receivable and payable accounts, and every feature built on receivables and payables works from them. A host app that already issues its own invoices and takes its own payments can instead have its own records tracked (`carrying_amount_sources`, `due_date_method` and `related_party_method`, with entries made by `register_entry_source`). That path is kept, and works alongside the engine's documents, but it is the secondary one, and new features aren't built for it:
+
+- **Works with host records:** the aging reports, statements (`PartyStatement`, the Statements page, and emailing them when the party responds to `email`), allocations and refunds, settlement and revaluation in foreign currencies, and tax returns and the tax summary, from the tax codes on the entries' lines.
+- **Only with the engine's documents and payments:** withholding tax and its reports (2307, QAP, SAWT, the withholding checks), the TPAR, contacts' columns in the SLSP (host records' tax lines go on a row with no contact), pay runs, PDFs and emails of documents and payments, overdue reminders, recurring invoices, and the documents and payments in the JSON API.
+
+After posting, `CarryingAmountProcessor` keeps track of what's still owed. Posting an entry whose source is an invoice or bill opens a `CarryingAmount` on its receivable or payable line (on the account marked `receivable` or `payable`, or one beneath it), with a due date and any foreign-currency amount. Posting a payment, disbursement or credit note opens a **credit** for the customer or supplier: a carrying amount on its line with a negative amount.
 
 Credits are applied to what is owed through **allocations** (`TudlaAccounting::Allocation`):
 - A payment or credit note that names an invoice or bill as `related` is applied to it automatically, up to what is still owed. Anything over stays as the customer's or supplier's credit, so an invoice never goes below zero.
@@ -441,7 +446,7 @@ Credits are applied to what is owed through **allocations** (`TudlaAccounting::A
 
 The migration that adds allocations converts payments posted before them: each gets its credit, applied to its related invoice or bill as far as that was owed (`AllocationBackfill`, safe to run again).
 
-This is **off until configured**. The host app chooses which of its models count as invoices, bills, payments and disbursements, and which accounts are receivables and payables. See [Configuration](#configuration).
+The engine's documents and payments are tracked once accounts are marked `receivable` and `payable`. For the host's own records, the host app also chooses which of its models count as invoices, bills, payments and disbursements (`carrying_amount_sources`); see [Configuration](#configuration).
 
 ### Setting up the books
 - **`AccountsCreator.call(nested_accounts, organization)`** creates a chart of accounts from nested hashes (`code`, `name`, `category`, optional `currency` and `contra_account`, `children`), all or nothing.
@@ -453,7 +458,7 @@ This is **off until configured**. The host app chooses which of its models count
 Opening balances are signed the natural way for each category, so a contra account such as accumulated depreciation is entered as a negative amount. The engine stores it on the contra account's own side, so later posting adds to it. Reloading over existing accounts or balances needs `overwrite_mode` (the last argument); any later balances that already exist move by the same amount.
 
 ### Entries from host-app records
-Register how each host model turns into an entry, then create entries from records:
+Register how each host model turns into an entry, then create entries from records. This suits anything the host app records that the engine doesn't (a sale in a till, payroll, stock); for invoices, bills and payments, prefer the engine's own (see [Receivables and payables](#receivables-and-payables-carrying-amounts)).
 
 ```ruby
 # config/initializers/tudla_accounting.rb
@@ -688,9 +693,10 @@ TudlaAccounting.configure do |config|
   config.attachment_content_types += %w[application/zip]
   config.attachment_max_size = 20.megabytes
 
-  # Receivables and payables (carrying amounts). Off until the organization has an
-  # account marked receivable or payable: entries still post normally, but no
-  # carrying amounts are tracked.
+  # Receivables and payables from the host's own records: the secondary path (see
+  # "Receivables and payables"); the engine's documents and payments need none of
+  # this. Off until the organization has an account marked receivable or payable:
+  # entries still post normally, but no carrying amounts are tracked.
   config.carrying_amount_sources = {      # entry source class => role
     "Invoice" => :receivable,             # opens a receivable
     "Bill" => :payable,                   # opens a payable
