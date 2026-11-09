@@ -35,6 +35,19 @@ RSpec.describe "Setup", type: :request do
       end
     end
 
+    it "names where exchange rates come from for the books' currency" do
+      get routes.setup_path
+      expect(response.body).to match(/Exchange rates from: <span[^>]*>not set/)
+
+      TudlaAccounting.configuration.forex_rate_provider = { organization.currency => TudlaAccounting::RbaForexRateProvider.new }
+      get routes.setup_path
+      expect(response.body).to include("Exchange rates from: <code class=\"text-xs\">TudlaAccounting::RbaForexRateProvider</code>")
+
+      TudlaAccounting.configuration.forex_rate_provider = { "PHP" => TudlaAccounting::BspForexRateProvider.new }
+      get routes.setup_path
+      expect(response.body).to match(/Exchange rates from: <span[^>]*>none for #{organization.currency}/)
+    end
+
     it "loads a chart of accounts from a CSV" do
       post routes.setup_chart_of_accounts_path, params: { file: upload("coa_saas_services.csv"), opening_date: "2026-01-01" }
 

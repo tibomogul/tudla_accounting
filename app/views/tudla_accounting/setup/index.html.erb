@@ -80,7 +80,7 @@
     <div>
       <h2 id="revaluation-heading" class="tc-card-title mb-1">Foreign exchange revaluation</h2>
       <p class="tc-muted text-sm">Revalues open foreign-currency receivables and payables at a month end's rate, and reverses it the next day.</p>
-      <p class="text-sm mt-2">Unrealized gains and losses account: <%= role_account_link(@role_accounts, :unrealized_fx_gain) %> · Realized gains and losses account: <%= role_account_link(@role_accounts, :realized_fx_gain) %> · Exchange rates from: <%= forex_provider_label(@config) %></p>
+      <p class="text-sm mt-2">Unrealized gains and losses account: <%= role_account_link(@role_accounts, :unrealized_fx_gain) %> · Realized gains and losses account: <%= role_account_link(@role_accounts, :realized_fx_gain) %> · Exchange rates from: <%= forex_provider_label(@config, accounting_organization.currency) %></p>
     </div>
     <% if @months.none? %>
       <p class="tc-muted text-sm">No month has ended yet.</p>

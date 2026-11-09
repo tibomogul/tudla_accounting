@@ -71,13 +71,13 @@ module TudlaAccounting
     ENTRY_NUMBER_SERIES = %i[organization financial_year].freeze
 
     attr_accessor :base_currency, :rounding, :time_zone, :organization_class,
-                  :due_date_method, :related_party_method, :forex_rate_provider,
+                  :due_date_method, :related_party_method,
                   :parent_controller, :current_organization, :current_actor, :authorize,
                   :cash_account_codes, :tax_basis, :organization_label, :entry_number_format,
                   :attachment_content_types, :attachment_max_size, :document_header, :books_header, :withholding_agent, :tax_registration, :country,
                   :api_rate_limit, :api_rate_limit_store, :pdf_browser_options, :pdf_paper, :pdf_stylesheet,
                   :document_mailer, :document_mail_from, :document_mail_reply_to
-    attr_reader :number_format
+    attr_reader :number_format, :forex_rate_provider
     attr_reader :carrying_amount_sources, :entry_sources, :entry_number_series, :document_number_format, :document_email_templates, :reminder_days
 
     def initialize
@@ -201,6 +201,22 @@ module TudlaAccounting
 
     # A per-organization setting's value for an organization: the setting, or what its
     # callable gives for the organization.
+    # Where missing exchange rates come from: a provider (anything with call(from:, to:,
+    # date:) giving the rate, or nil), or providers by the books' currency, for
+    # organizations kept in different currencies, whose rates come from different places:
+    #
+    #   config.forex_rate_provider = { "AUD" => RbaForexRateProvider.new, "PHP" => BspForexRateProvider.new }
+    def forex_rate_provider=(provider)
+      @forex_rate_provider = provider.is_a?(Hash) ? provider.to_h { |currency, given| [ currency.to_s.upcase, given ] } : provider
+    end
+
+    # The provider for rates into a currency: books in it ask for every rate into it (an
+    # organization's ForexRateRetriever calls are all to its currency). Nil when there's none.
+    def forex_rate_provider_for(currency)
+      provider = forex_rate_provider
+      provider.is_a?(Hash) ? provider[currency.to_s.upcase] : provider
+    end
+
     def for_organization(setting, organization)
       raise ArgumentError, "#{setting} isn't a per-organization setting; they are #{PER_ORGANIZATION.join(', ')}" unless PER_ORGANIZATION.include?(setting)
 

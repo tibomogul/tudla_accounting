@@ -41,6 +41,15 @@ RSpec.describe TudlaAccounting::ForexRateRetriever, type: :service do
     expect(TudlaAccounting::ForexRate.find_by!(from: "EUR", to: "AUD").rate).to eq(fetched)
   end
 
+  it "asks the provider for the currency converted into, when there's one by the books' currency" do
+    TudlaAccounting.configuration.forex_rate_provider = { aud: ->(**) { 1.6 }, "PHP" => ->(**) { 63.5 } }
+
+    expect(rate("EUR", "AUD")).to eq(BigDecimal("1.6"))
+    expect(rate("EUR", "PHP")).to eq(BigDecimal("63.5"))
+    expect(TudlaAccounting.configuration.forex_rate_provider_for("aud")).to be_a(Proc)
+    expect { rate("EUR", "GBP") }.to raise_error(described_class::RateNotFound, "No EUR/GBP rate for 2026-03-31 and no forex_rate_provider for GBP")
+  end
+
   it "raises when there is no provider, or the provider has no rate" do
     expect { rate("EUR", "AUD") }.to raise_error(described_class::RateNotFound, "No EUR/AUD rate for 2026-03-31 and no forex_rate_provider configured")
     TudlaAccounting.configuration.forex_rate_provider = ->(**) { nil }

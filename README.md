@@ -490,7 +490,7 @@ Each line's `amount` is a currency code and a number (`"USD 1100.00"`, `"USD -1,
 `AgingReportGenerator.call(organization:, report_type: :receivable, as_of_date:)` (or `:payable`) groups open amounts by related party and buckets them by days past due: current, 1–30, 31–60, 61–90 and over 90. It returns `summary` and `details` per party, plus `totals`, in the organization's currency. A past `as_of_date` shows what was owed on that day: later invoices are left out and later payments are added back. Credits not yet applied are listed as lines of their own with a negative amount, in the current bucket, so each party's total is what it owes net.
 
 ### Foreign exchange
-- **`ForexRateRetriever.call(from:, to:, date:)`** returns how many `to` one `from` was worth on a date. Rates are cached in `ForexRate`, and missing ones come from `forex_rate_provider`.
+- **`ForexRateRetriever.call(from:, to:, date:)`** returns how many `to` one `from` was worth on a date. Rates are cached in `ForexRate`, and missing ones come from `forex_rate_provider`: one provider, or one for each currency books are kept in (`{ "AUD" => RbaForexRateProvider.new, "PHP" => BspForexRateProvider.new }`), since where rates come from depends on it. Each organization's rates are into its own currency, so it gets its currency's provider; the Setup page names it, or warns that there's none.
 - **`RbaForexRateProvider`** reads the Reserve Bank of Australia's published rates. It needs the `spreadsheet` gem in the host app and network access. A weekend or holiday uses the latest earlier business day.
 - **`BspForexRateProvider`** reads the Bangko Sentral ng Pilipinas' rates, for books in pesos (any two currencies it quotes cross through the peso). It reads the day's Reference Exchange Rate Bulletin (32 currencies), the daily peso–dollar rates and the daily cross rates (31 currencies since 1978, which the BSP updates about monthly), with network access to bsp.gov.ph and no extra gem. A weekend or holiday uses the latest earlier business day; a file it can't download is logged and gives no rate, so the forms ask for one. What it reads is kept in `Rails.cache` (or `cache:`, `nil` for none), the cross rates for a day (`cross_rates_refresh_after:`) and the others for an hour (`refresh_after:`), so only the first lookup after that downloads them: the cross rates file is 10 MB and takes about 9 seconds to download and read, against 0.4 from the cache. Schedule **`BspRatesJob`** each business day after the bulletin is out (mid-morning, Manila time) to keep every currency's rate for the weeks before the cross rates catch up; without it, only the dollar has those days.
 - **`ForexGainOrLossCalculator`** gives the gain or loss on a foreign amount of a receivable or payable between its booked rate and a date's rate.
@@ -740,6 +740,8 @@ TudlaAccounting.configure do |config|
   # Foreign exchange: where missing rates come from (gains and losses go to the accounts
   # marked unrealized_fx_gain and realized_fx_gain)
   config.forex_rate_provider = TudlaAccounting::RbaForexRateProvider.new # BspForexRateProvider.new for pesos, or any ->(from:, to:, date:) { rate }
+  # or one by the books' currency, for organizations kept in different ones:
+  # config.forex_rate_provider = { "AUD" => TudlaAccounting::RbaForexRateProvider.new, "PHP" => TudlaAccounting::BspForexRateProvider.new }
 end
 ```
 

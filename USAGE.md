@@ -658,7 +658,7 @@ The BIR Form 2307 follows the first page of the January 2018 edition, without th
 
 At a month end, open foreign-currency receivables and payables can be revalued at that day's rate. The unrealized gain or loss is posted to the `unrealized_fx_gain` account and reversed the next day. Running it again for the same date does nothing more.
 
-Rates stored in `TudlaAccounting::ForexRate` are used first (one per currency pair and day; the inverse pair works too), and the `forex_rate_provider` setting supplies and stores any that are missing. Without either, revaluation refuses to run and names the missing rate. To record a rate by hand: `TudlaAccounting::ForexRate.create!(from: "EUR", to: "USD", year: 2026, month: 3, day: 31, rate: "1.6")`.
+Rates stored in `TudlaAccounting::ForexRate` are used first (one per currency pair and day; the inverse pair works too), and the `forex_rate_provider` setting supplies and stores any that are missing (with providers by currency, the one for the books' currency). Without either, revaluation refuses to run and names the missing rate. To record a rate by hand: `TudlaAccounting::ForexRate.create!(from: "EUR", to: "USD", year: 2026, month: 3, day: 31, rate: "1.6")`.
 
 **In the UI:** Setup → Foreign exchange revaluation; choose a month that has ended.
 

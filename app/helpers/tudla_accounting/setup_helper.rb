@@ -9,10 +9,11 @@ module TudlaAccounting
       link_to tag.code(account.code_with_name, class: "text-xs"), account_path(account)
     end
 
-    # The forex_rate_provider setting, by class for an object, or a warning when unset.
-    def forex_provider_label(config)
-      provider = config.forex_rate_provider
-      return tc_badge("not set", tone: :warning) unless provider
+    # The forex_rate_provider setting's provider for books in a currency, by class for an
+    # object, or a warning when there's none.
+    def forex_provider_label(config, currency)
+      provider = config.forex_rate_provider_for(currency)
+      return tc_badge(config.forex_rate_provider ? "none for #{currency}" : "not set", tone: :warning) unless provider
 
       tag.code(provider.is_a?(String) ? provider : provider.class.name, class: "text-xs")
     end

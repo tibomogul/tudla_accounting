@@ -6,9 +6,10 @@ module TudlaAccounting
   #   ForexRateRetriever.call(from: "EUR", to: "AUD", date: Date.new(2026, 3, 31)) # => 1.6431 (AUD per EUR)
   #
   # Rates are cached in the ForexRate table (an inverse rate is used if that is what is
-  # stored). Missing rates come from the configured forex_rate_provider, a callable
-  # taking from:, to: and date: and returning the rate (or nil if it has none), e.g.
-  # RbaForexRateProvider.new for books kept in AUD.
+  # stored). Missing rates come from the forex_rate_provider setting's provider for the
+  # currency converted into (the books' own: see Configuration#forex_rate_provider_for),
+  # a callable taking from:, to: and date: and returning the rate (or nil if it has none),
+  # e.g. RbaForexRateProvider.new for books kept in AUD.
   #
   # Every rate comes back to the 8 decimal places the rate columns hold (an inverse or a
   # provider's crossed rate included), so a rate is the same whether just fetched or read
@@ -45,8 +46,11 @@ module TudlaAccounting
     end
 
     def fetch
-      provider = TudlaAccounting.configuration.forex_rate_provider
-      raise RateNotFound, "No #{@from}/#{@to} rate for #{@date} and no forex_rate_provider configured" unless provider
+      config = TudlaAccounting.configuration
+      provider = config.forex_rate_provider_for(@to)
+      unless provider
+        raise RateNotFound, "No #{@from}/#{@to} rate for #{@date} and no forex_rate_provider #{config.forex_rate_provider ? "for #{@to}" : 'configured'}"
+      end
 
       rate = provider.call(from: @from, to: @to, date: @date)
       raise RateNotFound, "No #{@from}/#{@to} rate for #{@date}" unless rate&.positive?
