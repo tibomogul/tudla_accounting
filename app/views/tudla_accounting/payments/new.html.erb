@@ -37,7 +37,7 @@
     </div>
 
     <% if withholding %>
-      <%= render "withholdings", codes: withholding_codes, contact: @payment.contact, currency: @currency, cash_follows_tax: cash_follows_tax, received: received, start: @withholding_start %>
+      <%= render "withholdings", codes: withholding_codes, contact: @payment.contact, currency: @currency, cash_follows_tax: cash_follows_tax, received: received, start: @withholding_start, not_withheld: @payment.not_withheld_reason %>
     <% end %>
 
     <div class="tc-card overflow-x-auto">

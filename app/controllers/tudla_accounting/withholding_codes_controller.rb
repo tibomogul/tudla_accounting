@@ -68,7 +68,11 @@ module TudlaAccounting
     end
 
     def withholding_code_params
-      permitted = params.require(:withholding_code).permit(:code, :name, :rate_percent, :payable_account_id, :creditable_account_id, :withheld_on, :active)
+      permitted = params.require(:withholding_code).permit(:code, :name, :rate_percent, :payable_account_id, :creditable_account_id, :withheld_on, :exempt_up_to, :active)
+      if permitted.key?(:exempt_up_to)
+        typed = permitted.delete(:exempt_up_to)
+        permitted[:exempt_up_to_cents] = typed.blank? ? nil : amount_cents(typed, accounting_organization.currency) { |problem| permitted[:exempt_up_to_problem] = problem }
+      end
       %i[payable_account_id creditable_account_id].each { |field| permitted[field] = organization_scope(Account).find(permitted[field]).id if permitted[field].present? }
       permitted
     end

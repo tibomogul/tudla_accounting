@@ -100,7 +100,7 @@ end
 ```json
 { "id": 3, "name": "Northwind", "kind": "both", "email": "ap@northwind.test", "phone": null, "address": "1 Main St\nSydney",
   "postal_code": "2000", "tax_number": "51 824 753 556", "payment_terms_days": 30, "currency": "AUD", "notes": null,
-  "default_account_code": "4010", "default_tax_code": "GST", "default_withholding_code": null, "active": true, "taxable_payments": false, "created_at": "...", "updated_at": "..." }
+  "default_account_code": "4010", "default_tax_code": "GST", "default_withholding_code": null, "active": true, "taxable_payments": false, "withholding_exemption": null, "withholding_statement_on": null, "created_at": "...", "updated_at": "..." }
 ```
 
 ### Invoices, bills and credit notes
@@ -131,7 +131,7 @@ end
 { "id": 5, "kind": "received", "status": "posted", "contact": { "id": 3, "name": "Northwind" }, "account_code": "1000",
   "paid_on": "2026-04-10", "currency": "AUD", "amount": "300.00", "unapplied": "100.00", "reference": "EFT 1", "notes": null, "entry_id": 90,
   "applied": [ { "document_id": 7, "number": "INV-0001", "payment_id": null, "entry_id": 81, "amount": "200.00", "applied_at": "...", "active": true } ],
-  "refund_of": null, "taxable_payment": false, "voided_on": null, "void_reason": null, "created_at": "...", "updated_at": "..." }
+  "refund_of": null, "taxable_payment": false, "not_withheld_reason": null, "voided_on": null, "void_reason": null, "created_at": "...", "updated_at": "..." }
 ```
 
 `unapplied` is the credit the contact still has from it. An application taken off again (the payment voided, say) has `"active": false`. What was refunded of it is listed in `applied` with the refund's `payment_id`. A refund has `refund_of`, `{ "payment_id": 5 }` or `{ "document_id": 9 }` (a credit note), and nothing `applied` or `unapplied`. `taxable_payment` says whether a payment to a supplier, or a refund from one, goes on the taxable payments report: its contact's mark when it was made.
@@ -156,7 +156,7 @@ end
 
 ### The pay run
 
-`GET /pay_run?account_code=1000`: the approved bills with something owed that a pay run from that bank account could pay, in its currency, by supplier then due date. Filters: `due_by` (a date; all of them without it) and `contact_id` (one supplier's). A bill's `withholding_code` is the code withheld when its supplier is paid (the supplier's default, when it's active and withheld on payment), or null.
+`GET /pay_run?account_code=1000`: the approved bills with something owed that a pay run from that bank account could pay, in its currency, by supplier then due date. Filters: `due_by` (a date; all of them without it) and `contact_id` (one supplier's). A bill's `withholding_code` is the code withheld when its supplier is paid (the supplier's default, when it's active and withheld on payment), or null; null too, with `not_withheld_reason` saying why, when the supplier is exempt or the bill is at or under the code's `exempt_up_to` before tax.
 
 ```json
 { "data": { "account_code": "1000", "currency": "AUD",
@@ -168,7 +168,7 @@ end
 
 `GET /tax_codes`: `{ "id", "code", "name", "kind" (sales or purchases), "treatment" (standard, zero_rated or exempt; the last two have a rate of 0), "purchase_type" (services, capital_goods or other_goods, on a taxed purchases code that has one, otherwise null), "rate" ("0.1" for 10%), "account_code", "active" }`.
 
-`GET /withholding_codes`: `{ "id", "code", "name", "rate" ("0.1" for 10%), "payable_account_code" (for tax withheld from suppliers), "creditable_account_code" (for tax customers withhold), "withheld_on" (`approval`: from a supplier on a bill's line; `payment`: on the payment to them), "active" }`.
+`GET /withholding_codes`: `{ "id", "code", "name", "rate" ("0.1" for 10%), "payable_account_code" (for tax withheld from suppliers), "creditable_account_code" (for tax customers withhold), "withheld_on" (`approval`: from a supplier on a bill's line; `payment`: on the payment to them), "exempt_up_to" (for a code withheld on payment: a bill of this much or less before tax, in the organization's currency, isn't withheld from; null for no limit), "active" }`.
 
 `GET /periods`: financial years and their months, latest first: `{ "id", "label" ("Mar 2026"), "kind" (year or month), "year_id", "from_date", "thru_date", "closed" }`. Their ids pick the periods reports cover.
 
@@ -207,7 +207,7 @@ Idempotency-Key: shop-order-1042
 
 ### Contacts
 
-`POST /contacts` and `PATCH /contacts/:id` (`record`) take `name`, `kind` (customer, supplier, both), `email`, `phone`, `address`, `postal_code`, `tax_number`, `payment_terms_days`, `currency`, `notes`, `active`, `taxable_payments` (whether what's paid to them from now on goes on the taxable payments report; each payment keeps the mark it was made with, as `taxable_payment` on its JSON), `taxable_payments_from` (a date: their payments since then take the mark too), `default_account_code`, `default_tax_code` and `default_withholding_code`. A `PATCH` changes only the fields sent; `null` clears one. `currency` (an ISO code) is the one their new invoices and bills start in; it reads as the organization's when none is set, and `null` sets it back to that.
+`POST /contacts` and `PATCH /contacts/:id` (`record`) take `name`, `kind` (customer, supplier, both), `email`, `phone`, `address`, `postal_code`, `tax_number`, `payment_terms_days`, `currency`, `notes`, `active`, `taxable_payments` (whether what's paid to them from now on goes on the taxable payments report; each payment keeps the mark it was made with, as `taxable_payment` on its JSON), `taxable_payments_from` (a date: their payments since then take the mark too), `withholding_exemption` (why nothing is withheld from them under a code withheld on payment: `not_in_business`, `exempt_income`, `no_enterprise`, `under_18`, `through_agent` or `input_taxed`, the ATO's exceptions to no-ABN withholding; null for none), `withholding_statement_on` (the date of their statement), `default_account_code`, `default_tax_code` and `default_withholding_code`. A `PATCH` changes only the fields sent; `null` clears one. `currency` (an ISO code) is the one their new invoices and bills start in; it reads as the organization's when none is set, and `null` sets it back to that.
 
 ### Invoices, bills and credit notes
 
@@ -235,7 +235,7 @@ Their files: an entry's or document's JSON lists them under `attachments` (`id`,
 
 `kind` is `received` (from a customer, applied to their invoices) or `paid` (to a supplier, applied to their bills). `account_code` is the bank or cash account it went through; the amounts are in its currency, and for one held in another than the organization's, `exchange_rate` gives the rate (the date's is looked up when it isn't given). It applies only to documents in its currency. A payment's JSON has its `currency` and `exchange_rate` (null for the organization's own). Each application can't be more than is still owed on its document, nor all of them more than the payment; what isn't applied stays as a credit for the contact. `POST /payments/:id/void` (`post`) voids it, reversing its entry on `on` with a `reason` and taking it off what it paid; refused while it is matched to a bank statement line or a tax certificate for it is marked received.
 
-A customer's payment (`kind` `received`) can list the tax they withheld, `"withholdings": [ { "code": "WC160", "withheld": "200.00", "base": "10000.00" } ]`, in the payment's currency, as their certificate gives it; `base` is worked out from the code's rate when not given. `amount` stays the cash received. The payment and the tax together can be applied to invoices, and only the cash can be refunded. A payment's JSON has `withheld` and `withheld_taxes`, each with its `id`, `code`, `on`, `base`, `withheld` (these two in the organization's currency) and `certificate_received_on`. A payment to a supplier (`kind` `paid`) can list tax withheld under a code whose `withheld_on` is `payment`, such as `"withholdings": [ { "code": "NOABN", "base": "1000.00" } ]`; `withheld` is worked out from `base` at the code's rate when not given, and `amount` is the cash paid. `POST /withheld_taxes/:id/certificate` (`post`) marks an amount's certificate received `on` a day, and `DELETE /withheld_taxes/:id/certificate` (`post`) unmarks it.
+A customer's payment (`kind` `received`) can list the tax they withheld, `"withholdings": [ { "code": "WC160", "withheld": "200.00", "base": "10000.00" } ]`, in the payment's currency, as their certificate gives it; `base` is worked out from the code's rate when not given. `amount` stays the cash received. The payment and the tax together can be applied to invoices, and only the cash can be refunded. A payment's JSON has `withheld` and `withheld_taxes`, each with its `id`, `code`, `on`, `base`, `withheld` (these two in the organization's currency) and `certificate_received_on`. A payment to a supplier (`kind` `paid`) can list tax withheld under a code whose `withheld_on` is `payment`, such as `"withholdings": [ { "code": "NOABN", "base": "1000.00" } ]`; `withheld` is worked out from `base` at the code's rate when not given, and `amount` is the cash paid. When nothing (or not all) is withheld from a supplier whose default code is withheld on payment, the payment keeps `not_withheld_reason`: the one sent, or else the supplier's exemption or the bills at or under the code's `exempt_up_to`, or else "No reason given". `POST /withheld_taxes/:id/certificate` (`post`) marks an amount's certificate received `on` a day, and `DELETE /withheld_taxes/:id/certificate` (`post`) unmarks it.
 
 A refund pays a credit back: `kind` `refund` (money back to a customer) or `supplier_refund` (back from a supplier), with `refund_of` naming the contact's posted payment or approved credit note, `{ "payment_id": 5 }` or `{ "document_id": 9 }`, and no more than is left of it:
 
@@ -254,7 +254,7 @@ A refund pays a credit back: `kind` `refund` (money back to a customer) or `supp
   "bills": [ { "document_id": 12 }, { "document_id": 13, "amount": "20.00" } ] }
 ```
 
-A bill's `amount` is what is paid of it, all that is owed when not given, in the account's currency (the bills must be in it too); for an account held in another currency than the organization's, `exchange_rate` gives the rate (the day's when not given). A supplier whose default withholding code is withheld on payment (such as `NOABN`) has the tax withheld from what is paid of its bills: the bills are settled by the cash and the tax, and the payment's `amount` is the cash. `skip_withholding` (a list of supplier ids, `contact_id`s) pays those suppliers in full this time. With `"email": true` each supplier's payment notice is emailed. It answers `{ "data": { "payments": [ ... ], "emailed_ids": [ 31 ], "no_address_ids": [ 32 ] } }`: the payments as `GET /payments/:id` gives them, and which notices were emailed or not for want of an address. With an `Idempotency-Key`, a retry answers with the payments the first made and the notices emailed (`no_address_ids` empty).
+A bill's `amount` is what is paid of it, all that is owed when not given, in the account's currency (the bills must be in it too); for an account held in another currency than the organization's, `exchange_rate` gives the rate (the day's when not given). A supplier whose default withholding code is withheld on payment (such as `NOABN`) has the tax withheld from what is paid of its bills: the bills are settled by the cash and the tax, and the payment's `amount` is the cash. Nothing is withheld from an exempt supplier or from a bill at or under the code's `exempt_up_to` before tax, and the payment's `not_withheld_reason` says so. `skip_withholding` (a list of supplier ids, `contact_id`s) pays those suppliers in full this time ("Paid in full in a pay run"). With `"email": true` each supplier's payment notice is emailed. It answers `{ "data": { "payments": [ ... ], "emailed_ids": [ 31 ], "no_address_ids": [ 32 ] } }`: the payments as `GET /payments/:id` gives them, and which notices were emailed or not for want of an address. With an `Idempotency-Key`, a retry answers with the payments the first made and the notices emailed (`no_address_ids` empty).
 
 ### Recurring invoices
 

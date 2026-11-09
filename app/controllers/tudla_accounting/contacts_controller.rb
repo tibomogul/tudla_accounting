@@ -78,7 +78,7 @@ module TudlaAccounting
     end
 
     def contact_params
-      permitted = params.require(:contact).permit(:name, :kind, :email, :phone, :address, :postal_code, :tax_number, :payment_terms_days, :currency, :default_account_id, :default_tax_code_id, :default_withholding_code_id, :taxable_payments, :taxable_payments_from, :active, :notes)
+      permitted = params.require(:contact).permit(:name, :kind, :email, :phone, :address, :postal_code, :tax_number, :payment_terms_days, :currency, :default_account_id, :default_tax_code_id, :default_withholding_code_id, :taxable_payments, :taxable_payments_from, :withholding_exemption, :withholding_statement_on, :active, :notes)
       permitted[:default_account_id] = organization_scope(Account).find(permitted[:default_account_id]).id if permitted[:default_account_id].present?
       permitted[:default_tax_code_id] = organization_scope(TaxCode).find(permitted[:default_tax_code_id]).id if permitted[:default_tax_code_id].present?
       permitted[:default_withholding_code_id] = organization_scope(WithholdingCode).find(permitted[:default_withholding_code_id]).id if permitted[:default_withholding_code_id].present?

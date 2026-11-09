@@ -36,6 +36,13 @@ module TudlaAccounting
         rows("from_supplier").where(contact: contact).includes(:payment, :withholding_code).order(:on, :id).to_a
       end
 
+      # The payments to suppliers in the months that were made without all the tax, with
+      # why (Payment#not_withheld_reason), by date: for checking the reasons at year end.
+      def not_withheld
+        @not_withheld ||= Payment.where(organization: organization, kind: "paid", status: "posted", paid_on: from.from_date.to_date..thru.thru_date.to_date)
+                                 .where.not(not_withheld_reason: nil).includes(:contact).order(:paid_on, :id).to_a
+      end
+
       # What a payment summary names the payer by: the tax_registration setting's number.
       def payer_registration = TudlaAccounting.configuration.tax_registration_for(organization)
 

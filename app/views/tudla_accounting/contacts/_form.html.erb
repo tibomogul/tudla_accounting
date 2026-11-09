@@ -32,6 +32,12 @@
     <div class="sm:col-span-2"><%= tc_field form, :taxable_payments_from, as: :date_field, label: "And to payments already made since",
                                             hint: "Optional: their payments since this date are marked or unmarked the same way" %></div>
     <% end %>
+    <% if (TudlaAccounting::Jurisdictions.on?(accounting_organization, :payee_payments) && withholding_codes.any?(&:on_payment?)) || contact.withholding_exemption %>
+    <div class="sm:col-span-3"><%= tc_field form, :withholding_exemption, as: :select, label: "Nothing withheld from them because",
+                                            choices: [ [ "They're not exempt", "" ] ] + TudlaAccounting::Contact::WITHHOLDING_EXEMPTIONS.invert.to_a,
+                                            hint: "For a supplier with no ABN who is an exception to no-ABN withholding. Keep their signed statement for 5 years." %></div>
+    <div><%= tc_field form, :withholding_statement_on, as: :date_field, label: "Their statement dated" %></div>
+    <% end %>
   </fieldset>
   <div class="tc-card tc-card-body grid gap-4">
     <%= tc_field form, :notes, as: :text_area, rows: 3 %>

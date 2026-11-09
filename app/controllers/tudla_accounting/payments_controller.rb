@@ -51,7 +51,7 @@ module TudlaAccounting
     end
 
     def create
-      permitted = params.require(:payment).permit(:kind, :contact_id, :account_id, :paid_on, :amount, :exchange_rate, :reference, :notes, :email_it, applications: {},
+      permitted = params.require(:payment).permit(:kind, :contact_id, :account_id, :paid_on, :amount, :exchange_rate, :reference, :notes, :not_withheld_reason, :email_it, applications: {},
                                                   withholdings: %i[withholding_code_id withheld base])
       account = organization_scope(Account).find(permitted[:account_id]) if permitted[:account_id].present?
       @currency = account ? account.currency.presence || accounting_organization.currency : currency_param
@@ -60,6 +60,7 @@ module TudlaAccounting
       contact = organization_scope(Contact).find(permitted[:contact_id]) if permitted[:contact_id].present?
       @payment = organization_scope(Payment).new(kind: permitted[:kind].presence_in(%w[received paid]) || "received", contact: contact, paid_on: permitted[:paid_on],
                                                  account_id: account&.id, amount_cents: cents.call(permitted[:amount], "the payment"), reference: permitted[:reference], notes: permitted[:notes],
+                                                 not_withheld_reason: permitted[:not_withheld_reason],
                                                  exchange_rate: typed_decimal(permitted[:exchange_rate]) { problems << "#{permitted[:exchange_rate]} isn't an exchange rate" })
       @applied = (permitted[:applications]&.to_h || {}).filter_map { |id, text| [ id.to_i, cents.call(text, "applied") ] if text.present? }.to_h.compact
       @open = open_documents(@payment, @currency)
@@ -68,7 +69,7 @@ module TudlaAccounting
 
       documents = organization_scope(Document).where(id: @applied.keys).index_by(&:id)
       applications = @applied.map { |id, applied| { document: documents.fetch(id) { raise ActiveRecord::RecordNotFound }, amount_cents: applied } }
-      @payment = Payment.record!(**@payment.attributes.symbolize_keys.slice(:kind, :contact_id, :account_id, :paid_on, :amount_cents, :exchange_rate, :reference, :notes),
+      @payment = Payment.record!(**@payment.attributes.symbolize_keys.slice(:kind, :contact_id, :account_id, :paid_on, :amount_cents, :exchange_rate, :reference, :notes, :not_withheld_reason),
                                  organization: accounting_organization, applications: applications, withholdings: withholdings)
       redirect_to payment_path(@payment), notice: "#{@payment.title} of #{helpers.tc_money_text(@payment.amount)} recorded.#{email_it(@payment) if permitted[:email_it] == '1'}"
     rescue ArgumentError => e
@@ -118,9 +119,11 @@ module TudlaAccounting
     private
 
     # Paying a bill of a supplier whose default code is withheld on payment: the tax on what's
-    # owed, and the cash less it.
+    # owed, and the cash less it, or why nothing is withheld (see PaymentWithholding).
     def start_withholding(bill)
-      code = @payment.contact.payment_withholding_code or return
+      decision = PaymentWithholding.new(@payment.contact, [ { document: bill, amount_cents: bill.amount_due.cents } ])
+      @payment.not_withheld_reason = decision.reason unless decision.code
+      code = decision.code or return
 
       withheld = code.withheld_cents(bill.amount_due.cents)
       @withholding_start = { withholding_code_id: code.id.to_s, base: helpers.tc_amount_field(bill.amount_due), withheld: helpers.tc_amount_field(Money.new(withheld, bill.currency)) }

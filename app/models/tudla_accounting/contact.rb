@@ -11,6 +11,17 @@ module TudlaAccounting
   class Contact < ApplicationRecord
     KINDS = { "customer" => "Customer", "supplier" => "Supplier", "both" => "Customer and supplier" }.freeze
     POSTAL_CODE_LENGTH = 12 # the longest that fits the box on a printed form
+    # Why nothing is withheld from what is paid to a supplier under its code withheld on
+    # payment: the ATO's exceptions to no-ABN withholding, each normally backed by the
+    # supplier's statement (its date in withholding_statement_on). See PaymentWithholding.
+    WITHHOLDING_EXEMPTIONS = {
+      "not_in_business" => "Not a business transaction: an individual not in business, or a private, domestic or hobby supply",
+      "exempt_income" => "The whole payment is exempt income for them",
+      "no_enterprise" => "Not carrying on an enterprise",
+      "under_18" => "An individual under 18 paid $350 or less a week",
+      "through_agent" => "Supplied through an agent who quoted their ABN",
+      "input_taxed" => "The supplies are wholly input taxed"
+    }.freeze
 
     include OrganizationOwned
     belongs_to :default_account, class_name: "TudlaAccounting::Account", optional: true
@@ -26,6 +37,7 @@ module TudlaAccounting
     normalizes :email, :phone, :postal_code, :tax_number, with: ->(text) { text.strip.presence }
     normalizes :address, :notes, with: ->(text) { text.strip.presence }
     normalizes :currency, with: ->(currency) { currency.strip.upcase.presence }
+    normalizes :withholding_exemption, with: ->(exemption) { exemption.strip.presence }
     before_validation { self.currency = nil if self[:currency] == organization&.currency }
 
     validates :name, presence: true
@@ -33,6 +45,7 @@ module TudlaAccounting
     validates :email, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_nil: true
     validates :postal_code, length: { maximum: POSTAL_CODE_LENGTH }
     validates :payment_terms_days, numericality: { only_integer: true, greater_than_or_equal_to: 0 }, allow_nil: true
+    validates :withholding_exemption, inclusion: { in: WITHHOLDING_EXEMPTIONS.keys }, allow_nil: true
     validate :defaults_fit
     validate { errors.add(:currency, "is not a known currency code") if foreign? && !Money::Currency.find(self[:currency]) }
 
@@ -68,6 +81,13 @@ module TudlaAccounting
     def payment_withholding_code
       code = default_withholding_code
       code if code&.active? && code.on_payment?
+    end
+
+    # Its exemption from withholding, as a payment made without the tax records it: "Not
+    # carrying on an enterprise (their statement of 3 Mar 2026)", or nil.
+    def withholding_exemption_reason
+      label = WITHHOLDING_EXEMPTIONS[withholding_exemption] or return
+      withholding_statement_on ? "#{label} (their statement of #{withholding_statement_on.strftime('%-d %b %Y')})" : label
     end
 
     # The receivable and payable types it is a party to: as a customer, a supplier, or both.

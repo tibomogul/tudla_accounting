@@ -58,7 +58,7 @@ module TudlaAccounting
         def bill_json(bill)
           { document_id: bill.id, number: bill.number_label, reference: bill.reference, contact: { id: bill.contact_id, name: bill.contact.name },
             issued_on: date(bill.issued_on), due_on: date(bill.due_on), total: amount(bill.total), amount_due: amount(bill.amount_due),
-            withholding_code: bill.contact.payment_withholding_code&.code }
+            **PaymentWithholding.new(bill.contact, [ { document: bill, amount_cents: bill.amount_due.cents } ]).then { |decision| { withholding_code: decision.code&.code, not_withheld_reason: decision.reason } } }
         end
 
         # The payments an earlier run with this Idempotency-Key made (none without one),

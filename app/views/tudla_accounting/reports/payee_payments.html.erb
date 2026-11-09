@@ -38,5 +38,21 @@
       </tbody>
     </table>
   </section>
+  <% if @report.not_withheld.any? %>
+    <section class="tc-card overflow-x-auto mb-4" aria-labelledby="not-withheld" data-not-withheld>
+      <h2 id="not-withheld" class="tc-card-body tc-card-title pb-0">Paid without withholding</h2>
+      <p class="tc-card-body tc-hint py-0">Payments to suppliers whose code is withheld on payment that had nothing withheld, or not all of it, with the reason each keeps. Check each reason is backed by your records, such as the supplier's statement.</p>
+      <table class="tc-table">
+        <thead><tr><th>Date</th><th>Payee</th><th class="tc-num">Paid</th><th>Why nothing was withheld</th></tr></thead>
+        <tbody>
+          <% @report.not_withheld.each do |payment| %>
+            <tr data-not-withheld-row><td class="whitespace-nowrap"><%= link_to tc_date(payment.paid_on), payment_path(payment), class: "underline" %></td>
+              <td><%= payment.contact.name %></td><td class="tc-num"><%= tc_money(payment.amount) %></td>
+              <td class="<%= "tc-negative" if payment.not_withheld_reason == "No reason given" %>"><%= payment.not_withheld_reason %></td></tr>
+          <% end %>
+        </tbody>
+      </table>
+    </section>
+  <% end %>
   <%= render "withholding_checks", report: @report, direction: "from_supplier" %>
 <% end %>

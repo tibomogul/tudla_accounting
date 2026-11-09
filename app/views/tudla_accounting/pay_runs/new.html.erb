@@ -29,9 +29,11 @@
         <% @bills.group_by(&:contact).each do |supplier, bills| %>
           <tbody data-supplier="<%= supplier.name %>">
             <tr><th colspan="6" class="text-left"><%= supplier.name %><span class="tc-muted font-normal"> · <%= tc_money(bills.sum(Money.new(0, @currency), &:amount_due)) %> owed<%= " · no email address" unless supplier.email %></span>
-              <% if (code = supplier.payment_withholding_code) %><span class="tc-muted font-normal" data-withholding> ·
+              <% decision = TudlaAccounting::PaymentWithholding.new(supplier, bills.map { |bill| { document: bill, amount_cents: bill.amount_due.cents } }) %>
+              <% if (code = decision.code) %><span class="tc-muted font-normal" data-withholding> ·
                 <label class="inline-flex items-center gap-1"><%= hidden_field_tag "pay_run[withhold][#{supplier.id}]", "0", id: nil %><%= check_box_tag "pay_run[withhold][#{supplier.id}]", "1", !@skipped.include?(supplier.id), id: nil %>
-                  withhold <%= code.label %> from what is paid</label></span><% end %></th></tr>
+                  withhold <%= code.label %> from what is paid</label></span><% end %>
+              <% if decision.reason %><span class="tc-muted font-normal" data-not-withheld> · nothing withheld<%= " from some" if code %>: <%= decision.reason.downcase_first %></span><% end %></th></tr>
             <% bills.each do |bill| %>
               <tr data-bill>
                 <td><%= hidden_field_tag "pay_run[pay][#{bill.id}]", "0", id: nil %><%= check_box_tag "pay_run[pay][#{bill.id}]", "1", @selected.include?(bill.id), aria: { label: "Pay #{bill.number_label}" } %></td>

@@ -39,6 +39,11 @@ module TudlaAccounting
   #                   withholdings: [ { code: noabn, base_cents: 1_000_00 } ],
   #                   applications: [ { document: bill, amount_cents: 1_000_00 } ])
   #
+  # A payment to a supplier whose code is withheld on payment that has nothing withheld
+  # from it, or not all of it, keeps not_withheld_reason, for the records the ATO asks for:
+  # the reason given, or else PaymentWithholding's (the supplier's exemption, or a supply
+  # under the code's limit), or else "No reason given".
+  #
   #   Payment.record!(organization:, kind: "received", contact: northwind, account: bank,
   #                   paid_on: Date.current, amount_cents: 11_000_00,
   #                   withholdings: [ { code: wc120, withheld_cents: 200_00 } ],
@@ -107,6 +112,7 @@ module TudlaAccounting
       payment = new(attributes)
       payment.refund_of = refund_of
       payment.withholdings = withholdings
+      payment.explain_withholding(applications)
       transaction(requires_new: true) do
         payment.save!
         payment.post!(applications)
@@ -115,6 +121,19 @@ module TudlaAccounting
       payment
     rescue ActiveRecord::RecordInvalid => e
       raise ArgumentError, e.record.errors.full_messages.to_sentence
+    end
+
+    # Sets not_withheld_reason for a payment to a supplier whose code is withheld on payment,
+    # as the class comment says, and clears it for any other.
+    def explain_withholding(applications)
+      self.not_withheld_reason = not_withheld_reason.to_s.squish.truncate(255).presence
+      return self.not_withheld_reason = nil unless kind == "paid" && contact&.payment_withholding_code
+      return if not_withheld_reason || withholdings.present?
+
+      unapplied = [ amount_cents.to_i - applications.sum { |application| application.fetch(:amount_cents).to_i }, 0 ].max
+      unrated = unapplied.positive? && account&.currency.present? && account.currency != organization&.currency && !exchange_rate # can't be judged against the limit
+      decision = PaymentWithholding.new(contact, applications, unapplied_cents: unrated ? 0 : unapplied, exchange_rate: exchange_rate)
+      self.not_withheld_reason = decision.code || unrated || !decision.reason ? "No reason given" : decision.reason.truncate(255)
     end
 
     def self.kinds_for(side) = KINDS.select { |_kind, about| about[:side] == side.to_sym }.keys

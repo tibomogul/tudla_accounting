@@ -56,6 +56,7 @@ module TudlaAccounting
       def contact_json(contact)
         contact.slice(:id, :name, :kind, :email, :phone, :address, :postal_code, :tax_number, :payment_terms_days, :currency, :notes)
           .merge(default_account_code: contact.default_account&.code, default_tax_code: contact.default_tax_code&.code, default_withholding_code: contact.default_withholding_code&.code, active: contact.active?, taxable_payments: contact.taxable_payments?,
+                 withholding_exemption: contact.withholding_exemption, withholding_statement_on: date(contact.withholding_statement_on),
                  created_at: time(contact.created_at), updated_at: time(contact.updated_at))
       end
 
@@ -111,7 +112,7 @@ module TudlaAccounting
               entry_id: (target.is_a?(Entry) ? target.id : target.entry_id), amount: amount(applied), applied_at: time(allocation.allocated_at), active: allocation.active? }
           end,
           refund_of: payment.refund_of&.then { |credit| credit.is_a?(Payment) ? { payment_id: credit.id } : { document_id: credit.id } },
-          taxable_payment: payment.taxable_payment, withheld: amount(payment.withheld), withheld_taxes: payment.withheld_taxes.reject(&:reversal).sort_by(&:id).map { |row| withheld_tax_json(row) },
+          taxable_payment: payment.taxable_payment, not_withheld_reason: payment.not_withheld_reason, withheld: amount(payment.withheld), withheld_taxes: payment.withheld_taxes.reject(&:reversal).sort_by(&:id).map { |row| withheld_tax_json(row) },
           voided_on: date(payment.voided_on), void_reason: payment.void_reason, created_at: time(payment.created_at), updated_at: time(payment.updated_at) }
       end
 
@@ -137,7 +138,7 @@ module TudlaAccounting
 
       def withholding_code_json(code)
         { id: code.id, code: code.code, name: code.name, rate: code.rate.to_s("F"), payable_account_code: code.payable_account&.code, creditable_account_code: code.creditable_account&.code,
-          withheld_on: code.withheld_on, active: code.active? }
+          withheld_on: code.withheld_on, exempt_up_to: code.exempt_up_to && amount(code.exempt_up_to), active: code.active? }
       end
 
       def period_json(period)

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_09_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_09_200000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -269,6 +269,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_100000) do
     t.string "tax_number"
     t.boolean "taxable_payments", default: false, null: false
     t.datetime "updated_at", null: false
+    t.string "withholding_exemption"
+    t.date "withholding_statement_on"
     t.index ["default_account_id"], name: "index_tudla_accounting_contacts_on_default_account"
     t.index ["default_tax_code_id"], name: "index_tudla_accounting_contacts_on_default_tax_code"
     t.index ["default_withholding_code_id"], name: "index_tudla_accounting_contacts_on_default_withholding_code"
@@ -502,6 +504,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_100000) do
     t.decimal "exchange_rate", precision: 24, scale: 8
     t.string "idempotency_key"
     t.string "kind", null: false
+    t.string "not_withheld_reason"
     t.text "notes"
     t.bigint "organization_id", null: false
     t.string "organization_type", null: false
@@ -727,6 +730,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_100000) do
     t.string "code", null: false
     t.datetime "created_at", null: false
     t.bigint "creditable_account_id"
+    t.bigint "exempt_up_to_cents"
     t.string "name", null: false
     t.bigint "organization_id", null: false
     t.string "organization_type", null: false

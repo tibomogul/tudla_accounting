@@ -64,9 +64,9 @@ module TudlaAccounting
       line.unit_price_cents.to_i.positive? ? tc_amount_field(line.unit_price) : ""
     end
 
-    # The code withheld from a payment of an open bill (see Contact#payment_withholding_code).
+    # The code withheld from a payment of what is owed on an open bill (see PaymentWithholding).
     def payment_withholding_code_for(document)
-      document.contact.payment_withholding_code if document.purchases?
+      PaymentWithholding.new(document.contact, [ { document: document, amount_cents: document.amount_due.cents } ]).code if document.purchases?
     end
 
     # The cash that pays off an open document: what is owed, less any tax withheld on payment.

@@ -182,7 +182,7 @@ Grouped in the suggested order. Items marked **(decide)** need a decision before
 ### Withholding, smaller items
 
 - [x] Let a pay run skip withholding for one supplier. A box beside the supplier; `skip_withholding` in `PayRun.call` and the API.
-- [ ] **(decide)** Whether the no-ABN code should skip small payments, once the ATO threshold rules are confirmed.
+- [x] **(decide)** Whether the no-ABN code should skip small payments, once the ATO threshold rules are confirmed. Yes, from the ATO pages the user supplied: a code's `exempt_up_to` (75.00 in the no-ABN template), judged on each bill's total before tax; a contact's `withholding_exemption` for the ATO's other exceptions; and `Payment#not_withheld_reason`, kept on every payment made without the tax and listed on the payee report.
 - [x] Let the withholding checks show payments to the tax office as expected, rather than as a difference. A "Paid to the tax authority" (or "Claimed against tax due") figure; reversals of withholding entries don't count in it.
 
 ### Not code: confirm with an adviser or the tax office

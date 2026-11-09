@@ -10,7 +10,8 @@ module TudlaAccounting
   # withheld_on says when tax is withheld from a supplier: on approval of their bill (a
   # bill line's code, as in the Philippines), or on payment (a supplier payment's
   # withholdings, as for Australia's no-ABN withholding). A code withheld on payment is for
-  # suppliers only.
+  # suppliers only, and can have exempt_up_to: a supply of that much or less before tax, in
+  # the organization's currency, isn't withheld from (see PaymentWithholding).
   class WithholdingCode < ApplicationRecord
     include PercentRate
 
@@ -27,6 +28,10 @@ module TudlaAccounting
     validates :code, uniqueness: { scope: %i[organization_type organization_id] }
     validates :rate, numericality: { greater_than: 0, less_than: 1 }
     validates :withheld_on, inclusion: { in: WITHHELD_ON.keys }
+    validates :exempt_up_to_cents, numericality: { only_integer: true, greater_than: 0 }, allow_nil: true
+    validate { errors.add(:exempt_up_to, "is only for a code withheld when the supplier is paid") if exempt_up_to_cents && !on_payment? }
+    attr_accessor :exempt_up_to_problem # why the limit typed couldn't be read
+    validate { errors.add(:exempt_up_to, exempt_up_to_problem) if exempt_up_to_problem }
     validate :accounts_fit
     validate :unchanged_once_posted, on: :update
     before_destroy :ensure_unused, prepend: true
@@ -40,6 +45,9 @@ module TudlaAccounting
     scope :on_payment, -> { where(withheld_on: "payment") }
 
     def on_payment? = withheld_on == "payment"
+
+    # The supply at or under which nothing is withheld, in the organization's currency, or nil.
+    def exempt_up_to = exempt_up_to_cents && Money.new(exempt_up_to_cents, organization.currency)
 
     # The tax on base_cents at this code's rate, rounded to the cent the configured way.
     def withheld_cents(base_cents)

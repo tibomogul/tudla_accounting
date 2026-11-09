@@ -17,9 +17,12 @@
                  choices: [ [ "None", "" ] ] + postable_account_choices(creditable_accounts, selected: form.object.creditable_account_id),
                  hint: "The asset it is claimed from" %>
   </div>
-  <div class="max-w-sm">
-    <%= tc_field form, :withheld_on, as: :select, label: "When it is withheld from suppliers", choices: TudlaAccounting::WithholdingCode::WITHHELD_ON.invert.to_a,
-                 hint: "On approval, it goes on bill lines; on payment, on the payment (no-ABN withholding), for suppliers only" %>
+  <div class="grid gap-4 sm:grid-cols-3">
+    <div class="sm:col-span-2"><%= tc_field form, :withheld_on, as: :select, label: "When it is withheld from suppliers", choices: TudlaAccounting::WithholdingCode::WITHHELD_ON.invert.to_a,
+                 hint: "On approval, it goes on bill lines; on payment, on the payment (no-ABN withholding), for suppliers only" %></div>
+    <%= tc_field form, :exempt_up_to, label: "Nothing withheld up to (#{accounting_organization.currency})", inputmode: "decimal",
+                 value: params.dig(:withholding_code, :exempt_up_to) || (withholding_code.exempt_up_to && tc_amount_field(withholding_code.exempt_up_to)),
+                 hint: "Withheld on payment only: a bill of this much or less before tax isn't withheld from (75.00 for no-ABN withholding)" %>
   </div>
   <label class="flex items-center gap-2 text-sm"><%= form.check_box :active %> Active (offered for new bills and payments)</label>
   <div class="flex flex-wrap gap-2">

@@ -42,7 +42,7 @@ module TudlaAccounting
       "au_no_abn" => {
         country: "AU",
         title: "Australia: PAYG withholding where no ABN is quoted",
-        codes: [ { code: "NOABN", name: "No ABN quoted", rate: BigDecimal("0.47"), withheld_on: "payment" } ]
+        codes: [ { code: "NOABN", name: "No ABN quoted", rate: BigDecimal("0.47"), withheld_on: "payment", exempt_up_to_cents: 75_00 } ]
       }
     }.freeze
 

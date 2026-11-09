@@ -30,7 +30,8 @@
     <% { "Email" => (@contact.email && mail_to(@contact.email, class: "underline")), "Phone" => @contact.phone, "Tax number" => @contact.tax_number,
          "Payment terms" => (@contact.payment_terms_days && "#{@contact.payment_terms_days} days"), "Currency" => @contact.currency, "Default account" => @contact.default_account&.code_with_name,
          "Default tax code" => @contact.default_tax_code&.label, **(@contact.default_withholding_code ? { "Default withholding code" => @contact.default_withholding_code.label } : {}),
-         **(@contact.taxable_payments? ? { "Taxable payments" => "Reported" } : {}) }.each do |label, value| %>
+         **(@contact.taxable_payments? ? { "Taxable payments" => "Reported" } : {}),
+         **(@contact.withholding_exemption ? { "Not withheld from" => @contact.withholding_exemption_reason } : {}) }.each do |label, value| %>
       <div class="flex justify-between gap-4"><span class="tc-muted"><%= label %></span><span class="text-right"><%= value || "—" %></span></div>
     <% end %>
     <% if @contact.full_address %><div><p class="tc-muted">Address</p><p class="whitespace-pre-line"><%= @contact.full_address %></p></div><% end %>

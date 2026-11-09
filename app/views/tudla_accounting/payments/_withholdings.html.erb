@@ -1,4 +1,4 @@
-<%# locals: (codes:, contact:, currency:, cash_follows_tax: false, received: true, start: nil) %>
+<%# locals: (codes:, contact:, currency:, cash_follows_tax: false, received: true, start: nil, not_withheld: nil) %>
 <%# The tax withheld from a payment: by a customer, as their certificate says (three rows, for
     a payment covering more than one kind of income), or by us from a supplier, under a
     code withheld on payment (one row), the tax worked out from the amount as it's typed. %>
@@ -28,6 +28,9 @@
     <p class="tc-card-body tc-hint">Type the tax as the customer's certificate gives it. Leave the income blank to work it out from the code's rate. The cash and the tax together can be applied to invoices; what's left of the cash can be refunded, the tax can't.<%= " The cash received comes down by the tax as you type it, unless you've changed the cash yourself." if cash_follows_tax %></p>
   <% else %>
     <% no_abn = TudlaAccounting::Jurisdictions.on?(accounting_organization, :payee_payments) %>
-    <p class="tc-card-body tc-hint" data-withholding-hint><%= no_abn ? "For a supplier who hasn't quoted an ABN by the time you pay." : "For tax withheld from the supplier when you pay them." %> Type what the tax is withheld from (the amount you're settling); the tax is worked out at the code's rate, or type it yourself. The cash and the tax together settle their bills, and the tax goes to the code's account, to pay <%= no_abn ? "the ATO" : "the tax office" %>.<%= " The cash paid comes down by the tax as it's worked out, unless you've changed the cash yourself." if cash_follows_tax %><%= " Leave it blank if they've quoted an ABN." if no_abn %></p>
+    <p class="tc-card-body tc-hint" data-withholding-hint><%= no_abn ? "For a supplier who hasn't quoted an ABN by the time you pay." : "For tax withheld from the supplier when you pay them." %> Type what the tax is withheld from (the amount you're settling); the tax is worked out at the code's rate, or type it yourself. The cash and the tax together settle their bills, and the tax goes to the code's account, to pay <%= no_abn ? "the ATO" : "the tax office" %>.<%= " The cash paid comes down by the tax as it's worked out, unless you've changed the cash yourself." if cash_follows_tax %><%= " Leave it blank if they've quoted an ABN, or for a supply of the code's limit or less, such as $75 before GST." if no_abn %></p>
+    <div class="tc-card-body pt-0 space-y-1"><%= label_tag "payment_not_withheld_reason", "If nothing is withheld, why", class: "tc-label" %>
+      <%= text_field_tag "payment[not_withheld_reason]", params.dig(:payment, :not_withheld_reason) || not_withheld, id: "payment_not_withheld_reason", maxlength: 255, class: "tc-input" %>
+      <p class="tc-hint" data-not-withheld-hint>Kept on the payment as the reason. Left blank, it's the supplier's exemption or a supply under the limit when either applies, or else "No reason given".</p></div>
   <% end %>
 </div>

@@ -44,7 +44,8 @@ module TudlaAccounting
     # Records the line as a payment of an open invoice (money in) or bill (money out), as
     # far as it is owed, the rest a credit for the contact, and matches it. A supplier whose
     # tax is withheld on payment (Contact#payment_withholding_code) was paid the line's
-    # amount after the tax, so the bill is settled by both.
+    # amount after the tax, so the bill is settled by both, unless PaymentWithholding says
+    # nothing is withheld (an exempt supplier, or a bill under the code's limit).
     def record_payment
       document = organization_scope(Document).approved.find(params.require(:document_id))
       raise ArgumentError, "Choose #{@line.amount_cents.positive? ? 'an invoice' : 'a bill'}" unless document.kind == (@line.amount_cents.positive? ? "sales_invoice" : "bill")
@@ -65,7 +66,7 @@ module TudlaAccounting
     # The tax withheld from a supplier paid cash_cents for a bill, under its code withheld
     # on payment: from the amount the cash is that amount less the tax of.
     def withheld_from(document, cash_cents)
-      code = (document.contact.payment_withholding_code if document.purchases?) or return []
+      code = (PaymentWithholding.new(document.contact, [ { document: document, amount_cents: cash_cents } ]).code if document.purchases?) or return []
 
       base, withheld = code.split_cash(cash_cents)
       [ { code: code, base_cents: base, withheld_cents: withheld } ]

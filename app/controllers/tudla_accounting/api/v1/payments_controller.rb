@@ -10,6 +10,8 @@ module TudlaAccounting
       # { document_id } (a credit note). A customer's payment can list the tax they withheld,
       # and a payment to a supplier the tax withheld under a code withheld on payment:
       # withholdings [{ code, withheld, base }], either worked out from the other at the rate.
+      # A payment to a supplier made without the tax can say why (not_withheld_reason); see
+      # Payment.
       class PaymentsController < BaseController
         include Representation
 
@@ -43,7 +45,7 @@ module TudlaAccounting
           payment = Payment.record!(organization: accounting_organization, kind: body[:kind].to_s, contact: contact_by_id(body[:contact_id]),
                                     account: account, paid_on: date_param(:paid_on) || raise(ArgumentError, "paid_on is missing"),
                                     amount_cents: cents(body[:amount], "amount", currency: currency), reference: body[:reference], notes: body[:notes],
-                                    exchange_rate: body[:exchange_rate].presence && decimal(body[:exchange_rate], "exchange_rate"),
+                                    not_withheld_reason: body[:not_withheld_reason], exchange_rate: body[:exchange_rate].presence && decimal(body[:exchange_rate], "exchange_rate"),
                                     idempotency_key: idempotency_key, applications: applications, refund_of: refund_of, withholdings: withholdings(currency))
           render_made(payment_json(payment))
         rescue ActiveRecord::RecordNotUnique

@@ -5,7 +5,7 @@ require "csv"
 # of last year closed, a bank statement for the operating account, recurring entries,
 # this year's budget, customers with invoices on account and their payments (the engine's
 # contacts, invoices and payments) and a recurring invoice, a supplier's bills, GST-free sales, equipment bills, a payroll
-# with tax withheld, a supplier with no ABN paid with tax withheld, an electrician, both on the TPAR, and a BAS with last quarter's filed. Returns the organization; running it again returns the existing one, only
+# with tax withheld, a supplier with no ABN paid with tax withheld and a florist with none paid $40 a week without it, an electrician, both on the TPAR, and a BAS with last quarter's filed. Returns the organization; running it again returns the existing one, only
 # adding the years' periods up to this one if the year has turned since it was seeded.
 #
 # The name is the demo's identity: an organization someone else names "Demo Co" is
@@ -320,6 +320,20 @@ class Demo::Seeder
 
       TudlaAccounting::Payment.record!(organization: organization, kind: "paid", contact: gardener, account: accounts["1011"], paid_on: date + 3, reference: "EFT GG-#{index + 1}",
                                        amount_cents: 530_00, withholdings: [ { code: noabn, base_cents: 1_000_00 } ], applications: [ { document: bill, amount_cents: 1_000_00 } ])
+    end
+    add_florist(noabn)
+  end
+
+  # A florist with no ABN either, delivering flowers each week of last October for $40:
+  # separate supplies under NOABN's $75, so nothing is withheld, and each payment says so.
+  def add_florist(noabn)
+    florist = TudlaAccounting::Contact.create!(organization: organization, name: "Corner Florist", kind: "supplier", default_account: accounts["6050"], default_withholding_code: noabn)
+    4.times do |week|
+      date = Date.new(years.first, 10, 1) + (week * 7)
+      bill = TudlaAccounting::Document.create!(organization: organization, kind: "bill", contact: florist, issued_on: date, due_on: date, reference: "CF-#{week + 1}",
+                                               lines_attributes: [ { description: "Flowers for the front counter", quantity: 1, unit_price_cents: 40_00, account: accounts["6050"] } ]).approve!
+      TudlaAccounting::Payment.record!(organization: organization, kind: "paid", contact: florist, account: accounts["1011"], paid_on: date, reference: "EFT CF-#{week + 1}",
+                                       amount_cents: 40_00, applications: [ { document: bill, amount_cents: 40_00 } ])
     end
   end
 
