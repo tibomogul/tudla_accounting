@@ -2,7 +2,7 @@
 <% list_path = received ? received_payments_path : paid_payments_path %>
 <%= tc_page_header (received ? "Payments received" : "Payments made"), subtitle: (received ? "From customers" : "To suppliers") do %>
   <%= link_to (received ? "Sales" : "Purchases"), (received ? sales_documents_path : purchase_documents_path), class: "tc-btn tc-btn-ghost" %>
-  <% if received && payment_withholding_codes.any? %><%= link_to "Tax certificates", withholding_certificates_path, class: "tc-btn tc-btn-ghost" %><% end %>
+  <% if received && payment_withholding_codes.any? && TudlaAccounting::Jurisdictions.on?(accounting_organization, :customer_certificates) %><%= link_to "Tax certificates", withholding_certificates_path, class: "tc-btn tc-btn-ghost" %><% end %>
   <% query = request.query_parameters.to_query.presence %>
   <%= link_to "Download CSV", "#{list_path}.csv#{"?#{query}" if query}", class: "tc-btn tc-btn-ghost", data: { turbo: false } %>
   <% if tc_can?(:post) %><%= link_to "Record a payment", new_payment_path(kind: @kind), class: "tc-btn" %><% end %>

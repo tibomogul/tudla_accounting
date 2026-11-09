@@ -6,6 +6,7 @@ module TudlaAccounting
     Group = Data.define(:contact, :quarter, :rows)
 
     permits :post, only: %i[mark unmark mark_all]
+    for_country :customer_certificates, only: %i[index mark unmark mark_all]
 
     def index
       @show = params[:show].presence_in(%w[received all]) || "waiting"

@@ -130,6 +130,34 @@ RSpec.describe "Tax customers withhold from payments", type: :request do
   describe "the certificates page" do
     let(:other) { TudlaAccounting::Contact.create!(organization: organization, name: "Acme", kind: "customer") }
 
+    it "is only for books in the Philippines, or with no country" do
+      payment = receive
+      headers = { "Authorization" => "Bearer #{TudlaAccounting::ApiToken.issue!(organization: organization, name: "Shop", permissions: %w[read post]).last}" }
+      TudlaAccounting.configuration.country = "AU"
+      get routes.withholding_certificates_path
+      expect(response).to have_http_status(:not_found)
+      post routes.mark_withholding_certificate_path(rows.sole), params: { on: "2026-04-10" }
+      expect(response).to have_http_status(:not_found)
+      post "#{routes.api_v1_payments_path.delete_suffix('/payments')}/withheld_taxes/#{rows.sole.id}/certificate", params: { on: "2026-04-10" }, headers: headers
+      expect(response).to have_http_status(:not_found)
+      get routes.payment_path(payment)
+      expect(text("[data-withheld-taxes] thead th")).not_to include("Certificate")
+      expect(css_select("[data-certificate]")).to be_empty
+      get routes.received_payments_path
+      expect(css_select("a").map(&:text)).not_to include("Tax certificates")
+      expect(rows.sole.certificate_received_on).to be_nil
+
+      TudlaAccounting.configuration.country = "PH"
+      get routes.withholding_certificates_path
+      expect(response).to have_http_status(:ok)
+      get routes.payment_path(payment)
+      expect(css_select("[data-certificate=waiting]").size).to eq(1)
+      get routes.received_payments_path
+      expect(css_select("a").map(&:text)).to include("Tax certificates")
+      post "#{routes.api_v1_payments_path.delete_suffix('/payments')}/withheld_taxes/#{rows.sole.id}/certificate", params: { on: "2026-04-10" }, headers: headers
+      expect(response).to have_http_status(:ok)
+    end
+
     it "lists what is waiting by customer and quarter, oldest first, and filters" do
       get routes.withholding_certificates_path
       expect(response.body).to include("No certificates to chase.")

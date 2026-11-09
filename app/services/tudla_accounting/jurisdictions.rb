@@ -14,6 +14,7 @@ module TudlaAccounting
       books_of_accounts: "PH",   # the books report and its sample
       summary_lists: "PH",       # the SLSP reports, and TaxCode#purchase_type's field
       withholding_reports: "PH", # the withholding summary, QAP, SAWT and 2307s
+      customer_certificates: "PH", # marking customers' 2307s received, and the list to chase (the SAWT lists what's marked)
       # Australia (the ATO)
       payee_payments: "AU",      # the payee list and its payment summaries
       taxable_payments: "AU"     # the TPAR, and Contact#taxable_payments's field

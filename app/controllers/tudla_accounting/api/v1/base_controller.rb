@@ -27,6 +27,13 @@ module TudlaAccounting
         before_action :limit_rate
         before_action :authorize
 
+        # Actions that belong to one country (a Jurisdictions feature): not found for books
+        # of another country.
+        def self.for_country(feature, only:)
+          Jurisdictions.country(feature)
+          before_action(only: only) { raise ActiveRecord::RecordNotFound unless Jurisdictions.on?(accounting_organization, feature) }
+        end
+
         rescue_from ActiveRecord::RecordNotFound do
           error(:not_found, "Not found", :not_found)
         end
