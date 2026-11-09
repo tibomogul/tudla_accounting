@@ -1,6 +1,11 @@
 # Browser specs (type: :system) run in headless Chrome inside the container.
 # Buttons and fields can be found by their aria-label too, as assistive tech finds them.
 Capybara.enable_aria_label = true
+# Some steps make a lot (loading a chart of 83 accounts with opening balances takes over a
+# second here), and CI's machines are slower: Capybara's 2 seconds left the usage guide's
+# chart upload still on the Setup page in CI. Waits end as soon as the page is right, so
+# passing specs don't run longer.
+Capybara.default_max_wait_time = 10
 
 RSpec.configure do |config|
   config.before(:each, type: :system) do
