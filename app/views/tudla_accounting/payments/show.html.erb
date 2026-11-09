@@ -35,6 +35,7 @@
     <% else %>
       <% details["Not applied yet"] = (tc_money_text(@payment.unapplied) unless @payment.void?) %>
     <% end %>
+    <% details["Taxable payments report"] = "Reported" if @payment.taxable_payment? %>
     <% details.each do |label, value| %>
       <div class="flex justify-between gap-4"><span class="tc-muted"><%= label %></span><span class="text-right"><%= value || "—" %></span></div>
     <% end %>

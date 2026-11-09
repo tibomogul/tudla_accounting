@@ -80,6 +80,8 @@ module TudlaAccounting
       when "contact.created" then safe_join([ "Added the contact ", subject ])
       when "contact.updated" then safe_join([ "Changed the contact ", subject, ": #{details.fetch('changes', {}).keys.map(&:humanize).join(', ').downcase}" ])
       when "contact.deleted" then safe_join([ "Deleted the contact ", subject ])
+      when "contact.taxable_payments_marked"
+        safe_join([ "#{details['taxable_payments'] ? 'Marked' : 'Unmarked'} #{pluralize(details['payments'], 'payment')} to ", subject, " since #{tc_date(details['from'])} for the taxable payments report" ])
       when "document.created" then safe_join([ "Drafted ", subject ])
       when "document.updated" then safe_join([ "Changed ", subject, ": #{details.fetch('changes', {}).keys.map { |key| key.delete_suffix('_cents').humanize }.join(', ').downcase}" ])
       when "document.deleted" then safe_join([ "Deleted ", subject ])

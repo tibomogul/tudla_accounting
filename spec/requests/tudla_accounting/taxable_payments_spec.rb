@@ -116,6 +116,37 @@ RSpec.describe "Taxable payments, by payee", type: :request do
       expect(cells("tr[data-payee-row]")).to eq([ "51 824 753 556 | Bricks & Co | 1 Main St 2000 | 0 | 110.00 | 10.00 | 0.00" ])
     end
 
+    it "keeps each payment's mark from when it was made, and re-marks those since a date on request" do
+      before = pay(builder, Date.new(2025, 3, 10), 1_000_00)
+      builder.update!(taxable_payments: false)
+      after = pay(builder, Date.new(2025, 9, 10), 400_00)
+      refund = TudlaAccounting::Payment.record!(organization: organization, kind: "supplier_refund", contact: builder, account: account("1010"), paid_on: Date.new(2025, 9, 20),
+                                                amount_cents: 100_00, refund_of: before)
+      expect([ before, after, refund ].map(&:taxable_payment)).to eq([ true, false, false ])
+
+      get routes.reports_path
+      expect(text("a .font-semibold")).to include("Taxable payments, by payee") # a marked payment is enough
+      get routes.reports_taxable_payments_path
+      expect(cells("tr[data-payee-row]")).to eq([ "51 824 753 556 | Bricks & Co | 1 Main St 2000 | 1 | 1,000.00 | 0.00 | 0.00" ])
+      get routes.payment_path(before)
+      expect(css_select("[data-details]").sole.text.squish).to include("Taxable payments reportReported")
+      get routes.payment_path(after)
+      expect(css_select("[data-details]").sole.text.squish).not_to include("Taxable payments report")
+
+      patch routes.contact_path(builder), params: { contact: { taxable_payments: "1", taxable_payments_from: "2025-07-01" } }
+      expect([ before, after, refund ].map { |payment| payment.reload.taxable_payment }).to eq([ true, true, true ])
+      expect(TudlaAccounting::AuditEvent.where(action: "contact.taxable_payments_marked").sole.details).to eq("taxable_payments" => true, "from" => "2025-07-01", "payments" => 2)
+      get routes.activity_path
+      expect(response.body).to include("Marked 2 payments to")
+      expect(css_select("li, tr").map { |row| row.text.squish }.join("\n")).to include("Bricks & Co since 1 Jul 2025 for the taxable payments report")
+      get routes.reports_taxable_payments_path
+      expect(cells("tr[data-payee-row]")).to eq([ "51 824 753 556 | Bricks & Co | 1 Main St 2000 | 2 | 1,300.00 | 0.00 | 0.00" ])
+
+      patch routes.contact_path(builder), params: { contact: { taxable_payments: "0", taxable_payments_from: "" } }
+      expect([ before, after, refund ].map { |payment| payment.reload.taxable_payment }).to eq([ true, true, true ])
+      expect(TudlaAccounting::AuditEvent.where(action: "contact.taxable_payments_marked").count).to eq(1)
+    end
+
     it "takes no more queries for more payments" do
       count = lambda do
         queries = 0

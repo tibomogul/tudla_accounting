@@ -18,7 +18,7 @@ module TudlaAccounting
       @summary_lists = Jurisdictions.on?(accounting_organization, :summary_lists)
       @withholding = Jurisdictions.on?(accounting_organization, :withholding_reports) && organization_scope(WithholdingCode).exists?
       @withheld_on_payment = Jurisdictions.on?(accounting_organization, :payee_payments) && organization_scope(WithholdingCode).on_payment.exists?
-      @taxable_payments = Jurisdictions.on?(accounting_organization, :taxable_payments) && organization_scope(Contact).where(taxable_payments: true).exists?
+      @taxable_payments = Jurisdictions.on?(accounting_organization, :taxable_payments) && Reports::TaxablePayments.any_marked?(accounting_organization)
     end
 
     def balance_sheet
@@ -102,7 +102,7 @@ module TudlaAccounting
       respond_with_table("payee-payments-#{span_name}") { Reports::Tables.payee_payments(@report) }
     end
 
-    # What was paid to the contacts marked taxable_payments, by payee, over a run of months
+    # What was paid in the payments marked taxable_payment, by payee, over a run of months
     # (the last financial year by default), for a taxable payments report such as the TPAR.
     def taxable_payments
       return respond_with_table("taxable-payments") unless month_range(last_year: true)

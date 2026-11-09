@@ -61,6 +61,10 @@ module TudlaAccounting
       "supplier_refund" => { label: "Refund from supplier", role: :supplier_refund, side: :purchases, money_in: true }
     }.freeze
     STANDING = %w[status entry_id voided_on void_reason updated_at].freeze
+    # The kinds that go on a taxable payments report: each is marked taxable_payment when made
+    # if its contact is marked then (Contact#taxable_payments), so the report for a year
+    # stays as it was when the contact's mark changes later.
+    TAXABLE_KINDS = %w[paid supplier_refund].freeze
 
     include OrganizationOwned
     belongs_to :contact, class_name: "TudlaAccounting::Contact"
@@ -86,6 +90,7 @@ module TudlaAccounting
     before_validation(on: :create) do
       self.currency = account&.currency # its account's
       settle_currency(paid_on)
+      self.taxable_payment = kind.in?(TAXABLE_KINDS) && contact&.taxable_payments? || false
     end
     before_destroy { throw :abort } # a payment is voided, never deleted
 

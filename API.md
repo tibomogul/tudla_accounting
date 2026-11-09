@@ -131,10 +131,10 @@ end
 { "id": 5, "kind": "received", "status": "posted", "contact": { "id": 3, "name": "Northwind" }, "account_code": "1000",
   "paid_on": "2026-04-10", "currency": "AUD", "amount": "300.00", "unapplied": "100.00", "reference": "EFT 1", "notes": null, "entry_id": 90,
   "applied": [ { "document_id": 7, "number": "INV-0001", "payment_id": null, "entry_id": 81, "amount": "200.00", "applied_at": "...", "active": true } ],
-  "refund_of": null, "voided_on": null, "void_reason": null, "created_at": "...", "updated_at": "..." }
+  "refund_of": null, "taxable_payment": false, "voided_on": null, "void_reason": null, "created_at": "...", "updated_at": "..." }
 ```
 
-`unapplied` is the credit the contact still has from it. An application taken off again (the payment voided, say) has `"active": false`. What was refunded of it is listed in `applied` with the refund's `payment_id`. A refund has `refund_of`, `{ "payment_id": 5 }` or `{ "document_id": 9 }` (a credit note), and nothing `applied` or `unapplied`.
+`unapplied` is the credit the contact still has from it. An application taken off again (the payment voided, say) has `"active": false`. What was refunded of it is listed in `applied` with the refund's `payment_id`. A refund has `refund_of`, `{ "payment_id": 5 }` or `{ "document_id": 9 }` (a credit note), and nothing `applied` or `unapplied`. `taxable_payment` says whether a payment to a supplier, or a refund from one, goes on the taxable payments report: its contact's mark when it was made.
 
 ### Recurring invoices
 
@@ -207,7 +207,7 @@ Idempotency-Key: shop-order-1042
 
 ### Contacts
 
-`POST /contacts` and `PATCH /contacts/:id` (`record`) take `name`, `kind` (customer, supplier, both), `email`, `phone`, `address`, `postal_code`, `tax_number`, `payment_terms_days`, `currency`, `notes`, `active`, `taxable_payments` (whether what's paid to them goes on the taxable payments report), `default_account_code`, `default_tax_code` and `default_withholding_code`. A `PATCH` changes only the fields sent; `null` clears one. `currency` (an ISO code) is the one their new invoices and bills start in; it reads as the organization's when none is set, and `null` sets it back to that.
+`POST /contacts` and `PATCH /contacts/:id` (`record`) take `name`, `kind` (customer, supplier, both), `email`, `phone`, `address`, `postal_code`, `tax_number`, `payment_terms_days`, `currency`, `notes`, `active`, `taxable_payments` (whether what's paid to them from now on goes on the taxable payments report; each payment keeps the mark it was made with, as `taxable_payment` on its JSON), `taxable_payments_from` (a date: their payments since then take the mark too), `default_account_code`, `default_tax_code` and `default_withholding_code`. A `PATCH` changes only the fields sent; `null` clears one. `currency` (an ISO code) is the one their new invoices and bills start in; it reads as the organization's when none is set, and `null` sets it back to that.
 
 ### Invoices, bills and credit notes
 
@@ -284,7 +284,7 @@ A bill's `amount` is what is paid of it, all that is owed when not given, in the
 | `sales_list`, `purchases_list` | `from_id`, `thru_id` (this quarter by default): a row per customer or supplier per month, exempt, zero-rated and VATable, purchases split by the tax code's `purchase_type`, with the tax, then the total and any difference from the tax summary. For the Philippines' SLSP; the columns follow RR 16-2005, and the BIR's column order isn't confirmed. |
 | `withholding`, `qap`, `sawt` | `from_id`, `thru_id` (this quarter by default): the tax withheld by code and month, by supplier and code, and by customer and code with certificates received. Their columns aren't from a BIR specification, so check them before filing |
 | `payee_payments` | `from_id`, `thru_id` (the last financial year by default): each payee's gross payments and the tax withheld under codes withheld on payment, with their address, for the year-end report of tax withheld where no ABN was quoted |
-| `taxable_payments` | `from_id`, `thru_id` (the last financial year by default): what was paid to the contacts marked `taxable_payments`, by payee, with the GST in it and the tax withheld, for Australia's TPAR |
+| `taxable_payments` | `from_id`, `thru_id` (the last financial year by default): what was paid in the payments marked `taxable_payment` (made while their contact was marked `taxable_payments`), by payee, with the GST in it and the tax withheld, for Australia's TPAR |
 | `cash_flow` | `from_id`, `thru_id` (the start of the year to this month by default), `method` (direct or indirect); needs the `cash_account_codes` setting |
 
 A period id that isn't one of the organization's gets `404`, and so does another country's report (`withholding`, `qap`, `sawt`, `sales_list` and `purchases_list` are the Philippines', `payee_payments` and `taxable_payments` Australia's) when the `country` setting gives the books a country.

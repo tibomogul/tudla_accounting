@@ -37,7 +37,7 @@ module TudlaAccounting
     budget.created budget.updated budget.deleted
     tax_return_form.created tax_return_form.updated tax_return_form.deleted
     tax_return.filed tax_return.withdrawn
-    contact.created contact.updated contact.deleted
+    contact.created contact.updated contact.deleted contact.taxable_payments_marked
     document.created document.updated document.deleted document.approved document.voided
     document.attachment_added document.attachment_removed
     payment.recorded payment.voided

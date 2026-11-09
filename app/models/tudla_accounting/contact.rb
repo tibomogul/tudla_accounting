@@ -18,6 +18,10 @@ module TudlaAccounting
     belongs_to :default_withholding_code, class_name: "TudlaAccounting::WithholdingCode", optional: true
     has_many :documents, class_name: "TudlaAccounting::Document"
 
+    # A date: on save, its payments made since then (paid and refunds from it) take its
+    # taxable_payments mark too. Without it, the mark applies to payments made from now on.
+    attribute :taxable_payments_from, :date
+
     normalizes :name, with: ->(name) { name.squish }
     normalizes :email, :phone, :postal_code, :tax_number, with: ->(text) { text.strip.presence }
     normalizes :address, :notes, with: ->(text) { text.strip.presence }
@@ -36,6 +40,7 @@ module TudlaAccounting
     after_create { audit("contact.created") }
     after_update { audit("contact.updated", changes: saved_changes.except("created_at", "updated_at")) if saved_changes.except("created_at", "updated_at").any? }
     after_destroy { audit("contact.deleted") }
+    after_save :mark_payments_since, if: :taxable_payments_from
 
     scope :active, -> { where(active: true) }
     scope :customers, -> { where(kind: %w[customer both]) }
@@ -96,6 +101,15 @@ module TudlaAccounting
 
       errors.add(:base, "#{name} has invoices, bills or payments; make it inactive instead")
       throw :abort
+    end
+
+    # Marks (or unmarks) its payments since taxable_payments_from as its own mark is now.
+    def mark_payments_since
+      payments = Payment.where(organization: organization, contact: self, kind: Payment::TAXABLE_KINDS, paid_on: taxable_payments_from..)
+                        .where.not(taxable_payment: taxable_payments?)
+      changed = payments.update_all(taxable_payment: taxable_payments?, updated_at: Time.current)
+      audit("contact.taxable_payments_marked", taxable_payments: taxable_payments?, from: taxable_payments_from.iso8601, payments: changed) if changed.positive?
+      self.taxable_payments_from = nil
     end
 
     def audit(action, **details)

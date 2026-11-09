@@ -27,8 +27,10 @@
                         choices: [ [ "None", "" ] ] + withholding_codes.map { |code| [ "#{code.label} #{code.name}", code.id ] }, hint: "Starts the lines of their bills; none for a supplier nothing is withheld from" %></div>
     <% end %>
     <% if TudlaAccounting::Jurisdictions.on?(accounting_organization, :taxable_payments) || contact.taxable_payments? %>
-    <div class="sm:col-span-4"><label class="flex items-center gap-2 text-sm"><%= form.check_box :taxable_payments %> Report what we pay them as taxable payments</label>
-      <p class="tc-hint">For a contractor whose services go on a taxable payments report, such as Australia's TPAR.</p></div>
+    <div class="sm:col-span-2"><label class="flex items-center gap-2 text-sm"><%= form.check_box :taxable_payments %> Report what we pay them as taxable payments</label>
+      <p class="tc-hint">For a contractor whose services go on a taxable payments report, such as Australia's TPAR. It applies to payments made from now on, so a year already reported stays as it was.</p></div>
+    <div class="sm:col-span-2"><%= tc_field form, :taxable_payments_from, as: :date_field, label: "And to payments already made since",
+                                            hint: "Optional: their payments since this date are marked or unmarked the same way" %></div>
     <% end %>
   </fieldset>
   <div class="tc-card tc-card-body grid gap-4">

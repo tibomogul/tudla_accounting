@@ -12,7 +12,7 @@
     <p class="tc-muted">No contacts are marked for taxable payments yet. Tick "Report what we pay them as taxable payments" on each contractor's contact.</p>
   </div>
 <% else %>
-  <p class="tc-hint mb-4">What was paid to the contacts marked for taxable payments, for Australia's taxable payments annual report (TPAR). The gross paid includes GST and any tax withheld. The GST is each bill's, in proportion to what was paid of it. A refund from them is taken off, with the GST of the credit it paid back. A voided payment or refund counts in the month it was voided.</p>
+  <p class="tc-hint mb-4">What was paid to contractors while their contacts were marked for taxable payments, for Australia's taxable payments annual report (TPAR). Each payment keeps the mark it was made with, so unmarking a contact leaves a year already reported as it was. The gross paid includes GST and any tax withheld. The GST is each bill's, in proportion to what was paid of it. A refund from them is taken off, with the GST of the credit it paid back. A voided payment or refund counts in the month it was voided.</p>
   <% payees = @report.payees %>
   <% { "No ABN for" => payees.select(&:missing_tax_number?), "No address for" => payees.select(&:missing_address?) }.each do |lead, missing| %>
     <% if missing.any? %><div class="tc-alert tc-alert-warning mb-4" role="alert" data-missing><%= lead %> <%= missing.map { |payee| payee.contact.name }.to_sentence %>. Add it on the contact before reporting.</div><% end %>

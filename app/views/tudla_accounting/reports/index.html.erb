@@ -20,7 +20,7 @@
                           [ "Certificates to suppliers (2307)", reports_supplier_certificates_path, "A BIR Form 2307 for each supplier tax was withheld from in a quarter, to print and sign." ],
                           [ "Tax withheld from you (SAWT)", reports_sawt_path, "Each customer's income and tax by code, with certificates received." ] ] : []),
        *(@withheld_on_payment ? [ [ "Payments with tax withheld, by payee", reports_payee_payments_path, "Each supplier's gross payments and the tax withheld when they were paid, for a financial year: for the year-end report and payment summaries." ] ] : []),
-       *(@taxable_payments ? [ [ "Taxable payments, by payee", reports_taxable_payments_path, "What was paid to the contractors marked on their contacts, with the GST and tax withheld, for a financial year: for Australia's TPAR." ] ] : []) ].each do |title, path, description| %>
+       *(@taxable_payments ? [ [ "Taxable payments, by payee", reports_taxable_payments_path, "What was paid to the contractors while marked on their contacts, with the GST and tax withheld, for a financial year: for Australia's TPAR." ] ] : []) ].each do |title, path, description| %>
     <%= link_to path, class: "tc-card tc-card-body block hover:border-[var(--tc-primary)]" do %>
       <p class="font-semibold"><%= title %></p>
       <p class="tc-muted text-sm mt-1"><%= description %></p>

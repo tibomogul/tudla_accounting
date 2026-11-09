@@ -43,6 +43,7 @@ module TudlaAccounting
           attributes[:default_account] = body[:default_account_code].presence && account_by_code(body[:default_account_code], "default_account_code") if body.key?(:default_account_code)
           attributes[:default_tax_code] = body[:default_tax_code].presence && tax_code_by_code(body[:default_tax_code], "default_tax_code") if body.key?(:default_tax_code)
           attributes[:default_withholding_code] = body[:default_withholding_code].presence && withholding_code_by_code(body[:default_withholding_code], "default_withholding_code") if body.key?(:default_withholding_code)
+          attributes[:taxable_payments_from] = date_param(:taxable_payments_from)
           attributes
         end
       end

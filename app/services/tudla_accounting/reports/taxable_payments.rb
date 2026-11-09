@@ -2,8 +2,8 @@
 
 module TudlaAccounting
   module Reports
-    # What was paid over a run of months (normally a financial year) to the contacts marked
-    # taxable_payments, for a taxable payments report such as Australia's TPAR: a row per
+    # What was paid over a run of months (normally a financial year) in the payments marked
+    # taxable_payment (those made while their contact was marked taxable_payments), for a taxable payments report such as Australia's TPAR: a row per
     # payee with the gross paid (cash and any tax withheld, GST included), the GST in it and
     # the tax withheld, in the organization's currency.
     #
@@ -31,7 +31,12 @@ module TudlaAccounting
         @thru = thru
       end
 
-      def any_payees_marked? = Contact.where(organization: organization, taxable_payments: true).exists?
+      # Whether the organization has a contact marked, or a payment marked when it was made.
+      def self.any_marked?(organization)
+        Contact.where(organization: organization, taxable_payments: true).exists? || Payment.where(organization: organization, taxable_payment: true).exists?
+      end
+
+      def any_payees_marked? = self.class.any_marked?(organization)
 
       def payees
         @payees ||= signed_payments.group_by { |payment, _sign| payment.contact }.filter_map do |contact, held|
@@ -53,7 +58,7 @@ module TudlaAccounting
       # +1 for a payment made or a refund voided, -1 for the opposite.
       def signed_payments
         @signed_payments ||= begin
-          scope = Payment.where(organization: organization, kind: %w[paid supplier_refund], contact: Contact.where(organization: organization, taxable_payments: true))
+          scope = Payment.where(organization: organization, kind: Payment::TAXABLE_KINDS, taxable_payment: true)
                          .includes(:contact, :organization, entry: { related: :source })
           made = scope.where(paid_on: range).map { |payment| [ payment, payment.refund? ? -1 : 1 ] }
           made + scope.where(status: "void", voided_on: range).map { |payment| [ payment, payment.refund? ? 1 : -1 ] }

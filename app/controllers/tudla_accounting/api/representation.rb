@@ -111,7 +111,7 @@ module TudlaAccounting
               entry_id: (target.is_a?(Entry) ? target.id : target.entry_id), amount: amount(applied), applied_at: time(allocation.allocated_at), active: allocation.active? }
           end,
           refund_of: payment.refund_of&.then { |credit| credit.is_a?(Payment) ? { payment_id: credit.id } : { document_id: credit.id } },
-          withheld: amount(payment.withheld), withheld_taxes: payment.withheld_taxes.reject(&:reversal).sort_by(&:id).map { |row| withheld_tax_json(row) },
+          taxable_payment: payment.taxable_payment, withheld: amount(payment.withheld), withheld_taxes: payment.withheld_taxes.reject(&:reversal).sort_by(&:id).map { |row| withheld_tax_json(row) },
           voided_on: date(payment.voided_on), void_reason: payment.void_reason, created_at: time(payment.created_at), updated_at: time(payment.updated_at) }
       end
 

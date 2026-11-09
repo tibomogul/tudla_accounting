@@ -151,6 +151,9 @@ RSpec.describe "JSON API: recording in the books", type: :request do
       changed = call(:patch, routes.api_v1_contact_path(data["id"]), { phone: "02 9999 0000", default_tax_code: nil, active: false, currency: "eur", taxable_payments: true })["data"]
       expect(changed).to include("phone" => "02 9999 0000", "default_tax_code" => nil, "default_account_code" => "4000", "active" => false, "email" => "ap@globex.test", "currency" => "EUR", "taxable_payments" => true)
       expect(call(:patch, routes.api_v1_contact_path(data["id"]), { currency: nil })["data"]["currency"]).to eq("AUD")
+      call(:patch, routes.api_v1_contact_path(data["id"]), { taxable_payments: false, taxable_payments_from: "1 July" })
+      expect(json.dig("error", "message")).to eq("Taxable_payments_from must be an ISO 8601 date (YYYY-MM-DD)")
+      expect(call(:patch, routes.api_v1_contact_path(data["id"]), { taxable_payments: false, taxable_payments_from: "2025-07-01" })["data"]["taxable_payments"]).to be(false)
       call(:patch, routes.api_v1_contact_path(data["id"]), { currency: 7 })
       expect(json["error"]).to include("details" => { "currency" => [ "is not a known currency code" ] })
 
@@ -252,7 +255,7 @@ RSpec.describe "JSON API: recording in the books", type: :request do
       code
       data = call(:post, routes.api_v1_payments_path, { kind: "received", contact_id: northwind.id, account_code: "1000", paid_on: "2026-03-20", amount: "980.00",
                                                         withholdings: [ { code: "WC160", withheld: "20.00" } ] })["data"]
-      expect(data).to include("amount" => "980.00", "withheld" => "20.00", "unapplied" => "1000.00")
+      expect(data).to include("amount" => "980.00", "withheld" => "20.00", "unapplied" => "1000.00", "taxable_payment" => false)
       row = data["withheld_taxes"].sole
       expect(row).to include("code" => "WC160", "on" => "2026-03-20", "base" => "1000.00", "withheld" => "20.00", "certificate_received_on" => nil)
 
