@@ -16,7 +16,7 @@ module TudlaAccounting
       withholding_reports: "PH", # the withholding summary, QAP, SAWT and 2307s
       customer_certificates: "PH", # marking customers' 2307s received, and the list to chase (the SAWT lists what's marked)
       # Australia (the ATO)
-      payee_payments: "AU",      # the payee list and its payment summaries
+      payee_payments: "AU",      # the payee list and its payment summaries, and the payment form speaking of ABNs
       taxable_payments: "AU"     # the TPAR, and Contact#taxable_payments's field
     }.freeze
 

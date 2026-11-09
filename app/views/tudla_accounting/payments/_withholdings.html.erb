@@ -27,6 +27,7 @@
   <% if received %>
     <p class="tc-card-body tc-hint">Type the tax as the customer's certificate gives it. Leave the income blank to work it out from the code's rate. The cash and the tax together can be applied to invoices; what's left of the cash can be refunded, the tax can't.<%= " The cash received comes down by the tax as you type it, unless you've changed the cash yourself." if cash_follows_tax %></p>
   <% else %>
-    <p class="tc-card-body tc-hint">For a supplier who hasn't quoted an ABN by the time you pay. Type what the tax is withheld from (the amount you're settling); the tax is worked out at the code's rate, or type it yourself. The cash and the tax together settle their bills, and the tax goes to the code's account, to pay the ATO.<%= " The cash paid comes down by the tax as it's worked out, unless you've changed the cash yourself." if cash_follows_tax %> Leave it blank if they've quoted an ABN.</p>
+    <% no_abn = TudlaAccounting::Jurisdictions.on?(accounting_organization, :payee_payments) %>
+    <p class="tc-card-body tc-hint" data-withholding-hint><%= no_abn ? "For a supplier who hasn't quoted an ABN by the time you pay." : "For tax withheld from the supplier when you pay them." %> Type what the tax is withheld from (the amount you're settling); the tax is worked out at the code's rate, or type it yourself. The cash and the tax together settle their bills, and the tax goes to the code's account, to pay <%= no_abn ? "the ATO" : "the tax office" %>.<%= " The cash paid comes down by the tax as it's worked out, unless you've changed the cash yourself." if cash_follows_tax %><%= " Leave it blank if they've quoted an ABN." if no_abn %></p>
   <% end %>
 </div>

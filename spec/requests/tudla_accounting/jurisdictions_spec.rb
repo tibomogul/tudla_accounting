@@ -81,4 +81,29 @@ RSpec.describe "Country pieces", type: :request do
     get routes.new_tax_code_path
     expect(css_select("select[name='tax_code[purchase_type]']")).not_to be_empty
   end
+
+  it "names the books' country's templates when there are no tax returns yet" do
+    { "AU" => "None yet. Start one from a template (Australia: Business activity statement (GST, PAYG withholding and instalments)), or lay one out yourself.",
+      "DE" => "None yet. Lay one out yourself." }.each do |code, text|
+      country(code)
+      get routes.tax_return_forms_path
+      expect(css_select("[data-no-forms]").map { |cell| cell.text.squish }).to eq([ text ])
+    end
+    country(nil)
+    get routes.tax_return_forms_path
+    expect(css_select("[data-no-forms]").first.text).to include("Australia: Business activity statement", "United Kingdom: VAT return (boxes 1 to 9), or Philippines")
+  end
+
+  it "speaks of ABNs on the payment form only in Australian books" do
+    TudlaAccounting::AccountsCreator.call([ { code: "1010", name: "Bank", category: "asset" } ], organization)
+    TudlaAccounting::WithholdingCode.create!(organization: organization, code: "NOABN", name: "No ABN", rate: "0.47", payable_account: account("2350"), withheld_on: "payment")
+    supplier = TudlaAccounting::Contact.create!(organization: organization, name: "Greenleaf", kind: "supplier")
+    { "AU" => [ "hasn't quoted an ABN", "the ATO" ], "PH" => [ "withheld from the supplier when you pay them", "the tax office" ] }.each do |code, phrases|
+      country(code)
+      get routes.new_payment_path(kind: "paid", contact_id: supplier.id)
+      hint = css_select("[data-withholding-hint]").first.text.squish
+      expect(hint).to include(*phrases)
+      expect(hint.include?("ABN")).to eq(code == "AU")
+    end
+  end
 end

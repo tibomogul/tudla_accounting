@@ -8,7 +8,8 @@
     <thead><tr><th>Return</th><th class="tc-num">Boxes</th><th></th></tr></thead>
     <tbody>
       <% if @forms.empty? %>
-        <tr><td colspan="3" class="tc-muted text-center">None yet. Start one from the Australian BAS or the UK VAT return, or lay one out yourself.</td></tr>
+        <% templates = TudlaAccounting::TaxReturnTemplates.choices(accounting_organization).map(&:first) %>
+        <tr><td colspan="3" class="tc-muted text-center" data-no-forms>None yet. <%= templates.any? ? "Start one from a template (#{templates.to_sentence(two_words_connector: ' or ', last_word_connector: ', or ')}), or lay one out yourself." : "Lay one out yourself." %></td></tr>
       <% end %>
       <% @forms.each do |form| %>
         <tr data-tax-return-form>
