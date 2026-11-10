@@ -165,7 +165,7 @@ Grouped in the suggested order. Items marked **(decide)** need a decision before
 
 ### 5. Translation
 
-- [ ] Add `config/locales/en.yml` and move email and PDF text into it first.
+- [ ] Add `config/locales/en.yml` and move email and PDF text into it first. English only for now (decided). Emails done: their templates, a per-organization `locale` setting, `TudlaAccounting.t` and `.day`, with the default locale's wording for anything untranslated. PDFs next; BIR Form 2307 and the books of accounts keep their wording.
 - [ ] Move page text into it, view by view.
 - [ ] Let specs that compare exact page text read from the locale file where that makes them less brittle.
 

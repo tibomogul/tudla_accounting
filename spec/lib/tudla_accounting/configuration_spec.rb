@@ -71,7 +71,7 @@ RSpec.describe TudlaAccounting::Configuration do
       { organization_label: "Acme Pty Ltd", cash_account_codes: %w[1010], number_format: :comma, country: "AU", document_header: "Acme\n1 Demo Street",
         books_header: "ACME", withholding_agent: { tin: "1" }, tax_registration: TudlaAccounting::TaxRegistration.australia("51 824 753 556"),
         document_mail_from: "accounts@acme.test", document_mail_reply_to: "help@acme.test", rounding: BigDecimal::ROUND_HALF_EVEN, tax_basis: :cash,
-        pdf_paper: :Letter, reminder_days: [ 14, 7 ], document_email_templates: { invoice: { subject: "Invoice %{number}" } }, time_zone: "Australia/Sydney" }
+        pdf_paper: :Letter, reminder_days: [ 14, 7 ], document_email_templates: { invoice: { subject: "Invoice %{number}" } }, time_zone: "Australia/Sydney", locale: :en }
     end
 
     it "reads every per-organization setting the same whether given a value or a callable" do
@@ -81,7 +81,7 @@ RSpec.describe TudlaAccounting::Configuration do
           config.document_header_for(organization), config.books_header_for(organization), config.withholding_agent_for(organization)[:tin],
           config.tax_registration_for(organization), config.document_mail_address(:document_mail_from, organization), config.document_mail_address(:document_mail_reply_to, organization),
           config.rounding_for(organization), config.tax_basis_for(organization), config.pdf_paper_for(organization), config.reminder_days_for(organization),
-          config.document_email_templates_for(organization)["invoice"], config.time_zone_for(organization).tzinfo.name ]
+          config.document_email_templates_for(organization)["invoice"], config.time_zone_for(organization).tzinfo.name, config.locale_for(organization) ]
       end
       TudlaAccounting.configuration = config
       values.each { |setting, value| config.public_send(:"#{setting}=", value) }
@@ -89,7 +89,7 @@ RSpec.describe TudlaAccounting::Configuration do
       values.each { |setting, value| config.public_send(:"#{setting}=", ->(org) { value if org.name == "Acme" }) }
       expect(read.call).to eq(as_values)
       expect(as_values).to eq([ "Acme Pty Ltd", %w[1010], :comma, "AU", "Acme\n1 Demo Street", "ACME", "1", values[:tax_registration], "accounts@acme.test", "help@acme.test",
-                                BigDecimal::ROUND_HALF_EVEN, :cash, :letter, [ 7, 14 ], { subject: "Invoice %{number}", body: described_class::DOCUMENT_EMAIL_TEMPLATES["invoice"][:body] }, "Australia/Sydney" ])
+                                BigDecimal::ROUND_HALF_EVEN, :cash, :letter, [ 7, 14 ], { subject: "Invoice %{number}", body: I18n.t("tudla_accounting.email_templates.invoice.body") }, "Australia/Sydney", :en ])
     end
 
     it "refuses a setting that isn't per organization, or a callable with no organization to give it" do

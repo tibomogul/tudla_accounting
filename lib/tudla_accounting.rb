@@ -72,7 +72,7 @@ module TudlaAccounting
                   :parent_controller, :current_organization, :current_actor, :authorize,
                   :cash_account_codes, :tax_basis, :organization_label, :entry_number_format,
                   :attachment_content_types, :attachment_max_size, :document_header, :books_header, :withholding_agent, :tax_registration, :country,
-                  :api_rate_limit, :api_rate_limit_store, :pdf_browser_options, :pdf_paper, :pdf_stylesheet, :pages,
+                  :api_rate_limit, :api_rate_limit_store, :pdf_browser_options, :pdf_paper, :pdf_stylesheet, :pages, :locale,
                   :document_mailer, :document_mail_from, :document_mail_reply_to
     attr_reader :number_format, :forex_rate_provider, :pdf_renderer, :theme_storage_key, :page_stylesheets
     attr_reader :carrying_amount_sources, :entry_sources, :entry_number_series, :document_number_format, :document_email_templates, :reminder_days
@@ -86,6 +86,11 @@ module TudlaAccounting
       # day it is: a name ("Australia/Sydney"), or a callable given the organization
       # returning one. Keep an organization's once it has periods: they were made in it.
       @time_zone = "UTC"
+      # The language an organization's emails and PDFs are written in (a locale, such as
+      # :en or "en-AU"), or a callable given the organization returning one; nil for
+      # I18n.default_locale. The wording is config/locales/en.yml's, under tudla_accounting.*,
+      # which a host's locale files can change or translate.
+      @locale = nil
       @organization_class = "Organization"
       @carrying_amount_sources = {}
       @due_date_method = :due_date
@@ -190,7 +195,7 @@ module TudlaAccounting
       @document_mailer = "TudlaAccounting::DocumentMailer"
       @document_mail_from = nil
       @document_mail_reply_to = nil
-      @document_email_templates = DOCUMENT_EMAIL_TEMPLATES
+      @document_email_templates = {}
       # When overdue invoices' customers are reminded: days after the due date (see
       # reminder_days=). None by default.
       @reminder_days = []
@@ -206,7 +211,7 @@ module TudlaAccounting
     # document).
     PER_ORGANIZATION = %i[organization_label cash_account_codes number_format country document_header books_header
                           withholding_agent tax_registration document_mail_from document_mail_reply_to
-                          rounding tax_basis pdf_paper reminder_days document_email_templates time_zone].freeze
+                          rounding tax_basis pdf_paper reminder_days document_email_templates time_zone locale].freeze
     TAX_BASES = %i[accrual cash].freeze
 
     # A per-organization setting's value for an organization: the setting, or what its
@@ -264,7 +269,19 @@ module TudlaAccounting
     def reminder_days_for(organization) = self.class.reminder_days(for_organization(:reminder_days, organization))
 
     # An organization's email templates (see document_email_templates=).
-    def document_email_templates_for(organization) = self.class.email_templates(for_organization(:document_email_templates, organization))
+    def document_email_templates_for(organization)
+      given = self.class.email_templates(for_organization(:document_email_templates, organization))
+      self.class.locale_email_templates(locale_for(organization)).merge(given) { |_kind, locale, setting| locale.merge(setting) }
+    end
+
+    # The language an organization's emails and PDFs are in: the locale setting, or
+    # I18n.default_locale. It must be one of I18n.available_locales.
+    def locale_for(organization)
+      locale = (for_organization(:locale, organization).presence || I18n.default_locale).to_sym
+      return locale if I18n.available_locales.include?(locale)
+
+      raise ArgumentError, "locale gave #{locale.inspect} for #{organization_label_for(organization)}; the app's I18n.available_locales are #{I18n.available_locales.join(', ')}"
+    end
 
     # The organization_label setting's name for an organization.
     def organization_label_for(organization) = for_organization(:organization_label, organization).to_s
@@ -331,40 +348,32 @@ module TudlaAccounting
       days.uniq.sort.freeze
     end
 
-    # The subject and message each kind of email starts with (they can be changed before
-    # sending). Placeholders are filled in from what is sent: %{organization}, %{contact},
-    # and for invoices and credit notes %{number}, %{kind}, %{total}, %{amount_due},
-    # %{issued_on}, %{due_on}; for statements %{from}, %{thru}, %{balance}; for payments
-    # %{amount}, %{paid_on}, %{reference}.
-    DOCUMENT_EMAIL_TEMPLATES = {
-      "invoice" => { subject: "Invoice %{number} from %{organization}",
-                     body: "Hello %{contact},\n\nPlease find attached invoice %{number} for %{total}, due on %{due_on}.\n\nThank you,\n%{organization}" },
-      "credit_note" => { subject: "Credit note %{number} from %{organization}",
-                         body: "Hello %{contact},\n\nPlease find attached credit note %{number} for %{total}.\n\nThank you,\n%{organization}" },
-      "reminder" => { subject: "Reminder: invoice %{number} is overdue",
-                      body: "Hello %{contact},\n\nInvoice %{number}, due on %{due_on}, still has %{amount_due} owing. A copy is attached. " \
-                            "If you have already paid it, thank you, and please ignore this reminder.\n\nThank you,\n%{organization}" },
-      "statement" => { subject: "Your statement from %{organization}",
-                       body: "Hello %{contact},\n\nPlease find attached your statement for %{from} to %{thru}. The balance is %{balance}.\n\nThank you,\n%{organization}" },
-      "receipt" => { subject: "Receipt for your payment to %{organization}",
-                     body: "Hello %{contact},\n\nThank you for your payment of %{amount} on %{paid_on}. A receipt is attached.\n\n%{organization}" },
-      "payment_notice" => { subject: "Payment from %{organization}",
-                            body: "Hello %{contact},\n\nWe have paid you %{amount} on %{paid_on}. The attached notice shows what it is for.\n\n%{organization}" }
-    }.freeze
+    # The kinds of email, each starting from its template: tudla_accounting.email_templates
+    # in the organization's locale (config/locales/en.yml has the placeholders), under the
+    # document_email_templates setting.
+    DOCUMENT_EMAIL_KINDS = %w[invoice credit_note reminder statement receipt payment_notice].freeze
 
-    # Templates by kind (above), each { subject:, body: }, merged over the defaults; a kind
-    # given only a subject or body keeps the default other. Or a callable given the
-    # organization, returning them.
+    # Templates by kind, each { subject:, body: }, over the locale's; a kind given only a
+    # subject or body keeps the locale's other. Or a callable given the organization,
+    # returning them.
     def document_email_templates=(templates)
       @document_email_templates = templates.respond_to?(:call) ? templates : self.class.email_templates(templates)
     end
 
+    # The setting's templates, checked: only known kinds, with symbol keys.
     def self.email_templates(templates)
       templates = templates.to_h.transform_keys(&:to_s)
-      unknown = templates.keys - DOCUMENT_EMAIL_TEMPLATES.keys
-      raise ArgumentError, "unknown email template #{unknown.first.inspect}; expected one of #{DOCUMENT_EMAIL_TEMPLATES.keys.join(', ')}" if unknown.any?
+      unknown = templates.keys - DOCUMENT_EMAIL_KINDS
+      raise ArgumentError, "unknown email template #{unknown.first.inspect}; expected one of #{DOCUMENT_EMAIL_KINDS.join(', ')}" if unknown.any?
 
-      DOCUMENT_EMAIL_TEMPLATES.merge(templates) { |_kind, default, given| default.merge(given.to_h.symbolize_keys) }.freeze
+      templates.transform_values { |given| given.to_h.symbolize_keys.slice(:subject, :body) }.freeze
+    end
+
+    # The templates in a locale (tudla_accounting.email_templates), by kind.
+    def self.locale_email_templates(locale = I18n.locale)
+      DOCUMENT_EMAIL_KINDS.to_h do |kind|
+        [ kind, %i[subject body].to_h { |part| [ part, TudlaAccounting.t("email_templates.#{kind}.#{part}", locale: locale) ] } ]
+      end
     end
 
     # A from or reply-to setting's address for an organization, or nil.
@@ -566,6 +575,26 @@ module TudlaAccounting
 
   # The time zone an organization's books are kept in (the time_zone setting).
   def self.zone(organization) = configuration.time_zone_for(organization)
+
+  # Runs the block in an organization's language (the locale setting).
+  def self.with_locale(organization, &) = I18n.with_locale(configuration.locale_for(organization), &)
+
+  # The engine's wording for a key under tudla_accounting (config/locales/en.yml), in the
+  # current locale, or I18n.default_locale's where that locale lacks it, so a partial
+  # translation still reads; a key missing there too raises I18n::MissingTranslationData.
+  #
+  #   TudlaAccounting.t("email_templates.invoice.subject")
+  def self.t(key, locale: I18n.locale, **options) = localized("tudla_accounting.#{key}", locale: locale, **options)
+
+  # A day as emails and PDFs write it (date.formats.tudla_accounting_day: 6 Nov 2026), in
+  # the current locale, its month names from the locale's date.abbr_month_names (rails-i18n
+  # has them for most languages).
+  def self.day(date) = date && I18n.l(date.to_date, format: localized("date.formats.tudla_accounting_day"))
+
+  def self.localized(key, locale: I18n.locale, **options)
+    I18n.t(key, locale: locale, **options, default: nil) || I18n.t(key, locale: I18n.default_locale, **options, raise: true)
+  end
+  private_class_method :localized
 
   # Limits lookups of the engine's models to one organization's books for the block, as
   # each request to the engine's pages and API does (see OrganizationOwned); nil lifts

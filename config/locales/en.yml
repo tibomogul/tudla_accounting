@@ -1,0 +1,34 @@
+# TudlaAccounting's wording, under tudla_accounting.*. A host app changes any of it in its
+# own locale files (they're loaded after the engine's), or adds another language; each
+# organization's emails and PDFs are in its locale setting's language. See the README's
+# "Wording and languages".
+en:
+  date:
+    formats:
+      # A day in emails and PDFs: 6 Nov 2026.
+      tudla_accounting_day: "%-d %b %Y"
+  tudla_accounting:
+    # What each kind of email starts with (it can be changed before sending). Placeholders
+    # are filled in from what is sent: %{organization}, %{contact}, and for invoices and
+    # credit notes %{number}, %{kind}, %{total}, %{amount_due}, %{issued_on}, %{due_on};
+    # for statements %{from}, %{thru}, %{balance}; for payments %{amount}, %{paid_on},
+    # %{reference}. The document_email_templates setting overrides them per organization.
+    email_templates:
+      invoice:
+        subject: "Invoice %{number} from %{organization}"
+        body: "Hello %{contact},\n\nPlease find attached invoice %{number} for %{total}, due on %{due_on}.\n\nThank you,\n%{organization}"
+      credit_note:
+        subject: "Credit note %{number} from %{organization}"
+        body: "Hello %{contact},\n\nPlease find attached credit note %{number} for %{total}.\n\nThank you,\n%{organization}"
+      reminder:
+        subject: "Reminder: invoice %{number} is overdue"
+        body: "Hello %{contact},\n\nInvoice %{number}, due on %{due_on}, still has %{amount_due} owing. A copy is attached. If you have already paid it, thank you, and please ignore this reminder.\n\nThank you,\n%{organization}"
+      statement:
+        subject: "Your statement from %{organization}"
+        body: "Hello %{contact},\n\nPlease find attached your statement for %{from} to %{thru}. The balance is %{balance}.\n\nThank you,\n%{organization}"
+      receipt:
+        subject: "Receipt for your payment to %{organization}"
+        body: "Hello %{contact},\n\nThank you for your payment of %{amount} on %{paid_on}. A receipt is attached.\n\n%{organization}"
+      payment_notice:
+        subject: "Payment from %{organization}"
+        body: "Hello %{contact},\n\nWe have paid you %{amount} on %{paid_on}. The attached notice shows what it is for.\n\n%{organization}"

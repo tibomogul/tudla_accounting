@@ -1,9 +1,10 @@
 # frozen_string_literal: true
 
 module TudlaAccounting
-  # The email something starts with, from the document_email_templates setting: who it
-  # goes to (the contact's email), its subject line and message, the placeholders filled
-  # in, and for a statement the details it is made from.
+  # The email something starts with, from its template (the locale's, under the
+  # document_email_templates setting) in the organization's language: who it goes to (the
+  # contact's email), its subject line and message, the placeholders filled in, and for a
+  # statement the details it is made from.
   #
   #   EmailDraft.for_document(invoice) # => { kind: "document", to:, subject_line:, message: }
   #   EmailDraft.for_statement(statement, open_items: false)
@@ -24,26 +25,29 @@ module TudlaAccounting
     def document_values(document)
       books = document.organization
       { number: document.number_label, kind: document.kind_label, total: MoneyFormatter.labelled(document.total, books), amount_due: MoneyFormatter.labelled(document.amount_due, books),
-        issued_on: day(document.issued_on), due_on: day(document.due_on) }
+        issued_on: document.issued_on, due_on: document.due_on }
     end
 
     # A statement's (a PartyStatement), to its customer or supplier: their contact, or a host
     # app's record with an email.
     def for_statement(statement, open_items:)
-      values = { from: day(statement.from), thru: day(statement.thru), balance: MoneyFormatter.labelled(statement.closing, statement.organization) }
+      values = { from: statement.from, thru: statement.thru, balance: MoneyFormatter.labelled(statement.closing, statement.organization) }
       details = { "type" => statement.type.to_s, "from" => statement.from.iso8601, "thru" => statement.thru.iso8601, "open_items" => open_items }
       draft("statement", "statement", statement.organization, statement.party, values).merge(details: details)
     end
 
     def for_payment(payment)
       kind = payment.received? ? "receipt" : "payment_notice"
-      draft(kind, kind, payment.organization, payment.contact, amount: MoneyFormatter.labelled(payment.amount, payment.organization), paid_on: day(payment.paid_on), reference: payment.reference)
+      draft(kind, kind, payment.organization, payment.contact, amount: MoneyFormatter.labelled(payment.amount, payment.organization), paid_on: payment.paid_on, reference: payment.reference)
     end
 
     def draft(kind, template, organization, party, values)
-      text = TudlaAccounting.configuration.document_email_templates_for(organization).fetch(template)
-      values = values.merge(organization: organization_name(organization), contact: PartyStatement.party_name(party))
-      { kind: kind, to: (party.email if party.respond_to?(:email)), subject_line: fill(text[:subject], values), message: fill(text[:body], values) }
+      TudlaAccounting.with_locale(organization) do
+        text = TudlaAccounting.configuration.document_email_templates_for(organization).fetch(template)
+        values = values.transform_values { |value| value.is_a?(Date) ? TudlaAccounting.day(value) : value }
+                       .merge(organization: organization_name(organization), contact: PartyStatement.party_name(party))
+        { kind: kind, to: (party.email if party.respond_to?(:email)), subject_line: fill(text[:subject], values), message: fill(text[:body], values) }
+      end
     end
 
     # The text with each %{placeholder} it knows replaced; others are left as they are.
@@ -54,7 +58,5 @@ module TudlaAccounting
     def organization_name(organization)
       organization.respond_to?(:name) && organization.name.present? ? organization.name : TudlaAccounting.organization_label(organization)
     end
-
-    def day(date) = date&.strftime("%-d %b %Y")
   end
 end

@@ -118,7 +118,22 @@ TudlaAccounting::EmailDraft.for_statement(statement, open_items: false) # with t
 TudlaAccounting::EmailDraft.for_payment(payment)                        # a receipt, or a payment notice
 ```
 
-Emails go through the host's own ActionMailer setup (delivery method, SMTP), from `document_mail_from` (text, or a callable given the organization; the host's ActionMailer default otherwise) and replying to `document_mail_reply_to`. `document_email_templates` changes each kind's subject and message, with placeholders such as `%{number}`, `%{total}`, `%{amount_due}` and `%{due_on}`. To send them another way, point `document_mailer` at a mailer of your own whose `delivery(delivery, pdf:, filename:)` returns the mail. The dummy app writes them to files in `spec/dummy/tmp/mails` in development.
+Emails go through the host's own ActionMailer setup (delivery method, SMTP), from `document_mail_from` (text, or a callable given the organization; the host's ActionMailer default otherwise) and replying to `document_mail_reply_to`. Each kind's subject and message start from `tudla_accounting.email_templates` in the engine's `config/locales/en.yml` (see [Wording and languages](#wording-and-languages)), with placeholders such as `%{number}`, `%{total}`, `%{amount_due}` and `%{due_on}`; `document_email_templates` overrides them per organization. To send them another way, point `document_mailer` at a mailer of your own whose `delivery(delivery, pdf:, filename:)` returns the mail. The dummy app writes them to files in `spec/dummy/tmp/mails` in development.
+
+### Wording and languages
+
+The wording of emails is in the engine's `config/locales/en.yml`, under `tudla_accounting.*` (the PDFs' is moving there too). To change it, put the same keys in a locale file of your own, which Rails loads after the engine's:
+
+```yaml
+# config/locales/tudla_accounting.en.yml
+en:
+  tudla_accounting:
+    email_templates:
+      invoice:
+        subject: "Tax invoice %{number} from %{organization}"
+```
+
+Each organization's emails are written in its `locale` setting's language (a locale, or a callable given the organization; `I18n.default_locale` when nil), which must be one of the app's `I18n.available_locales`. They're made in that language whatever the request's or a background job's locale is. To add a language, translate the keys in a locale file of your own; anything left untranslated reads in the default locale's wording, so a partial translation still works. Dates are written by `date.formats.tudla_accounting_day` (`6 Nov 2026`), with the locale's month names, which the `rails-i18n` gem has for most languages. Amounts follow `number_format`, not the locale. Text the engine has already saved, such as entries' particulars and the activity log, stays as it was written. The pages are in English only for now.
 
 ### Recurring invoices
 `TudlaAccounting::RecurringInvoice` is an invoice made again and again (a retainer, a subscription): its customer, lines (as an invoice's: description, quantity, unit price, account, tax code, dimension values), reference and notes, and a schedule as a recurring entry has (`RecurringSchedule`). Each invoice is dated the day it falls due and due `due_days` later, or on the customer's payment terms when that is blank. What happens to each (`issue`): `draft` (the default) leaves it to check and approve, `approve` approves it (numbered and posted), `email` approves it and emails it to the customer as **Email** would.
@@ -677,7 +692,7 @@ The generator writes `config/initializers/tudla_accounting.rb` with every settin
 
 Configure the engine in an initializer, e.g. `config/initializers/tudla_accounting.rb`.
 
-Some settings can differ by organization: `organization_label`, `cash_account_codes`, `number_format`, `country`, `time_zone`, `rounding`, `tax_basis`, `document_header`, `books_header`, `withholding_agent`, `tax_registration`, `pdf_paper`, `document_mail_from`, `document_mail_reply_to`, `document_email_templates` and `reminder_days` (`TudlaAccounting::Configuration::PER_ORGANIZATION`). Each takes a value, for an app with one set of books or the same answer for all, or a callable given the organization returning one, and `config.for_organization(setting, organization)` reads either. The rest are the app's: one value, except that a few take a callable given what they're about (`current_organization`, `current_actor` and `authorize` the controller; `entry_number_series` and `entry_number_format` the entry; `document_number_format` the document).
+Some settings can differ by organization: `organization_label`, `cash_account_codes`, `number_format`, `country`, `time_zone`, `rounding`, `tax_basis`, `document_header`, `books_header`, `withholding_agent`, `tax_registration`, `pdf_paper`, `document_mail_from`, `document_mail_reply_to`, `document_email_templates`, `reminder_days` and `locale` (`TudlaAccounting::Configuration::PER_ORGANIZATION`). Each takes a value, for an app with one set of books or the same answer for all, or a callable given the organization returning one, and `config.for_organization(setting, organization)` reads either. The rest are the app's: one value, except that a few take a callable given what they're about (`current_organization`, `current_actor` and `authorize` the controller; `entry_number_series` and `entry_number_format` the entry; `document_number_format` the document).
 
 
 ```ruby
@@ -751,7 +766,8 @@ TudlaAccounting.configure do |config|
   # Emailing documents to customers and suppliers (sent through the host's ActionMailer setup)
   config.document_mail_from = ->(organization) { "#{organization.name} <accounts@example.com>" } # per organization; the ActionMailer default if nil
   config.document_mail_reply_to = "accounts@example.com" # per organization
-  config.document_email_templates = { invoice: { subject: "Invoice %{number} from %{organization}" } } # per organization; over the defaults
+  config.document_email_templates = { invoice: { subject: "Invoice %{number} from %{organization}" } } # per organization; over config/locales/en.yml's
+  config.locale = ->(organization) { organization.locale } # per organization: the emails' language; I18n.default_locale if nil
   config.document_mailer = "TudlaAccounting::DocumentMailer" # or one of the host's: delivery(delivery, pdf:, filename:)
   config.reminder_days = [ 7, 14, 30 ]   # per organization: days after the due date to remind customers of overdue invoices (none by default)
 

@@ -13,6 +13,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The wording of emails is in a locale file, `config/locales/en.yml` under `tudla_accounting.*`, so a host changes it, or translates it, in its own locale files. A per-organization `locale` setting picks each organization's language (`I18n.default_locale` by default); untranslated keys read in the default locale's wording, and dates use the locale's month names. `TudlaAccounting.t` and `TudlaAccounting.day` read them. `document_email_templates` still overrides the templates per organization, but `Configuration::DOCUMENT_EMAIL_TEMPLATES` is gone (`Configuration.locale_email_templates(locale)` reads them).
 - A `pages` setting: `false` draws only the JSON API's routes, for an app with its own screens. PDFs and emails still work.
 - A `pdf_renderer` setting makes the PDFs some other way than headless Chrome: a callable given the page's HTML and the paper, returning the PDF's bytes. With it, the `ferrum` gem isn't needed.
 - A `theme_storage_key` setting names the `localStorage` key the pages keep the light or dark choice under, so they follow a host's own switch; `nil` keeps no choice. It's `"theme"` by default, as before.

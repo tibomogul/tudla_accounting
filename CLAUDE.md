@@ -91,6 +91,10 @@ Behind that, each model with an organization includes `OrganizationOwned` (in pl
 
 Controllers in `app/controllers/tudla_accounting/api/v1/` build on `BaseController` (`body`, `cents`, `decimal`, `account_by_code`, `contact_by_id`, `date_param`, `render_page`, `require_permission!`, the `permits` DSL) and `Representation` (`*_json`). Creating endpoints honour an `Idempotency-Key` header (`replay` / `render_made`; the key is stored on the record). Document every endpoint in `API.md`.
 
+### Wording and translation
+
+Email wording (and, as it moves, the PDFs') lives in `config/locales/en.yml` under `tudla_accounting.*`; read it with `TudlaAccounting.t("key")` (falls back to `I18n.default_locale`, and raises for a key missing there) and write dates with `TudlaAccounting.day(date)`. Emails and PDFs are made inside `TudlaAccounting.with_locale(organization)` (the per-organization `locale` setting), never the request's locale. The pages are still English in the views. Don't translate stored text (particulars, audit descriptions). `spec/lib/tudla_accounting/locale_spec.rb` checks the keys exist and the fallback.
+
 ### Withholding tax
 
 `WithholdingCode` is the tax, and `WithheldTax` (one row per amount, in the organization's currency) is what every withholding report reads. Rows don't change: reversing adds an opposite row dated then, so an earlier quarter stays as it was and each quarter ties to the account. Only `certificate_received_on` changes. Bills post the tax on approval and payments received on recording; `document.total` stays gross and `amount_due` comes from the net payable.
