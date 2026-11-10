@@ -15,6 +15,9 @@ services:
     rails:
         platform: linux/amd64
         tty: true
+        # Reaps exited processes: the main process is `sleep infinity`, which doesn't, so
+        # every PDF made here (headless Chrome) left dead processes until none could start.
+        init: true
         build:
             context: ./
             args:
