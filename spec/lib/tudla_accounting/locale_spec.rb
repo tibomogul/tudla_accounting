@@ -45,9 +45,51 @@ RSpec.describe "The engine's wording and languages" do
     expect(TudlaAccounting::EmailDraft.for_document(invoice).values_at(:subject_line, :message)).to eq([ "Facture INV-0001 de Acme, à payer le 28 févr. 2026", "Bonjour Northwind" ])
   end
 
+  it "makes an organization's PDFs in its language, from the same layouts the pages show in English" do
+    TudlaAccounting::PeriodCreator.call(organization, 2026)
+    TudlaAccounting::AccountsCreator.call([ { code: "1100", name: "Receivables", category: "asset", role: "receivable" }, { code: "4000", name: "Sales", category: "income" } ], organization)
+    contact = TudlaAccounting::Contact.create!(organization: organization, name: "Northwind")
+    invoice = TudlaAccounting::Document.create!(organization: organization, kind: "sales_invoice", contact: contact, issued_on: Date.new(2026, 2, 1), due_on: Date.new(2026, 2, 28),
+                                                lines_attributes: [ { description: "Work", unit_price_cents: 10_00, account: TudlaAccounting::Account.find_by!(organization: organization, code: "4000") } ]).approve!
+    I18n.backend.store_translations(:fr, tudla_accounting: { document_kinds: { sales_invoice: "Facture" }, documents: { document: { total: "Total TTC", due: "Échéance" } } })
+    pages = []
+    config.pdf_renderer = lambda do |html, **|
+      pages << Nokogiri::HTML(html).at("[data-document]").text.squish
+      "%PDF"
+    end
+    config.locale = :fr
+    TudlaAccounting::PdfMaker.document(invoice)
+    expect(pages.last).to include("Facture", "Échéance28 févr. 2026", "Total TTC", "Description") # Description isn't translated: English
+    expect(I18n.locale).to eq(:en)
+
+    html = TudlaAccounting::PdfViewsController.render(partial: "tudla_accounting/documents/document", locals: { document: invoice })
+    expect(Nokogiri::HTML(html).text.squish).to include("Invoice", "Due28 Feb 2026", "Total")
+  end
+
   it "has every key it reads in English" do
     expect(TudlaAccounting::Configuration.locale_email_templates(:en).keys).to eq(TudlaAccounting::Configuration::DOCUMENT_EMAIL_KINDS)
     expect(TudlaAccounting.day(Date.new(2026, 11, 6))).to eq("6 Nov 2026")
     expect { TudlaAccounting.t("email_templates.fax.subject") }.to raise_error(I18n::MissingTranslationData)
+  end
+end
+
+RSpec.describe "The PDFs' wording" do
+  include_context "with isolated TudlaAccounting configuration"
+
+  let(:partials) { %w[documents/_document payments/_notice reports/_party_statement reports/_payment_summary] }
+
+  it "has every key the PDF layouts read in English" do
+    keys = partials.flat_map do |partial|
+      source = File.read(TudlaAccounting::Engine.root.join("app/views/tudla_accounting/#{partial}.html.erb"))
+      scope = partial.tr("/", ".").sub(/\._?/, ".").sub("._", ".")
+      source.scan(/tc_t\(([^%]*?)\)\s*(?:%>|\)|,|if|\.)/).flatten.flat_map { |call| call.scan(/"(\.?[a-z_.]+)"/).flatten }
+            .map { |key| key.start_with?(".") ? "#{scope}#{key}" : key }
+    end
+    expect(keys.size).to be > 80
+    expect(keys.reject { |key| I18n.exists?("tudla_accounting.#{key}", :en) }).to eq([])
+    %w[statement_kinds aging_buckets document_kinds].each { |group| expect(I18n.t("tudla_accounting.#{group}")).to be_a(Hash) }
+    expect(TudlaAccounting::PartyStatement::KINDS.keys + %i[reversal adjustment]).to match_array(I18n.t("tudla_accounting.statement_kinds").keys)
+    expect(TudlaAccounting::ReportsHelper::AGING_BUCKETS.keys).to eq(I18n.t("tudla_accounting.aging_buckets").keys)
+    expect(TudlaAccounting::Document::KINDS.keys.map(&:to_sym)).to eq(I18n.t("tudla_accounting.document_kinds").keys)
   end
 end

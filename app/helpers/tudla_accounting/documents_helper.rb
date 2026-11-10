@@ -34,7 +34,7 @@ module TudlaAccounting
     # are taxed, so a code without tax goes by its name, and no code says so.
     def document_line_tax(line, registration)
       return line.tax_code&.label unless registration
-      return "No #{registration.tax_name}" unless line.tax_code
+      return tc_t("documents.document.no_tax", tax: registration.tax_name) unless line.tax_code
 
       line.tax_code.standard? ? line.tax_code.label : line.tax_code.name
     end

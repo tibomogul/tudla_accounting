@@ -25,7 +25,7 @@ module TudlaAccounting
   # itself when there is none): PartyStatement.parties lists those with receivables or
   # payables, and key names one in a URL.
   class PartyStatement
-    Line = Struct.new(:date, :entry, :kind, :due_date, :charge, :credit, :balance, :foreign, keyword_init: true)
+    Line = Struct.new(:date, :entry, :kind, :kind_key, :due_date, :charge, :credit, :balance, :foreign, keyword_init: true)
 
     KINDS = { receivable: "Invoice", payable: "Bill", receipt: "Payment", disbursement: "Payment", credit_note: "Credit note",
               supplier_credit: "Credit note", refund: "Refund", supplier_refund: "Refund" }.freeze
@@ -137,18 +137,20 @@ module TudlaAccounting
         amount = -amount if item.credit?
         amount = -amount if reversal
         balance += amount
-        Line.new(date: at.to_date, entry: reversal || item.detail.entry, kind: reversal ? "Reversal" : kind(item), due_date: (item.due_date if item.charge? && !reversal),
+        Line.new(date: at.to_date, entry: reversal || item.detail.entry, kind: reversal ? "Reversal" : KINDS.fetch(kind_key(item)), kind_key: reversal ? :reversal : kind_key(item), due_date: (item.due_date if item.charge? && !reversal),
                  charge: (amount if amount.positive?), credit: (-amount if amount.negative?), balance: balance, foreign: (foreign(item, reversal) if item.forex))
       end
       difference = closing - balance
-      lines << Line.new(date: thru, kind: ADJUSTMENT, charge: (difference if difference.positive?), credit: (-difference if difference.negative?), balance: closing) unless difference.zero?
+      lines << Line.new(date: thru, kind: ADJUSTMENT, kind_key: :adjustment, charge: (difference if difference.positive?), credit: (-difference if difference.negative?), balance: closing) unless difference.zero?
       lines
     end
 
-    # What the item is, by its source's role; an imported open item (with no source) is an
+    # What the item is (a key of KINDS, and of the tudla_accounting.statement_kinds the PDF
+    # names it by), by its source's role; an imported open item (with no source) is an
     # invoice or bill.
-    def kind(item)
-      KINDS[CarryingAmountRole.call(entry: item.detail.entry)] || KINDS.fetch(type)
+    def kind_key(item)
+      role = CarryingAmountRole.call(entry: item.detail.entry)
+      KINDS.key?(role) ? role : type
     end
 
     # The line's amount in its own currency, on the same side as the line.

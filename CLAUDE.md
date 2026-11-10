@@ -93,7 +93,7 @@ Controllers in `app/controllers/tudla_accounting/api/v1/` build on `BaseControll
 
 ### Wording and translation
 
-Email wording (and, as it moves, the PDFs') lives in `config/locales/en.yml` under `tudla_accounting.*`; read it with `TudlaAccounting.t("key")` (falls back to `I18n.default_locale`, and raises for a key missing there) and write dates with `TudlaAccounting.day(date)`. Emails and PDFs are made inside `TudlaAccounting.with_locale(organization)` (the per-organization `locale` setting), never the request's locale. The pages are still English in the views. Don't translate stored text (particulars, audit descriptions). `spec/lib/tudla_accounting/locale_spec.rb` checks the keys exist and the fallback.
+Email and PDF wording lives in `config/locales/en.yml` under `tudla_accounting.*`; read it with `TudlaAccounting.t("key")`, or in a view `tc_t(".key")` (the partial's own keys, as Rails' lazy lookup; an HTML-safe value stays HTML) (falls back to `I18n.default_locale`, and raises for a key missing there) and write dates with `TudlaAccounting.day(date)`. Emails and PDFs are made inside `TudlaAccounting.with_locale(organization)` (the per-organization `locale` setting), never the request's locale. The PDF layouts (`documents/_document`, `payments/_notice`, `reports/_party_statement`, `reports/_payment_summary`) use only `tc_t`, and `locale_spec` checks each key they name exists; the 2307 and the books of accounts keep their form's wording in the view. The other pages are still English in the views. Don't translate stored text (particulars, audit descriptions). `spec/lib/tudla_accounting/locale_spec.rb` checks the keys exist and the fallback.
 
 ### Withholding tax
 

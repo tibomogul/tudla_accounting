@@ -25,7 +25,7 @@ module TudlaAccounting
     end
 
     def statements(statements, open_items:)
-      render("tudla_accounting/reports/party_statement", { open_items: open_items }, collection: statements, as: :statement, title: "Statement of account",
+      render("tudla_accounting/reports/party_statement", { open_items: open_items }, collection: statements, as: :statement, title: -> { TudlaAccounting.t("reports.party_statement.title") },
                                                                                      organization: statements.first&.organization)
     end
 
@@ -49,15 +49,18 @@ module TudlaAccounting
     # A payment summary for each payee: what the payer paid it and withheld over the
     # report's months, a page each. See Reports::PayeePayments.
     def payment_summaries(report, payees)
-      render("tudla_accounting/reports/payment_summary", { report: report }, collection: payees, as: :payee, title: "Payment summary", organization: report.organization)
+      render("tudla_accounting/reports/payment_summary", { report: report }, collection: payees, as: :payee, title: -> { TudlaAccounting.t("reports.payment_summary.title") }, organization: report.organization)
     end
 
-    # The PDF of a partial, in the PDF layout, for an organization's amounts.
+    # The PDF of a partial, in the PDF layout, for an organization's amounts, in its
+    # language (the locale setting). title: can be a callable, to read in that language.
     def render(partial, locals, title:, organization:, landscape: false, paper: nil, margin: 0.5, **options)
       raise Error, "PDFs need the ferrum gem or the pdf_renderer setting" unless TudlaAccounting.pdf?
 
-      html = PdfViewsController.render(template: "tudla_accounting/pdf_views/page", layout: "tudla_accounting/pdf", assigns: { title: title, organization: organization },
-                                       locals: { partial: partial, locals: locals, **options })
+      html = TudlaAccounting.with_locale(organization) do
+        PdfViewsController.render(template: "tudla_accounting/pdf_views/page", layout: "tudla_accounting/pdf", assigns: { title: title.respond_to?(:call) ? title.call : title, organization: organization },
+                                  locals: { partial: partial, locals: locals, **options })
+      end
       from_html(html, landscape: landscape, paper: paper, margin: margin, organization: organization)
     end
 

@@ -116,9 +116,10 @@ module TudlaAccounting
 
     # What it's headed as it prints: a tax registration can name an invoice. A draft's
     # keeps an acronym's capitals ("Draft tax invoice", "Draft VAT invoice").
+    # In the current locale (tudla_accounting.document_kinds and draft_title).
     def printed_title(registration = tax_registration)
-      printed = (registration&.invoice_title if kind == "sales_invoice") || kind_label
-      draft? ? "Draft #{printed.sub(/\A[A-Z](?=[a-z])/, &:downcase)}" : printed
+      printed = (registration&.invoice_title if kind == "sales_invoice") || TudlaAccounting.t("document_kinds.#{kind}")
+      draft? ? TudlaAccounting.t("draft_title", title: printed.sub(/\A[A-Z](?=[a-z])/, &:downcase)) : printed
     end
 
     # For the audit trail: "Invoice INV-0001 – Northwind", or before it is numbered "an

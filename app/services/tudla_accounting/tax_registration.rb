@@ -34,6 +34,6 @@ module TudlaAccounting
     def fails_check?(text) = text.present? && check.present? && !check.call(text)
 
     # What a contact's number is called: the label only when it has passed the check.
-    def contact_label(text) = check.present? && !fails_check?(text) ? label : "Tax number"
+    def contact_label(text) = check.present? && !fails_check?(text) ? label : TudlaAccounting.t("tax_number")
   end
 end

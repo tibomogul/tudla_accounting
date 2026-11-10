@@ -52,7 +52,18 @@ module TudlaAccounting
     end
 
     def tc_date(value)
-      value&.to_date&.strftime("%-d %b %Y")
+      TudlaAccounting.day(value)
+    end
+
+    # The engine's wording for a key (TudlaAccounting.t, in config/locales/en.yml); one
+    # starting with "." is the partial's own, as Rails' t finds it (".total" in
+    # documents/_document is tudla_accounting.documents.document.total). With an HTML-safe
+    # value (a tag) to fill in, the others are escaped and the result is HTML-safe.
+    def tc_t(key, **values)
+      key = scope_key_by_partial(key).delete_prefix("tudla_accounting.") if key.start_with?(".")
+      return TudlaAccounting.t(key, **values) unless values.values.any? { |value| value.respond_to?(:html_safe?) && value.html_safe? }
+
+      TudlaAccounting.t(key, **values.transform_values { |value| ERB::Util.html_escape(value) }).html_safe # rubocop:disable Rails/OutputSafety -- the values are escaped; the wording is the app's
     end
 
     def tc_badge(text, tone: :neutral)

@@ -7,29 +7,29 @@
   <header class="flex flex-wrap justify-between gap-4">
     <div>
       <p class="tc-muted text-sm whitespace-pre-line" data-from><%= TudlaAccounting.configuration.document_header_for(statement.organization) %></p>
-      <h2 class="text-xl font-semibold">Statement of account</h2>
+      <h2 class="text-xl font-semibold"><%= tc_t(".title") %></h2>
       <p class="font-semibold mt-2" data-party><%= related_party_name(statement.party) %></p>
     </div>
     <div class="text-sm sm:text-right">
-      <p><%= open_items ? "Open items at #{tc_date(statement.thru)}" : "#{tc_date(statement.from)} to #{tc_date(statement.thru)}" %></p>
-      <p class="tc-muted">Amounts in <%= currency %></p>
+      <p><%= open_items ? tc_t(".open_items_at", date: tc_date(statement.thru)) : tc_t(".dates", from: tc_date(statement.from), thru: tc_date(statement.thru)) %></p>
+      <p class="tc-muted"><%= tc_t(".amounts_in", currency: currency) %></p>
     </div>
   </header>
 
   <div class="overflow-x-auto">
     <% if open_items %>
       <table class="tc-table" data-open-items>
-        <thead><tr><th>Date</th><th>Reference</th><th>Details</th><th>Due</th><th class="tc-num">Days overdue</th>
-          <% if foreign %><th class="tc-num">Foreign outstanding</th><% end %><th class="tc-num">Amount</th><th class="tc-num">Outstanding</th></tr></thead>
+        <thead><tr><th><%= tc_t(".date") %></th><th><%= tc_t(".reference") %></th><th><%= tc_t(".details") %></th><th><%= tc_t(".due") %></th><th class="tc-num"><%= tc_t(".days_overdue") %></th>
+          <% if foreign %><th class="tc-num"><%= tc_t(".foreign_outstanding") %></th><% end %><th class="tc-num"><%= tc_t(".amount") %></th><th class="tc-num"><%= tc_t(".outstanding") %></th></tr></thead>
         <tbody>
-          <% if statement.open_items.empty? %><tr><td colspan="<%= foreign ? 8 : 7 %>" class="tc-muted text-center">Nothing open.</td></tr><% end %>
+          <% if statement.open_items.empty? %><tr><td colspan="<%= foreign ? 8 : 7 %>" class="tc-muted text-center"><%= tc_t(".nothing_open") %></td></tr><% end %>
           <% statement.open_items.each do |line| %>
             <% item = line[:carrying_amount] %>
             <tr>
               <td class="whitespace-nowrap"><%= tc_date(line[:entry].transacted_at) %></td>
               <td class="whitespace-nowrap"><%= line[:entry].reference || line[:entry].number_label %></td>
               <td class="min-w-48"><%= link_to_if TudlaAccounting.configuration.pages, line[:entry].particulars, (entry_path(line[:entry]) if TudlaAccounting.configuration.pages) %></td>
-              <td class="whitespace-nowrap"><%= line[:credit] ? tc_badge("Credit to apply") : (tc_date(item.due_date) || "—") %></td>
+              <td class="whitespace-nowrap"><%= line[:credit] ? tc_badge(tc_t(".credit_to_apply")) : (tc_date(item.due_date) || "—") %></td>
               <td class="tc-num"><%= line[:days_outstanding] if line[:days_outstanding].positive? %></td>
               <% if foreign %><td class="tc-num whitespace-nowrap"><%= tc_money_text(Money.new(item.forex.other_currency_amount_cents, item.forex.other_currency)) if item.forex %></td><% end %>
               <td class="tc-num"><%= tc_money(item.credit? ? -item.detail.amount : item.detail.amount) %></td>
@@ -40,17 +40,17 @@
       </table>
     <% else %>
       <table class="tc-table" data-activity>
-        <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Details</th><th>Due</th><% if foreign %><th class="tc-num">Foreign amount</th><% end %>
-          <th class="tc-num"><%= TudlaAccounting::PartyStatement::CHARGE_HEADINGS.fetch(statement.type) %></th><th class="tc-num"><%= TudlaAccounting::PartyStatement::CREDIT_HEADING %></th><th class="tc-num">Balance</th></tr></thead>
+        <thead><tr><th><%= tc_t(".date") %></th><th><%= tc_t(".type") %></th><th><%= tc_t(".reference") %></th><th><%= tc_t(".details") %></th><th><%= tc_t(".due") %></th><% if foreign %><th class="tc-num"><%= tc_t(".foreign_amount") %></th><% end %>
+          <th class="tc-num"><%= tc_t(statement.type == :receivable ? ".invoiced" : ".billed") %></th><th class="tc-num"><%= tc_t(".paid_or_credited") %></th><th class="tc-num"><%= tc_t(".balance") %></th></tr></thead>
         <tbody>
           <tr data-opening>
-            <td class="whitespace-nowrap"><%= tc_date(statement.from) %></td><td colspan="<%= foreign ? 6 : 5 %>">Opening balance</td>
+            <td class="whitespace-nowrap"><%= tc_date(statement.from) %></td><td colspan="<%= foreign ? 6 : 5 %>"><%= tc_t(".opening_balance") %></td>
             <td class="tc-num"></td><td class="tc-num font-semibold"><%= tc_money(statement.opening) %></td>
           </tr>
           <% statement.lines.each do |line| %>
             <tr data-line>
               <td class="whitespace-nowrap"><%= tc_date(line.date) %></td>
-              <td><%= line.entry ? line.kind : tag.span(line.kind, class: "tc-muted") %></td>
+              <% kind = tc_t("statement_kinds.#{line.kind_key}") %><td><%= line.entry ? kind : tag.span(kind, class: "tc-muted") %></td>
               <td class="whitespace-nowrap"><%= line.entry && (line.entry.reference || line.entry.number_label) %></td>
               <td class="min-w-48"><%= link_to_if TudlaAccounting.configuration.pages, line.entry.particulars, (entry_path(line.entry) if TudlaAccounting.configuration.pages) if line.entry %></td>
               <td class="whitespace-nowrap"><%= tc_date(line.due_date) %></td>
@@ -60,9 +60,9 @@
               <td class="tc-num"><%= tc_money(line.balance) %></td>
             </tr>
           <% end %>
-          <% if statement.lines.empty? %><tr><td colspan="<%= foreign ? 9 : 8 %>" class="tc-muted text-center">Nothing in these dates.</td></tr><% end %>
+          <% if statement.lines.empty? %><tr><td colspan="<%= foreign ? 9 : 8 %>" class="tc-muted text-center"><%= tc_t(".nothing_in_dates") %></td></tr><% end %>
           <tr class="font-semibold" data-closing>
-            <td class="whitespace-nowrap"><%= tc_date(statement.thru) %></td><td colspan="<%= foreign ? 5 : 4 %>">Closing balance</td>
+            <td class="whitespace-nowrap"><%= tc_date(statement.thru) %></td><td colspan="<%= foreign ? 5 : 4 %>"><%= tc_t(".closing_balance") %></td>
             <td class="tc-num"><%= tc_money(statement.charges_total) %></td><td class="tc-num"><%= tc_money(statement.credits_total) %></td>
             <td class="tc-num"><%= tc_money(statement.closing) %></td>
           </tr>
@@ -74,12 +74,12 @@
   <footer class="grid gap-4 sm:grid-cols-[1fr_auto] items-end">
     <div class="overflow-x-auto">
       <table class="tc-table" data-aging>
-        <thead><tr><% TudlaAccounting::ReportsHelper::AGING_BUCKETS.each_value do |label| %><th class="tc-num"><%= label %></th><% end %></tr></thead>
+        <thead><tr><% TudlaAccounting::ReportsHelper::AGING_BUCKETS.each_key do |bucket| %><th class="tc-num"><%= tc_t("aging_buckets.#{bucket}") %></th><% end %></tr></thead>
         <tbody><tr><% TudlaAccounting::ReportsHelper::AGING_BUCKETS.each_key do |bucket| %><td class="tc-num"><%= tc_money(statement.aging[bucket]) %></td><% end %></tr></tbody>
       </table>
     </div>
     <div class="rounded-lg border border-[var(--tc-border)] px-4 py-3 sm:text-right" data-amount-due>
-      <p class="tc-muted text-sm"><%= statement.closing.negative? ? "In credit" : (statement.type == :receivable ? "Amount due" : "Balance owing") %> at <span class="whitespace-nowrap"><%= tc_date(statement.thru) %></span></p>
+      <p class="tc-muted text-sm"><%= tc_t(statement.closing.negative? ? ".in_credit_at" : (statement.type == :receivable ? ".amount_due_at" : ".balance_owing_at"), date: tag.span(tc_date(statement.thru), class: "whitespace-nowrap")) %></p>
       <p class="text-2xl font-semibold tc-num"><%= currency %> <%= TudlaAccounting::MoneyFormatter.number(statement.closing.abs, statement.organization) %></p>
     </div>
   </footer>

@@ -2,35 +2,36 @@
 <%# A payment as it goes to the contact: a receipt for money received, a payment notice
     (remittance advice) for money paid, with what it paid. It prints on its own. %>
 <% received = payment.received? %>
-<article class="tc-card tc-card-body space-y-6" data-document aria-label="<%= received ? "Receipt" : "Payment notice" %>">
+<% heading = tc_t(received ? ".receipt" : ".payment_notice") %>
+<article class="tc-card tc-card-body space-y-6" data-document aria-label="<%= heading %>">
   <header class="flex flex-wrap justify-between gap-6">
     <div class="whitespace-pre-line text-sm"><%= TudlaAccounting.configuration.document_header_for(payment.organization) %></div>
     <div class="text-right">
-      <h2 class="text-2xl font-bold tracking-tight"><%= received ? "Receipt" : "Payment notice" %><%= " (void)" if payment.void? %></h2>
+      <h2 class="text-2xl font-bold tracking-tight"><%= heading %><%= tc_t("void") if payment.void? %></h2>
       <dl class="mt-2 grid grid-cols-[auto_auto] justify-end gap-x-4 gap-y-1 text-sm">
-        <dt class="tc-muted">Date</dt><dd><%= tc_date(payment.paid_on) %></dd>
-        <% if payment.reference %><dt class="tc-muted">Reference</dt><dd><%= payment.reference %></dd><% end %>
+        <dt class="tc-muted"><%= tc_t(".date") %></dt><dd><%= tc_date(payment.paid_on) %></dd>
+        <% if payment.reference %><dt class="tc-muted"><%= tc_t(".reference") %></dt><dd><%= payment.reference %></dd><% end %>
       </dl>
     </div>
   </header>
 
-  <section class="text-sm" aria-label="<%= received ? "From" : "To" %>">
-    <p class="tc-muted"><%= received ? "Received from" : "Paid to" %></p>
+  <section class="text-sm" aria-label="<%= tc_t(received ? ".from" : ".to") %>">
+    <p class="tc-muted"><%= tc_t(received ? ".received_from" : ".paid_to") %></p>
     <p class="font-semibold"><%= payment.contact.name %></p>
     <% if payment.contact.full_address %><p class="whitespace-pre-line"><%= payment.contact.full_address %></p><% end %>
   </section>
 
   <% applications = payment.applications.select { |_target, _amount, allocation| allocation.active? } %>
   <table class="tc-table">
-    <thead><tr><th><%= received ? "For invoice" : "For bill" %></th><th>Dated</th><th class="tc-num">Amount (<%= payment.currency %>)</th></tr></thead>
+    <thead><tr><th><%= tc_t(received ? ".for_invoice" : ".for_bill") %></th><th><%= tc_t(".dated") %></th><th class="tc-num"><%= tc_t(".amount", currency: payment.currency) %></th></tr></thead>
     <tbody>
       <% applications.each do |target, amount, _allocation| %>
         <tr>
           <% if target.is_a?(TudlaAccounting::Document) %>
-            <td><%= target.number_label %><%= " (your #{target.reference})" if target.purchases? && target.reference %><% if target.withheld_cents.positive? %><span class="block tc-muted text-xs" data-withheld><%= tc_money(target.withheld) %> tax withheld from the bill</span><% end %></td>
+            <td><%= target.number_label %><%= tc_t(".your_number", reference: target.reference) if target.purchases? && target.reference %><% if target.withheld_cents.positive? %><span class="block tc-muted text-xs" data-withheld><%= tc_t(".withheld_from_bill", amount: tc_money(target.withheld)) %></span><% end %></td>
             <td><%= tc_date(target.issued_on) %></td>
           <% elsif target.is_a?(TudlaAccounting::Payment) %>
-            <td><%= received ? "Refunded to you" : "Refunded to us" %><%= " (#{target.reference})" if target.reference %></td>
+            <td><%= tc_t(received ? ".refunded_to_you" : ".refunded_to_us") %><%= " (#{target.reference})" if target.reference %></td>
             <td><%= tc_date(target.paid_on) %></td>
           <% else %>
             <td><%= target.reference || target.particulars %></td>
@@ -40,15 +41,15 @@
         </tr>
       <% end %>
       <% if payment.unapplied.positive? %>
-        <tr><td colspan="2"><%= received ? "Held as a credit to your account" : "Paid in advance, held as a credit" %></td><td class="tc-num"><%= tc_money(payment.unapplied) %></td></tr>
+        <tr><td colspan="2"><%= tc_t(received ? ".held_as_credit" : ".paid_in_advance") %></td><td class="tc-num"><%= tc_money(payment.unapplied) %></td></tr>
       <% end %>
     </tbody>
     <tfoot>
       <% if payment.withheld_cents.positive? %>
-        <tr><td colspan="2" class="text-right">Total settled</td><td class="tc-num"><%= tc_money(payment.settled) %></td></tr>
-        <tr data-withheld><td colspan="2" class="text-right">Less tax <%= received ? "you" : "we" %> withheld, <%= payment.withheld_taxes.reject(&:reversal).map { |row| row.withholding_code.code }.uniq.to_sentence %></td><td class="tc-num"><%= tc_money(-payment.withheld) %></td></tr>
+        <tr><td colspan="2" class="text-right"><%= tc_t(".total_settled") %></td><td class="tc-num"><%= tc_money(payment.settled) %></td></tr>
+        <tr data-withheld><td colspan="2" class="text-right"><%= tc_t(received ? ".less_withheld_received" : ".less_withheld_paid", codes: payment.withheld_taxes.reject(&:reversal).map { |row| row.withholding_code.code }.uniq.to_sentence) %></td><td class="tc-num"><%= tc_money(-payment.withheld) %></td></tr>
       <% end %>
-      <tr class="font-semibold"><td colspan="2" class="text-right"><%= received ? "Total received" : "Total paid" %></td><td class="tc-num"><%= tc_money(payment.amount) %></td></tr>
+      <tr class="font-semibold"><td colspan="2" class="text-right"><%= tc_t(received ? ".total_received" : ".total_paid") %></td><td class="tc-num"><%= tc_money(payment.amount) %></td></tr>
     </tfoot>
   </table>
 
