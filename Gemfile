@@ -11,6 +11,8 @@ gem "solid_cache"
 gem "solid_cable"
 
 gem "propshaft"
+# The dummy app's own pages (DaisyUI); the engine's ship built (rake tudla_accounting:css:build).
+gem "tailwindcss-rails", "~> 4.0"
 
 group :development, :test do
   gem "rspec-rails"

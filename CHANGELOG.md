@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** the pages bring their own stylesheet, built with Tailwind and shipped in the gem (`tudla_accounting.css`), instead of the host compiling the engine's styles into its `tailwind.css`. The engine no longer depends on `tailwindcss-rails`, and the install generator no longer adds the `@import "../builds/tailwind/tudla_accounting";` line, which can be removed. The host's own CSS no longer reaches the pages; the new `page_stylesheets` setting links stylesheets of its own after theirs, to set the `--tc-*` colours. PDFs use the built stylesheet unless `pdf_stylesheet` says otherwise.
+
 ### Added
 
 - A `pdf_renderer` setting makes the PDFs some other way than headless Chrome: a callable given the page's HTML and the paper, returning the PDF's bytes. With it, the `ferrum` gem isn't needed.

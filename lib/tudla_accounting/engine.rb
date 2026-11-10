@@ -34,9 +34,13 @@ module TudlaAccounting
       end
     end
 
-    # Ensure the engine's assets are visible to the host's pipeline
+    # The pages' built stylesheet (tudla_accounting.css), for Propshaft, which serves
+    # everything on its paths, and Sprockets, which needs it named for precompiling.
     initializer "tudla_accounting.assets.precompile" do |app|
-      app.config.assets.paths << root.join("app/assets/tailwind")
+      if app.config.respond_to?(:assets)
+        app.config.assets.paths << root.join("app/assets/builds")
+        app.config.assets.precompile += %w[tudla_accounting.css] if defined?(Sprockets)
+      end
     end
   end
 end

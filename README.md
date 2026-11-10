@@ -97,7 +97,7 @@ TudlaAccounting::PdfMaker.statements([ statement ], open_items: false)
 TudlaAccounting::PdfMaker.payment(payment)
 ```
 
-The page is rendered with the engine's styles inline (the host's compiled `tailwind.css`, or the `pdf_stylesheet` setting) and the browser is barred from fetching anything, so making a PDF reaches nothing on the network. `pdf_browser_options` passes options to `Ferrum::Browser` (Chrome's path, a timeout; in a container that can't sandbox Chrome, `browser_options: { "no-sandbox" => nil }`), and `pdf_paper` picks A4 or Letter. A PDF that can't be made raises `PdfMaker::Error`; the pages say why.
+The page is rendered with the engine's styles inline (its own built stylesheet, or the `pdf_stylesheet` setting) and the browser is barred from fetching anything, so making a PDF reaches nothing on the network. `pdf_browser_options` passes options to `Ferrum::Browser` (Chrome's path, a timeout; in a container that can't sandbox Chrome, `browser_options: { "no-sandbox" => nil }`), and `pdf_paper` picks A4 or Letter. A PDF that can't be made raises `PdfMaker::Error`; the pages say why.
 
 To make PDFs without headless Chrome, set `pdf_renderer` to a callable given the page's HTML, with the styles already inline, and the paper, returning the PDF's bytes; `ferrum` is then not needed. `paper:` is a size by name (`:A4`, `:letter`) or `[width, height]` in inches (the 2307's 8.5 x 13), and `margin:` is in inches on every side. The page needs nothing from the network, so keep the renderer from fetching anything if it can. Whatever it raises reaches the pages as `PdfMaker::Error`. The one-page-a-sheet layouts (the 2307, the books) are checked in Chrome, so check them in yours.
 
@@ -529,7 +529,7 @@ Mounted at `/accounting` by the install generator (see [Integration](#integratio
 - **Setup:** upload a chart of accounts with opening balances (CSV or Excel), or enter or correct opening balances account by account, with live totals checking that they balance. Manage tax codes and reporting dimensions. Also import the receivables and payables open at the cut-over, and run the foreign exchange revaluation. A balance check compares the stored balances with the posted entries and can rebuild them.
 - **Activity:** the audit trail, newest first, filterable by kind, linking to entries, accounts and years that still exist.
 
-The pages use Tailwind CSS with the engine's own `tc-` component classes (no DaisyUI needed) and follow the host's light/dark theme: they read and save the reader's choice in `localStorage` under the `theme_storage_key` setting (`"theme"`, DaisyUI's, by default), and follow the operating system's with none set or with the setting `nil`. Their Stimulus controllers load through the engine's import map.
+The pages bring their own stylesheet, built with Tailwind CSS from the engine's `tc-` component classes and shipped in the gem, so the host needs neither Tailwind nor DaisyUI, and its own CSS doesn't reach them. To restyle them, set the `--tc-*` colours (`--tc-primary`, `--tc-bg`, `--tc-text`... in `app/assets/tailwind/tudla_accounting/engine.css`) in a stylesheet of your own and name it in `page_stylesheets`, which the pages link after theirs. They follow the host's light/dark theme: they read and save the reader's choice in `localStorage` under the `theme_storage_key` setting (`"theme"`, DaisyUI's, by default), and follow the operating system's with none set or with the setting `nil`. Their Stimulus controllers load through the engine's import map.
 
 ## Usage
 
@@ -580,7 +580,7 @@ TudlaAccounting::Balance.find_by(account: cash, period: year).ending_amount   # 
 - **money-rails** for amounts and currencies, **ancestry** for the account and period trees
 - **PostgreSQL** (the ledger's integrity checks and triggers rely on it)
 - Works with any Active Job backend; with **Solid Queue**, background posting jobs for an organization run one at a time (the dummy app runs the Solid trifecta)
-- **Tailwind CSS v4** for engine views (no DaisyUI dependency) and **Importmap Rails**
+- **Tailwind CSS v4** for engine views (no DaisyUI dependency), built into a stylesheet that ships in the gem, and **Importmap Rails**
 - **RSpec**, **FactoryBot**, **SimpleCov** (100% line coverage), **Capybara**
 - **RuboCop** with `rubocop-rails-omakase`
 - A full dummy Rails app in `spec/dummy/` for running the engine
@@ -648,7 +648,7 @@ The engine's specs boot the dummy app without the demo, so they never depend on 
 
 ## Integration into a Host Application
 
-Requirements: Ruby 3.3+, Rails 8.1, PostgreSQL, and (for the engine's pages) tailwindcss-rails 4 and importmap-rails, as a new Rails app with `--css=tailwind` has.
+Requirements: Ruby 3.3+, Rails 8.1, PostgreSQL, and (for the engine's pages) an asset pipeline (Propshaft, as a new Rails app has, or Sprockets) and importmap-rails. The pages' stylesheet comes built, so the app needs no Tailwind.
 
 ```ruby
 # Gemfile
@@ -662,7 +662,7 @@ bin/rails generate tudla_accounting:install   # --mount-path=/books, --skip-migr
 bin/rails db:migrate
 ```
 
-The generator writes `config/initializers/tudla_accounting.rb` with every setting, mounts the engine (at `/accounting` by default), copies the engine's migrations, and imports the engine's styles into `app/assets/tailwind/application.css` (with tailwindcss-rails). To do it by hand: `bin/rails tudla_accounting:install:migrations`, `mount TudlaAccounting::Engine => "/accounting"` in `config/routes.rb`, and `@import "../builds/tailwind/tudla_accounting";` in the Tailwind entry point.
+The generator writes `config/initializers/tudla_accounting.rb` with every setting, mounts the engine (at `/accounting` by default), and copies the engine's migrations. To do it by hand: `bin/rails tudla_accounting:install:migrations` and `mount TudlaAccounting::Engine => "/accounting"` in `config/routes.rb`. An app set up by an earlier version has `@import "../builds/tailwind/tudla_accounting";` in its Tailwind entry point; it's no longer needed, and can be removed.
 
 ### Hooks for the host app
 
@@ -738,11 +738,12 @@ TudlaAccounting.configure do |config|
   # PDFs (with the ferrum gem): Ferrum::Browser options, the paper, and the compiled stylesheet
   config.pdf_browser_options = { browser_path: "/usr/bin/chromium", timeout: 60 }
   config.pdf_paper = :A4                  # per organization: or :Letter, :A5...
-  config.pdf_stylesheet = nil             # found among the host's assets as tailwind.css; or a path, or ->{ css }
+  config.pdf_stylesheet = nil             # the engine's built stylesheet; or a path, or ->{ css }
   config.pdf_renderer = nil               # or ->(html, paper:, landscape:, margin:) { pdf_bytes }, in place of ferrum
 
   # The pages' light or dark choice, kept in localStorage under the host's key; nil keeps none
   config.theme_storage_key = "theme"
+  config.page_stylesheets = []            # the host's stylesheets linked after the pages' own, e.g. ["accounting_theme"] setting --tc-* colours
 
   # Emailing documents to customers and suppliers (sent through the host's ActionMailer setup)
   config.document_mail_from = ->(organization) { "#{organization.name} <accounts@example.com>" } # per organization; the ActionMailer default if nil
@@ -770,6 +771,8 @@ The dummy app (`spec/dummy/`) uses **Tailwind CSS v4** and **DaisyUI** for all U
 
 ### Engine
 Engine views use **Tailwind CSS v4 only** — no DaisyUI dependency. Engine styles must work standalone in any host app. They should be compatible with DaisyUI (no conflicts) but must not require it.
+
+The pages' stylesheet is built from `app/assets/tailwind/tudla_accounting/engine.css` into `app/assets/builds/tudla_accounting.css`, which is committed and ships in the gem: `bundle exec rake tudla_accounting:css:build` after changing the classes in views, helpers or JavaScript (`bin/dev` watches them). `spec/integration/built_stylesheet_spec.rb` fails while it's out of date.
 
 ## Database Configuration Notes
 

@@ -14,7 +14,7 @@ module TudlaAccounting
   # Each returns the PDF's bytes. The page is rendered with the engine's styles inline and
   # the browser is barred from fetching anything, so nothing in it reaches the network.
   # The browser, paper and stylesheet come from the pdf_* settings. Error (a Ferrum error or
-  # the renderer's underneath, or no stylesheet) when it can't be made.
+  # the renderer's underneath) when it can't be made.
   module PdfMaker
     class Error < StandardError; end
 
@@ -96,17 +96,15 @@ module TudlaAccounting
       raise Error, "The PDF couldn't be made (#{e.message})"
     end
 
-    # The compiled CSS with the engine's styles: the pdf_stylesheet setting (a path, or a
-    # callable returning the CSS), else the host's "tailwind.css" asset.
+    BUILT_STYLESHEET = Engine.root.join("app/assets/builds/tudla_accounting.css")
+
+    # The CSS with the engine's styles: the pdf_stylesheet setting (a path, or a callable
+    # returning the CSS), else the engine's own built stylesheet.
     def stylesheet
       setting = TudlaAccounting.configuration.pdf_stylesheet
       return setting.call.to_s if setting.respond_to?(:call)
-      return File.read(setting, encoding: "UTF-8") if setting
 
-      asset = Rails.application.respond_to?(:assets) && Rails.application.assets.respond_to?(:load_path) && Rails.application.assets.load_path.find("tailwind.css")
-      raise Error, "PDFs need the compiled stylesheet: build tailwind.css, or set pdf_stylesheet" unless asset
-
-      asset.content.dup.force_encoding(Encoding::UTF_8) # read as bytes
+      File.read(setting || BUILT_STYLESHEET, encoding: "UTF-8")
     end
   end
 end

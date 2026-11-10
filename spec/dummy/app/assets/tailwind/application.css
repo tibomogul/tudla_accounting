@@ -12,16 +12,5 @@
     /* custom theme here */
 }
 
-/*
-   IMPORT THE ENGINE CSS ARTIFACT
-
-   Crucial: You are importing the *built* file from the builds directory,
-   NOT the source file from the engine.
-
-   Relative Path Logic:
-   Current Dir: app/assets/tailwind/
-   Target Dir:  app/assets/builds/tailwind/
-
-   Path:../builds/tailwind/<engine_name>
-*/
-@import "../builds/tailwind/tudla_accounting";
+/* The engine's pages bring their own built stylesheet (app/assets/builds/tudla_accounting.css
+   in the engine), so it isn't imported here, as in a host app. */

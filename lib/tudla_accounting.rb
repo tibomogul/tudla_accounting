@@ -1,6 +1,5 @@
 # Requires are necessary for the Engine to load these gems' tasks and classes
 require "bigdecimal"
-require "tailwindcss-rails"
 require "importmap-rails"
 require "stimulus-rails"
 require "money-rails"
@@ -77,7 +76,7 @@ module TudlaAccounting
                   :attachment_content_types, :attachment_max_size, :document_header, :books_header, :withholding_agent, :tax_registration, :country,
                   :api_rate_limit, :api_rate_limit_store, :pdf_browser_options, :pdf_paper, :pdf_stylesheet,
                   :document_mailer, :document_mail_from, :document_mail_reply_to
-    attr_reader :number_format, :forex_rate_provider, :pdf_renderer, :theme_storage_key
+    attr_reader :number_format, :forex_rate_provider, :pdf_renderer, :theme_storage_key, :page_stylesheets
     attr_reader :carrying_amount_sources, :entry_sources, :entry_number_series, :document_number_format, :document_email_templates, :reminder_days
 
     def initialize
@@ -167,8 +166,8 @@ module TudlaAccounting
       # e.g. { browser_path: "/usr/bin/chromium", timeout: 60 } (and, in a container that
       # can't sandbox Chrome, browser_options: { "no-sandbox" => nil }); the paper size
       # (:A4 or :Letter, or a callable given the organization returning it); and the
-      # compiled stylesheet with the engine's styles, a path or a callable returning the
-      # CSS, found among the host's assets as "tailwind.css" when nil. pdf_renderer
+      # stylesheet, a path or a callable returning the CSS, the engine's own built one
+      # (with its pages' styles) when nil. pdf_renderer
       # replaces headless Chrome; see pdf_renderer=.
       @pdf_browser_options = {}
       @pdf_paper = :A4
@@ -178,6 +177,9 @@ module TudlaAccounting
       # follow the host app's own switch (DaisyUI's apps use "theme"); nil keeps no
       # choice, and the pages follow the operating system's.
       @theme_storage_key = "theme"
+      # The host's stylesheets the pages link after the engine's own, by asset name
+      # (["accounting_theme"]), to restyle them, such as by setting the --tc-* colours.
+      @page_stylesheets = []
       # Emailing invoices, statements and payments to customers and suppliers: the mailer
       # (its class name; see DocumentMailer for what one takes), the From and Reply-To
       # addresses (text, or a callable given the organization; From falls back to the host's
@@ -310,6 +312,10 @@ module TudlaAccounting
     # The localStorage key for the light or dark choice (see theme_storage_key above).
     def theme_storage_key=(key)
       @theme_storage_key = key.presence&.to_s
+    end
+
+    def page_stylesheets=(names)
+      @page_stylesheets = Array(names).map(&:to_s).compact_blank.freeze
     end
 
     def reminder_days=(days)

@@ -144,8 +144,8 @@ RSpec.describe TudlaAccounting::PdfMaker, type: :service do
   end
 
   describe "the stylesheet" do
-    it "comes from the setting, a callable or a path, else the host's tailwind.css" do
-      expect(described_class.stylesheet).to include(".tc-app")
+    it "comes from the setting, a callable or a path, else the engine's built one" do
+      expect(described_class.stylesheet).to include(".tc-app").and(eq(File.read(TudlaAccounting::Engine.root.join("app/assets/builds/tudla_accounting.css"))))
       TudlaAccounting.configuration.pdf_stylesheet = -> { "body { color: red }" }
       expect(described_class.stylesheet).to eq("body { color: red }")
       file = Tempfile.create([ "styles", ".css" ]).tap { |io| io.write("p { margin: 0 }") && io.flush }
@@ -153,11 +153,6 @@ RSpec.describe TudlaAccounting::PdfMaker, type: :service do
       expect(described_class.stylesheet).to eq("p { margin: 0 }")
     ensure
       file&.close
-    end
-
-    it "is needed" do
-      allow(Rails.application.assets.load_path).to receive(:find).with("tailwind.css").and_return(nil)
-      expect { described_class.stylesheet }.to raise_error(described_class::Error, "PDFs need the compiled stylesheet: build tailwind.css, or set pdf_stylesheet")
     end
   end
 

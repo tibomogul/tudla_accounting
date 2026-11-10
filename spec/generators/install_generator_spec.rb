@@ -31,29 +31,22 @@ RSpec.describe TudlaAccounting::Generators::InstallGenerator do
 
   def read(path) = File.read(File.join(root, path))
 
-  it "writes the initializer, mounts the engine, imports its styles and copies its migrations" do
+  it "writes the initializer, mounts the engine and copies its migrations, leaving the app's styles alone" do
     output = generate
 
     initializer = read("config/initializers/tudla_accounting.rb")
     expect(initializer).to include("TudlaAccounting.configure do |config|", "# --- Pages (mounted at /accounting) ---", "config.authorize")
     expect { RubyVM::InstructionSequence.compile(initializer) }.not_to raise_error
     expect(read("config/routes.rb")).to include(%(mount TudlaAccounting::Engine => "/accounting"))
-    expect(File.read(css)).to include(%(@import "../builds/tailwind/tudla_accounting";))
+    expect(File.read(css)).to eq(%(@import "tailwindcss";\n))
     expect(output).to include("TudlaAccounting is installed", "Open /accounting once signed in", "bin/rails active_storage:install")
     expect(rakes).to eq([ "tudla_accounting:install:migrations" ])
   end
 
-  it "takes another mount path, can skip migrations, and imports the styles only once" do
+  it "takes another mount path, and can skip migrations" do
     generate("--mount-path=/books", "--skip-migrations")
-    generate("--mount-path=/books", "--skip-migrations", "--force")
 
     expect(read("config/routes.rb")).to include(%(mount TudlaAccounting::Engine => "/books"))
-    expect(File.read(css).scan("builds/tailwind/tudla_accounting").size).to eq(1)
     expect(rakes).to be_empty
-  end
-
-  it "says how to import the styles when the app has no Tailwind entry point" do
-    File.delete(css)
-    expect(generate("--skip-migrations")).to include("app/assets/tailwind/application.css not found")
   end
 end

@@ -8,13 +8,9 @@
 
   <%= yield :head %>
 
-  <%#
-    The engine's Tailwind CSS is compiled into the host application's tailwind.css
-    via the @import stub in app/assets/builds/tailwind/tudla_accounting.css.
-    Referencing "tailwind" here picks up that compiled output which includes all
-    engine styles. The host app must run tailwindcss:build to generate this file.
-  %>
-  <%= stylesheet_link_tag "tailwind", media: "all" %>
+  <%# The engine's own built stylesheet (rake tudla_accounting:css:build), then any of the
+      host's (the page_stylesheets setting), to restyle the --tc-* tokens. %>
+  <%= stylesheet_link_tag "tudla_accounting", *TudlaAccounting.configuration.page_stylesheets, media: "all" %>
   <%= javascript_importmap_tags "tudla_accounting/application" %>
   <% if (theme_key = TudlaAccounting.configuration.theme_storage_key) %>
     <script>
