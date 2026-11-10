@@ -77,7 +77,7 @@ module TudlaAccounting
                   :attachment_content_types, :attachment_max_size, :document_header, :books_header, :withholding_agent, :tax_registration, :country,
                   :api_rate_limit, :api_rate_limit_store, :pdf_browser_options, :pdf_paper, :pdf_stylesheet,
                   :document_mailer, :document_mail_from, :document_mail_reply_to
-    attr_reader :number_format, :forex_rate_provider
+    attr_reader :number_format, :forex_rate_provider, :pdf_renderer, :theme_storage_key
     attr_reader :carrying_amount_sources, :entry_sources, :entry_number_series, :document_number_format, :document_email_templates, :reminder_days
 
     def initialize
@@ -168,10 +168,16 @@ module TudlaAccounting
       # can't sandbox Chrome, browser_options: { "no-sandbox" => nil }); the paper size
       # (:A4 or :Letter, or a callable given the organization returning it); and the
       # compiled stylesheet with the engine's styles, a path or a callable returning the
-      # CSS, found among the host's assets as "tailwind.css" when nil.
+      # CSS, found among the host's assets as "tailwind.css" when nil. pdf_renderer
+      # replaces headless Chrome; see pdf_renderer=.
       @pdf_browser_options = {}
       @pdf_paper = :A4
       @pdf_stylesheet = nil
+      @pdf_renderer = nil
+      # Where the pages keep the reader's light or dark choice in localStorage, so they
+      # follow the host app's own switch (DaisyUI's apps use "theme"); nil keeps no
+      # choice, and the pages follow the operating system's.
+      @theme_storage_key = "theme"
       # Emailing invoices, statements and payments to customers and suppliers: the mailer
       # (its class name; see DocumentMailer for what one takes), the From and Reply-To
       # addresses (text, or a callable given the organization; From falls back to the host's
@@ -285,6 +291,27 @@ module TudlaAccounting
     # e.g. [7, 14, 30]: whole days, kept in order. ReminderRunner (and SendRemindersJob,
     # which the host schedules) sends each reminder that is due, once.
     # Or a callable given the organization, returning them.
+    # What makes the PDFs instead of headless Chrome (ferrum): a callable given the page's
+    # HTML, complete with the engine's styles inline, and the paper, returning the PDF's
+    # bytes:
+    #
+    #   config.pdf_renderer = ->(html, paper:, landscape:, margin:) { Grover.new(html, ...).to_pdf }
+    #
+    # paper: is a size by name (:A4, :letter) or [width, height] in inches; margin: is in
+    # inches, on every side. The page needs nothing from the network, so the renderer can
+    # be kept from fetching anything. An error it raises reaches the pages as
+    # PdfMaker::Error. nil uses ferrum, when the host bundles it.
+    def pdf_renderer=(renderer)
+      raise ArgumentError, "pdf_renderer must be nil or a callable given the HTML, paper:, landscape: and margin:" unless renderer.nil? || renderer.respond_to?(:call)
+
+      @pdf_renderer = renderer
+    end
+
+    # The localStorage key for the light or dark choice (see theme_storage_key above).
+    def theme_storage_key=(key)
+      @theme_storage_key = key.presence&.to_s
+    end
+
     def reminder_days=(days)
       @reminder_days = days.respond_to?(:call) ? days : self.class.reminder_days(days)
     end
@@ -497,13 +524,16 @@ module TudlaAccounting
     end
   end
 
-  # Whether the engine can make PDFs: the host app bundles the ferrum gem (the engine
-  # doesn't depend on it) and the server has Chrome or Chromium for it to drive. The pages
-  # offer printing only otherwise.
-  def self.pdf?
-    return @pdf if defined?(@pdf)
+  # Whether the engine can make PDFs: the pdf_renderer setting is set, or the host app
+  # bundles the ferrum gem (the engine doesn't depend on it) and the server has Chrome or
+  # Chromium for it to drive. The pages offer printing only otherwise.
+  def self.pdf? = configuration&.pdf_renderer.present? || ferrum?
 
-    @pdf = begin
+  # Whether the host bundles the ferrum gem.
+  def self.ferrum?
+    return @ferrum if defined?(@ferrum)
+
+    @ferrum = begin
       require "ferrum"
       true
     rescue LoadError

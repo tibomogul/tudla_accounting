@@ -157,11 +157,11 @@ Grouped in the suggested order. Items marked **(decide)** need a decision before
 
 ### 4. Front-end lock-in
 
-- [ ] **(decide)** Split into a core gem and a UI gem, or keep one gem with the UI optional.
+- [x] **(decide)** Split into a core gem and a UI gem, or keep one gem with the UI optional. One gem, its pages needing nothing from the host's front end: a built stylesheet and its own JavaScript, `tailwindcss-rails`, `importmap-rails` and `stimulus-rails` no longer dependencies, and the pages optional by a setting (0.6.0). A second gem would mean matched versions, split specs and CI for one maintainer, to save an API-only host some unused views; the PDF and email templates would have to stay in the core anyway.
 - [ ] Ship a precompiled engine stylesheet, so the host doesn't need Tailwind.
 - [ ] Make importmap optional for hosts using jsbundling or Vite.
-- [ ] Make the theme sync configurable, instead of assuming `localStorage('theme')`.
-- [ ] Make the PDF renderer replaceable, so headless Chrome isn't required.
+- [x] Make the theme sync configurable, instead of assuming `localStorage('theme')`. `theme_storage_key`, `"theme"` by default, `nil` for none.
+- [x] Make the PDF renderer replaceable, so headless Chrome isn't required. `pdf_renderer`, a callable given the HTML and the paper.
 
 ### 5. Translation
 

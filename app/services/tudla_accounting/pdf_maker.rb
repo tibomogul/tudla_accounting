@@ -2,7 +2,8 @@
 
 module TudlaAccounting
   # Makes the PDFs that go to customers and suppliers, from the same partials the pages
-  # print, in headless Chrome (the ferrum gem; see TudlaAccounting.pdf?):
+  # print, in headless Chrome (the ferrum gem), or by the pdf_renderer setting (see
+  # TudlaAccounting.pdf?):
   #
   #   PdfMaker.document(invoice)                       # an invoice, bill or credit note
   #   PdfMaker.statements([statement], open_items: false)
@@ -12,8 +13,8 @@ module TudlaAccounting
   #
   # Each returns the PDF's bytes. The page is rendered with the engine's styles inline and
   # the browser is barred from fetching anything, so nothing in it reaches the network.
-  # The browser, paper and stylesheet come from the pdf_* settings. Error (a Ferrum error
-  # underneath, or no stylesheet) when it can't be made.
+  # The browser, paper and stylesheet come from the pdf_* settings. Error (a Ferrum error or
+  # the renderer's underneath, or no stylesheet) when it can't be made.
   module PdfMaker
     class Error < StandardError; end
 
@@ -42,7 +43,7 @@ module TudlaAccounting
     # whatever pdf_paper says. See Reports::SupplierCertificates.
     def supplier_certificates(report, certificates)
       render("tudla_accounting/reports/supplier_certificates", { report: report, certificates: certificates }, title: "BIR Form 2307", organization: report.organization,
-                                                                                                                paper: { paper_width: 8.5, paper_height: 13 }, margin: 0.3)
+                                                                                                                paper: [ 8.5, 13 ], margin: 0.3)
     end
 
     # A payment summary for each payee: what the payer paid it and withheld over the
@@ -53,22 +54,40 @@ module TudlaAccounting
 
     # The PDF of a partial, in the PDF layout, for an organization's amounts.
     def render(partial, locals, title:, organization:, landscape: false, paper: nil, margin: 0.5, **options)
-      raise Error, "PDFs need the ferrum gem" unless TudlaAccounting.pdf?
+      raise Error, "PDFs need the ferrum gem or the pdf_renderer setting" unless TudlaAccounting.pdf?
 
       html = PdfViewsController.render(template: "tudla_accounting/pdf_views/page", layout: "tudla_accounting/pdf", assigns: { title: title, organization: organization },
                                        locals: { partial: partial, locals: locals, **options })
       from_html(html, landscape: landscape, paper: paper, margin: margin, organization: organization)
     end
 
-    # The PDF of a page's HTML, on the organization's paper (pdf_paper) unless paper: says.
+    # The PDF of a page's HTML, on the organization's paper (pdf_paper) unless paper: says
+    # (a size by name, or [width, height] in inches), by the pdf_renderer setting or ferrum.
     def from_html(html, landscape: false, paper: nil, margin: 0.5, organization: nil)
-      settings = TudlaAccounting.configuration
-      browser = Ferrum::Browser.new(**{ timeout: 30 }.merge(settings.pdf_browser_options.to_h))
+      paper ||= TudlaAccounting.configuration.pdf_paper_for(organization)
+      renderer = TudlaAccounting.configuration.pdf_renderer
+      renderer ? by_renderer(renderer, html, paper: paper, landscape: landscape, margin: margin) : in_chrome(html, paper: paper, landscape: landscape, margin: margin)
+    end
+
+    def by_renderer(renderer, html, **page)
+      pdf = renderer.call(html, **page)
+      raise Error, "The PDF couldn't be made (the pdf_renderer gave #{pdf.class.name}, not the PDF's bytes)" unless pdf.is_a?(String) && pdf.present?
+
+      pdf.b.freeze
+    rescue Error
+      raise
+    rescue StandardError => e
+      raise Error, "The PDF couldn't be made (#{e.message})"
+    end
+
+    def in_chrome(html, paper:, landscape:, margin:)
+      browser = Ferrum::Browser.new(**{ timeout: 30 }.merge(TudlaAccounting.configuration.pdf_browser_options.to_h))
       begin
         page = browser.create_page
         page.network.blocklist = [ /./ ]
         page.content = html
-        page.pdf(encoding: :binary, **(paper || { format: settings.pdf_paper_for(organization) }), landscape: landscape, print_background: true,
+        size = paper.is_a?(Array) ? { paper_width: paper.first, paper_height: paper.last } : { format: paper }
+        page.pdf(encoding: :binary, **size, landscape: landscape, print_background: true,
                  margin_top: margin, margin_bottom: margin, margin_left: margin, margin_right: margin)
       ensure
         browser.quit

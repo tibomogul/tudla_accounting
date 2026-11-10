@@ -1,10 +1,12 @@
 import { Controller } from "@hotwired/stimulus"
 
-// Switches between light and dark. Saves the choice in localStorage("theme"), the key
-// DaisyUI host apps use, so the engine and the host stay in step; until a choice is made
-// the page follows the operating system's preference.
+// Switches between light and dark. Saves the choice in localStorage under the key the
+// theme_storage_key setting gives ("theme" by default, the key DaisyUI host apps use), so
+// the engine and the host stay in step; until a choice is made, or with no key, the page
+// follows the operating system's preference.
 export default class extends Controller {
   static targets = ["sun", "moon"]
+  static values = { key: String }
 
   connect() {
     this.media = window.matchMedia("(prefers-color-scheme: dark)")
@@ -20,7 +22,9 @@ export default class extends Controller {
   toggle() {
     const theme = this.current() === "dark" ? "light" : "dark"
     document.documentElement.setAttribute("data-theme", theme)
-    try { localStorage.setItem("theme", theme) } catch (_error) { /* storage unavailable: the switch lasts for this page */ }
+    if (this.keyValue) {
+      try { localStorage.setItem(this.keyValue, theme) } catch (_error) { /* storage unavailable: the switch lasts for this page */ }
+    }
     this.render()
   }
 

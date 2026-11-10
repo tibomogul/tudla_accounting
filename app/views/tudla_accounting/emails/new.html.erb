@@ -9,7 +9,7 @@
     <%= tc_field form, :subject_line, label: "Subject", required: true %>
     <%= tc_field form, :message, as: :text_area, rows: 9, required: true %>
     <p class="text-sm tc-muted" data-attachment>
-      <% if TudlaAccounting.pdf? %>Attached: <%= @attachment %><% else %>No PDF is attached: the app can't make PDFs (it needs the ferrum gem).<% end %>
+      <% if TudlaAccounting.pdf? %>Attached: <%= @attachment %><% else %>No PDF is attached: the app can't make PDFs (it needs the ferrum gem or the pdf_renderer setting).<% end %>
     </p>
   </div>
   <div class="flex gap-2">

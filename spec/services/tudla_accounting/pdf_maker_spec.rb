@@ -163,26 +163,65 @@ RSpec.describe TudlaAccounting::PdfMaker, type: :service do
 
   it "says when it can't make one" do
     allow(TudlaAccounting).to receive(:pdf?).and_return(false)
-    expect { described_class.document(invoice) }.to raise_error(described_class::Error, "PDFs need the ferrum gem")
+    expect { described_class.document(invoice) }.to raise_error(described_class::Error, "PDFs need the ferrum gem or the pdf_renderer setting")
 
     allow(TudlaAccounting).to receive(:pdf?).and_call_original
     allow(Ferrum::Browser).to receive(:new).and_raise(Ferrum::BinaryNotFoundError, "Could not find an executable for the browser")
     expect { described_class.from_html("<p>x</p>") }.to raise_error(described_class::Error, "The PDF couldn't be made (Could not find an executable for the browser)")
   end
+
+  describe "with the pdf_renderer setting" do
+    let(:made) { [] }
+
+    before do
+      TudlaAccounting.configuration.pdf_renderer = lambda do |html, **page|
+        made << [ html, page ]
+        "%PDF-1.4 made elsewhere".encode(Encoding::UTF_8)
+      end
+    end
+
+    it "is given the page with the styles inline, and the paper, in place of Chrome" do
+      expect(Ferrum::Browser).not_to receive(:new)
+      pdf = described_class.document(invoice)
+      expect([ pdf, pdf.encoding, pdf.frozen? ]).to eq([ "%PDF-1.4 made elsewhere".b, Encoding::BINARY, true ])
+      html, page = made.last
+      expect(html).to include("INV-0001", ".tc-app")
+      expect(page).to eq(paper: :A4, landscape: false, margin: 0.5)
+
+      TudlaAccounting.configuration.pdf_paper = :Letter
+      described_class.from_html("<p>x</p>", landscape: true)
+      expect(made.last.last).to eq(paper: :letter, landscape: true, margin: 0.5)
+    end
+
+    it "says when it gives no PDF or fails" do
+      TudlaAccounting.configuration.pdf_renderer = ->(_html, **) { nil }
+      expect { described_class.from_html("<p>x</p>") }.to raise_error(described_class::Error, "The PDF couldn't be made (the pdf_renderer gave NilClass, not the PDF's bytes)")
+      TudlaAccounting.configuration.pdf_renderer = ->(_html, **) { raise IOError, "the service is down" }
+      expect { described_class.from_html("<p>x</p>") }.to raise_error(described_class::Error, "The PDF couldn't be made (the service is down)")
+    end
+
+    it "must be a callable" do
+      expect { TudlaAccounting.configuration.pdf_renderer = "grover" }.to raise_error(ArgumentError, /pdf_renderer must be nil or a callable/)
+    end
+  end
 end
 
 RSpec.describe TudlaAccounting, ".pdf?" do
+  include_context "with isolated TudlaAccounting configuration"
+
   around do |example|
-    TudlaAccounting.remove_instance_variable(:@pdf) if TudlaAccounting.instance_variable_defined?(:@pdf)
+    TudlaAccounting.remove_instance_variable(:@ferrum) if TudlaAccounting.instance_variable_defined?(:@ferrum)
     example.run
   ensure
-    TudlaAccounting.remove_instance_variable(:@pdf) if TudlaAccounting.instance_variable_defined?(:@pdf)
+    TudlaAccounting.remove_instance_variable(:@ferrum) if TudlaAccounting.instance_variable_defined?(:@ferrum)
   end
 
-  it "is true when ferrum can be loaded, and false otherwise" do
+  it "is true when ferrum can be loaded or there's a pdf_renderer, and false otherwise" do
     expect(TudlaAccounting.pdf?).to be(true)
-    TudlaAccounting.remove_instance_variable(:@pdf)
+    TudlaAccounting.remove_instance_variable(:@ferrum)
     allow(TudlaAccounting).to receive(:require).with("ferrum").and_raise(LoadError)
     expect(TudlaAccounting.pdf?).to be(false)
+    TudlaAccounting.configuration.pdf_renderer = ->(_html, **) { "%PDF" }
+    expect(TudlaAccounting.pdf?).to be(true)
   end
 end

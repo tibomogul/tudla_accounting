@@ -8,6 +8,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- A `pdf_renderer` setting makes the PDFs some other way than headless Chrome: a callable given the page's HTML and the paper, returning the PDF's bytes. With it, the `ferrum` gem isn't needed.
+- A `theme_storage_key` setting names the `localStorage` key the pages keep the light or dark choice under, so they follow a host's own switch; `nil` keeps no choice. It's `"theme"` by default, as before.
 - `forex_rate_provider` can give a provider for each currency books are kept in (`{ "AUD" => RbaForexRateProvider.new, "PHP" => BspForexRateProvider.new }`), so organizations in different currencies get their rates from different places; each gets the provider for its own currency (`Configuration#forex_rate_provider_for`), and the Setup page names it. One provider for all, as before, still works.
 - A `tax_registration` setting for what printed documents say about tax. `TaxRegistration.australia(abn)` heads an invoice "Tax invoice", prints your ABN, calls the tax GST, and warns about an ABN that's missing or fails its check digits. The README lists what we couldn't confirm with the ATO.
 - The BAS template adds W4, W3, W5 and the summary labels 4, 5A, 5B, 8A, 8B and 9, and G1's name says to answer Yes to the form's GST question. Forms already set up don't change. The README lists what we couldn't confirm with the ATO. The demo's BAS now shows exports, GST-free sales, capital purchases and tax withheld from wages.

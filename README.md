@@ -89,7 +89,7 @@ With the `tax_registration` setting, printed documents say how the organization 
 The **Sales** and **Purchases** pages list them, searched by number, reference or contact, by kind and status (draft, awaiting payment, part paid, overdue, paid, void), with what is still owed (each in its currency; the total in the organization's), and download as CSV. The form fills in the contact's payment terms, default account and tax code, and adds up the lines as they're typed. Each document's page prints (or saves as a PDF) as the document itself, headed by the `document_header` setting, and shows the payments and credits applied to it; an approved invoice or bill offers a credit note copying its lines. Drafting needs `:record`; approving and voiding need `:post`.
 
 ### PDFs
-With the `ferrum` gem in the host's bundle (the engine doesn't depend on it) and Chrome or Chromium on the server, the engine makes PDFs of what goes to customers and suppliers, from the same layouts the pages print: an invoice, bill or credit note, a statement of account (or every statement at once, one to a page), and a payment, as a receipt (money received) or a payment notice (money paid, with the bills it paid). Their pages get a **Download PDF** button; without `ferrum` they offer printing only (`TudlaAccounting.pdf?` says which).
+With the `ferrum` gem in the host's bundle (the engine doesn't depend on it) and Chrome or Chromium on the server, the engine makes PDFs of what goes to customers and suppliers, from the same layouts the pages print: an invoice, bill or credit note, a statement of account (or every statement at once, one to a page), and a payment, as a receipt (money received) or a payment notice (money paid, with the bills it paid). Their pages get a **Download PDF** button; without `ferrum` (or a `pdf_renderer`, below) they offer printing only (`TudlaAccounting.pdf?` says which).
 
 ```ruby
 TudlaAccounting::PdfMaker.document(invoice)                          # => the PDF's bytes
@@ -98,6 +98,15 @@ TudlaAccounting::PdfMaker.payment(payment)
 ```
 
 The page is rendered with the engine's styles inline (the host's compiled `tailwind.css`, or the `pdf_stylesheet` setting) and the browser is barred from fetching anything, so making a PDF reaches nothing on the network. `pdf_browser_options` passes options to `Ferrum::Browser` (Chrome's path, a timeout; in a container that can't sandbox Chrome, `browser_options: { "no-sandbox" => nil }`), and `pdf_paper` picks A4 or Letter. A PDF that can't be made raises `PdfMaker::Error`; the pages say why.
+
+To make PDFs without headless Chrome, set `pdf_renderer` to a callable given the page's HTML, with the styles already inline, and the paper, returning the PDF's bytes; `ferrum` is then not needed. `paper:` is a size by name (`:A4`, `:letter`) or `[width, height]` in inches (the 2307's 8.5 x 13), and `margin:` is in inches on every side. The page needs nothing from the network, so keep the renderer from fetching anything if it can. Whatever it raises reaches the pages as `PdfMaker::Error`. The one-page-a-sheet layouts (the 2307, the books) are checked in Chrome, so check them in yours.
+
+```ruby
+config.pdf_renderer = ->(html, paper:, landscape:, margin:) do
+  size = paper.is_a?(Array) ? { width: "#{paper[0]}in", height: "#{paper[1]}in" } : { format: paper.to_s }
+  Grover.new(html, **size, landscape: landscape, margin: %i[top bottom left right].index_with { "#{margin}in" }).to_pdf
+end
+```
 
 ### Emailing invoices, statements and payments
 An approved invoice or credit note, a statement of account, and a payment (as its receipt, or a payment notice) each have an **Email** button (`:post`): the email starts from its template, to the contact's email address, and can be changed (To, Cc, subject, message) before it goes. It is recorded (`TudlaAccounting::Delivery`) and sent in the background (`DeliveryJob`, so the host's Active Job backend must run jobs), with the PDF attached when the engine can make PDFs. The page it came from lists its emails, who asked for each, and whether it was sent or failed (with the error, and **Send again**); a contact's page lists their statements' emails; the Sales list marks invoices emailed; and the activity log has `email.sent` and `email.failed`. **Email them all** on the statements page emails every statement it shows, naming the customers or suppliers with no email address. Recording a payment can email its receipt (or payment notice) at once. A statement is made again as it stands when it is sent.
@@ -520,7 +529,7 @@ Mounted at `/accounting` by the install generator (see [Integration](#integratio
 - **Setup:** upload a chart of accounts with opening balances (CSV or Excel), or enter or correct opening balances account by account, with live totals checking that they balance. Manage tax codes and reporting dimensions. Also import the receivables and payables open at the cut-over, and run the foreign exchange revaluation. A balance check compares the stored balances with the posted entries and can rebuild them.
 - **Activity:** the audit trail, newest first, filterable by kind, linking to entries, accounts and years that still exist.
 
-The pages use Tailwind CSS with the engine's own `tc-` component classes (no DaisyUI needed) and follow the host's light/dark theme. Their Stimulus controllers load through the engine's import map.
+The pages use Tailwind CSS with the engine's own `tc-` component classes (no DaisyUI needed) and follow the host's light/dark theme: they read and save the reader's choice in `localStorage` under the `theme_storage_key` setting (`"theme"`, DaisyUI's, by default), and follow the operating system's with none set or with the setting `nil`. Their Stimulus controllers load through the engine's import map.
 
 ## Usage
 
@@ -730,6 +739,10 @@ TudlaAccounting.configure do |config|
   config.pdf_browser_options = { browser_path: "/usr/bin/chromium", timeout: 60 }
   config.pdf_paper = :A4                  # per organization: or :Letter, :A5...
   config.pdf_stylesheet = nil             # found among the host's assets as tailwind.css; or a path, or ->{ css }
+  config.pdf_renderer = nil               # or ->(html, paper:, landscape:, margin:) { pdf_bytes }, in place of ferrum
+
+  # The pages' light or dark choice, kept in localStorage under the host's key; nil keeps none
+  config.theme_storage_key = "theme"
 
   # Emailing documents to customers and suppliers (sent through the host's ActionMailer setup)
   config.document_mail_from = ->(organization) { "#{organization.name} <accounts@example.com>" } # per organization; the ActionMailer default if nil
