@@ -1,5 +1,5 @@
 /* Engine CSS — pure Tailwind v4, no DaisyUI dependency */
-@import "tailwindcss";
+@import "tailwindcss" source(none); /* only the @source paths below, not the whole engine folder */
 
 /*
    @source Directive:

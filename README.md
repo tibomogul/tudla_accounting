@@ -529,7 +529,9 @@ Mounted at `/accounting` by the install generator (see [Integration](#integratio
 - **Setup:** upload a chart of accounts with opening balances (CSV or Excel), or enter or correct opening balances account by account, with live totals checking that they balance. Manage tax codes and reporting dimensions. Also import the receivables and payables open at the cut-over, and run the foreign exchange revaluation. A balance check compares the stored balances with the posted entries and can rebuild them.
 - **Activity:** the audit trail, newest first, filterable by kind, linking to entries, accounts and years that still exist.
 
-The pages bring their own stylesheet, built with Tailwind CSS from the engine's `tc-` component classes and shipped in the gem, so the host needs neither Tailwind nor DaisyUI, and its own CSS doesn't reach them. To restyle them, set the `--tc-*` colours (`--tc-primary`, `--tc-bg`, `--tc-text`... in `app/assets/tailwind/tudla_accounting/engine.css`) in a stylesheet of your own and name it in `page_stylesheets`, which the pages link after theirs. They follow the host's light/dark theme: they read and save the reader's choice in `localStorage` under the `theme_storage_key` setting (`"theme"`, DaisyUI's, by default), and follow the operating system's with none set or with the setting `nil`. Their Stimulus controllers load through the engine's import map.
+The pages bring their own stylesheet, built with Tailwind CSS from the engine's `tc-` component classes and shipped in the gem, so the host needs neither Tailwind nor DaisyUI, and its own CSS doesn't reach them. To restyle them, set the `--tc-*` colours (`--tc-primary`, `--tc-bg`, `--tc-text`... in `app/assets/tailwind/tudla_accounting/engine.css`) in a stylesheet of your own and name it in `page_stylesheets`, which the pages link after theirs. They follow the host's light/dark theme: they read and save the reader's choice in `localStorage` under the `theme_storage_key` setting (`"theme"`, DaisyUI's, by default), and follow the operating system's with none set or with the setting `nil`. Their JavaScript comes built too, one script with a Stimulus of its own, so it works beside any of the host's (importmap, jsbundling, Vite, or none) and needs none of it.
+
+An app with its own screens can leave the pages out with `config.pages = false`: the engine then draws only the JSON API's routes, and still makes PDFs and sends emails. It's read when the routes are drawn, so set it in the initializer.
 
 ## Usage
 
@@ -580,7 +582,7 @@ TudlaAccounting::Balance.find_by(account: cash, period: year).ending_amount   # 
 - **money-rails** for amounts and currencies, **ancestry** for the account and period trees
 - **PostgreSQL** (the ledger's integrity checks and triggers rely on it)
 - Works with any Active Job backend; with **Solid Queue**, background posting jobs for an organization run one at a time (the dummy app runs the Solid trifecta)
-- **Tailwind CSS v4** for engine views (no DaisyUI dependency), built into a stylesheet that ships in the gem, and **Importmap Rails**
+- **Tailwind CSS v4** for engine views (no DaisyUI dependency), built into a stylesheet that ships in the gem, and **Stimulus**, built with it into one script
 - **RSpec**, **FactoryBot**, **SimpleCov** (100% line coverage), **Capybara**
 - **RuboCop** with `rubocop-rails-omakase`
 - A full dummy Rails app in `spec/dummy/` for running the engine
@@ -648,7 +650,7 @@ The engine's specs boot the dummy app without the demo, so they never depend on 
 
 ## Integration into a Host Application
 
-Requirements: Ruby 3.3+, Rails 8.1, PostgreSQL, and (for the engine's pages) an asset pipeline (Propshaft, as a new Rails app has, or Sprockets) and importmap-rails. The pages' stylesheet comes built, so the app needs no Tailwind.
+Requirements: Ruby 3.3+, Rails 8.1, PostgreSQL, and (for the engine's pages) an asset pipeline (Propshaft, as a new Rails app has, or Sprockets). The pages' stylesheet and JavaScript come built, so the app needs no Tailwind, importmap or Stimulus, and an app using only the API (`config.pages = false`) needs no asset pipeline either.
 
 ```ruby
 # Gemfile
@@ -744,6 +746,7 @@ TudlaAccounting.configure do |config|
   # The pages' light or dark choice, kept in localStorage under the host's key; nil keeps none
   config.theme_storage_key = "theme"
   config.page_stylesheets = []            # the host's stylesheets linked after the pages' own, e.g. ["accounting_theme"] setting --tc-* colours
+  config.pages = true                     # false draws only the JSON API's routes
 
   # Emailing documents to customers and suppliers (sent through the host's ActionMailer setup)
   config.document_mail_from = ->(organization) { "#{organization.name} <accounts@example.com>" } # per organization; the ActionMailer default if nil
@@ -772,7 +775,7 @@ The dummy app (`spec/dummy/`) uses **Tailwind CSS v4** and **DaisyUI** for all U
 ### Engine
 Engine views use **Tailwind CSS v4 only** — no DaisyUI dependency. Engine styles must work standalone in any host app. They should be compatible with DaisyUI (no conflicts) but must not require it.
 
-The pages' stylesheet is built from `app/assets/tailwind/tudla_accounting/engine.css` into `app/assets/builds/tudla_accounting.css`, which is committed and ships in the gem: `bundle exec rake tudla_accounting:css:build` after changing the classes in views, helpers or JavaScript (`bin/dev` watches them). `spec/integration/built_stylesheet_spec.rb` fails while it's out of date.
+The pages' stylesheet is built from `app/assets/tailwind/tudla_accounting/engine.css` into `app/assets/builds/tudla_accounting.css`, which is committed and ships in the gem: `bundle exec rake tudla_accounting:css:build` after changing the classes in views, helpers or JavaScript (`bin/dev` watches them). `spec/integration/built_stylesheet_spec.rb` fails while it's out of date. The JavaScript is built the same way, from `app/javascript/tudla_accounting` into `app/assets/builds/tudla_accounting.js`, by `bundle exec rake tudla_accounting:js:build` (`tasks/javascript_bundle.rb`, with no Node; checked by `spec/integration/built_javascript_spec.rb`).
 
 ## Database Configuration Notes
 

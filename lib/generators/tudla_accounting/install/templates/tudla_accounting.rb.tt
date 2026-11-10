@@ -13,6 +13,11 @@ TudlaAccounting.configure do |config|
   # What each user may do: permission is :read, :record (drafts and accounts),
   # :post (posting, reversing, applying payments) or :administer (periods and setup).
   # config.authorize = ->(controller, permission) { controller.send(:current_user)&.admin? || permission == :read }
+  # The pages come with their own stylesheet and JavaScript. To restyle them, link a stylesheet
+  # setting the --tc-* colours after theirs; for an app using only the API, leave them out.
+  # config.page_stylesheets = ["accounting_theme"]
+  # config.theme_storage_key = "theme" # where the host keeps its light or dark choice; nil for none
+  # config.pages = false
 
   # --- Books ---
   config.base_currency = "USD"

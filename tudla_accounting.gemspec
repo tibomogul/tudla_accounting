@@ -25,8 +25,6 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency "rails", "~> 8.1", ">= 8.1.1"
   spec.add_dependency "pg", "~> 1.5"                 # the ledger relies on PostgreSQL (jsonb, triggers)
-  spec.add_dependency "importmap-rails", "~> 2.0"
-  spec.add_dependency "stimulus-rails", "~> 1.3"
   spec.add_dependency "money-rails", ">= 1.15", "< 4"
   spec.add_dependency "ancestry", "~> 5.0"
   spec.add_dependency "csv", "~> 3.3"               # no longer a default gem from Ruby 3.4

@@ -30,7 +30,8 @@ RSpec.describe "Dashboard", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("<title>Dashboard · Accounting</title>", "Acme Pty Ltd", "kept in AUD")
       expect(response.body).to include('aria-current="page"', %(href="#{Rails.application.routes.url_helpers.root_path}"))
-      expect(response.body).to include('import "tudla_accounting/application"')
+      expect(response.body).to match(%r{<script src="/assets/tudla_accounting-\w+\.js" defer="defer">})
+      expect(response.body).not_to include("importmap")
     end
 
     it "guides a new organization through getting started, with no figures yet" do

@@ -21,25 +21,13 @@ module TudlaAccounting
       end
     end
 
-    initializer "tudla_accounting.importmap", before: "importmap" do |app|
-      if app.config.respond_to?(:importmap)
-        app.config.importmap.paths << Engine.root.join("config/importmap.rb")
-        app.config.importmap.cache_sweepers << Engine.root.join("app/javascript")
-      end
-    end
-
-    initializer "tudla_accounting.assets" do |app|
-      if app.config.respond_to?(:assets)
-        app.config.assets.paths << Engine.root.join("app/javascript")
-      end
-    end
-
-    # The pages' built stylesheet (tudla_accounting.css), for Propshaft, which serves
-    # everything on its paths, and Sprockets, which needs it named for precompiling.
+    # The pages' built stylesheet and JavaScript (tudla_accounting.css and .js), for
+    # Propshaft, which serves everything on its paths, and Sprockets, which needs them
+    # named for precompiling.
     initializer "tudla_accounting.assets.precompile" do |app|
       if app.config.respond_to?(:assets)
         app.config.assets.paths << root.join("app/assets/builds")
-        app.config.assets.precompile += %w[tudla_accounting.css] if defined?(Sprockets)
+        app.config.assets.precompile += %w[tudla_accounting.css tudla_accounting.js] if defined?(Sprockets)
       end
     end
   end

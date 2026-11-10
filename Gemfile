@@ -11,8 +11,12 @@ gem "solid_cache"
 gem "solid_cable"
 
 gem "propshaft"
-# The dummy app's own pages (DaisyUI); the engine's ship built (rake tudla_accounting:css:build).
+# The dummy app's own pages (DaisyUI, importmap, Stimulus); the engine's ship built
+# (rake tudla_accounting:css:build and tudla_accounting:js:build, which takes Stimulus from
+# stimulus-rails).
 gem "tailwindcss-rails", "~> 4.0"
+gem "importmap-rails", "~> 2.0"
+gem "stimulus-rails", "~> 1.3"
 
 group :development, :test do
   gem "rspec-rails"

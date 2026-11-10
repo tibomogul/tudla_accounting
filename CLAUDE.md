@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-TudlaAccounting is a **Rails 8.1 mountable engine** with namespace isolation (`TudlaAccounting::`) and the Solid trifecta (Solid Queue, Solid Cache, Solid Cable), Tailwind CSS v4 (built into a stylesheet that ships in the gem), and Importmap Rails.
+TudlaAccounting is a **Rails 8.1 mountable engine** with namespace isolation (`TudlaAccounting::`) and the Solid trifecta (Solid Queue, Solid Cache, Solid Cable), Tailwind CSS v4 and Stimulus (built into a stylesheet and a script that ship in the gem).
 
 ## Commands
 
@@ -23,7 +23,7 @@ docker compose exec -d rails bash -lc 'bin/dev'                                 
 
 > **Note:** Always prefix `bundle exec rspec` with `RAILS_ENV=test`. The container has `RAILS_ENV=development` set in its environment, which overrides the `||=` default in `rails_helper.rb`.
 
-- **Restart the dev server after editing `lib/`** (e.g. `lib/tudla_accounting.rb`, where the configuration lives): it isn't reloaded, so pages fail with `undefined method` for a new setting. Stop it by PID (`docker compose exec -T rails ps -eo pid,args`, then `kill -TERM` puma, the solid-queue supervisor and the two tailwind watchers, the dummy app's and the engine's); `pkill -f <pattern>` inside `bash -lc '...'` matches and kills its own shell. Then `rm -f spec/dummy/tmp/pids/server.pid` and start `bin/dev` again.
+- **Restart the dev server after editing `lib/`** (e.g. `lib/tudla_accounting.rb`, where the configuration lives): it isn't reloaded, so pages fail with `undefined method` for a new setting. Stop it by PID (`docker compose exec -T rails ps -eo pid,args`, then `kill -TERM` puma, the solid-queue supervisor and the watchers: the dummy app's and the engine's tailwind, and the engine's JavaScript rake task); `pkill -f <pattern>` inside `bash -lc '...'` matches and kills its own shell. Then `rm -f spec/dummy/tmp/pids/server.pid` and start `bin/dev` again.
 - `bin/setup --reset` fails while the dev server runs (it holds the queue DB); stop the server first.
 - After a migration, `db:migrate` rewrites every `check_constraint` string in `spec/dummy/db/schema.rb` (PostgreSQL's canonical form). Revert the file and hand-edit only the version and the new column/table, then rebuild the test DB (see Testing Gotchas).
 
@@ -31,7 +31,7 @@ docker compose exec -d rails bash -lc 'bin/dev'                                 
 
 This is a **Rails engine gem** (not a standalone app). All application code lives under the `TudlaAccounting::` namespace via `isolate_namespace TudlaAccounting` in `lib/tudla_accounting/engine.rb`.
 
-- `lib/tudla_accounting.rb` — main entry point, requires Importmap, Stimulus, money-rails and ancestry, and holds the configuration
+- `lib/tudla_accounting.rb` — main entry point, requires money-rails and ancestry, and holds the configuration
 - `lib/tudla_accounting/engine.rb` — engine configuration with namespace isolation
 - `spec/dummy/` — full Rails 8.1 app used for testing the engine (has its own config, routes, db); uses **Tailwind CSS v4** and **DaisyUI** for styling
 - Engine is mounted at `/tudla_accounting` in the dummy app's routes
@@ -135,7 +135,7 @@ Use **Tailwind CSS v4 only** — no DaisyUI dependency. Engine styles must be se
 
 ### How the CSS pipeline works
 
-The engine's Tailwind source lives at `app/assets/tailwind/tudla_accounting/engine.css` (it starts with `@import "tailwindcss"`). It is **built standalone** into `app/assets/builds/tudla_accounting.css`, which is committed and ships in the gem, so host apps need no Tailwind:
+The engine's Tailwind source lives at `app/assets/tailwind/tudla_accounting/engine.css` (it starts with `@import "tailwindcss" source(none)`, so only its `@source` paths are scanned: without it Tailwind scans the whole engine folder, specs, docs and the built JavaScript included). It is **built standalone** into `app/assets/builds/tudla_accounting.css`, which is committed and ships in the gem, so host apps need no Tailwind:
 
 ```bash
 docker compose exec rails bash -lc 'bundle exec rake tudla_accounting:css:build'
@@ -160,6 +160,12 @@ The `@source` directive in `engine.css` tells Tailwind where to scan for class u
 @source "../../../views";  /* resolves to app/views/ from engine.css location */
 ```
 This is resolved relative to `engine.css`. Any new view directories added to the engine must be reachable from these source paths.
+
+### The engine's JavaScript
+
+The pages' Stimulus controllers and `amounts.js` live in `app/javascript/tudla_accounting` and are built, with Stimulus itself (from stimulus-rails), into one classic script, `app/assets/builds/tudla_accounting.js`, committed and shipped like the stylesheet: `docker compose exec rails bash -lc 'bundle exec rake tudla_accounting:js:build'` (`bin/dev`'s `engine_js` process rebuilds it as you go). `tasks/javascript_bundle.rb` does it in Ruby with no Node, so a controller may only `import { Controller } from "@hotwired/stimulus"` and functions from `"tudla_accounting/amounts"`, and must `export default class`; it's registered by its file name (`budget_grid_controller.js` is `budget-grid`). A new function exported from `amounts.js` goes in `JavascriptBundle::AMOUNTS`. `spec/integration/built_javascript_spec.rb` fails while the built file is out of date.
+
+The `pages` setting (true by default) wraps every route but the API's in `config/routes.rb`; anything the PDFs or emails render must not need a page route then (`reports/_party_statement` links entries only with pages on), and `spec/requests/tudla_accounting/without_pages_spec.rb` checks it.
 
 ### CSS variable strategy for theming
 
@@ -194,6 +200,6 @@ RuboCop with `rubocop-rails-omakase` (Rails official style). Ruby 3.4 (`.ruby-ve
 
 ## Packaging
 
-- `tudla_accounting.gemspec` lists only what host apps need at runtime (Rails, pg, importmap/stimulus, money-rails, ancestry, csv, roo). The Solid gems, `tailwindcss-rails` (for the dummy app's own pages and the engine's stylesheet build) and test tools are in the `Gemfile`, for the dummy app and the suite; don't add them back to the gemspec.
+- `tudla_accounting.gemspec` lists only what host apps need at runtime (Rails, pg, money-rails, ancestry, csv, roo). The Solid gems, `tailwindcss-rails`, `importmap-rails` and `stimulus-rails` (for the dummy app's own pages and the engine's stylesheet and JavaScript builds) and test tools are in the `Gemfile`, for the dummy app and the suite; don't add them back to the gemspec.
 - Record user-facing changes in `CHANGELOG.md` under "Unreleased".
 - CI (`.github/workflows/ci.yml`) runs RuboCop, the suite against PostgreSQL and `gem build --strict`. `spec/dummy/config/database.yml` reads `DATABASE_HOST`/`DATABASE_USERNAME`/`DATABASE_PASSWORD` (defaulting to the Docker `db` service).

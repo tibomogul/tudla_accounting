@@ -28,7 +28,7 @@
             <tr>
               <td class="whitespace-nowrap"><%= tc_date(line[:entry].transacted_at) %></td>
               <td class="whitespace-nowrap"><%= line[:entry].reference || line[:entry].number_label %></td>
-              <td class="min-w-48"><%= link_to line[:entry].particulars, entry_path(line[:entry]) %></td>
+              <td class="min-w-48"><%= link_to_if TudlaAccounting.configuration.pages, line[:entry].particulars, (entry_path(line[:entry]) if TudlaAccounting.configuration.pages) %></td>
               <td class="whitespace-nowrap"><%= line[:credit] ? tc_badge("Credit to apply") : (tc_date(item.due_date) || "—") %></td>
               <td class="tc-num"><%= line[:days_outstanding] if line[:days_outstanding].positive? %></td>
               <% if foreign %><td class="tc-num whitespace-nowrap"><%= tc_money_text(Money.new(item.forex.other_currency_amount_cents, item.forex.other_currency)) if item.forex %></td><% end %>
@@ -52,7 +52,7 @@
               <td class="whitespace-nowrap"><%= tc_date(line.date) %></td>
               <td><%= line.entry ? line.kind : tag.span(line.kind, class: "tc-muted") %></td>
               <td class="whitespace-nowrap"><%= line.entry && (line.entry.reference || line.entry.number_label) %></td>
-              <td class="min-w-48"><%= link_to line.entry.particulars, entry_path(line.entry) if line.entry %></td>
+              <td class="min-w-48"><%= link_to_if TudlaAccounting.configuration.pages, line.entry.particulars, (entry_path(line.entry) if TudlaAccounting.configuration.pages) if line.entry %></td>
               <td class="whitespace-nowrap"><%= tc_date(line.due_date) %></td>
               <% if foreign %><td class="tc-num whitespace-nowrap"><%= tc_money_text(line.foreign.abs) if line.foreign %></td><% end %>
               <td class="tc-num"><%= tc_money(line.charge) %></td>

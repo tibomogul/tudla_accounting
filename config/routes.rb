@@ -1,6 +1,4 @@
 TudlaAccounting::Engine.routes.draw do
-  root to: "dashboard#index"
-
   # The JSON API; see API.md.
   namespace :api, defaults: { format: :json } do
     namespace :v1 do
@@ -41,148 +39,153 @@ TudlaAccounting::Engine.routes.draw do
     end
   end
 
-  resources :accounts do
-    member do
-      post :deactivate
-      post :reactivate
+  # The pages, left out with the pages setting off (an app using only the API).
+  if TudlaAccounting.configuration.pages
+    root to: "dashboard#index"
+
+    resources :accounts do
+      member do
+        post :deactivate
+        post :reactivate
+      end
     end
-  end
-  resources :periods, only: %i[index show new create destroy] do
-    member do
-      post :close
-      post :reopen
+    resources :periods, only: %i[index show new create destroy] do
+      member do
+        post :close
+        post :reopen
+      end
     end
-  end
-  get "activity", to: "activity#index", as: :activity
-  get "setup", to: "setup#index", as: :setup
-  scope "setup", controller: :setup, as: :setup do
-    get :opening_balances
-    patch :opening_balances, action: :save_opening_balances
-    post :chart_of_accounts
-    post :open_items
-    post :revaluation
-    get :balances
-    post :balances, action: :rebuild_balances
-  end
-
-  get "reports", to: "reports#index", as: :reports
-  scope "reports", controller: :reports, as: :reports do
-    get :balance_sheet
-    get :profit_and_loss
-    get :trial_balance
-    get :receivables
-    get :payables
-    get :tax
-    get :by_dimension
-    get :general_ledger
-    get :books
-    get "books/sample", action: :books_sample, as: :books_sample
-    get :cash_flow
-    get :statement
-    get :statements
-    get :tax_return
-    get :withholding
-    get :qap
-    get :sawt
-    get :payee_payments
-    get :taxable_payments
-    get :sales_list
-    get :purchases_list
-    get :supplier_certificates
-  end
-
-  resources :budgets do
-    member { post :upload }
-  end
-
-  resources :api_tokens, only: %i[index new create] do
-    member { post :revoke }
-  end
-  resources :tax_codes, except: :show
-  resources :withholding_codes, except: :show do
-    collection { post :add_template }
-  end
-  resources :filed_tax_returns, only: %i[index show create] do
-    member { post :withdraw }
-  end
-  resources :tax_return_forms do
-    resources :boxes, controller: :tax_return_boxes, except: %i[index show]
-  end
-  resources :dimensions, except: %i[show destroy] do
-    resources :dimension_values, path: "values", only: %i[new create edit update]
-  end
-
-  get "banking", to: "banking#index", as: :banking
-  scope "banking/:account_id", controller: :banking, as: :banking do
-    get "", action: :show, as: :account
-    post :import
-    post :match_suggestions
-    post :record_by_rules
-  end
-  resources :bank_statement_lines, only: [] do
-    member do
-      post :match
-      post :unmatch
-      post :create_entry
-      post :record_by_rule
-      post :record_payment
+    get "activity", to: "activity#index", as: :activity
+    get "setup", to: "setup#index", as: :setup
+    scope "setup", controller: :setup, as: :setup do
+      get :opening_balances
+      patch :opening_balances, action: :save_opening_balances
+      post :chart_of_accounts
+      post :open_items
+      post :revaluation
+      get :balances
+      post :balances, action: :rebuild_balances
     end
-  end
-  resources :bank_rules, except: :show
-  resources :contacts do
-    collection { post :import }
-  end
-  get "sales", to: "documents#index", defaults: { side: "sales" }, as: :sales_documents
-  get "sales/reminders", to: "reminders#index", as: :reminders
-  post "sales/reminders", to: "reminders#create"
-  get "purchases", to: "documents#index", defaults: { side: "purchases" }, as: :purchase_documents
-  get "sales/payments", to: "payments#index", defaults: { kind: "received" }, as: :received_payments
-  get "purchases/payments", to: "payments#index", defaults: { kind: "paid" }, as: :paid_payments
-  resources :withholding_certificates, only: :index do
-    post :mark_all, on: :collection
-    member do
-      post :mark
-      post :unmark
+
+    get "reports", to: "reports#index", as: :reports
+    scope "reports", controller: :reports, as: :reports do
+      get :balance_sheet
+      get :profit_and_loss
+      get :trial_balance
+      get :receivables
+      get :payables
+      get :tax
+      get :by_dimension
+      get :general_ledger
+      get :books
+      get "books/sample", action: :books_sample, as: :books_sample
+      get :cash_flow
+      get :statement
+      get :statements
+      get :tax_return
+      get :withholding
+      get :qap
+      get :sawt
+      get :payee_payments
+      get :taxable_payments
+      get :sales_list
+      get :purchases_list
+      get :supplier_certificates
     end
-  end
-  resources :payments, only: %i[show new create] do
-    member { post :void }
-  end
-  resource :pay_run, only: %i[new create]
-  get "refunds/new", to: "payments#new_refund", as: :new_refund
-  post "refunds", to: "payments#create_refund", as: :refunds
-  resources :emails, only: %i[new create] do
-    collection { post :statements }
-    member { post :resend }
-  end
-  resources :documents, except: :index do
-    member do
-      post :approve
-      post :void
+
+    resources :budgets do
+      member { post :upload }
     end
-    resources :attachments, only: %i[show create destroy]
-  end
 
-  resources :allocations, only: :create do
-    collection { post :oldest_first }
-    member { post :reverse }
-  end
-
-  resources :recurring_entries do
-    collection { post :run }
-    member { post :make }
-  end
-
-  resources :recurring_invoices do
-    collection { post :run }
-    member { post :make }
-  end
-
-  resources :entries do
-    member do
-      post :post
-      post :reverse
+    resources :api_tokens, only: %i[index new create] do
+      member { post :revoke }
     end
-    resources :attachments, only: %i[show create destroy]
+    resources :tax_codes, except: :show
+    resources :withholding_codes, except: :show do
+      collection { post :add_template }
+    end
+    resources :filed_tax_returns, only: %i[index show create] do
+      member { post :withdraw }
+    end
+    resources :tax_return_forms do
+      resources :boxes, controller: :tax_return_boxes, except: %i[index show]
+    end
+    resources :dimensions, except: %i[show destroy] do
+      resources :dimension_values, path: "values", only: %i[new create edit update]
+    end
+
+    get "banking", to: "banking#index", as: :banking
+    scope "banking/:account_id", controller: :banking, as: :banking do
+      get "", action: :show, as: :account
+      post :import
+      post :match_suggestions
+      post :record_by_rules
+    end
+    resources :bank_statement_lines, only: [] do
+      member do
+        post :match
+        post :unmatch
+        post :create_entry
+        post :record_by_rule
+        post :record_payment
+      end
+    end
+    resources :bank_rules, except: :show
+    resources :contacts do
+      collection { post :import }
+    end
+    get "sales", to: "documents#index", defaults: { side: "sales" }, as: :sales_documents
+    get "sales/reminders", to: "reminders#index", as: :reminders
+    post "sales/reminders", to: "reminders#create"
+    get "purchases", to: "documents#index", defaults: { side: "purchases" }, as: :purchase_documents
+    get "sales/payments", to: "payments#index", defaults: { kind: "received" }, as: :received_payments
+    get "purchases/payments", to: "payments#index", defaults: { kind: "paid" }, as: :paid_payments
+    resources :withholding_certificates, only: :index do
+      post :mark_all, on: :collection
+      member do
+        post :mark
+        post :unmark
+      end
+    end
+    resources :payments, only: %i[show new create] do
+      member { post :void }
+    end
+    resource :pay_run, only: %i[new create]
+    get "refunds/new", to: "payments#new_refund", as: :new_refund
+    post "refunds", to: "payments#create_refund", as: :refunds
+    resources :emails, only: %i[new create] do
+      collection { post :statements }
+      member { post :resend }
+    end
+    resources :documents, except: :index do
+      member do
+        post :approve
+        post :void
+      end
+      resources :attachments, only: %i[show create destroy]
+    end
+
+    resources :allocations, only: :create do
+      collection { post :oldest_first }
+      member { post :reverse }
+    end
+
+    resources :recurring_entries do
+      collection { post :run }
+      member { post :make }
+    end
+
+    resources :recurring_invoices do
+      collection { post :run }
+      member { post :make }
+    end
+
+    resources :entries do
+      member do
+        post :post
+        post :reverse
+      end
+      resources :attachments, only: %i[show create destroy]
+    end
   end
 end

@@ -9,9 +9,11 @@ All notable changes to this project are documented here. The format follows
 ### Changed
 
 - **Breaking:** the pages bring their own stylesheet, built with Tailwind and shipped in the gem (`tudla_accounting.css`), instead of the host compiling the engine's styles into its `tailwind.css`. The engine no longer depends on `tailwindcss-rails`, and the install generator no longer adds the `@import "../builds/tailwind/tudla_accounting";` line, which can be removed. The host's own CSS no longer reaches the pages; the new `page_stylesheets` setting links stylesheets of its own after theirs, to set the `--tc-*` colours. PDFs use the built stylesheet unless `pdf_stylesheet` says otherwise.
+- **Breaking:** the pages' JavaScript ships built too, one script with its own Stimulus (`tudla_accounting.js`), instead of loading through the host's import map. The engine no longer depends on `importmap-rails` or `stimulus-rails`, and adds nothing to the host's import map, so the pages work beside jsbundling, Vite or no JavaScript setup at all.
 
 ### Added
 
+- A `pages` setting: `false` draws only the JSON API's routes, for an app with its own screens. PDFs and emails still work.
 - A `pdf_renderer` setting makes the PDFs some other way than headless Chrome: a callable given the page's HTML and the paper, returning the PDF's bytes. With it, the `ferrum` gem isn't needed.
 - A `theme_storage_key` setting names the `localStorage` key the pages keep the light or dark choice under, so they follow a host's own switch; `nil` keeps no choice. It's `"theme"` by default, as before.
 - `forex_rate_provider` can give a provider for each currency books are kept in (`{ "AUD" => RbaForexRateProvider.new, "PHP" => BspForexRateProvider.new }`), so organizations in different currencies get their rates from different places; each gets the provider for its own currency (`Configuration#forex_rate_provider_for`), and the Setup page names it. One provider for all, as before, still works.

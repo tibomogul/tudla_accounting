@@ -1,7 +1,5 @@
 # Requires are necessary for the Engine to load these gems' tasks and classes
 require "bigdecimal"
-require "importmap-rails"
-require "stimulus-rails"
 require "money-rails"
 require "ancestry"
 
@@ -74,7 +72,7 @@ module TudlaAccounting
                   :parent_controller, :current_organization, :current_actor, :authorize,
                   :cash_account_codes, :tax_basis, :organization_label, :entry_number_format,
                   :attachment_content_types, :attachment_max_size, :document_header, :books_header, :withholding_agent, :tax_registration, :country,
-                  :api_rate_limit, :api_rate_limit_store, :pdf_browser_options, :pdf_paper, :pdf_stylesheet,
+                  :api_rate_limit, :api_rate_limit_store, :pdf_browser_options, :pdf_paper, :pdf_stylesheet, :pages,
                   :document_mailer, :document_mail_from, :document_mail_reply_to
     attr_reader :number_format, :forex_rate_provider, :pdf_renderer, :theme_storage_key, :page_stylesheets
     attr_reader :carrying_amount_sources, :entry_sources, :entry_number_series, :document_number_format, :document_email_templates, :reminder_days
@@ -180,6 +178,10 @@ module TudlaAccounting
       # The host's stylesheets the pages link after the engine's own, by asset name
       # (["accounting_theme"]), to restyle them, such as by setting the --tc-* colours.
       @page_stylesheets = []
+      # Whether the engine draws its pages' routes; false leaves only the JSON API (and the
+      # PDFs and emails, which need no pages), for an app that has its own screens. Read
+      # when the routes are drawn, so set it in an initializer.
+      @pages = true
       # Emailing invoices, statements and payments to customers and suppliers: the mailer
       # (its class name; see DocumentMailer for what one takes), the From and Reply-To
       # addresses (text, or a callable given the organization; From falls back to the host's
