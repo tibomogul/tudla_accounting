@@ -339,6 +339,8 @@ Reports → Certificates to suppliers (2307) lists a certificate for each suppli
 
 Withholding on advance payments and on journal entries isn't supported, and payroll, final withholding and government VAT withholding are out of scope.
 
+The points below are also set out as questions for a tax adviser, each with what the engine does now and what would change: [Australia](docs/adviser-questions/australia.md) (tax invoices, the BAS, the TPAR and no-ABN withholding) and [the Philippines](docs/adviser-questions/philippines.md) (expanded withholding, Form 2307, the QAP, SAWT and SLSP, Form 2550Q and the books of accounts). When answers come back, update the code and move each answered point out of these lists, with its source.
+
 #### Australian tax invoices: what to confirm
 
 We worked from search summaries of the ATO's tax invoice page and GSTR 2013/1, because the ATO's site refused our direct requests. Check these with an accountant or registered BAS agent before relying on them.
